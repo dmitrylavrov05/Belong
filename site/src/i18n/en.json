@@ -1,0 +1,596 @@
+{
+  "meta": {
+    "title": "Belong for Couples",
+    "description": "Belong is a shared space for two: a wish board, shared goals, a plan for the day, chat and games for couples. Join the waitlist.",
+    "ogTitle": "Belong: your life together, in one place",
+    "ogLocale": "en_US",
+    "ogImage": "og-en.png"
+  },
+  "a11y": {
+    "skip": "Skip to content",
+    "home": "Belong home",
+    "mainNav": "Main",
+    "language": "Language",
+    "otherLangLabel": "Українська",
+    "phoneAlt": "Belong app, Today screen: Max’s mood, Anya’s check-in, countdowns and the plan for the day"
+  },
+  "nav": {
+    "how": "How it works",
+    "day": "A day together",
+    "play": "Date Match",
+    "privacy": "Privacy",
+    "faq": "FAQ",
+    "cta": "Get early access",
+    "thisLang": "EN",
+    "otherLang": "UA"
+  },
+  "hero": {
+    "eyebrow": "For couples · Coming to iOS and Android",
+    "title": "Your life together, in one place",
+    "lead": "Belong is a shared space for two. Make a wish board, turn wishes into goals, plan the day and keep your memories. Everything connects.",
+    "ctaPrimary": "Get early access",
+    "ctaSecondary": "Play Date Match",
+    "note": "Free to start. One subscription covers you both.",
+    "float1": "Max is thinking of you",
+    "float2Label": "It’s a match!",
+    "float2": "Night in a tent by a lake"
+  },
+  "phone": {
+    "greeting": "Good morning, Anya",
+    "date": "Thursday, October 1",
+    "him": "M",
+    "her": "A",
+    "partner": "<b>Max today</b> 😴 · energy 2 of 5, a tough day",
+    "support": "Send support",
+    "howAreYou": "How are you, Anya?",
+    "maxSees": "Max will see",
+    "energy": "Energy",
+    "cd1Label": "Until Japan",
+    "cd1Num": "187",
+    "days": "days",
+    "cd1Date": "April 6, 2027",
+    "cd2Label": "Until our anniversary",
+    "cd2Num": "136",
+    "cd2Date": "Feb 14 · 3 years",
+    "plan": "Plan for today",
+    "planCount": "3 tasks",
+    "t1": "Buy tickets to Tokyo",
+    "t1Tag": "★ Japan",
+    "t1Due": "by Oct 15",
+    "t2": "Pick up a parcel",
+    "t2Meta": "Post office · by 8 pm",
+    "tabToday": "Today",
+    "tabDreams": "Dreams",
+    "tabChat": "Chat",
+    "tabGames": "Games",
+    "tabUs": "Us"
+  },
+  "how": {
+    "eyebrow": "How it works",
+    "title": "One wish, all the way to a memory",
+    "lead": "Most couple apps do one job. Belong links them up, so a dream you mention over breakfast can end up in your shared timeline.",
+    "s1k": "Dream",
+    "s1t": "Add it to your wish board",
+    "s1d": "Mark who wants it: you, your partner or both of you.",
+    "s1Card": "Japan in spring 🌸",
+    "s1Badge": "we both want",
+    "s1Btn": "Make it a goal",
+    "s2k": "Plan",
+    "s2t": "Turn it into a shared goal",
+    "s2d": "Break it into steps, give each step an owner and save up together.",
+    "s2Card": "Japan, April 2027",
+    "s2Piggy": "Savings",
+    "s2Amount": "$2,480",
+    "s2Of": "of $4,000",
+    "s2Her": "Anya $1,300",
+    "s2Him": "Max $1,180",
+    "s3k": "Do",
+    "s3t": "Steps land in your day",
+    "s3d": "“Buy tickets to Tokyo” shows up in Anya’s plan for today, with its deadline.",
+    "s4k": "Remember",
+    "s4t": "It becomes a memory",
+    "s4d": "Photos and the moment it happened go into your shared timeline.",
+    "s4Title": "Dream came true ✨",
+    "s4Meta": "Northern lights, March 2026"
+  },
+  "day": {
+    "eyebrow": "A day with Belong",
+    "title": "Small moments that keep you close",
+    "lead": "Belong fits into the day you already have: half a minute in the morning, one tap at lunch, one kind sentence before bed.",
+    "mTime": "08:10",
+    "mTitle": "Morning check-in",
+    "mText": "Pick a mood and an energy level. Your partner sees you’re tired before asking you for anything.",
+    "moodGroup": "Your mood",
+    "mood1": "Low",
+    "mood2": "Meh",
+    "mood3": "Okay",
+    "mood4": "Good",
+    "mood5": "Great",
+    "moodNote": "Max will see: 😊 · energy 4 of 5",
+    "dTime": "13:05",
+    "dTitle": "A tap that says “thinking of you”",
+    "dText": "One tap sends a soft buzz to your partner’s phone. Notes can stay locked until a date, like the morning of your anniversary.",
+    "chatMax": "Morning! Calls until lunch, then dinner at my parents’ tonight, remember?",
+    "chatAnya": "I remember 🙂 I’ll bring the apple pie",
+    "noteTitle": "Surprise note",
+    "noteMeta": "Opens Feb 14 at 8:00",
+    "thinkBtn": "Thinking of you",
+    "eTime": "18:30",
+    "eTitle": "One plan, three views",
+    "eText": "Switch between your tasks, shared ones and your partner’s. Groceries sync instantly, with a dot for who added what.",
+    "segLabel": "Whose tasks",
+    "segMine": "Mine",
+    "segOurs": "Ours",
+    "segHis": "Max’s",
+    "mine1": "Buy tickets to Tokyo",
+    "mine1Meta": "★ Japan · by Oct 15",
+    "mine2": "Pick up a parcel",
+    "mine2Meta": "Post office · by 8 pm",
+    "ours1": "Dinner at Max’s parents, 7 pm",
+    "ours1Meta": "shared",
+    "ours2": "Pick a film for Friday",
+    "ours2Meta": "shared",
+    "his1": "Call the landlord",
+    "his1Meta": "by Friday",
+    "his2": "Book a car service",
+    "his2Meta": "Saturday morning",
+    "groceries": "Groceries",
+    "g1": "Milk",
+    "g2": "Avocado",
+    "g3": "Cat food",
+    "nTime": "22:40",
+    "nTitle": "Evening gratitude",
+    "nText": "Before bed, write one thing you’re thankful for. Max reads it with your “good morning”.",
+    "nLabel": "End of the day",
+    "nQuestion": "What are you thankful to Max for today?",
+    "nField": "Your note to Max",
+    "chip1": "Made breakfast",
+    "chip1Phrase": "making breakfast",
+    "chip2": "Had my back",
+    "chip2Phrase": "having my back",
+    "chip3": "Made me laugh",
+    "chip3Phrase": "making me laugh",
+    "nSend": "Send with love",
+    "wTime": "Sunday",
+    "wTitle": "A ten-minute weekly talk",
+    "wText": "Three questions: what went well, what was hard, what you want next week. It’s the weekly check-in many couples therapists recommend.",
+    "wDuration": "About 10 minutes",
+    "wSkip": "Skip",
+    "wNext": "Next"
+  },
+  "play": {
+    "eyebrow": "Try it now, no download",
+    "title": "Date Match",
+    "lead": "Swipe 10 date ideas. Then pass the phone or send a link to your partner. You’ll only see the ideas you both said yes to.",
+    "step1": "Swipe yes or no",
+    "step2": "Your partner does the same",
+    "step3": "See your matches and share the card",
+    "wheelTitle": "Can’t decide? Spin the date wheel",
+    "wheelLead": "Pick a budget and where you want to be. The wheel chooses for you.",
+    "budget": "Budget",
+    "place": "Where",
+    "spin": "Spin"
+  },
+  "dist": {
+    "eyebrow": "Long distance",
+    "title": "Far apart, still in the same day",
+    "lead": "Belong is built for couples who live apart too: for work, for study, or because of the war.",
+    "f1": "Both time zones on your home screen",
+    "f2": "One tap on “I’m safe” sends your partner a calm notification",
+    "f3": "Widgets with your partner’s mood and a countdown to the next meeting",
+    "f4": "A shared goodnight, even 7 hours apart",
+    "cityA": "Kyiv",
+    "cityB": "Toronto",
+    "personA": "Anya · 😊 4/5",
+    "personB": "Max · 😴 2/5",
+    "widgetNum": "12 days",
+    "widgetText": "until we meet",
+    "safeText": "Let Max know you’re okay without typing a word.",
+    "safeBtn": "I’m safe"
+  },
+  "priv": {
+    "eyebrow": "Privacy",
+    "title": "Yours, theirs, ours",
+    "lead": "Everything in Belong has an owner, and color shows who. You decide what to share.",
+    "mine": "Mine",
+    "mineText": "Private notes, goals and photos only you can see.",
+    "theirs": "Max’s",
+    "theirsText": "What your partner keeps to themselves stays theirs.",
+    "ours": "Ours",
+    "oursText": "Plans, goals and the timeline you both see.",
+    "l1": "No location tracking. It stays off unless you both turn it on.",
+    "l2": "Secret swipes are revealed only when you both say yes.",
+    "l3": "Chat is end-to-end encrypted.",
+    "l4": "If you break up, each of you exports your own data, and the shared space is archived instead of quietly deleted.",
+    "l5": "No guilt streaks. Missing a day costs you nothing."
+  },
+  "wrap": {
+    "eyebrow": "Your year",
+    "title": "Your year together, wrapped",
+    "lead": "Every December Belong turns your year into a set of story cards: places, dreams that came true, your warmest moments. Share them if you like, or keep them for the two of you.",
+    "example": "Example",
+    "year": "2026",
+    "names": "Anya & Max",
+    "stat1": "52",
+    "stat1Label": "dates",
+    "stat2": "3",
+    "stat2Label": "dreams came true",
+    "stat3": "214",
+    "stat3Label": "“thinking of you” taps",
+    "word": "Most-used word: pizza 🍕",
+    "city": "Favorite city: Lviv",
+    "homeTitle": "Our home",
+    "homeLevel": "Level 7",
+    "homeText": "Your little home grows with everything you do together. Two more shared tasks until a new room."
+  },
+  "price": {
+    "eyebrow": "Pricing",
+    "title": "One subscription for two",
+    "freeName": "Free",
+    "freePrice": "$0",
+    "freeNote": "for both of you",
+    "free1": "Shared space, Today and chat",
+    "free2": "Lists and one wish board",
+    "free3": "Three goals",
+    "free4": "Basic games and Date Match",
+    "free5": "Home and lock screen widgets",
+    "plusName": "Belong+",
+    "plusPrice": "$4.99",
+    "plusNote": "a month for both of you, or $39.99 a year",
+    "plus1": "Unlimited goals and wish boards",
+    "plus2": "All games and question packs",
+    "plus3": "AI helper for dates and goal steps",
+    "plus4": "Time capsules and your Year Wrapped",
+    "plus5": "Themes",
+    "cta": "Join the waitlist",
+    "perk": "Couples on the waitlist get 3 months of Belong+ free."
+  },
+  "wl": {
+    "eyebrow": "Early access",
+    "title": "Join the waitlist together",
+    "lead": "Leave your email. Add your partner’s too, and we’ll invite you both at the same time.",
+    "email": "Your email",
+    "partner": "Partner’s email",
+    "optional": "optional",
+    "platform": "Your phone",
+    "ios": "iPhone",
+    "android": "Android",
+    "submit": "Join the waitlist",
+    "consent": "We only email you about the launch. No spam.",
+    "okTitle": "You’re on the list",
+    "okText": "We’ll email you when the beta opens.",
+    "shareTitle": "Know a couple who’d love this?",
+    "shareText": "Send them your link.",
+    "copyLink": "Copy link"
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "title": "Questions couples ask",
+    "q1": "When does Belong launch?",
+    "a1": "We’re building it now. Join the waitlist and we’ll email you when the beta opens on iOS and Android.",
+    "q2": "Is it free?",
+    "a2": "Yes. The core of Belong is free for both of you. Belong+ adds unlimited goals, all the games and the AI helper, and one subscription covers you both.",
+    "q3": "Do we both need the app?",
+    "a3": "Yes, Belong is made for two. One of you creates a shared space and invites the other with a code or a link.",
+    "q4": "Who can see what I add?",
+    "a4": "You choose for each item: just you, or both of you. Color shows who owns what, and shared things use both colors.",
+    "q5": "Does it work for long-distance couples?",
+    "a5": "Yes. You get both time zones, widgets, “I’m safe” check-ins and games you can play while apart.",
+    "q6": "Which languages?",
+    "a6": "English and Ukrainian at launch. More will follow."
+  },
+  "footer": {
+    "tag": "A shared space for two.",
+    "copy": "© 2026 Belong"
+  },
+  "runtime": {
+    "locale": "en-US",
+    "banner": {
+      "show": true,
+      "lang": "uk",
+      "text": "Цей сайт є українською.",
+      "link": "Перейти",
+      "close": "Закрити"
+    },
+    "day": {
+      "moodNote": "Max will see: {mood} · energy {energy} of 5",
+      "thinkSent": "Sent. Max’s phone buzzes softly.",
+      "gratitudePrefix": "Thank you for ",
+      "gratitudeSent": "Saved. Max will see it in the morning 🌙",
+      "talk": [
+        [
+          "What went well this week?",
+          "Take turns and don’t interrupt. Write down what matters, and we’ll keep it in your timeline."
+        ],
+        [
+          "What was hard?",
+          "Talk about the situation, not about who’s to blame."
+        ],
+        [
+          "What do you want next week?",
+          "Choose one small thing each of you will do for the other."
+        ]
+      ],
+      "talkProgress": "{i} of {n}",
+      "talkDone": "Done",
+      "safeSent": "Max got it: Anya is safe · {time}",
+      "diff": "{h} h apart"
+    },
+    "match": {
+      "introTitle": "Who’s playing first?",
+      "nameLabel": "Your name",
+      "namePh": "Anya",
+      "start": "Start swiping",
+      "nameRequired": "Add your name so your partner knows who’s inviting them.",
+      "partnerRequired": "Add your partner’s name.",
+      "yourNameRequired": "Add your name.",
+      "progress": "{i} of {n}",
+      "yes": "Yes",
+      "no": "No",
+      "yesStamp": "YES",
+      "noStamp": "NOPE",
+      "hint": "Drag the card or press ← →",
+      "you": "You",
+      "partner": "Partner",
+      "handoffTitle": "Done, {name}! Now it’s your partner’s turn",
+      "passPhone": "Pass the phone",
+      "partnerNameLabel": "Partner’s name",
+      "partnerPh": "Max",
+      "or": "or",
+      "sendLink": "Send a link",
+      "linkLabel": "Link for your partner",
+      "copy": "Copy",
+      "copied": "Copied",
+      "copyFail": "Select the link and copy it",
+      "shareNative": "Share",
+      "sendNote": "When your partner finishes, they can send the results back to you.",
+      "invitedTitle": "{name} invited you to Date Match",
+      "invitedText": "Swipe 10 date ideas. Then you’ll both see where you match.",
+      "resultTitle": "Matches: {k} of {n}",
+      "resultTitleZero": "No matches this time",
+      "resultZeroText": "That’s useful to know too. Spin the date wheel below for new ideas.",
+      "resultPrivate": "Ideas only one of you liked stay hidden.",
+      "sendBack": "Send results to {name}",
+      "storyCard": "Save story card",
+      "storySaved": "Story card saved",
+      "again": "Play again",
+      "storySub": "date ideas we both want",
+      "storyCta": "Play Date Match on Belong",
+      "shareInvite": "Swipe 10 date ideas with me 💞 Let’s see where we match:",
+      "shareResult": "Date Match on Belong: {k} of {n} 💞",
+      "cards": [
+        {
+          "e": "⛺",
+          "t": "Night in a tent by a lake",
+          "c": "Adventure"
+        },
+        {
+          "e": "🧀",
+          "t": "Floor picnic with a movie and fondue",
+          "c": "At home"
+        },
+        {
+          "e": "🌅",
+          "t": "Sunrise walk with coffee to go",
+          "c": "Outdoors"
+        },
+        {
+          "e": "🍜",
+          "t": "Cook a dish from your dream country",
+          "c": "At home"
+        },
+        {
+          "e": "📵",
+          "t": "A phones-off evening, just the two of you",
+          "c": "At home"
+        },
+        {
+          "e": "💃",
+          "t": "A salsa class for beginners",
+          "c": "Something new"
+        },
+        {
+          "e": "🎤",
+          "t": "Karaoke night",
+          "c": "Night out"
+        },
+        {
+          "e": "🚆",
+          "t": "A weekend trip with no plan",
+          "c": "Adventure"
+        },
+        {
+          "e": "🛁",
+          "t": "Spa evening at home",
+          "c": "At home"
+        },
+        {
+          "e": "🔭",
+          "t": "Stargazing from a rooftop",
+          "c": "Outdoors"
+        }
+      ]
+    },
+    "wheel": {
+      "budgets": [
+        "Free",
+        "$",
+        "$$"
+      ],
+      "budgetNames": [
+        "free",
+        "cheap",
+        "a treat"
+      ],
+      "home": "At home",
+      "out": "Out",
+      "resultLabel": "The wheel says",
+      "again": "Spin again",
+      "send": "Send to partner",
+      "sent": "Copied. Paste it to your partner",
+      "sendText": "Date idea from Belong: {idea}",
+      "ideas": [
+        {
+          "s": "Board games",
+          "t": "Board game tournament",
+          "b": 0,
+          "w": "home"
+        },
+        {
+          "s": "Floor picnic",
+          "t": "Floor picnic with a movie",
+          "b": 0,
+          "w": "home"
+        },
+        {
+          "s": "Puzzle",
+          "t": "A 1,000-piece puzzle night",
+          "b": 0,
+          "w": "home"
+        },
+        {
+          "s": "Old photos",
+          "t": "Look through old photos and pick your top 10",
+          "b": 0,
+          "w": "home"
+        },
+        {
+          "s": "Dancing",
+          "t": "A living-room dance party",
+          "b": 0,
+          "w": "home"
+        },
+        {
+          "s": "36 questions",
+          "t": "The 36 questions to fall in love",
+          "b": 0,
+          "w": "home"
+        },
+        {
+          "s": "Fondue",
+          "t": "Cheese fondue and a film",
+          "b": 1,
+          "w": "home"
+        },
+        {
+          "s": "Sushi",
+          "t": "Make sushi together",
+          "b": 1,
+          "w": "home"
+        },
+        {
+          "s": "Spa",
+          "t": "Spa evening with face masks",
+          "b": 1,
+          "w": "home"
+        },
+        {
+          "s": "Cocktail",
+          "t": "Invent your signature cocktail",
+          "b": 1,
+          "w": "home"
+        },
+        {
+          "s": "Chef box",
+          "t": "Order a restaurant meal kit and cook it together",
+          "b": 2,
+          "w": "home"
+        },
+        {
+          "s": "Wine",
+          "t": "Wine tasting at home with three bottles",
+          "b": 2,
+          "w": "home"
+        },
+        {
+          "s": "Sunrise",
+          "t": "Watch the sunrise with a thermos",
+          "b": 0,
+          "w": "out"
+        },
+        {
+          "s": "Picnic",
+          "t": "Picnic in the park",
+          "b": 0,
+          "w": "out"
+        },
+        {
+          "s": "Stars",
+          "t": "Stargazing outside the city",
+          "b": 0,
+          "w": "out"
+        },
+        {
+          "s": "Flea market",
+          "t": "Wander around a flea market",
+          "b": 0,
+          "w": "out"
+        },
+        {
+          "s": "Bike ride",
+          "t": "Bike ride somewhere new",
+          "b": 0,
+          "w": "out"
+        },
+        {
+          "s": "Karaoke",
+          "t": "Karaoke for two",
+          "b": 1,
+          "w": "out"
+        },
+        {
+          "s": "Museum",
+          "t": "A museum, then coffee",
+          "b": 1,
+          "w": "out"
+        },
+        {
+          "s": "Bowling",
+          "t": "Bowling night",
+          "b": 1,
+          "w": "out"
+        },
+        {
+          "s": "Breakfast",
+          "t": "Breakfast at a new café",
+          "b": 1,
+          "w": "out"
+        },
+        {
+          "s": "Spa day",
+          "t": "A day at the spa",
+          "b": 2,
+          "w": "out"
+        },
+        {
+          "s": "Concert",
+          "t": "Concert tickets",
+          "b": 2,
+          "w": "out"
+        },
+        {
+          "s": "Trip",
+          "t": "One night out of town",
+          "b": 2,
+          "w": "out"
+        },
+        {
+          "s": "Dinner",
+          "t": "Dinner at the place you’ve been saving",
+          "b": 2,
+          "w": "out"
+        }
+      ]
+    },
+    "wl": {
+      "errEmail": "Enter an email like name@example.com.",
+      "errPartner": "Check your partner’s email, or leave it empty.",
+      "errSame": "Your partner’s email needs to be different from yours.",
+      "errNetwork": "Couldn’t send. Check your connection and try again.",
+      "okPartner": "We’ll invite {email} too.",
+      "copied": "Copied",
+      "copyFail": "Select the link and copy it",
+      "shareText": "We’re joining Belong, an app for couples. Join the waitlist:"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "belong-site",
+  "private": true,
+  "type": "module",
+  "description": "Landing site for Belong, the app for couples (English and Ukrainian).",
+  "scripts": {
+    "build": "node build.mjs",
+    "serve": "node scripts/serve.mjs dist 4173",
+    "test": "node build.mjs && playwright test"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.11.0",
+    "@playwright/test": "1.56.1"
+  }
+}

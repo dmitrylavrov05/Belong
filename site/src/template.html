@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="{{@lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{meta.title}}</title>
+<meta name="description" content="{{meta.description|attr}}">
+<link rel="canonical" href="{{@canonical}}">
+<link rel="alternate" hreflang="en" href="{{@urlEn}}">
+<link rel="alternate" hreflang="uk" href="{{@urlUk}}">
+<link rel="alternate" hreflang="x-default" href="{{@urlEn}}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Belong">
+<meta property="og:title" content="{{meta.ogTitle|attr}}">
+<meta property="og:description" content="{{meta.description|attr}}">
+<meta property="og:url" content="{{@canonical}}">
+<meta property="og:locale" content="{{meta.ogLocale}}">
+<meta property="og:image" content="{{@siteUrl}}/assets/{{meta.ogImage}}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#FFF8F3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1C1622" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="{{@root}}assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap">
+<link rel="stylesheet" href="{{@root}}assets/site.css">
+</head>
+<body>
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="g-us" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F07DA1"/><stop offset="1" stop-color="#5C9DF2"/></linearGradient>
+    <clipPath id="clip-her"><circle cx="15" cy="16" r="12"/></clipPath>
+  </defs>
+  <symbol id="pair" viewBox="0 0 48 32"><circle class="pair-her" cx="15" cy="16" r="12"/><circle class="pair-him" cx="33" cy="16" r="12"/><circle cx="33" cy="16" r="12" fill="url(#g-us)" clip-path="url(#clip-her)"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13"/></symbol>
+  <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></symbol>
+  <symbol id="i-dice" viewBox="0 0 24 24"><rect width="12" height="12" x="2" y="10" rx="2"/><path d="m17.9 14 3.5-3.5a2.2 2.2 0 0 0 0-3l-5-4.9a2.2 2.2 0 0 0-3 0L10 6M6 18h.01M10 14h.01M15 6h.01M18 9h.01"/></symbol>
+  <symbol id="i-circles" viewBox="0 0 24 24"><circle cx="9" cy="12" r="6"/><circle cx="15" cy="12" r="6"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
+  <symbol id="i-trend" viewBox="0 0 24 24"><path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></symbol>
+  <symbol id="i-again" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.8 9.8 0 0 0-6.7 2.7L3 8"/><path d="M3 3v5h5"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
+</svg>
+
+<a class="skip" href="#main">{{a11y.skip}}</a>
+
+<div class="lang-banner" id="lang-banner" lang="{{@bannerLang}}" hidden>
+  <p class="lang-banner__text" id="lang-banner-text"></p>
+  <a class="lang-banner__link" id="lang-banner-link" href="{{@otherHref}}" hreflang="{{@otherLang}}"></a>
+  <button class="lang-banner__close" id="lang-banner-close" type="button"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg><span class="sr" id="lang-banner-close-label"></span></button>
+</div>
+
+<header class="header" id="top">
+  <div class="header__inner wrap">
+    <a class="logo" href="#top" aria-label="{{a11y.home|attr}}">
+      <svg class="logo__mark" viewBox="0 0 48 32" aria-hidden="true"><use href="#pair"/></svg>
+      <span class="logo__word">belong</span>
+    </a>
+    <nav class="nav" aria-label="{{a11y.mainNav|attr}}">
+      <a href="#how">{{nav.how}}</a>
+      <a href="#day">{{nav.day}}</a>
+      <a href="#play">{{nav.play}}</a>
+      <a href="#privacy">{{nav.privacy}}</a>
+      <a href="#faq">{{nav.faq}}</a>
+    </nav>
+    <div class="header__end">
+      <div class="lang" role="group" aria-label="{{a11y.language|attr}}">
+        <span class="lang__item is-current" aria-current="true">{{nav.thisLang}}</span>
+        <a class="lang__item" id="lang-switch" href="{{@otherHref}}" hreflang="{{@otherLang}}" lang="{{@otherLang}}" aria-label="{{a11y.otherLangLabel|attr}}">{{nav.otherLang}}</a>
+      </div>
+      <a class="btn btn--primary btn--sm" href="#waitlist">{{nav.cta}}</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="hero">
+  <div class="hero__glow" aria-hidden="true"></div>
+  <div class="hero__inner wrap">
+    <div class="hero__copy">
+      <p class="eyebrow">{{hero.eyebrow}}</p>
+      <h1 class="hero__title">{{hero.title}}</h1>
+      <p class="hero__lead">{{hero.lead}}</p>
+      <div class="hero__ctas">
+        <a class="btn btn--primary btn--lg" href="#waitlist">{{hero.ctaPrimary}}</a>
+        <a class="btn btn--secondary btn--lg" href="#play">{{hero.ctaSecondary}}<svg class="ic" aria-hidden="true"><use href="#i-arrow"/></svg></a>
+      </div>
+      <p class="hero__note">{{hero.note}}</p>
+    </div>
+
+    <div class="hero__stage">
+      <div class="phone" role="img" aria-label="{{a11y.phoneAlt|attr}}">
+        <div class="phone__inner" aria-hidden="true">
+          <div class="phone__status"><span>9:41</span><span class="phone__bat"><i></i></span></div>
+          <div class="phone__screen">
+            <div class="ph-head">
+              <div><p class="ph-h1">{{phone.greeting}}</p><p class="ph-sub">{{phone.date}}</p></div>
+              <svg class="ph-pair" viewBox="0 0 48 32"><use href="#pair"/></svg>
+            </div>
+            <div class="ph-card">
+              <div class="ph-partner">
+                <span class="av av--him">{{phone.him}}</span>
+                <div class="ph-partner__body">
+                  <p>{{phone.partner}}</p>
+                  <div class="meter meter--him" style="--v:2"><i></i><i></i><i></i><i></i><i></i></div>
+                </div>
+              </div>
+              <span class="ph-pill ph-pill--him"><svg class="ic"><use href="#i-heart"/></svg>{{phone.support}}</span>
+            </div>
+            <div class="ph-card">
+              <div class="ph-row"><b>{{phone.howAreYou}}</b><span class="ph-meta">{{phone.maxSees}}</span></div>
+              <div class="ph-moods"><span>😔</span><span>😕</span><span>🙂</span><span class="is-on">😊</span><span>🤩</span></div>
+              <div class="ph-energy"><span class="ph-meta">{{phone.energy}}</span><div class="meter meter--her meter--battery" style="--v:4"><i></i><i></i><i></i><i></i><i></i></div><b>4/5</b></div>
+            </div>
+            <div class="ph-cds">
+              <div class="ph-cd ph-cd--us"><span class="ph-meta">{{phone.cd1Label}}</span><span class="ph-cd__num">{{phone.cd1Num}} <small>{{phone.days}}</small></span><span class="ph-meta">{{phone.cd1Date}}</span></div>
+              <div class="ph-cd"><span class="ph-meta">{{phone.cd2Label}}</span><span class="ph-cd__num">{{phone.cd2Num}} <small>{{phone.days}}</small></span><span class="ph-meta">{{phone.cd2Date}}</span></div>
+            </div>
+            <div class="ph-row ph-row--sec"><b>{{phone.plan}}</b><span class="ph-meta">{{phone.planCount}}</span></div>
+            <div class="ph-card ph-tasks">
+              <div class="task task--her"><span class="task__ring"></span><span class="task__body"><span>{{phone.t1}}</span><span class="task__meta"><span class="tag">{{phone.t1Tag}}</span>{{phone.t1Due}}</span></span><i class="dot dot--her"></i></div>
+              <div class="task task--her"><span class="task__ring"></span><span class="task__body"><span>{{phone.t2}}</span><span class="task__meta">{{phone.t2Meta}}</span></span><i class="dot dot--her"></i></div>
+            </div>
+          </div>
+          <span class="ph-fab"><svg class="ic"><use href="#i-plus"/></svg></span>
+          <div class="ph-tabs">
+            <span class="is-on"><svg class="ic"><use href="#i-sun"/></svg>{{phone.tabToday}}</span>
+            <span><svg class="ic"><use href="#i-star"/></svg>{{phone.tabDreams}}</span>
+            <span><svg class="ic"><use href="#i-chat"/></svg>{{phone.tabChat}}</span>
+            <span><svg class="ic"><use href="#i-dice"/></svg>{{phone.tabGames}}</span>
+            <span><svg class="ic"><use href="#i-circles"/></svg>{{phone.tabUs}}</span>
+          </div>
+        </div>
+      </div>
+      <div class="float float--toast" aria-hidden="true">
+        <span class="float__icon"><svg class="ic"><use href="#i-heart"/></svg></span>{{hero.float1}}
+      </div>
+      <div class="float float--match" aria-hidden="true">
+        <span class="float__emoji">⛺</span>
+        <span><b>{{hero.float2Label}}</b><span>{{hero.float2}}</span></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="how" aria-labelledby="how-title">
+  <div class="wrap">
+    <div class="section__head">
+      <p class="eyebrow">{{how.eyebrow}}</p>
+      <h2 class="section__title" id="how-title">{{how.title}}</h2>
+      <p class="section__lead">{{how.lead}}</p>
+    </div>
+    <ol class="loop">
+      <li class="loop__step">
+        <div class="loop__ui">
+          <div class="mini mini--wish">
+            <div class="mini__photo mini__photo--sakura" aria-hidden="true">🌸</div>
+            <p class="mini__title">{{how.s1Card}}</p>
+            <p class="owner owner--us"><i class="dot dot--us"></i>{{how.s1Badge}}</p>
+            <span class="mini__btn">{{how.s1Btn}} <svg class="ic" aria-hidden="true"><use href="#i-arrow"/></svg></span>
+          </div>
+        </div>
+        <p class="loop__k"><span class="loop__n">1</span>{{how.s1k}}</p>
+        <h3 class="loop__t">{{how.s1t}}</h3>
+        <p class="loop__d">{{how.s1d}}</p>
+      </li>
+      <li class="loop__step">
+        <div class="loop__ui">
+          <div class="mini mini--goal">
+            <div class="mini__goalhead">
+              <p class="mini__title">{{how.s2Card}}</p>
+              <div class="ring" style="--p:62" aria-hidden="true"><span>62%</span></div>
+            </div>
+            <p class="mini__label">{{how.s2Piggy}}</p>
+            <p class="mini__amount"><b class="nowrap">{{how.s2Amount}}</b> <span class="nowrap">{{how.s2Of}}</span></p>
+            <div class="split" aria-hidden="true"><i style="--w:32.5%"></i><i style="--w:29.5%"></i></div>
+            <p class="mini__legend"><span class="nowrap"><i class="dot dot--her"></i>{{how.s2Her}}</span> <span class="nowrap"><i class="dot dot--him"></i>{{how.s2Him}}</span></p>
+          </div>
+        </div>
+        <p class="loop__k"><span class="loop__n">2</span>{{how.s2k}}</p>
+        <h3 class="loop__t">{{how.s2t}}</h3>
+        <p class="loop__d">{{how.s2d}}</p>
+      </li>
+      <li class="loop__step">
+        <div class="loop__ui">
+          <div class="mini">
+            <div class="task task--her">
+              <span class="task__ring"></span>
+              <span class="task__body"><span>{{phone.t1}}</span><span class="task__meta"><span class="tag">{{phone.t1Tag}}</span>{{phone.t1Due}}</span></span>
+              <i class="dot dot--her"></i>
+            </div>
+            <div class="task task--done">
+              <span class="task__ring"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg></span>
+              <span class="task__body"><span>{{phone.t2}}</span><span class="task__meta">{{phone.t2Meta}}</span></span>
+              <i class="dot dot--her"></i>
+            </div>
+          </div>
+        </div>
+        <p class="loop__k"><span class="loop__n">3</span>{{how.s3k}}</p>
+        <h3 class="loop__t">{{how.s3t}}</h3>
+        <p class="loop__d">{{how.s3d}}</p>
+      </li>
+      <li class="loop__step">
+        <div class="loop__ui">
+          <div class="mini mini--memory">
+            <div class="mini__photo mini__photo--aurora" aria-hidden="true"></div>
+            <p class="mini__title">{{how.s4Title}}</p>
+            <p class="mini__meta">{{how.s4Meta}}</p>
+          </div>
+        </div>
+        <p class="loop__k"><span class="loop__n">4</span>{{how.s4k}}</p>
+        <h3 class="loop__t">{{how.s4t}}</h3>
+        <p class="loop__d">{{how.s4d}}</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<section class="section section--tint" id="day" aria-labelledby="day-title">
+  <div class="wrap">
+    <div class="section__head">
+      <p class="eyebrow">{{day.eyebrow}}</p>
+      <h2 class="section__title" id="day-title">{{day.title}}</h2>
+      <p class="section__lead">{{day.lead}}</p>
+    </div>
+
+    <ol class="day">
+      <li class="day__row">
+        <p class="day__time"><time>{{day.mTime}}</time></p>
+        <div class="day__copy"><h3>{{day.mTitle}}</h3><p>{{day.mText}}</p></div>
+        <div class="day__ui">
+          <div class="card">
+            <div class="moods" role="group" aria-label="{{day.moodGroup|attr}}" id="moods">
+              <button type="button" class="mood" data-mood="😔" data-energy="1" aria-pressed="false"><span aria-hidden="true">😔</span><span class="sr">{{day.mood1}}</span></button>
+              <button type="button" class="mood" data-mood="😕" data-energy="2" aria-pressed="false"><span aria-hidden="true">😕</span><span class="sr">{{day.mood2}}</span></button>
+              <button type="button" class="mood" data-mood="🙂" data-energy="3" aria-pressed="false"><span aria-hidden="true">🙂</span><span class="sr">{{day.mood3}}</span></button>
+              <button type="button" class="mood" data-mood="😊" data-energy="4" aria-pressed="true"><span aria-hidden="true">😊</span><span class="sr">{{day.mood4}}</span></button>
+              <button type="button" class="mood" data-mood="🤩" data-energy="5" aria-pressed="false"><span aria-hidden="true">🤩</span><span class="sr">{{day.mood5}}</span></button>
+            </div>
+            <div class="meter meter--her meter--battery meter--wide" id="mood-meter" style="--v:4" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+            <p class="card__note" id="mood-note" aria-live="polite">{{day.moodNote}}</p>
+          </div>
+        </div>
+      </li>
+
+      <li class="day__row">
+        <p class="day__time"><time>{{day.dTime}}</time></p>
+        <div class="day__copy"><h3>{{day.dTitle}}</h3><p>{{day.dText}}</p></div>
+        <div class="day__ui">
+          <div class="card chat">
+            <p class="bubble bubble--him">{{day.chatMax}}</p>
+            <p class="bubble bubble--her">{{day.chatAnya}}</p>
+            <div class="sealed"><span class="sealed__icon"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg></span><span><b>{{day.noteTitle}}</b><span>{{day.noteMeta}}</span></span></div>
+            <div class="think">
+              <button type="button" class="think__btn" id="think-btn"><span class="think__waves" aria-hidden="true"></span><svg class="ic" aria-hidden="true"><use href="#i-heart"/></svg>{{day.thinkBtn}}</button>
+              <p class="card__note" id="think-note" aria-live="polite"></p>
+            </div>
+          </div>
+        </div>
+      </li>
+
+      <li class="day__row">
+        <p class="day__time"><time>{{day.eTime}}</time></p>
+        <div class="day__copy"><h3>{{day.eTitle}}</h3><p>{{day.eText}}</p></div>
+        <div class="day__ui">
+          <div class="card">
+            <div class="seg" role="group" aria-label="{{day.segLabel|attr}}" id="plan-seg">
+              <button type="button" aria-pressed="true" data-owner="mine">{{day.segMine}}</button>
+              <button type="button" aria-pressed="false" data-owner="ours">{{day.segOurs}}</button>
+              <button type="button" aria-pressed="false" data-owner="his">{{day.segHis}}</button>
+            </div>
+            <ul class="tasks" id="plan-list">
+              <li class="task task--her" data-owner="mine"><span class="task__ring"></span><span class="task__body"><span>{{day.mine1}}</span><span class="task__meta">{{day.mine1Meta}}</span></span><i class="dot dot--her"></i></li>
+              <li class="task task--her" data-owner="mine"><span class="task__ring"></span><span class="task__body"><span>{{day.mine2}}</span><span class="task__meta">{{day.mine2Meta}}</span></span><i class="dot dot--her"></i></li>
+              <li class="task task--us" data-owner="ours" hidden><span class="task__ring"></span><span class="task__body"><span>{{day.ours1}}</span><span class="task__meta">{{day.ours1Meta}}</span></span><i class="dot dot--us"></i></li>
+              <li class="task task--us" data-owner="ours" hidden><span class="task__ring"></span><span class="task__body"><span>{{day.ours2}}</span><span class="task__meta">{{day.ours2Meta}}</span></span><i class="dot dot--us"></i></li>
+              <li class="task task--him" data-owner="his" hidden><span class="task__ring"></span><span class="task__body"><span>{{day.his1}}</span><span class="task__meta">{{day.his1Meta}}</span></span><i class="dot dot--him"></i></li>
+              <li class="task task--him" data-owner="his" hidden><span class="task__ring"></span><span class="task__body"><span>{{day.his2}}</span><span class="task__meta">{{day.his2Meta}}</span></span><i class="dot dot--him"></i></li>
+            </ul>
+            <p class="card__label">{{day.groceries}}</p>
+            <ul class="checks">
+              <li><input type="checkbox" id="g1"><label for="g1">{{day.g1}}</label><span class="av av--him av--xs" aria-hidden="true">{{phone.him}}</span></li>
+              <li><input type="checkbox" id="g2" checked><label for="g2">{{day.g2}}</label><span class="av av--her av--xs" aria-hidden="true">{{phone.her}}</span></li>
+              <li><input type="checkbox" id="g3"><label for="g3">{{day.g3}}</label><span class="av av--him av--xs" aria-hidden="true">{{phone.him}}</span></li>
+            </ul>
+          </div>
+        </div>
+      </li>
+
+      <li class="day__row">
+        <p class="day__time"><time>{{day.nTime}}</time></p>
+        <div class="day__copy"><h3>{{day.nTitle}}</h3><p>{{day.nText}}</p></div>
+        <div class="day__ui">
+          <div class="card card--night">
+            <p class="card__label"><svg class="ic" aria-hidden="true"><use href="#i-moon"/></svg>{{day.nLabel}}</p>
+            <p class="night__q">{{day.nQuestion}}</p>
+            <label class="sr" for="gratitude">{{day.nField}}</label>
+            <textarea id="gratitude" rows="3"></textarea>
+            <div class="chips" id="gratitude-chips">
+              <button type="button" class="chip" aria-pressed="false" data-phrase="{{day.chip1Phrase|attr}}">{{day.chip1}}</button>
+              <button type="button" class="chip" aria-pressed="false" data-phrase="{{day.chip2Phrase|attr}}">{{day.chip2}}</button>
+              <button type="button" class="chip" aria-pressed="false" data-phrase="{{day.chip3Phrase|attr}}">{{day.chip3}}</button>
+            </div>
+            <button type="button" class="btn btn--primary btn--block" id="gratitude-send">{{day.nSend}}</button>
+            <p class="card__note" id="gratitude-note" aria-live="polite"></p>
+          </div>
+        </div>
+      </li>
+
+      <li class="day__row">
+        <p class="day__time"><time>{{day.wTime}}</time></p>
+        <div class="day__copy"><h3>{{day.wTitle}}</h3><p>{{day.wText}}</p></div>
+        <div class="day__ui">
+          <div class="card talk" id="talk">
+            <div class="talk__top"><span class="card__label">{{day.wDuration}}</span><span class="talk__progress" id="talk-progress"></span></div>
+            <div class="talk__bar" aria-hidden="true"><i></i><i></i><i></i></div>
+            <div class="talk__card">
+              <span class="talk__num" id="talk-num">1</span>
+              <p class="talk__q" id="talk-q" aria-live="polite"></p>
+              <p class="talk__hint" id="talk-hint"></p>
+            </div>
+            <div class="talk__actions">
+              <button type="button" class="btn btn--ghost" id="talk-skip">{{day.wSkip}}</button>
+              <button type="button" class="btn btn--primary" id="talk-next">{{day.wNext}}</button>
+            </div>
+          </div>
+        </div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<section class="section section--play" id="play" aria-labelledby="play-title">
+  <div class="wrap">
+    <div class="play">
+      <div class="play__copy">
+        <p class="eyebrow">{{play.eyebrow}}</p>
+        <h2 class="section__title" id="play-title">{{play.title}}</h2>
+        <p class="section__lead">{{play.lead}}</p>
+        <ol class="steps">
+          <li><span class="steps__n">1</span>{{play.step1}}</li>
+          <li><span class="steps__n">2</span>{{play.step2}}</li>
+          <li><span class="steps__n">3</span>{{play.step3}}</li>
+        </ol>
+      </div>
+      <div class="game" id="match"></div>
+      <p class="sr" id="match-status" aria-live="polite"></p>
+    </div>
+
+    <div class="wheel-panel" id="wheel-panel">
+      <div class="wheel-panel__copy">
+        <h3 class="wheel-panel__title">{{play.wheelTitle}}</h3>
+        <p>{{play.wheelLead}}</p>
+        <div class="filters">
+          <div class="filter">
+            <p class="filter__label" id="wheel-budget-label">{{play.budget}}</p>
+            <div class="seg" role="group" aria-labelledby="wheel-budget-label" id="wheel-budget"></div>
+          </div>
+          <div class="filter">
+            <p class="filter__label" id="wheel-place-label">{{play.place}}</p>
+            <div class="seg" role="group" aria-labelledby="wheel-place-label" id="wheel-place"></div>
+          </div>
+        </div>
+        <div class="wheel-result" id="wheel-result" hidden>
+          <p class="wheel-result__label" id="wheel-result-label"></p>
+          <p class="wheel-result__title" id="wheel-result-title"></p>
+          <p class="wheel-result__meta" id="wheel-result-meta"></p>
+          <div class="wheel-result__actions">
+            <button type="button" class="btn btn--secondary" id="wheel-again"></button>
+            <button type="button" class="btn btn--primary" id="wheel-send"></button>
+          </div>
+          <p class="card__note" id="wheel-note" aria-live="polite"></p>
+        </div>
+      </div>
+      <div class="wheel-wrap">
+        <div class="wheel__pointer" aria-hidden="true"></div>
+        <div class="wheel" id="wheel" aria-hidden="true"></div>
+        <button type="button" class="wheel__spin" id="wheel-spin">{{play.spin}}</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="distance" aria-labelledby="dist-title">
+  <div class="wrap split-2">
+    <div>
+      <p class="eyebrow">{{dist.eyebrow}}</p>
+      <h2 class="section__title" id="dist-title">{{dist.title}}</h2>
+      <p class="section__lead">{{dist.lead}}</p>
+      <ul class="ticks">
+        <li>{{dist.f1}}</li>
+        <li>{{dist.f2}}</li>
+        <li>{{dist.f3}}</li>
+        <li>{{dist.f4}}</li>
+      </ul>
+    </div>
+    <div class="dist-ui">
+      <div class="clocks card">
+        <div class="clock clock--her"><p class="clock__city">{{dist.cityA}}</p><p class="clock__time" id="clock-a" data-tz="Europe/Kyiv">21:40</p><p class="clock__who">{{dist.personA}}</p></div>
+        <p class="clocks__diff" id="clock-diff"></p>
+        <div class="clock clock--him"><p class="clock__city">{{dist.cityB}}</p><p class="clock__time" id="clock-b" data-tz="America/Toronto">14:40</p><p class="clock__who">{{dist.personB}}</p></div>
+      </div>
+      <div class="dist-ui__row">
+        <div class="widget" aria-hidden="true">
+          <svg class="widget__pair" viewBox="0 0 48 32"><use href="#pair"/></svg>
+          <p class="widget__num">{{dist.widgetNum}}</p>
+          <p class="widget__text">{{dist.widgetText}}</p>
+        </div>
+        <div class="safe card">
+          <p class="safe__text">{{dist.safeText}}</p>
+          <button type="button" class="btn btn--safe btn--block" id="safe-btn"><svg class="ic" aria-hidden="true"><use href="#i-shield"/></svg>{{dist.safeBtn}}</button>
+          <p class="card__note" id="safe-note" aria-live="polite"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section--tint" id="privacy" aria-labelledby="priv-title">
+  <div class="wrap">
+    <div class="section__head">
+      <p class="eyebrow">{{priv.eyebrow}}</p>
+      <h2 class="section__title" id="priv-title">{{priv.title}}</h2>
+      <p class="section__lead">{{priv.lead}}</p>
+    </div>
+    <div class="owners">
+      <div class="owner-card owner-card--her"><p class="owner owner--her"><i class="dot dot--her"></i>{{priv.mine}}</p><p>{{priv.mineText}}</p></div>
+      <div class="owner-card owner-card--him"><p class="owner owner--him"><i class="dot dot--him"></i>{{priv.theirs}}</p><p>{{priv.theirsText}}</p></div>
+      <div class="owner-card owner-card--us"><p class="owner owner--us"><i class="dot dot--us"></i>{{priv.ours}}</p><p>{{priv.oursText}}</p></div>
+    </div>
+    <ul class="ticks ticks--cols">
+      <li>{{priv.l1}}</li>
+      <li>{{priv.l2}}</li>
+      <li>{{priv.l3}}</li>
+      <li>{{priv.l4}}</li>
+      <li>{{priv.l5}}</li>
+    </ul>
+  </div>
+</section>
+
+<section class="section" id="wrapped" aria-labelledby="wrap-title">
+  <div class="wrap split-2 split-2--rev">
+    <div>
+      <p class="eyebrow">{{wrap.eyebrow}}</p>
+      <h2 class="section__title" id="wrap-title">{{wrap.title}}</h2>
+      <p class="section__lead">{{wrap.lead}}</p>
+      <div class="home card">
+        <span class="home__icon" aria-hidden="true"><svg class="ic"><use href="#i-home"/></svg></span>
+        <div class="home__body">
+          <p class="home__row"><b>{{wrap.homeTitle}}</b><span>{{wrap.homeLevel}}</span></p>
+          <div class="bar" aria-hidden="true"><i style="--w:72%"></i></div>
+          <p class="home__text">{{wrap.homeText}}</p>
+        </div>
+      </div>
+    </div>
+    <div class="story-wrap">
+      <figure class="story">
+        <span class="story__example">{{wrap.example}}</span>
+        <p class="story__year">{{wrap.year}}</p>
+        <p class="story__names">{{wrap.names}}</p>
+        <dl class="story__stats">
+          <div><dt>{{wrap.stat1Label}}</dt><dd>{{wrap.stat1}}</dd></div>
+          <div><dt>{{wrap.stat2Label}}</dt><dd>{{wrap.stat2}}</dd></div>
+          <div><dt>{{wrap.stat3Label}}</dt><dd>{{wrap.stat3}}</dd></div>
+        </dl>
+        <p class="story__line">{{wrap.word}}</p>
+        <p class="story__line">{{wrap.city}}</p>
+        <svg class="story__mark" viewBox="0 0 48 32" aria-hidden="true"><use href="#pair"/></svg>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="section section--tint" id="pricing" aria-labelledby="price-title">
+  <div class="wrap">
+    <div class="section__head">
+      <p class="eyebrow">{{price.eyebrow}}</p>
+      <h2 class="section__title" id="price-title">{{price.title}}</h2>
+    </div>
+    <div class="plans">
+      <div class="plan">
+        <h3 class="plan__name">{{price.freeName}}</h3>
+        <p class="plan__price"><b>{{price.freePrice}}</b> <span>{{price.freeNote}}</span></p>
+        <ul class="ticks">
+          <li>{{price.free1}}</li><li>{{price.free2}}</li><li>{{price.free3}}</li><li>{{price.free4}}</li><li>{{price.free5}}</li>
+        </ul>
+        <a class="btn btn--secondary btn--block" href="#waitlist">{{price.cta}}</a>
+      </div>
+      <div class="plan plan--plus">
+        <h3 class="plan__name"><svg class="ic" aria-hidden="true"><use href="#i-sparkles"/></svg>{{price.plusName}}</h3>
+        <p class="plan__price"><b>{{price.plusPrice}}</b> <span>{{price.plusNote}}</span></p>
+        <ul class="ticks">
+          <li>{{price.plus1}}</li><li>{{price.plus2}}</li><li>{{price.plus3}}</li><li>{{price.plus4}}</li><li>{{price.plus5}}</li>
+        </ul>
+        <a class="btn btn--primary btn--block" href="#waitlist">{{price.cta}}</a>
+      </div>
+    </div>
+    <p class="plans__perk">{{price.perk}}</p>
+  </div>
+</section>
+
+<section class="section" id="waitlist" aria-labelledby="wl-title">
+  <div class="wrap">
+    <div class="waitlist">
+      <div class="waitlist__copy">
+        <p class="eyebrow">{{wl.eyebrow}}</p>
+        <h2 class="section__title" id="wl-title">{{wl.title}}</h2>
+        <p class="section__lead">{{wl.lead}}</p>
+      </div>
+      <form class="form" id="wl-form" novalidate data-endpoint="{{@endpoint}}">
+        <div class="field">
+          <label for="wl-email">{{wl.email}}</label>
+          <input type="email" id="wl-email" name="email" autocomplete="email" inputmode="email" required aria-describedby="wl-email-err">
+          <p class="field__err" id="wl-email-err" hidden></p>
+        </div>
+        <div class="field">
+          <label for="wl-partner">{{wl.partner}} <span class="field__opt">({{wl.optional}})</span></label>
+          <input type="email" id="wl-partner" name="partner" autocomplete="off" inputmode="email" aria-describedby="wl-partner-err">
+          <p class="field__err" id="wl-partner-err" hidden></p>
+        </div>
+        <fieldset class="field field--radios">
+          <legend>{{wl.platform}}</legend>
+          <div class="radios">
+            <input type="radio" id="wl-ios" name="platform" value="ios" checked><label for="wl-ios">{{wl.ios}}</label>
+            <input type="radio" id="wl-android" name="platform" value="android"><label for="wl-android">{{wl.android}}</label>
+          </div>
+        </fieldset>
+        <button type="submit" class="btn btn--primary btn--lg btn--block" id="wl-submit">{{wl.submit}}</button>
+        <p class="field__err" id="wl-form-err" hidden></p>
+        <p class="form__consent">{{wl.consent}}</p>
+      </form>
+      <div class="form form--ok" id="wl-success" hidden tabindex="-1">
+        <span class="form__okicon" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+        <h3 class="form__oktitle">{{wl.okTitle}}</h3>
+        <p>{{wl.okText}}</p>
+        <p id="wl-ok-partner" hidden></p>
+        <div class="ref">
+          <p class="ref__title">{{wl.shareTitle}}</p>
+          <p>{{wl.shareText}}</p>
+          <div class="copyrow">
+            <label class="sr" for="wl-ref">{{wl.copyLink}}</label>
+            <input type="text" id="wl-ref" readonly>
+            <button type="button" class="btn btn--secondary" id="wl-ref-copy"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg>{{wl.copyLink}}</button>
+          </div>
+          <p class="card__note" id="wl-ref-note" aria-live="polite"></p>
+          <div class="sharerow" id="wl-share"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section--tint" id="faq" aria-labelledby="faq-title">
+  <div class="wrap wrap--narrow">
+    <p class="eyebrow">{{faq.eyebrow}}</p>
+    <h2 class="section__title" id="faq-title">{{faq.title}}</h2>
+    <div class="faq">
+      <details><summary>{{faq.q1}}</summary><p>{{faq.a1}}</p></details>
+      <details><summary>{{faq.q2}}</summary><p>{{faq.a2}}</p></details>
+      <details><summary>{{faq.q3}}</summary><p>{{faq.a3}}</p></details>
+      <details><summary>{{faq.q4}}</summary><p>{{faq.a4}}</p></details>
+      <details><summary>{{faq.q5}}</summary><p>{{faq.a5}}</p></details>
+      <details><summary>{{faq.q6}}</summary><p>{{faq.a6}}</p></details>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap footer__inner">
+    <a class="logo" href="#top" aria-label="{{a11y.home|attr}}">
+      <svg class="logo__mark" viewBox="0 0 48 32" aria-hidden="true"><use href="#pair"/></svg>
+      <span class="logo__word">belong</span>
+    </a>
+    <p class="footer__tag">{{footer.tag}}</p>
+    <div class="lang" role="group" aria-label="{{a11y.language|attr}}">
+      <span class="lang__item is-current" aria-current="true">{{nav.thisLang}}</span>
+      <a class="lang__item" href="{{@otherHref}}" hreflang="{{@otherLang}}" lang="{{@otherLang}}" aria-label="{{a11y.otherLangLabel|attr}}">{{nav.otherLang}}</a>
+    </div>
+    <p class="footer__copy">{{footer.copy}}</p>
+  </div>
+</footer>
+
+<script type="application/json" id="runtime">{{@runtime}}</script>
+<script src="{{@root}}assets/site.js" defer></script>
+</body>
+</html>
