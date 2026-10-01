@@ -5,6 +5,7 @@ import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
 import app.belong.couple.R
+import app.belong.couple.data.ChatRepo
 import app.belong.couple.data.CoupleStore
 import app.belong.couple.data.Counter
 import app.belong.couple.data.DoodleArt
@@ -25,8 +26,18 @@ object DemoPartner {
         main.postDelayed({
             val store = CoupleStore.get(app)
             store.increment(Counter.TAPS_RECEIVED)
-            Toast.makeText(app, app.getString(R.string.think_back, store.partnerName), Toast.LENGTH_SHORT).show()
+            Toast.makeText(app, app.getString(R.string.think_back, store.partnerDisplay), Toast.LENGTH_SHORT).show()
         }, 3_000)
+    }
+
+    /** Shows "typing…" after a moment, then answers with a short message. */
+    fun onChatMessage(context: Context, onTyping: () -> Unit) {
+        val app = context.applicationContext
+        main.postDelayed({ onTyping() }, 1_200)
+        main.postDelayed({
+            val replies = app.resources.getStringArray(R.array.chat_replies)
+            ChatRepo(app).send(replies[Random.nextInt(replies.size)], fromMe = false)
+        }, 3_200)
     }
 
     fun onDoodleSent(context: Context) {
@@ -36,7 +47,7 @@ object DemoPartner {
             store.savePartnerDoodle(DoodleArt.draw(app, nextDoodle++, 600))
             store.increment(Counter.DOODLES)
             Widgets.updateAll(app)
-            Toast.makeText(app, app.getString(R.string.doodle_reply, store.partnerName), Toast.LENGTH_SHORT).show()
+            Toast.makeText(app, app.getString(R.string.doodle_reply, store.partnerDisplay), Toast.LENGTH_SHORT).show()
         }, 5_000)
     }
 }

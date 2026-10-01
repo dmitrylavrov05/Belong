@@ -11,9 +11,12 @@ import android.text.format.DateUtils
 import android.view.View
 import android.widget.RemoteViews
 import app.belong.couple.R
+import app.belong.couple.core.Owner
 import app.belong.couple.core.Recap
+import app.belong.couple.core.TaskList
 import app.belong.couple.core.TimeMath
 import app.belong.couple.data.CoupleStore
+import app.belong.couple.data.TaskRepo
 import app.belong.couple.ui.MainActivity
 import app.belong.couple.ui.formatLongDate
 import app.belong.couple.ui.language
@@ -43,6 +46,26 @@ class DoodleWidget : BelongWidget() {
     override fun render(context: Context) = Widgets.doodle(context)
 }
 
+/** Today's tasks; tapping a row ticks it off right on the home screen. */
+class TasksWidget : BelongWidget() {
+    override fun render(context: Context) = Widgets.tasks(context)
+
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == ACTION_TOGGLE) {
+            val id = intent.getLongExtra(EXTRA_ID, -1L)
+            if (id != -1L) TaskRepo(context).toggle(id)
+            Widgets.updateAll(context)
+        } else {
+            super.onReceive(context, intent)
+        }
+    }
+
+    companion object {
+        const val ACTION_TOGGLE = "app.belong.couple.TOGGLE_TASK"
+        const val EXTRA_ID = "id"
+    }
+}
+
 object Widgets {
     private fun open(context: Context, tab: Int): PendingIntent {
         val intent = Intent(context, MainActivity::class.java)
@@ -56,7 +79,7 @@ object Widgets {
         val city = store.partnerCity
         return RemoteViews(context.packageName, R.layout.widget_mood).apply {
             setTextViewText(R.id.widget_mood_emoji, Recap.emojiFor(store.partnerMood))
-            setTextViewText(R.id.widget_mood_name, "${store.partnerName} · ${city.name(context.language())}")
+            setTextViewText(R.id.widget_mood_name, "${store.partnerDisplay} · ${city.name(context.language())}")
             setString(R.id.widget_mood_clock, "setTimeZone", city.zone)
             setProgressBar(R.id.widget_mood_energy, 5, store.partnerEnergy, false)
             setTextViewText(R.id.widget_mood_energy_text, context.getString(R.string.widget_energy, store.partnerEnergy))
@@ -94,9 +117,55 @@ object Widgets {
                 setViewVisibility(R.id.widget_doodle_image, View.VISIBLE)
                 setViewVisibility(R.id.widget_doodle_caption, View.VISIBLE)
                 setImageViewBitmap(R.id.widget_doodle_image, bitmap)
-                setTextViewText(R.id.widget_doodle_caption, context.getString(R.string.widget_from, store.partnerName, whenText(context, store.partnerDoodleAt)))
+                setTextViewText(R.id.widget_doodle_caption, context.getString(R.string.widget_from, store.partnerDisplay, whenText(context, store.partnerDoodleAt)))
             }
             setOnClickPendingIntent(R.id.widget_root, open(context, MainActivity.TAB_DOODLE))
+        }
+    }
+
+    private val taskRows = listOf(
+        Triple(R.id.task_row_0, R.id.task_check_0, R.id.task_title_0) to R.id.task_dot_0,
+        Triple(R.id.task_row_1, R.id.task_check_1, R.id.task_title_1) to R.id.task_dot_1,
+        Triple(R.id.task_row_2, R.id.task_check_2, R.id.task_title_2) to R.id.task_dot_2,
+        Triple(R.id.task_row_3, R.id.task_check_3, R.id.task_title_3) to R.id.task_dot_3,
+        Triple(R.id.task_row_4, R.id.task_check_4, R.id.task_title_4) to R.id.task_dot_4,
+    )
+
+    fun tasks(context: Context): RemoteViews {
+        val tasks = TaskRepo(context).forToday()
+        return RemoteViews(context.packageName, R.layout.widget_tasks).apply {
+            setTextViewText(R.id.tasks_progress, "${TaskList.doneCount(tasks)}/${tasks.size}")
+            setViewVisibility(R.id.tasks_empty, if (tasks.isEmpty()) View.VISIBLE else View.GONE)
+            taskRows.forEachIndexed { i, (ids, dotId) ->
+                val (rowId, checkId, titleId) = ids
+                val task = tasks.getOrNull(i)
+                if (task == null) {
+                    setViewVisibility(rowId, View.GONE)
+                    return@forEachIndexed
+                }
+                setViewVisibility(rowId, View.VISIBLE)
+                setImageViewResource(checkId, if (task.done) R.drawable.wcheck_on else R.drawable.wcheck_off)
+                setTextViewText(titleId, task.title)
+                setTextColor(titleId, context.getColor(if (task.done) R.color.ink2 else R.color.ink))
+                setImageViewResource(dotId, when (task.owner) {
+                    Owner.ME -> R.drawable.wdot_her
+                    Owner.OURS -> R.drawable.wdot_us
+                    Owner.PARTNER -> R.drawable.wdot_him
+                })
+                setContentDescription(rowId, context.getString(if (task.done) R.string.task_done_cd else R.string.task_open_cd, task.title))
+                val toggle = Intent(context, TasksWidget::class.java)
+                    .setAction(TasksWidget.ACTION_TOGGLE)
+                    .putExtra(TasksWidget.EXTRA_ID, task.id)
+                setOnClickPendingIntent(
+                    rowId,
+                    PendingIntent.getBroadcast(context, task.id.hashCode(), toggle, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE),
+                )
+            }
+            val extra = tasks.size - taskRows.size
+            setViewVisibility(R.id.tasks_more, if (extra > 0) View.VISIBLE else View.GONE)
+            if (extra > 0) setTextViewText(R.id.tasks_more, context.getString(R.string.widget_tasks_more, extra))
+            setOnClickPendingIntent(R.id.tasks_header, open(context, MainActivity.TAB_TODAY))
+            setOnClickPendingIntent(R.id.tasks_empty, open(context, MainActivity.TAB_TODAY))
         }
     }
 
@@ -111,6 +180,7 @@ object Widgets {
             MoodWidget::class.java to ::mood,
             CountdownWidget::class.java to ::countdown,
             DoodleWidget::class.java to ::doodle,
+            TasksWidget::class.java to ::tasks,
         )
         for ((cls, render) in renderers) {
             val ids = manager.getAppWidgetIds(ComponentName(context, cls))

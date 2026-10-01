@@ -258,9 +258,12 @@ test.describe('Date Match with animation', () => {
   test('dragging the card answers it', async ({ page }, testInfo) => {
     desktopOnly(testInfo);
     await page.goto('/');
+    // Smooth page scrolling can move the card between measuring it and pressing on it.
+    await page.addStyleTag({ content: 'html { scroll-behavior: auto !important; }' });
     await page.fill('#match-name-a', 'Yulia');
     await page.locator('#match [data-act="start-a"]').click();
     const drag = async (dx) => {
+      await page.locator('#match [data-top]').scrollIntoViewIfNeeded();
       const box = await page.locator('#match [data-top]').boundingBox();
       const x = box.x + box.width / 2;
       const y = box.y + box.height / 2;

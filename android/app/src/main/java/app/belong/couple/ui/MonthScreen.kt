@@ -177,7 +177,7 @@ class MonthScreen(private val activity: MainActivity) : Screen {
         body.removeAllViews()
         body.addView(ctx.text(ctx.getString(R.string.month_title), 28f, 800).apply { letterSpacing = -0.02f })
         val monthTitle = DateTimeFormatter.ofPattern("LLLL yyyy", ctx.locale()).format(s.month).replaceFirstChar { it.titlecase(ctx.locale()) }
-        body.addView(ctx.text("$monthTitle · ${ctx.getString(R.string.couple_line, store.myName, store.partnerName)}", 15f, 500, ctx.col(R.color.ink2)))
+        body.addView(ctx.text("$monthTitle · ${ctx.getString(R.string.couple_line, store.myName, store.partnerDisplay)}", 15f, 500, ctx.col(R.color.ink2)))
         if (s.inProgress) {
             body.addView(ctx.text(ctx.getString(R.string.month_in_progress), 13f, 700, ctx.col(R.color.on_tint)).apply {
                 background = ctx.rounded(ctx.col(R.color.her_tint), 999f)
@@ -205,7 +205,7 @@ class MonthScreen(private val activity: MainActivity) : Screen {
             body.addView(row)
         }
 
-        val bitmap = StoryRenderer.render(ctx, s, store.myName, store.partnerName)
+        val bitmap = StoryRenderer.render(ctx, s, store.myName, store.partnerDisplay)
         story = bitmap
         val preview = ImageView(ctx).apply {
             setImageBitmap(bitmap)

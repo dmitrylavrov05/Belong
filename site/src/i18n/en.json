@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Belong for Couples",
-    "description": "Belong is a shared space for two: a wish board, shared goals, a plan for the day, chat and games for couples. Join the waitlist.",
+    "description": "Belong is a shared space for two: a wishlist, shared goals, a plan for the day, chat, a map of your places and games for couples. Join the waitlist.",
     "ogTitle": "Belong: your life together, in one place",
     "ogLocale": "en_US",
     "ogImage": "og-en.png"
@@ -27,7 +27,7 @@
   "hero": {
     "eyebrow": "For couples · Coming to iOS and Android",
     "title": "Your life together, in one place",
-    "lead": "Belong is a shared space for two. Make a wish board, turn wishes into goals, plan the day and keep your memories. Everything connects.",
+    "lead": "Belong is a shared space for two. Keep a wishlist, turn wishes into goals, plan the day and keep your memories on a map. Everything connects.",
     "ctaPrimary": "Get early access",
     "ctaSecondary": "Play Date Match",
     "note": "Free to start. One subscription covers you both.",
@@ -70,8 +70,8 @@
     "title": "One wish, all the way to a memory",
     "lead": "Most couple apps do one job. Belong links them up, so a dream you mention over breakfast can end up in your shared timeline.",
     "s1k": "Dream",
-    "s1t": "Add it to your wish board",
-    "s1d": "Mark who wants it: you, your partner or both of you.",
+    "s1t": "Add it to your wishlist",
+    "s1d": "Gifts, trips and experiences, with a price and a link. Your partner can quietly reserve a gift.",
     "s1Card": "Japan in spring 🌸",
     "s1Badge": "we both want",
     "s1Btn": "Make it a goal",
@@ -209,7 +209,8 @@
     "moodLine": "😊 · energy 4/5",
     "cdNum": "12 days",
     "cdText": "until we meet",
-    "doodleFrom": "From Yulia · 13:05"
+    "doodleFrom": "From Yulia · 13:05",
+    "l5": "Today’s tasks you can tick off right on the home screen"
   },
   "priv": {
     "eyebrow": "Privacy",
@@ -262,14 +263,14 @@
     "freePrice": "$0",
     "freeNote": "for both of you",
     "free1": "Shared space, Today and chat",
-    "free2": "Lists and one wish board",
+    "free2": "Lists and wishlists",
     "free3": "Three goals",
     "free4": "Basic games and Date Match",
     "free5": "Home and lock screen widgets",
     "plusName": "Belong+",
     "plusPrice": "$4.99",
     "plusNote": "a month for both of you, or $39.99 a year",
-    "plus1": "Unlimited goals and wish boards",
+    "plus1": "Unlimited goals",
     "plus2": "All games and question packs",
     "plus3": "AI helper for dates and goal steps",
     "plus4": "Time capsules and your Year Wrapped",

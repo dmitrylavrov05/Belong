@@ -134,6 +134,8 @@ val createKeystore by tasks.registering(Exec::class) {
 
 val assembleApk by tasks.registering {
     dependsOn(linkResources, dex, createKeystore)
+    inputs.file(resourcesApk)
+    inputs.dir(dexDir)
     outputs.file(apkOut)
     doLast {
         val work = outDir.dir("intermediates/apk").get().asFile.apply { deleteRecursively(); mkdirs() }

@@ -199,9 +199,9 @@ class GamesScreen(private val activity: MainActivity) : Screen {
                 })
             }
             Phase.SWIPE_A -> swipeView(store.myName, answersA, R.color.her)
-            Phase.SWIPE_B -> swipeView(store.partnerName, answersB, R.color.him)
+            Phase.SWIPE_B -> swipeView(store.partnerDisplay, answersB, R.color.him)
             Phase.PASS -> {
-                matchCard.addView(ctx.text(ctx.getString(R.string.match_pass, store.partnerName), 22f, 800))
+                matchCard.addView(ctx.text(ctx.getString(R.string.match_pass, store.partnerDisplay), 22f, 800))
                 matchCard.addView(ctx.primaryButton(ctx.getString(R.string.match_continue)) {
                     phase = Phase.SWIPE_B
                     renderMatch()
@@ -295,7 +295,7 @@ class GamesScreen(private val activity: MainActivity) : Screen {
 
     private fun resultView() {
         val matched = DateMatch.matches(answersA, answersB)
-        matchCard.addView(ctx.text(ctx.getString(R.string.couple_line, store.myName, store.partnerName), 14f, 600, ctx.col(R.color.ink2)))
+        matchCard.addView(ctx.text(ctx.getString(R.string.couple_line, store.myName, store.partnerDisplay), 14f, 600, ctx.col(R.color.ink2)))
         matchCard.addView(ctx.text(ctx.getString(R.string.match_result, matched.size, cards.size), 24f, 800))
         if (matched.isEmpty()) {
             matchCard.addView(ctx.text(ctx.getString(R.string.match_none), 15f, 400, ctx.col(R.color.ink2)))

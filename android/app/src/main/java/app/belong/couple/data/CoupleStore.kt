@@ -40,6 +40,14 @@ class CoupleStore private constructor(private val context: Context) {
         get() = prefs.getString("partner_name", null) ?: context.getString(R.string.default_partner_name)
         set(value) = prefs.edit().putString("partner_name", value.trim()).apply()
 
+    /** What you call your partner, e.g. "Сонечко ☀️". Empty means use their name. */
+    var partnerNickname: String
+        get() = prefs.getString("partner_nickname", "")!!
+        set(value) = prefs.edit().putString("partner_nickname", value.trim().take(24)).apply()
+
+    /** The name the app shows for the partner: the pet name when there is one. */
+    val partnerDisplay: String get() = partnerNickname.ifBlank { partnerName }
+
     var myCityId: String
         get() = prefs.getString("my_city", "kyiv")!!
         set(value) = prefs.edit().putString("my_city", value).apply()

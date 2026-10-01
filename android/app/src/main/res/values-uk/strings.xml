@@ -175,4 +175,138 @@
     <string name="settings_save">Зберегти</string>
     <string name="settings_cancel">Скасувати</string>
     <string name="settings_demo">Демо-режим: сервера ще немає, тому партнер працює як демо на цьому телефоні.</string>
+
+    <!-- Навігація -->
+    <string name="tab_chat">Чат</string>
+    <string name="tab_wishlist">Вішліст</string>
+    <string name="tab_map">Місця</string>
+    <string name="tab_more">Ще</string>
+    <string name="back">Назад</string>
+    <string name="more_title">Ще</string>
+    <string name="more_doodle_text">Малюнки на головний екран партнера</string>
+    <string name="more_games_text">«Збіги» і колесо побачень</string>
+    <string name="more_month_text">Ваш місяць на відстані карткою для сторіс</string>
+    <string name="more_settings_text">Імена, ласкаве ім’я, міста й дата зустрічі</string>
+    <string name="delete">Видалити</string>
+
+    <!-- Справи -->
+    <string name="tasks_title">План на день</string>
+    <string name="tasks_progress">Виконано %1$d з %2$d</string>
+    <string name="tasks_empty">Справ поки немає. Додайте першу.</string>
+    <string name="task_hint">Нова справа</string>
+    <string name="task_add">Додати</string>
+    <string name="owner_me">Моє</string>
+    <string name="owner_ours">Спільне</string>
+    <string name="task_delete_title">Видалити справу?</string>
+    <string name="task_done_cd">%1$s, виконано</string>
+    <string name="task_open_cd">%1$s, не виконано</string>
+    <string name="add_widget_tasks">Справи</string>
+    <string name="widget_tasks_desc">Справи на сьогодні з галочками</string>
+    <string name="widget_tasks_more">ще %1$d</string>
+    <string name="widget_tasks_empty">На сьогодні справ немає</string>
+    <string-array name="seed_tasks">
+        <item>me|Купити квитки до Торонто</item>
+        <item>ours|Відеодзвінок о 21:00</item>
+        <item>partner|Забронювати столик на нашу зустріч</item>
+        <item>me|Забрати посилку</item>
+        <item>partner|Надіслати фото з прогулянки</item>
+    </string-array>
+
+    <!-- Вішліст -->
+    <string name="wish_title">Вішліст</string>
+    <string name="wish_mine">Мій</string>
+    <string name="wish_add">Додати бажання</string>
+    <string name="wish_edit">Змінити бажання</string>
+    <string name="wish_field_title">Що хочеш?</string>
+    <string name="wish_field_price">Ціна</string>
+    <string name="wish_field_link">Посилання</string>
+    <string name="wish_field_note">Примітка</string>
+    <string name="wish_open">Відкрити посилання</string>
+    <string name="wish_reserve">Подарую я 🎁</string>
+    <string name="wish_reserved">Заброньовано тобою · скасувати</string>
+    <string name="wish_secret">%1$s не побачить, що подарунок заброньовано.</string>
+    <string name="wish_empty_mine">Додай те, що хотілося б отримати: подарунки, враження, подорожі.</string>
+    <string name="wish_empty_partner">Список поки порожній.</string>
+    <string name="wish_bad_link">Перевірте посилання: воно має виглядати як https://example.com</string>
+    <string name="wish_title_required">Напишіть, що хочете</string>
+    <string name="wish_tap_hint">Торкніться бажання, щоб змінити його.</string>
+    <string-array name="seed_wishes">
+        <item>me|Плівковий фотоапарат|3 500 ₴|Для наших поїздок</item>
+        <item>me|Свічка з ароматом інжиру|450 ₴|</item>
+        <item>me|Квитки на концерт|1 800 ₴|Будь-який концерт у Львові</item>
+        <item>partner|Навушники з шумозаглушенням|9 000 ₴|Для перельотів до тебе</item>
+        <item>partner|Набір для кави V60|1 200 ₴|</item>
+        <item>partner|Теплий светр|2 000 ₴|Розмір L</item>
+    </string-array>
+
+    <!-- Чат -->
+    <string name="chat_hint">Повідомлення</string>
+    <string name="chat_send">Надіслати</string>
+    <string name="chat_heart">Надіслати «думаю про тебе»</string>
+    <string name="chat_heart_text">Думаю про тебе 💗</string>
+    <string name="chat_typing">%1$s друкує…</string>
+    <string name="chat_hearted">вподобано</string>
+    <string name="chat_heart_action">Вподобати</string>
+    <string-array name="seed_chat">
+        <item>partner|Доброго ранку! До обіду в мене дзвінки 😴</item>
+        <item>me|Тримайся! Увечері відеодзвінок?</item>
+        <item>partner|Так, о 21:00 за Києвом ❤️</item>
+    </string-array>
+    <string-array name="chat_replies">
+        <item>❤️</item>
+        <item>Скучаю за тобою</item>
+        <item>Ахах 😄</item>
+        <item>Розкажи більше!</item>
+        <item>Я теж думаю про тебе</item>
+        <item>Уже рахую дні до зустрічі</item>
+        <item>Обіймаю 🤗</item>
+        <item>Домовились!</item>
+    </string-array>
+
+    <!-- Мапа місць -->
+    <string name="map_title">Наші місця</string>
+    <string name="map_text">Фото з геоміткою з вашої галереї на карті світу. Усе залишається на цьому телефоні.</string>
+    <string name="map_allow">Показати мої фото на мапі</string>
+    <string name="map_example">Приклад місць, поки немає доступу до ваших фото</string>
+    <string name="map_example_photo">Це фото для прикладу</string>
+    <string name="map_scanning">Шукаємо геомітки у фото… %1$d з %2$d</string>
+    <string name="map_none">У галереї поки немає фото з геоміткою. Увімкніть геомітки в налаштуваннях камери.</string>
+    <string name="map_no_location">Дозвольте доступ до геоміток у фото, щоб побачити, де їх зроблено.</string>
+    <string name="map_denied">Доступ до фото вимкнено. Його можна ввімкнути в налаштуваннях застосунку.</string>
+    <string name="map_open_settings">Відкрити налаштування</string>
+    <string name="map_rescan">Оновити</string>
+    <string name="map_zoom_in">Наблизити</string>
+    <string name="map_zoom_out">Віддалити</string>
+    <string name="map_places_title">Місця</string>
+    <string name="map_canvas">Карта світу з вашими фото</string>
+    <plurals name="photos">
+        <item quantity="one">%d фото</item>
+        <item quantity="few">%d фото</item>
+        <item quantity="many">%d фото</item>
+        <item quantity="other">%d фото</item>
+    </plurals>
+    <plurals name="places">
+        <item quantity="one">%d місце</item>
+        <item quantity="few">%d місця</item>
+        <item quantity="many">%d місць</item>
+        <item quantity="other">%d місця</item>
+    </plurals>
+    <string-array name="map_examples">
+        <item>50.45|30.52|📸|Київ|24</item>
+        <item>49.84|24.03|☕|Львів|9</item>
+        <item>48.45|24.55|⛰️|Карпати|12</item>
+        <item>43.65|-79.38|🍁|Торонто|31</item>
+        <item>38.72|-9.14|🌅|Лісабон|6</item>
+    </string-array>
+
+    <!-- Ласкаве ім’я -->
+    <string name="settings_nickname">Як ти називаєш партнера?</string>
+    <string name="settings_nickname_hint">Наприклад, Сонечко</string>
+    <string name="settings_nickname_note">Показуватимемо в застосунку замість імені.</string>
+    <string-array name="nickname_ideas">
+        <item>Сонечко ☀️</item>
+        <item>Котик 🐱</item>
+        <item>Зайчик 🐰</item>
+        <item>Серденько ❤️</item>
+    </string-array>
 </resources>

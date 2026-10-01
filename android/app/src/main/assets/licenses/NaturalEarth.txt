@@ -1,0 +1,2 @@
+World map: Natural Earth land polygons (1:50m and 1:110m), public domain.
+https://www.naturalearthdata.com/about/terms-of-use/

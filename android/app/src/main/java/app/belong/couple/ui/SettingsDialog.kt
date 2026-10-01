@@ -44,6 +44,19 @@ object SettingsDialog {
         val myName = nameField(store.myName).also { form.addView(it) }
         label(R.string.settings_partner_name)
         val partnerName = nameField(store.partnerName).also { form.addView(it) }
+        label(R.string.settings_nickname)
+        val nickname = nameField(store.partnerNickname).apply { hint = ctx.getString(R.string.settings_nickname_hint) }
+        form.addView(nickname)
+        val ideas = ctx.row(6)
+        ctx.resources.getStringArray(R.array.nickname_ideas).forEach { idea ->
+            ideas.addView(ctx.chip(idea, false) { nickname.setText(idea) }.apply { textSize = 13f })
+        }
+        form.addView(android.widget.HorizontalScrollView(ctx).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(ideas)
+        })
+        form.addView(ctx.text(ctx.getString(R.string.settings_nickname_note), 12f, 500, ctx.col(R.color.ink2)))
+
         label(R.string.settings_my_city)
         val myCity = cityPicker(store.myCityId).also { form.addView(it) }
         label(R.string.settings_partner_city)
@@ -67,6 +80,7 @@ object SettingsDialog {
             .setPositiveButton(R.string.settings_save) { _, _ ->
                 myName.text.toString().takeIf { it.isNotBlank() }?.let { store.myName = it }
                 partnerName.text.toString().takeIf { it.isNotBlank() }?.let { store.partnerName = it }
+                store.partnerNickname = nickname.text.toString()
                 store.myCityId = Cities.all[myCity.selectedItemPosition].id
                 store.partnerCityId = Cities.all[partnerCity.selectedItemPosition].id
                 store.meetingDate = meeting

@@ -173,4 +173,135 @@
     <string name="settings_save">Save</string>
     <string name="settings_cancel">Cancel</string>
     <string name="settings_demo">Demo mode: there’s no server yet, so your partner is simulated on this phone.</string>
+
+    <!-- Navigation -->
+    <string name="tab_chat">Chat</string>
+    <string name="tab_wishlist">Wishlist</string>
+    <string name="tab_map">Places</string>
+    <string name="tab_more">More</string>
+    <string name="back">Back</string>
+    <string name="more_title">More</string>
+    <string name="more_doodle_text">Draw for your partner’s home screen</string>
+    <string name="more_games_text">Date Match and the date wheel</string>
+    <string name="more_month_text">Your month apart as a story card</string>
+    <string name="more_settings_text">Names, pet name, cities and meeting date</string>
+    <string name="delete">Delete</string>
+
+    <!-- Tasks -->
+    <string name="tasks_title">Plan for today</string>
+    <string name="tasks_progress">%1$d of %2$d done</string>
+    <string name="tasks_empty">Nothing planned yet. Add the first task.</string>
+    <string name="task_hint">New task</string>
+    <string name="task_add">Add</string>
+    <string name="owner_me">Mine</string>
+    <string name="owner_ours">Ours</string>
+    <string name="task_delete_title">Delete this task?</string>
+    <string name="task_done_cd">%1$s, done</string>
+    <string name="task_open_cd">%1$s, not done</string>
+    <string name="add_widget_tasks">Tasks</string>
+    <string name="widget_tasks_desc">Today’s tasks you can tick off</string>
+    <string name="widget_tasks_more">+%1$d more</string>
+    <string name="widget_tasks_empty">No tasks for today</string>
+    <string-array name="seed_tasks">
+        <item>me|Buy tickets to Toronto</item>
+        <item>ours|Video call at 9 pm</item>
+        <item>partner|Book a table for our meeting</item>
+        <item>me|Pick up a parcel</item>
+        <item>partner|Send a photo from the walk</item>
+    </string-array>
+
+    <!-- Wishlist -->
+    <string name="wish_title">Wishlist</string>
+    <string name="wish_mine">Mine</string>
+    <string name="wish_add">Add a wish</string>
+    <string name="wish_edit">Edit wish</string>
+    <string name="wish_field_title">What would you like?</string>
+    <string name="wish_field_price">Price</string>
+    <string name="wish_field_link">Link</string>
+    <string name="wish_field_note">Note</string>
+    <string name="wish_open">Open link</string>
+    <string name="wish_reserve">I’ll give this 🎁</string>
+    <string name="wish_reserved">Reserved by you · cancel</string>
+    <string name="wish_secret">%1$s won’t see that it’s reserved.</string>
+    <string name="wish_empty_mine">Add things you’d love to get: gifts, experiences, trips.</string>
+    <string name="wish_empty_partner">The list is empty for now.</string>
+    <string name="wish_bad_link">Check the link: it should look like https://example.com</string>
+    <string name="wish_title_required">Write what you’d like</string>
+    <string name="wish_tap_hint">Tap a wish to change it.</string>
+    <string-array name="seed_wishes">
+        <item>me|Film camera|$90|For our trips</item>
+        <item>me|Fig-scented candle|$15|</item>
+        <item>me|Concert tickets|$50|Any gig in Lviv</item>
+        <item>partner|Noise-cancelling headphones|$250|For the flights to you</item>
+        <item>partner|V60 coffee set|$35|</item>
+        <item>partner|Warm sweater|$60|Size L</item>
+    </string-array>
+
+    <!-- Chat -->
+    <string name="chat_hint">Message</string>
+    <string name="chat_send">Send</string>
+    <string name="chat_heart">Send “thinking of you”</string>
+    <string name="chat_heart_text">Thinking of you 💗</string>
+    <string name="chat_typing">%1$s is typing…</string>
+    <string name="chat_hearted">liked</string>
+    <string name="chat_heart_action">Like</string>
+    <string-array name="seed_chat">
+        <item>partner|Morning! Calls until lunch for me 😴</item>
+        <item>me|Hang in there! Video call tonight?</item>
+        <item>partner|Yes, 9 pm Kyiv time ❤️</item>
+    </string-array>
+    <string-array name="chat_replies">
+        <item>❤️</item>
+        <item>Miss you</item>
+        <item>Haha 😄</item>
+        <item>Tell me more!</item>
+        <item>Thinking of you too</item>
+        <item>Counting the days until we meet</item>
+        <item>Sending a hug 🤗</item>
+        <item>Deal!</item>
+    </string-array>
+
+    <!-- Places map -->
+    <string name="map_title">Our places</string>
+    <string name="map_text">Photos from your gallery that have a location, on a map of the world. Everything stays on this phone.</string>
+    <string name="map_allow">Show my photos on the map</string>
+    <string name="map_example">Example places until you allow access to your photos</string>
+    <string name="map_example_photo">This is an example photo</string>
+    <string name="map_scanning">Looking for photo locations… %1$d of %2$d</string>
+    <string name="map_none">No photos with a location yet. Turn on location tags in your camera settings.</string>
+    <string name="map_no_location">Allow access to photo locations to see where they were taken.</string>
+    <string name="map_denied">Access to photos is off. You can turn it on in the app’s settings.</string>
+    <string name="map_open_settings">Open settings</string>
+    <string name="map_rescan">Rescan</string>
+    <string name="map_zoom_in">Zoom in</string>
+    <string name="map_zoom_out">Zoom out</string>
+    <string name="map_places_title">Places</string>
+    <string name="map_canvas">World map with your photos</string>
+    <plurals name="photos">
+        <item quantity="one">%d photo</item>
+        <item quantity="other">%d photos</item>
+    </plurals>
+    <plurals name="places">
+        <item quantity="one">%d place</item>
+        <item quantity="other">%d places</item>
+    </plurals>
+    <!-- lat|lon|emoji|name|photos -->
+    <string-array name="map_examples">
+        <item>50.45|30.52|📸|Kyiv|24</item>
+        <item>49.84|24.03|☕|Lviv|9</item>
+        <item>48.45|24.55|⛰️|Carpathians|12</item>
+        <item>43.65|-79.38|🍁|Toronto|31</item>
+        <item>38.72|-9.14|🌅|Lisbon|6</item>
+    </string-array>
+
+    <!-- Pet name -->
+    <string name="settings_nickname">What do you call your partner?</string>
+    <string name="settings_nickname_hint">For example, Sunshine</string>
+    <string name="settings_nickname_note">We’ll use it everywhere in the app instead of the name.</string>
+    <string-array name="nickname_ideas">
+        <item>Sunshine ☀️</item>
+        <item>Honey 🍯</item>
+        <item>Love ❤️</item>
+        <item>Kitten 🐱</item>
+    </string-array>
 </resources>

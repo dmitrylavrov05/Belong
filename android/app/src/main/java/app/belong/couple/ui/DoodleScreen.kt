@@ -213,25 +213,25 @@ class DoodleScreen(private val activity: MainActivity) : Screen {
         store.saveMyDoodle(doodle.export(600))
         store.increment(Counter.DOODLES)
         doodle.clear()
-        ctx.toast(ctx.getString(R.string.doodle_sent, store.partnerName))
+        ctx.toast(ctx.getString(R.string.doodle_sent, store.partnerDisplay))
         Widgets.updateAll(ctx)
         DemoPartner.onDoodleSent(ctx)
     }
 
     private fun showPartnerDoodle() {
-        partnerTitle.text = ctx.getString(R.string.doodle_latest, store.partnerName)
+        partnerTitle.text = ctx.getString(R.string.doodle_latest, store.partnerDisplay)
         val bitmap = store.loadPartnerDoodle(900)
         if (bitmap == null) {
             partnerImage.setImageDrawable(null)
             partnerCaption.text = ctx.getString(R.string.doodle_none)
         } else {
             partnerImage.setImageBitmap(bitmap)
-            partnerCaption.text = ctx.getString(R.string.widget_from, store.partnerName, Widgets.whenText(ctx, store.partnerDoodleAt))
+            partnerCaption.text = ctx.getString(R.string.widget_from, store.partnerDisplay, Widgets.whenText(ctx, store.partnerDoodleAt))
         }
     }
 
     override fun refresh() {
-        hint.text = ctx.getString(R.string.doodle_hint, store.partnerName)
+        hint.text = ctx.getString(R.string.doodle_hint, store.partnerDisplay)
         showPartnerDoodle()
     }
 }
