@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Belong</string>
+    <string name="default_my_name">Yulia</string>
+    <string name="default_partner_name">Igor</string>
+
+    <string name="tab_today">Today</string>
+    <string name="tab_doodle">Doodle</string>
+    <string name="tab_games">Games</string>
+    <string name="tab_month">Month</string>
+
+    <string name="greeting_morning">Good morning</string>
+    <string name="greeting_day">Good afternoon</string>
+    <string name="greeting_evening">Good evening</string>
+    <string name="greeting_night">Good night</string>
+    <string name="couple_line">%1$s &amp; %2$s</string>
+    <string name="settings">Settings</string>
+
+    <string name="partner_now">%1$s right now</string>
+    <string name="mood_line">Mood %1$s · energy %2$d of 5</string>
+    <string name="updated_at">updated at %1$s</string>
+    <string name="support">Send support</string>
+    <string name="support_sent">%1$s will feel a little hug.</string>
+    <string name="checkin_title">How are you today?</string>
+    <string name="checkin_hint">%1$s will see</string>
+    <string name="energy">Energy</string>
+    <string name="mood_1">Low</string>
+    <string name="mood_2">Meh</string>
+    <string name="mood_3">Okay</string>
+    <string name="mood_4">Good</string>
+    <string name="mood_5">Great</string>
+    <string name="energy_level">Energy %1$d of 5</string>
+
+    <string name="distance_title">Between you</string>
+    <string name="km">%1$s km</string>
+    <string name="hours_apart">%1$s h apart</string>
+    <string name="same_zone">Same time zone</string>
+
+    <string name="countdown_title">Until we meet</string>
+    <plurals name="days">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
+    <plurals name="days_until_label">
+        <item quantity="one">day until we meet</item>
+        <item quantity="other">days until we meet</item>
+    </plurals>
+    <string name="countdown_today">Today is the day!</string>
+    <string name="countdown_past">Pick your next date</string>
+    <string name="change_date">Change date</string>
+
+    <string name="think">Thinking of you</string>
+    <string name="think_sent">Sent. %1$s will feel a soft buzz.</string>
+    <string name="think_back">%1$s is thinking of you too 💗</string>
+    <string name="safe">I’m safe</string>
+    <string name="safe_sent">%1$s gets a calm notification: you’re safe.</string>
+
+    <string name="widgets_title">Widgets for your home screen</string>
+    <string name="widgets_text">See your partner’s mood, the countdown and new doodles without opening the app.</string>
+    <string name="add_widget_mood">Mood</string>
+    <string name="add_widget_countdown">Countdown</string>
+    <string name="add_widget_doodle">Doodles</string>
+    <string name="widget_pin_unsupported">Long-press your home screen, tap Widgets and find Belong.</string>
+    <string name="widget_mood_desc">Your partner’s mood and local time</string>
+    <string name="widget_countdown_desc">Days until you meet</string>
+    <string name="widget_doodle_desc">Doodles from your partner</string>
+    <string name="widget_from">From %1$s · %2$s</string>
+    <string name="widget_doodle_empty">Your partner’s doodles will appear here</string>
+    <string name="widget_energy">energy %1$d/5</string>
+
+    <string name="doodle_title">Draw something</string>
+    <string name="doodle_hint">%1$s will see it on their home screen.</string>
+    <string name="doodle_send">Send</string>
+    <string name="doodle_clear">Clear</string>
+    <string name="doodle_undo">Undo</string>
+    <string name="doodle_canvas">Drawing area</string>
+    <string name="doodle_sent">Sent. %1$s will see it on the home screen.</string>
+    <string name="doodle_empty_warn">Draw something first.</string>
+    <string name="doodle_latest">Latest · %1$s</string>
+    <string name="doodle_reply">New doodle from %1$s</string>
+    <string name="doodle_none">No doodles yet</string>
+    <string name="color_pink">Pink</string>
+    <string name="color_blue">Blue</string>
+    <string name="color_ink">Dark</string>
+    <string name="color_honey">Honey</string>
+
+    <string name="games_title">Games</string>
+    <string name="match_title">Date Match</string>
+    <string name="match_text">Each of you swipes 10 date ideas. You’ll only see the ones you both want.</string>
+    <string name="match_start">Start</string>
+    <string name="match_turn">%1$s’s turn</string>
+    <string name="match_progress">%1$d of %2$d</string>
+    <string name="match_yes">Yes</string>
+    <string name="match_no">No</string>
+    <string name="match_pass">Pass the phone to %1$s</string>
+    <string name="match_continue">Continue</string>
+    <string name="match_result">Matches: %1$d of %2$d</string>
+    <string name="match_none">No matches this time. Spin the wheel for new ideas.</string>
+    <string name="match_again">Play again</string>
+    <string name="share">Share</string>
+    <string name="match_share_text">Date Match on Belong: %1$d of %2$d 💞</string>
+    <string-array name="match_cards">
+        <item>⛺|Night in a tent by a lake</item>
+        <item>🧀|Floor picnic with a movie and fondue</item>
+        <item>🌅|Sunrise walk with coffee to go</item>
+        <item>🍜|Cook a dish from your dream country</item>
+        <item>📵|A phones-off evening, just the two of you</item>
+        <item>💃|A salsa class for beginners</item>
+        <item>🎤|Karaoke night</item>
+        <item>🚆|A weekend trip with no plan</item>
+        <item>🛁|Spa evening at home</item>
+        <item>🔭|Stargazing from a rooftop</item>
+    </string-array>
+
+    <string name="wheel_title">Date wheel</string>
+    <string name="wheel_text">Can’t decide? Let the wheel choose.</string>
+    <string name="wheel_spin">Spin</string>
+    <string name="wheel_result">The wheel says</string>
+    <string name="wheel_home">At home</string>
+    <string name="wheel_out">Out</string>
+    <string-array name="wheel_budgets">
+        <item>Free</item>
+        <item>$</item>
+        <item>$$</item>
+    </string-array>
+    <!-- budget|place|short label|full idea -->
+    <string-array name="wheel_ideas">
+        <item>0|home|Board games|Board game tournament</item>
+        <item>0|home|Floor picnic|Floor picnic with a movie</item>
+        <item>0|home|Old photos|Pick your top 10 old photos</item>
+        <item>0|home|Dancing|A living-room dance party</item>
+        <item>0|home|Video date|Cook the same recipe on a video call</item>
+        <item>0|home|36 questions|The 36 questions to fall in love</item>
+        <item>1|home|Fondue|Cheese fondue and a film</item>
+        <item>1|home|Sushi|Make sushi together</item>
+        <item>1|home|Spa|Spa evening with face masks</item>
+        <item>2|home|Chef box|Order a restaurant meal kit and cook it together</item>
+        <item>0|out|Sunrise|Watch the sunrise with a thermos</item>
+        <item>0|out|Picnic|Picnic in the park</item>
+        <item>0|out|Stars|Stargazing outside the city</item>
+        <item>0|out|Bike ride|Bike ride somewhere new</item>
+        <item>0|out|Flea market|Wander around a flea market</item>
+        <item>1|out|Karaoke|Karaoke for two</item>
+        <item>1|out|Museum|A museum, then coffee</item>
+        <item>1|out|Breakfast|Breakfast at a new café</item>
+        <item>2|out|Concert|Concert tickets</item>
+        <item>2|out|Trip|One night out of town</item>
+    </string-array>
+
+    <string name="month_title">Our month apart</string>
+    <string name="month_in_progress">Month in progress</string>
+    <string name="month_example">Example numbers until your partner joins</string>
+    <string name="stat_km">km between you</string>
+    <string name="stat_hours">time difference</string>
+    <string name="hours_short">%1$s h</string>
+    <string name="stat_taps">“thinking of you” taps</string>
+    <string name="stat_taps_value">%1$d sent · %2$d received</string>
+    <string name="stat_doodles">doodles</string>
+    <string name="stat_safe">“I’m safe” check-ins</string>
+    <string name="stat_mood">average mood</string>
+    <string name="month_share">Share to stories</string>
+    <string name="month_save">Save to gallery</string>
+    <string name="month_saved">Saved to Pictures</string>
+    <string name="story_title">Our %1$s apart</string>
+    <string name="story_footer">Made with Belong</string>
+
+    <string name="settings_title">Your couple</string>
+    <string name="settings_my_name">Your name</string>
+    <string name="settings_partner_name">Partner’s name</string>
+    <string name="settings_my_city">Your city</string>
+    <string name="settings_partner_city">Partner’s city</string>
+    <string name="settings_meeting">Next meeting</string>
+    <string name="settings_save">Save</string>
+    <string name="settings_cancel">Cancel</string>
+    <string name="settings_demo">Demo mode: there’s no server yet, so your partner is simulated on this phone.</string>
+</resources>

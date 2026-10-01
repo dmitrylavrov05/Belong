@@ -124,7 +124,7 @@
               <span class="ph-pill ph-pill--him"><svg class="ic"><use href="#i-heart"/></svg>{{phone.support}}</span>
             </div>
             <div class="ph-card">
-              <div class="ph-row"><b>{{phone.howAreYou}}</b><span class="ph-meta">{{phone.maxSees}}</span></div>
+              <div class="ph-row"><b>{{phone.howAreYou}}</b><span class="ph-meta">{{phone.partnerSees}}</span></div>
               <div class="ph-moods"><span>😔</span><span>😕</span><span>🙂</span><span class="is-on">😊</span><span>🤩</span></div>
               <div class="ph-energy"><span class="ph-meta">{{phone.energy}}</span><div class="meter meter--her meter--battery" style="--v:4"><i></i><i></i><i></i><i></i><i></i></div><b>4/5</b></div>
             </div>
@@ -264,8 +264,8 @@
         <div class="day__copy"><h3>{{day.dTitle}}</h3><p>{{day.dText}}</p></div>
         <div class="day__ui">
           <div class="card chat">
-            <p class="bubble bubble--him">{{day.chatMax}}</p>
-            <p class="bubble bubble--her">{{day.chatAnya}}</p>
+            <p class="bubble bubble--him">{{day.chatHim}}</p>
+            <p class="bubble bubble--her">{{day.chatHer}}</p>
             <div class="sealed"><span class="sealed__icon"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg></span><span><b>{{day.noteTitle}}</b><span>{{day.noteMeta}}</span></span></div>
             <div class="think">
               <button type="button" class="think__btn" id="think-btn"><span class="think__waves" aria-hidden="true"></span><svg class="ic" aria-hidden="true"><use href="#i-heart"/></svg>{{day.thinkBtn}}</button>
@@ -416,23 +416,72 @@
         <p class="clocks__diff" id="clock-diff"></p>
         <div class="clock clock--him"><p class="clock__city">{{dist.cityB}}</p><p class="clock__time" id="clock-b" data-tz="America/Toronto">14:40</p><p class="clock__who">{{dist.personB}}</p></div>
       </div>
-      <div class="dist-ui__row">
-        <div class="widget" aria-hidden="true">
-          <svg class="widget__pair" viewBox="0 0 48 32"><use href="#pair"/></svg>
-          <p class="widget__num">{{dist.widgetNum}}</p>
-          <p class="widget__text">{{dist.widgetText}}</p>
-        </div>
-        <div class="safe card">
-          <p class="safe__text">{{dist.safeText}}</p>
-          <button type="button" class="btn btn--safe btn--block" id="safe-btn"><svg class="ic" aria-hidden="true"><use href="#i-shield"/></svg>{{dist.safeBtn}}</button>
-          <p class="card__note" id="safe-note" aria-live="polite"></p>
-        </div>
+      <div class="safe card">
+        <p class="safe__text">{{dist.safeText}}</p>
+        <button type="button" class="btn btn--safe btn--block" id="safe-btn"><svg class="ic" aria-hidden="true"><use href="#i-shield"/></svg>{{dist.safeBtn}}</button>
+        <p class="card__note" id="safe-note" aria-live="polite"></p>
       </div>
     </div>
   </div>
 </section>
 
-<section class="section section--tint" id="privacy" aria-labelledby="priv-title">
+<section class="section section--tint" id="widgets" aria-labelledby="wid-title">
+  <div class="wrap split-2">
+    <div>
+      <p class="eyebrow">{{wid.eyebrow}}</p>
+      <h2 class="section__title" id="wid-title">{{wid.title}}</h2>
+      <p class="section__lead">{{wid.lead}}</p>
+      <ul class="ticks">
+        <li>{{wid.l1}}</li>
+        <li>{{wid.l2}}</li>
+        <li>{{wid.l3}}</li>
+        <li>{{wid.l4}}</li>
+      </ul>
+    </div>
+    <div class="wid-demo">
+      <div class="pad card">
+        <div class="pad__surface">
+          <canvas class="pad__canvas" id="pad" width="600" height="600" role="img" aria-label="{{wid.padLabel|attr}}"></canvas>
+          <p class="pad__hint" id="pad-hint" aria-hidden="true">{{wid.padHint}}</p>
+        </div>
+        <div class="pad__tools">
+          <div class="swatches" role="group" aria-label="{{wid.colors|attr}}" id="pad-colors">
+            <button type="button" class="swatch" data-color="#F07DA1" aria-pressed="true"><span class="sr">{{wid.pink}}</span></button>
+            <button type="button" class="swatch" data-color="#5C9DF2" aria-pressed="false"><span class="sr">{{wid.blue}}</span></button>
+            <button type="button" class="swatch" data-color="#2B2233" aria-pressed="false"><span class="sr">{{wid.dark}}</span></button>
+            <button type="button" class="swatch" data-color="#F5B85C" aria-pressed="false"><span class="sr">{{wid.honey}}</span></button>
+          </div>
+          <button type="button" class="btn btn--ghost btn--sm" id="pad-clear">{{wid.clear}}</button>
+        </div>
+        <button type="button" class="btn btn--primary btn--block" id="pad-send"><svg class="ic" aria-hidden="true"><use href="#i-send"/></svg>{{wid.send}}</button>
+        <p class="card__note" id="pad-note" aria-live="polite"></p>
+      </div>
+      <figure class="homescreen" role="img" aria-label="{{wid.phoneAlt|attr}}">
+        <div class="homescreen__grid" aria-hidden="true">
+          <div class="hw hw--mood">
+            <span class="hw__emoji">😊</span>
+            <span class="hw__name">{{wid.moodName}}</span>
+            <span class="hw__time" id="hw-time" data-tz="Europe/Kyiv">21:40</span>
+            <span class="hw__meter"><i></i><i></i><i></i><i></i><i></i></span>
+            <span class="hw__line">{{wid.moodLine}}</span>
+          </div>
+          <div class="hw hw--count">
+            <span class="hw__num">{{wid.cdNum}}</span>
+            <span class="hw__label">{{wid.cdText}}</span>
+          </div>
+          <div class="hw hw--doodle" id="hw-doodle">
+            <img class="hw__img" id="hw-doodle-img" alt="">
+            <span class="hw__from" id="hw-doodle-from">{{wid.doodleFrom}}</span>
+          </div>
+          <span class="hw-app"></span><span class="hw-app"></span><span class="hw-app"></span><span class="hw-app"></span>
+        </div>
+        <figcaption class="homescreen__caption">{{wid.phoneCaption}}</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="privacy" aria-labelledby="priv-title">
   <div class="wrap">
     <div class="section__head">
       <p class="eyebrow">{{priv.eyebrow}}</p>
@@ -454,40 +503,44 @@
   </div>
 </section>
 
-<section class="section" id="wrapped" aria-labelledby="wrap-title">
+<section class="section section--tint" id="month" aria-labelledby="month-title">
   <div class="wrap split-2 split-2--rev">
     <div>
-      <p class="eyebrow">{{wrap.eyebrow}}</p>
-      <h2 class="section__title" id="wrap-title">{{wrap.title}}</h2>
-      <p class="section__lead">{{wrap.lead}}</p>
-      <div class="home card">
-        <span class="home__icon" aria-hidden="true"><svg class="ic"><use href="#i-home"/></svg></span>
-        <div class="home__body">
-          <p class="home__row"><b>{{wrap.homeTitle}}</b><span>{{wrap.homeLevel}}</span></p>
-          <div class="bar" aria-hidden="true"><i style="--w:72%"></i></div>
-          <p class="home__text">{{wrap.homeText}}</p>
+      <p class="eyebrow">{{month.eyebrow}}</p>
+      <h2 class="section__title" id="month-title">{{month.title}}</h2>
+      <p class="section__lead">{{month.lead}}</p>
+      <form class="month-form card" id="month-form" novalidate>
+        <div class="month-form__grid">
+          <div class="field"><label for="month-me">{{month.myName}}</label><input type="text" id="month-me" maxlength="24" autocomplete="off"></div>
+          <div class="field"><label for="month-partner">{{month.partnerName}}</label><input type="text" id="month-partner" maxlength="24" autocomplete="off"></div>
+          <div class="field"><label for="month-city-me">{{month.myCity}}</label><select id="month-city-me"></select></div>
+          <div class="field"><label for="month-city-partner">{{month.partnerCity}}</label><select id="month-city-partner"></select></div>
         </div>
-      </div>
+        <button type="button" class="btn btn--primary btn--block" id="month-save"><svg class="ic" aria-hidden="true"><use href="#i-download"/></svg>{{month.save}}</button>
+        <p class="card__note" id="month-note" aria-live="polite"></p>
+        <p class="month-form__fine">{{month.note}}</p>
+      </form>
     </div>
     <div class="story-wrap">
-      <figure class="story">
-        <span class="story__example">{{wrap.example}}</span>
-        <p class="story__year">{{wrap.year}}</p>
-        <p class="story__names">{{wrap.names}}</p>
+      <figure class="story" id="month-story">
+        <span class="story__example">{{month.example}}</span>
+        <p class="story__title" id="story-title">{{month.storyTitle}}</p>
+        <p class="story__names" id="story-names">{{month.storyNames}}</p>
+        <p class="story__km"><b id="story-km">{{month.km}}</b> <span>{{month.kmLabel}}</span></p>
         <dl class="story__stats">
-          <div><dt>{{wrap.stat1Label}}</dt><dd>{{wrap.stat1}}</dd></div>
-          <div><dt>{{wrap.stat2Label}}</dt><dd>{{wrap.stat2}}</dd></div>
-          <div><dt>{{wrap.stat3Label}}</dt><dd>{{wrap.stat3}}</dd></div>
+          <div><dt>{{month.tapsLabel}}</dt><dd>{{month.taps}}</dd></div>
+          <div><dt>{{month.doodlesLabel}}</dt><dd>{{month.doodles}}</dd></div>
+          <div><dt>{{month.safeLabel}}</dt><dd>{{month.safe}}</dd></div>
+          <div><dt>{{month.daysLabel}}</dt><dd>{{month.days}}</dd></div>
+          <div><dt>{{month.hoursLabel}}</dt><dd id="story-hours">{{month.hours}}</dd></div>
+          <div><dt>{{month.moodLabel}}</dt><dd>{{month.mood}}</dd></div>
         </dl>
-        <p class="story__line">{{wrap.word}}</p>
-        <p class="story__line">{{wrap.city}}</p>
-        <svg class="story__mark" viewBox="0 0 48 32" aria-hidden="true"><use href="#pair"/></svg>
       </figure>
     </div>
   </div>
 </section>
 
-<section class="section section--tint" id="pricing" aria-labelledby="price-title">
+<section class="section" id="pricing" aria-labelledby="price-title">
   <div class="wrap">
     <div class="section__head">
       <p class="eyebrow">{{price.eyebrow}}</p>

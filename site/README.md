@@ -33,7 +33,12 @@ Set these environment variables for `npm run build`:
 - A day with Belong: interactive mood check-in, “thinking of you”, the plan switcher, evening gratitude and the weekly talk.
 - **Date Match**: a two-player game that works without the app. One partner swipes 10 date ideas, then passes the phone or sends a link. The partner's results can be sent back with a reply link. The result screen exports a 1080×1920 story card. Answers travel in the link's `#` fragment, so nothing is stored on a server.
 - Date wheel with budget and place filters.
-- Long distance, privacy, Year Wrapped, pricing, waitlist with a referral link, FAQ.
+- Long distance: both clocks and the “I'm safe” button.
+- **Widgets**: draw on a pad and send it. The doodle appears on a mock of the partner's home screen, next to the mood and countdown widgets.
+- **Our month apart**: a story card with km between you and the time difference, worked out from the cities the visitor picks. It saves as a 1080×1920 PNG. The other numbers are examples.
+- Privacy, pricing, waitlist with a referral link, FAQ.
+
+The example couple is Yulia and Igor (Юля та Ігор).
 
 ## Editing text
 

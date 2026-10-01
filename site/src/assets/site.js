@@ -50,6 +50,325 @@
     navigator.share({ text: btn.dataset.text, url: btn.dataset.url }).catch(() => {});
   });
 
+  // Shares a PNG where the device supports sharing files, otherwise downloads it.
+  async function deliverPng(blob, filename, text, noteEl, savedMessage) {
+    if (!blob) return;
+    const file = new File([blob], filename, { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], text });
+        return;
+      } catch (err) {
+        if (err && err.name === 'AbortError') return;
+      }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    if (noteEl) noteEl.textContent = savedMessage;
+  }
+
+  const canvasFont = (weight, size) => `${weight} ${size}px Manrope, system-ui, -apple-system, "Segoe UI", sans-serif`;
+
+  // Fits text into maxWidth by shrinking, then by cutting with an ellipsis.
+  function fitText(ctx, text, maxWidth, weight, size, min = 28) {
+    let s = size;
+    ctx.font = canvasFont(weight, s);
+    while (ctx.measureText(text).width > maxWidth && s > min) { s -= 2; ctx.font = canvasFont(weight, s); }
+    if (ctx.measureText(text).width <= maxWidth) return text;
+    let t = text;
+    while (t.length > 1 && ctx.measureText(`${t}…`).width > maxWidth) t = t.slice(0, -1);
+    return `${t}…`;
+  }
+
+  // Splits text into centred lines no wider than maxWidth; returns the y below the last line.
+  function wrapCentered(ctx, text, x, y, maxWidth, lineHeight) {
+    const words = text.split(/\s+/);
+    const lines = [];
+    let line = '';
+    for (const w of words) {
+      const next = line ? `${line} ${w}` : w;
+      if (ctx.measureText(next).width > maxWidth && line) { lines.push(line); line = w; } else line = next;
+    }
+    if (line) lines.push(line);
+    lines.forEach((l, i) => ctx.fillText(l, x, y + i * lineHeight));
+    return y + (lines.length - 1) * lineHeight;
+  }
+
+  // A heart doodle like the ones partners send each other.
+  function sampleDoodle(size) {
+    const c = document.createElement('canvas');
+    c.width = size;
+    c.height = size;
+    const g = c.getContext('2d');
+    const s = size / 100;
+    g.fillStyle = '#FFF8F3';
+    g.fillRect(0, 0, size, size);
+    g.lineCap = 'round';
+    g.lineJoin = 'round';
+    g.lineWidth = 3.4 * s;
+    g.strokeStyle = '#F07DA1';
+    g.beginPath();
+    g.moveTo(50 * s, 78 * s);
+    g.bezierCurveTo(14 * s, 56 * s, 16 * s, 24 * s, 36 * s, 24 * s);
+    g.bezierCurveTo(45 * s, 24 * s, 49 * s, 30 * s, 50 * s, 36 * s);
+    g.bezierCurveTo(52 * s, 29 * s, 57 * s, 23 * s, 66 * s, 24 * s);
+    g.bezierCurveTo(86 * s, 26 * s, 84 * s, 58 * s, 50 * s, 78 * s);
+    g.stroke();
+    g.strokeStyle = '#5C9DF2';
+    [[80, 18, 6], [18, 80, 4.5]].forEach(([x, y, r]) => {
+      g.beginPath();
+      g.moveTo((x - r) * s, y * s); g.lineTo((x + r) * s, y * s);
+      g.moveTo(x * s, (y - r) * s); g.lineTo(x * s, (y + r) * s);
+      g.stroke();
+    });
+    return c.toDataURL('image/png');
+  }
+
+  // ---------- Widgets demo ----------
+  function initWidgetsDemo() {
+    const pad = $('#pad');
+    if (!pad || !pad.getContext) return;
+    const T = R.wid;
+    const g = pad.getContext('2d');
+    const hint = $('#pad-hint');
+    const note = $('#pad-note');
+    const img = $('#hw-doodle-img');
+    const from = $('#hw-doodle-from');
+    const widget = $('#hw-doodle');
+    let color = '#F07DA1';
+    let drawing = false;
+    let last = null;
+    let strokes = 0;
+
+    img.src = sampleDoodle(300);
+    g.lineCap = 'round';
+    g.lineJoin = 'round';
+
+    const at = (e) => {
+      const r = pad.getBoundingClientRect();
+      return [((e.clientX - r.left) * pad.width) / r.width, ((e.clientY - r.top) * pad.height) / r.height];
+    };
+    pad.addEventListener('pointerdown', (e) => {
+      drawing = true;
+      last = at(e);
+      try { pad.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
+      g.fillStyle = color;
+      g.beginPath();
+      g.arc(last[0], last[1], 8, 0, Math.PI * 2);
+      g.fill();
+      hint.classList.add('is-hidden');
+      note.textContent = '';
+    });
+    pad.addEventListener('pointermove', (e) => {
+      if (!drawing) return;
+      const p = at(e);
+      g.strokeStyle = color;
+      g.lineWidth = 16;
+      g.beginPath();
+      g.moveTo(last[0], last[1]);
+      g.lineTo(p[0], p[1]);
+      g.stroke();
+      last = p;
+    });
+    const end = () => {
+      if (drawing) strokes += 1;
+      drawing = false;
+    };
+    pad.addEventListener('pointerup', end);
+    pad.addEventListener('pointercancel', end);
+    pad.addEventListener('pointerleave', end);
+
+    $('#pad-colors').addEventListener('click', (e) => {
+      const btn = e.target.closest('.swatch');
+      if (!btn) return;
+      color = btn.dataset.color;
+      $$('.swatch', e.currentTarget).forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+    });
+    const clear = () => {
+      g.clearRect(0, 0, pad.width, pad.height);
+      strokes = 0;
+      hint.classList.remove('is-hidden');
+    };
+    $('#pad-clear').addEventListener('click', () => {
+      clear();
+      note.textContent = '';
+    });
+    $('#pad-send').addEventListener('click', () => {
+      if (!strokes) {
+        note.textContent = T.empty;
+        return;
+      }
+      const out = document.createElement('canvas');
+      out.width = 300;
+      out.height = 300;
+      const o = out.getContext('2d');
+      o.fillStyle = '#FFF8F3';
+      o.fillRect(0, 0, 300, 300);
+      o.drawImage(pad, 0, 0, 300, 300);
+      img.src = out.toDataURL('image/png');
+      from.textContent = T.from;
+      widget.classList.remove('is-new');
+      void widget.offsetWidth; // restart the arrival animation
+      widget.classList.add('is-new');
+      note.textContent = T.sent;
+      clear();
+      const r = widget.getBoundingClientRect();
+      if (r.top < 0 || r.bottom > window.innerHeight) widget.scrollIntoView({ block: 'center', behavior: reduceMotion() ? 'auto' : 'smooth' });
+    });
+
+    const time = $('#hw-time');
+    const zone = resolveZone(time.dataset.tz);
+    const tick = () => { try { if (zone) time.textContent = timeIn(zone, new Date()); } catch { /* keep static time */ } };
+    tick();
+    setInterval(tick, 20000);
+  }
+
+  // ---------- Our month apart ----------
+  function initMonth() {
+    const form = $('#month-form');
+    if (!form) return;
+    const M = R.month;
+    const me = $('#month-me');
+    const partner = $('#month-partner');
+    const cityMe = $('#month-city-me');
+    const cityPartner = $('#month-city-partner');
+    const options = M.cities.map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
+    cityMe.innerHTML = options;
+    cityPartner.innerHTML = options;
+    cityMe.value = 'kyiv';
+    cityPartner.value = 'toronto';
+    me.value = M.defaultMe;
+    partner.value = M.defaultPartner;
+
+    const now = new Date();
+    const recap = now.getDate() <= 7 ? new Date(now.getFullYear(), now.getMonth() - 1, 1) : new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthName = new Intl.DateTimeFormat(LOCALE, { month: 'long' }).format(recap);
+    const byId = (id) => M.cities.find((c) => c.id === id) || M.cities[0];
+    const rad = (d) => (d * Math.PI) / 180;
+    const distance = (a, b) => {
+      const h = Math.sin(rad(b.lat - a.lat) / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.lon - a.lon) / 2) ** 2;
+      return 2 * 6371.0088 * Math.asin(Math.sqrt(h));
+    };
+    const name = (input, fallback) => input.value.replace(/\s+/g, ' ').trim().slice(0, 24) || fallback;
+
+    function update() {
+      const a = byId(cityMe.value);
+      const b = byId(cityPartner.value);
+      const km = Math.round(distance(a, b) / 10) * 10;
+      $('#story-km').textContent = new Intl.NumberFormat(LOCALE).format(km);
+      let hours = null;
+      try {
+        hours = Math.abs(Math.round((offsetMinutes(resolveZone(a.zone), new Date()) - offsetMinutes(resolveZone(b.zone), new Date())) / 30) / 2);
+      } catch { /* no time zone data */ }
+      if (hours !== null) $('#story-hours').textContent = hours ? fmt(M.hoursTpl, { h: hours }) : M.sameZone;
+      $('#story-title').textContent = fmt(M.titleTpl, { month: monthName });
+      $('#story-names').textContent = fmt(M.namesTpl, { a: name(me, M.defaultMe), b: name(partner, M.defaultPartner) });
+    }
+    [me, partner].forEach((el) => el.addEventListener('input', update));
+    [cityMe, cityPartner].forEach((el) => el.addEventListener('change', update));
+    update();
+
+    $('#month-save').addEventListener('click', async () => {
+      const story = $('#month-story');
+      const rows = $$('.story__stats > div', story).map((d) => [$('dt', d).textContent, $('dd', d).textContent]);
+      const blob = await monthCard({
+        title: $('#story-title').textContent,
+        names: $('#story-names').textContent,
+        km: $('#story-km').textContent,
+        kmLabel: $('.story__km span', story).textContent,
+        rows,
+        footer: M.footer,
+      });
+      await deliverPng(blob, 'belong-our-month.png', `${$('#story-title').textContent} 💞`, $('#month-note'), M.saved);
+    });
+  }
+
+  // Draws the 1080×1920 "our month apart" story card.
+  async function monthCard(d) {
+    const W = 1080;
+    const H = 1920;
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    try {
+      await Promise.all([document.fonts.load(canvasFont(800, 200)), document.fonts.load(canvasFont(700, 48))]);
+    } catch { /* fall back to system fonts */ }
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#FDE2EB');
+    bg.addColorStop(0.5, '#FFF8F3');
+    bg.addColorStop(1, '#E1EDFD');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.lineWidth = 10;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#2B2233';
+    ctx.beginPath();
+    ctx.ellipse(540, 240, 120, 90, 0, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+    ctx.fillStyle = '#F07DA1';
+    ctx.beginPath(); ctx.arc(432, 262, 30, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#5C9DF2';
+    ctx.beginPath(); ctx.arc(648, 262, 30, 0, Math.PI * 2); ctx.fill();
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#2B2233';
+    ctx.font = canvasFont(800, 76);
+    let y = wrapCentered(ctx, d.title, W / 2, 440, 920, 86);
+    ctx.fillStyle = '#6A5F70';
+    ctx.fillText(fitText(ctx, d.names, 920, 600, 44), W / 2, y + 80);
+
+    let bigSize = 210;
+    ctx.font = canvasFont(800, bigSize);
+    while (ctx.measureText(d.km).width > 960 && bigSize > 120) {
+      bigSize -= 10;
+      ctx.font = canvasFont(800, bigSize);
+    }
+    const big = ctx.createLinearGradient(200, 0, 880, 0);
+    big.addColorStop(0, '#C93F76');
+    big.addColorStop(1, '#2F6BC8');
+    ctx.fillStyle = big;
+    ctx.fillText(d.km, W / 2, y + 330);
+    ctx.fillStyle = '#5E5466';
+    ctx.fillText(fitText(ctx, d.kmLabel, 920, 700, 48), W / 2, y + 400);
+
+    let top = y + 460;
+    d.rows.forEach(([label, value]) => {
+      ctx.save();
+      ctx.shadowColor = 'rgba(43,34,51,0.08)';
+      ctx.shadowBlur = 30;
+      ctx.shadowOffsetY = 8;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(90, top, 900, 112, 38);
+      else ctx.rect(90, top, 900, 112);
+      ctx.fill();
+      ctx.restore();
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#2B2233';
+      ctx.font = canvasFont(800, 50);
+      const valueWidth = ctx.measureText(value).width;
+      ctx.fillText(value, 950, top + 74);
+      ctx.textAlign = 'left';
+      ctx.fillText(fitText(ctx, label, 800 - valueWidth - 60, 600, 40, 26), 130, top + 70);
+      top += 130;
+    });
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#6A5F70';
+    ctx.fillText(fitText(ctx, d.footer, 920, 700, 40), W / 2, H - 90);
+    return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+  }
+
   // ---------- Header ----------
   function initHeader() {
     const header = $('.header');
@@ -448,27 +767,8 @@
     }
 
     async function saveStory() {
-      const note = $('#match-note', root);
       const blob = await storyCard(S.a.name, S.b.name, matches(), N, M);
-      if (!blob) return;
-      const file = new File([blob], 'belong-date-match.png', { type: 'image/png' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        try {
-          await navigator.share({ files: [file], text: fmt(M.shareResult, { k: matches().length, n: N }) });
-          return;
-        } catch (err) {
-          if (err && err.name === 'AbortError') return;
-        }
-      }
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = file.name;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-      if (note) note.textContent = M.storySaved;
+      await deliverPng(blob, 'belong-date-match.png', fmt(M.shareResult, { k: matches().length, n: N }), $('#match-note', root), M.storySaved);
     }
 
     root.addEventListener('click', async (e) => {
@@ -870,5 +1170,7 @@
   initDistance();
   initMatch();
   initWheel();
+  initWidgetsDemo();
+  initMonth();
   initWaitlist();
 })();

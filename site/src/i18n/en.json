@@ -12,7 +12,7 @@
     "mainNav": "Main",
     "language": "Language",
     "otherLangLabel": "Українська",
-    "phoneAlt": "Belong app, Today screen: Max’s mood, Anya’s check-in, countdowns and the plan for the day"
+    "phoneAlt": "Belong app, Today screen: Igor’s mood, Yulia’s check-in, countdowns and the plan for the day"
   },
   "nav": {
     "how": "How it works",
@@ -31,19 +31,19 @@
     "ctaPrimary": "Get early access",
     "ctaSecondary": "Play Date Match",
     "note": "Free to start. One subscription covers you both.",
-    "float1": "Max is thinking of you",
+    "float1": "Igor is thinking of you",
     "float2Label": "It’s a match!",
     "float2": "Night in a tent by a lake"
   },
   "phone": {
-    "greeting": "Good morning, Anya",
+    "greeting": "Good morning, Yulia",
     "date": "Thursday, October 1",
-    "him": "M",
-    "her": "A",
-    "partner": "<b>Max today</b> 😴 · energy 2 of 5, a tough day",
+    "him": "I",
+    "her": "Y",
+    "partner": "<b>Igor today</b> 😴 · energy 2 of 5, a tough day",
     "support": "Send support",
-    "howAreYou": "How are you, Anya?",
-    "maxSees": "Max will see",
+    "howAreYou": "How are you, Yulia?",
+    "partnerSees": "Igor will see",
     "energy": "Energy",
     "cd1Label": "Until Japan",
     "cd1Num": "187",
@@ -82,11 +82,11 @@
     "s2Piggy": "Savings",
     "s2Amount": "$2,480",
     "s2Of": "of $4,000",
-    "s2Her": "Anya $1,300",
-    "s2Him": "Max $1,180",
+    "s2Her": "Yulia $1,300",
+    "s2Him": "Igor $1,180",
     "s3k": "Do",
     "s3t": "Steps land in your day",
-    "s3d": "“Buy tickets to Tokyo” shows up in Anya’s plan for today, with its deadline.",
+    "s3d": "“Buy tickets to Tokyo” shows up in Yulia’s plan for today, with its deadline.",
     "s4k": "Remember",
     "s4t": "It becomes a memory",
     "s4d": "Photos and the moment it happened go into your shared timeline.",
@@ -106,12 +106,12 @@
     "mood3": "Okay",
     "mood4": "Good",
     "mood5": "Great",
-    "moodNote": "Max will see: 😊 · energy 4 of 5",
+    "moodNote": "Igor will see: 😊 · energy 4 of 5",
     "dTime": "13:05",
     "dTitle": "A tap that says “thinking of you”",
     "dText": "One tap sends a soft buzz to your partner’s phone. Notes can stay locked until a date, like the morning of your anniversary.",
-    "chatMax": "Morning! Calls until lunch, then dinner at my parents’ tonight, remember?",
-    "chatAnya": "I remember 🙂 I’ll bring the apple pie",
+    "chatHim": "Morning! Calls until lunch, then dinner at my parents’ tonight, remember?",
+    "chatHer": "I remember 🙂 I’ll bring the apple pie",
     "noteTitle": "Surprise note",
     "noteMeta": "Opens Feb 14 at 8:00",
     "thinkBtn": "Thinking of you",
@@ -121,12 +121,12 @@
     "segLabel": "Whose tasks",
     "segMine": "Mine",
     "segOurs": "Ours",
-    "segHis": "Max’s",
+    "segHis": "Igor’s",
     "mine1": "Buy tickets to Tokyo",
     "mine1Meta": "★ Japan · by Oct 15",
     "mine2": "Pick up a parcel",
     "mine2Meta": "Post office · by 8 pm",
-    "ours1": "Dinner at Max’s parents, 7 pm",
+    "ours1": "Dinner at Igor’s parents, 7 pm",
     "ours1Meta": "shared",
     "ours2": "Pick a film for Friday",
     "ours2Meta": "shared",
@@ -140,10 +140,10 @@
     "g3": "Cat food",
     "nTime": "22:40",
     "nTitle": "Evening gratitude",
-    "nText": "Before bed, write one thing you’re thankful for. Max reads it with your “good morning”.",
+    "nText": "Before bed, write one thing you’re thankful for. Igor reads it with your “good morning”.",
     "nLabel": "End of the day",
-    "nQuestion": "What are you thankful to Max for today?",
-    "nField": "Your note to Max",
+    "nQuestion": "What are you thankful to Igor for today?",
+    "nField": "Your note to Igor",
     "chip1": "Made breakfast",
     "chip1Phrase": "making breakfast",
     "chip2": "Had my back",
@@ -181,12 +181,35 @@
     "f4": "A shared goodnight, even 7 hours apart",
     "cityA": "Kyiv",
     "cityB": "Toronto",
-    "personA": "Anya · 😊 4/5",
-    "personB": "Max · 😴 2/5",
-    "widgetNum": "12 days",
-    "widgetText": "until we meet",
-    "safeText": "Let Max know you’re okay without typing a word.",
+    "personA": "Yulia · 😊 4/5",
+    "personB": "Igor · 😴 2/5",
+    "safeText": "Let Igor know you’re okay without typing a word.",
     "safeBtn": "I’m safe"
+  },
+  "wid": {
+    "eyebrow": "Home screen widgets",
+    "title": "Always on each other’s home screen",
+    "lead": "Belong lives where you look a hundred times a day. Draw something, and in a few seconds it’s on your partner’s home screen.",
+    "l1": "Your partner’s mood and local time",
+    "l2": "A countdown to your next meeting",
+    "l3": "Doodles that land on their screen",
+    "l4": "On the lock screen too, where the phone supports it",
+    "padLabel": "Drawing area. Draw with your mouse or finger.",
+    "padHint": "Draw here",
+    "colors": "Pen color",
+    "pink": "Pink",
+    "blue": "Blue",
+    "dark": "Dark",
+    "honey": "Honey",
+    "clear": "Clear",
+    "send": "Send to Igor",
+    "phoneCaption": "Igor’s home screen",
+    "phoneAlt": "Igor’s home screen with Belong widgets: Yulia’s mood, the countdown and her latest doodle",
+    "moodName": "Yulia · Kyiv",
+    "moodLine": "😊 · energy 4/5",
+    "cdNum": "12 days",
+    "cdText": "until we meet",
+    "doodleFrom": "From Yulia · 13:05"
   },
   "priv": {
     "eyebrow": "Privacy",
@@ -194,7 +217,7 @@
     "lead": "Everything in Belong has an owner, and color shows who. You decide what to share.",
     "mine": "Mine",
     "mineText": "Private notes, goals and photos only you can see.",
-    "theirs": "Max’s",
+    "theirs": "Igor’s",
     "theirsText": "What your partner keeps to themselves stays theirs.",
     "ours": "Ours",
     "oursText": "Plans, goals and the timeline you both see.",
@@ -204,24 +227,33 @@
     "l4": "If you break up, each of you exports your own data, and the shared space is archived instead of quietly deleted.",
     "l5": "No guilt streaks. Missing a day costs you nothing."
   },
-  "wrap": {
-    "eyebrow": "Your year",
-    "title": "Your year together, wrapped",
-    "lead": "Every December Belong turns your year into a set of story cards: places, dreams that came true, your warmest moments. Share them if you like, or keep them for the two of you.",
+  "month": {
+    "eyebrow": "Every month",
+    "title": "Our month apart",
+    "lead": "On the first of each month Belong sums up your month: kilometres between you, “thinking of you” taps, doodles and days until you meet. It comes as a story card made to share, and once a year you get the big one.",
+    "myName": "Your name",
+    "partnerName": "Partner’s name",
+    "myCity": "Your city",
+    "partnerCity": "Partner’s city",
+    "save": "Save story card",
+    "note": "Distance and time difference use your cities. Taps, doodles and mood are example numbers.",
     "example": "Example",
-    "year": "2026",
-    "names": "Anya & Max",
-    "stat1": "52",
-    "stat1Label": "dates",
-    "stat2": "3",
-    "stat2Label": "dreams came true",
-    "stat3": "214",
-    "stat3Label": "“thinking of you” taps",
-    "word": "Most-used word: pizza 🍕",
-    "city": "Favorite city: Lviv",
-    "homeTitle": "Our home",
-    "homeLevel": "Level 7",
-    "homeText": "Your little home grows with everything you do together. Two more shared tasks until a new room."
+    "storyTitle": "Our September apart",
+    "storyNames": "Yulia & Igor",
+    "km": "7,560",
+    "kmLabel": "km between you",
+    "taps": "121",
+    "tapsLabel": "“thinking of you” taps",
+    "doodles": "17",
+    "doodlesLabel": "doodles",
+    "safe": "9",
+    "safeLabel": "“I’m safe” check-ins",
+    "days": "12",
+    "daysLabel": "days until we meet",
+    "hours": "7 h",
+    "hoursLabel": "time difference",
+    "mood": "😊",
+    "moodLabel": "average mood"
   },
   "price": {
     "eyebrow": "Pricing",
@@ -293,10 +325,10 @@
       "close": "Закрити"
     },
     "day": {
-      "moodNote": "Max will see: {mood} · energy {energy} of 5",
-      "thinkSent": "Sent. Max’s phone buzzes softly.",
+      "moodNote": "Igor will see: {mood} · energy {energy} of 5",
+      "thinkSent": "Sent. Igor’s phone buzzes softly.",
       "gratitudePrefix": "Thank you for ",
-      "gratitudeSent": "Saved. Max will see it in the morning 🌙",
+      "gratitudeSent": "Saved. Igor will see it in the morning 🌙",
       "talk": [
         [
           "What went well this week?",
@@ -313,13 +345,13 @@
       ],
       "talkProgress": "{i} of {n}",
       "talkDone": "Done",
-      "safeSent": "Max got it: Anya is safe · {time}",
+      "safeSent": "Igor got it: Yulia is safe · {time}",
       "diff": "{h} h apart"
     },
     "match": {
       "introTitle": "Who’s playing first?",
       "nameLabel": "Your name",
-      "namePh": "Anya",
+      "namePh": "Yulia",
       "start": "Start swiping",
       "nameRequired": "Add your name so your partner knows who’s inviting them.",
       "partnerRequired": "Add your partner’s name.",
@@ -335,7 +367,7 @@
       "handoffTitle": "Done, {name}! Now it’s your partner’s turn",
       "passPhone": "Pass the phone",
       "partnerNameLabel": "Partner’s name",
-      "partnerPh": "Max",
+      "partnerPh": "Igor",
       "or": "or",
       "sendLink": "Send a link",
       "linkLabel": "Link for your partner",
@@ -591,6 +623,114 @@
       "copied": "Copied",
       "copyFail": "Select the link and copy it",
       "shareText": "We’re joining Belong, an app for couples. Join the waitlist:"
+    },
+    "wid": {
+      "sent": "Sent. It’s on Igor’s home screen.",
+      "empty": "Draw something first.",
+      "from": "From Yulia · just now"
+    },
+    "month": {
+      "titleTpl": "Our {month} apart",
+      "namesTpl": "{a} & {b}",
+      "hoursTpl": "{h} h",
+      "sameZone": "0 h",
+      "footer": "Made with Belong",
+      "saved": "Story card saved",
+      "defaultMe": "Yulia",
+      "defaultPartner": "Igor",
+      "cities": [
+        {
+          "id": "kyiv",
+          "name": "Kyiv",
+          "lat": 50.4501,
+          "lon": 30.5234,
+          "zone": "Europe/Kiev"
+        },
+        {
+          "id": "lviv",
+          "name": "Lviv",
+          "lat": 49.8397,
+          "lon": 24.0297,
+          "zone": "Europe/Kiev"
+        },
+        {
+          "id": "kharkiv",
+          "name": "Kharkiv",
+          "lat": 49.9935,
+          "lon": 36.2304,
+          "zone": "Europe/Kiev"
+        },
+        {
+          "id": "odesa",
+          "name": "Odesa",
+          "lat": 46.4825,
+          "lon": 30.7233,
+          "zone": "Europe/Kiev"
+        },
+        {
+          "id": "warsaw",
+          "name": "Warsaw",
+          "lat": 52.2297,
+          "lon": 21.0122,
+          "zone": "Europe/Warsaw"
+        },
+        {
+          "id": "berlin",
+          "name": "Berlin",
+          "lat": 52.52,
+          "lon": 13.405,
+          "zone": "Europe/Berlin"
+        },
+        {
+          "id": "prague",
+          "name": "Prague",
+          "lat": 50.0755,
+          "lon": 14.4378,
+          "zone": "Europe/Prague"
+        },
+        {
+          "id": "london",
+          "name": "London",
+          "lat": 51.5074,
+          "lon": -0.1278,
+          "zone": "Europe/London"
+        },
+        {
+          "id": "lisbon",
+          "name": "Lisbon",
+          "lat": 38.7223,
+          "lon": -9.1393,
+          "zone": "Europe/Lisbon"
+        },
+        {
+          "id": "dubai",
+          "name": "Dubai",
+          "lat": 25.2048,
+          "lon": 55.2708,
+          "zone": "Asia/Dubai"
+        },
+        {
+          "id": "toronto",
+          "name": "Toronto",
+          "lat": 43.6532,
+          "lon": -79.3832,
+          "zone": "America/Toronto"
+        },
+        {
+          "id": "newyork",
+          "name": "New York",
+          "lat": 40.7128,
+          "lon": -74.006,
+          "zone": "America/New_York"
+        },
+        {
+          "id": "vancouver",
+          "name": "Vancouver",
+          "lat": 49.2827,
+          "lon": -123.1207,
+          "zone": "America/Vancouver"
+        }
+      ]
     }
   }
 }

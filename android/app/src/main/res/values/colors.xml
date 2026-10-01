@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#FFF8F3</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="sunk">#F3EAE5</color>
+    <color name="line">#EADFE2</color>
+    <color name="ink">#2B2233</color>
+    <color name="ink2">#6A5F70</color>
+    <color name="on_tint">#5E5466</color>
+    <color name="her">#F07DA1</color>
+    <color name="her_tint">#FDE2EB</color>
+    <color name="him">#5C9DF2</color>
+    <color name="him_tint">#E1EDFD</color>
+    <!-- Deeper pair gradient that keeps white text readable. -->
+    <color name="us_start">#C93F76</color>
+    <color name="us_end">#2F6BC8</color>
+    <color name="ok">#6FBF9A</color>
+    <color name="ok_tint">#EAF6F0</color>
+    <color name="ok_ink">#2E6E50</color>
+    <color name="honey">#F5B85C</color>
+    <color name="white">#FFFFFF</color>
+</resources>

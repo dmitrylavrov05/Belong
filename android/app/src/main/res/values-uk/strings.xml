@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="default_my_name">Юля</string>
+    <string name="default_partner_name">Ігор</string>
+
+    <string name="tab_today">Сьогодні</string>
+    <string name="tab_doodle">Малюнок</string>
+    <string name="tab_games">Ігри</string>
+    <string name="tab_month">Місяць</string>
+
+    <string name="greeting_morning">Доброго ранку</string>
+    <string name="greeting_day">Добрий день</string>
+    <string name="greeting_evening">Добрий вечір</string>
+    <string name="greeting_night">Доброї ночі</string>
+    <string name="couple_line">%1$s та %2$s</string>
+    <string name="settings">Налаштування</string>
+
+    <string name="partner_now">%1$s зараз</string>
+    <string name="mood_line">Настрій %1$s · енергія %2$d з 5</string>
+    <string name="updated_at">оновлено о %1$s</string>
+    <string name="support">Підтримати</string>
+    <string name="support_sent">%1$s відчує маленькі обійми.</string>
+    <string name="checkin_title">Як ти сьогодні?</string>
+    <string name="checkin_hint">%1$s побачить</string>
+    <string name="energy">Енергія</string>
+    <string name="mood_1">Сумно</string>
+    <string name="mood_2">Так собі</string>
+    <string name="mood_3">Нормально</string>
+    <string name="mood_4">Добре</string>
+    <string name="mood_5">Чудово</string>
+    <string name="energy_level">Енергія %1$d з 5</string>
+
+    <string name="distance_title">Між вами</string>
+    <string name="km">%1$s км</string>
+    <string name="hours_apart">різниця %1$s год</string>
+    <string name="same_zone">Один часовий пояс</string>
+
+    <string name="countdown_title">До зустрічі</string>
+    <plurals name="days">
+        <item quantity="one">%d день</item>
+        <item quantity="few">%d дні</item>
+        <item quantity="many">%d днів</item>
+        <item quantity="other">%d дня</item>
+    </plurals>
+    <plurals name="days_until_label">
+        <item quantity="one">день до зустрічі</item>
+        <item quantity="few">дні до зустрічі</item>
+        <item quantity="many">днів до зустрічі</item>
+        <item quantity="other">дня до зустрічі</item>
+    </plurals>
+    <string name="countdown_today">Сьогодні зустріч!</string>
+    <string name="countdown_past">Оберіть дату наступної зустрічі</string>
+    <string name="change_date">Змінити дату</string>
+
+    <string name="think">Думаю про тебе</string>
+    <string name="think_sent">Надіслано. %1$s відчує легку вібрацію.</string>
+    <string name="think_back">%1$s теж думає про тебе 💗</string>
+    <string name="safe">Я в безпеці</string>
+    <string name="safe_sent">%1$s отримає спокійне сповіщення: ти в безпеці.</string>
+
+    <string name="widgets_title">Віджети на головний екран</string>
+    <string name="widgets_text">Настрій партнера, відлік до зустрічі й нові малюнки без відкриття застосунку.</string>
+    <string name="add_widget_mood">Настрій</string>
+    <string name="add_widget_countdown">Відлік</string>
+    <string name="add_widget_doodle">Малюнки</string>
+    <string name="widget_pin_unsupported">Утримуйте палець на головному екрані, відкрийте «Віджети» і знайдіть Belong.</string>
+    <string name="widget_mood_desc">Настрій і місцевий час партнера</string>
+    <string name="widget_countdown_desc">Дні до зустрічі</string>
+    <string name="widget_doodle_desc">Малюнки від партнера</string>
+    <string name="widget_from">Від: %1$s · %2$s</string>
+    <string name="widget_doodle_empty">Тут з’являться малюнки партнера</string>
+    <string name="widget_energy">енергія %1$d/5</string>
+
+    <string name="doodle_title">Намалюй щось</string>
+    <string name="doodle_hint">%1$s побачить це на головному екрані.</string>
+    <string name="doodle_send">Надіслати</string>
+    <string name="doodle_clear">Очистити</string>
+    <string name="doodle_undo">Скасувати</string>
+    <string name="doodle_canvas">Поле для малювання</string>
+    <string name="doodle_sent">Надіслано. %1$s побачить малюнок на головному екрані.</string>
+    <string name="doodle_empty_warn">Спершу намалюй щось.</string>
+    <string name="doodle_latest">Останній малюнок · %1$s</string>
+    <string name="doodle_reply">Новий малюнок · %1$s</string>
+    <string name="doodle_none">Малюнків ще немає</string>
+    <string name="color_pink">Рожевий</string>
+    <string name="color_blue">Синій</string>
+    <string name="color_ink">Темний</string>
+    <string name="color_honey">Медовий</string>
+
+    <string name="games_title">Ігри</string>
+    <string name="match_title">«Збіги»</string>
+    <string name="match_text">Кожен гортає 10 ідей для побачень. Ви побачите лише ті, яких хочете обоє.</string>
+    <string name="match_start">Почати</string>
+    <string name="match_turn">Гортає: %1$s</string>
+    <string name="match_progress">%1$d з %2$d</string>
+    <string name="match_yes">Так</string>
+    <string name="match_no">Ні</string>
+    <string name="match_pass">Передай телефон: %1$s</string>
+    <string name="match_continue">Продовжити</string>
+    <string name="match_result">Збігів: %1$d з %2$d</string>
+    <string name="match_none">Цього разу без збігів. Покрутіть колесо, щоб знайти нові ідеї.</string>
+    <string name="match_again">Зіграти ще раз</string>
+    <string name="share">Поділитися</string>
+    <string name="match_share_text">«Збіги» в Belong: %1$d з %2$d 💞</string>
+    <string-array name="match_cards">
+        <item>⛺|Ніч у наметі біля озера</item>
+        <item>🧀|Пікнік на підлозі з фільмом і фондю</item>
+        <item>🌅|Прогулянка на світанку з кавою</item>
+        <item>🍜|Приготувати страву з країни мрії</item>
+        <item>📵|Вечір без телефонів, тільки ви двоє</item>
+        <item>💃|Урок сальси для початківців</item>
+        <item>🎤|Вечір караоке</item>
+        <item>🚆|Подорож на вихідні без плану</item>
+        <item>🛁|Спа-вечір удома</item>
+        <item>🔭|Дивитися на зорі з даху</item>
+    </string-array>
+
+    <string name="wheel_title">Колесо побачень</string>
+    <string name="wheel_text">Не можете вирішити? Хай обере колесо.</string>
+    <string name="wheel_spin">Крутити</string>
+    <string name="wheel_result">Випало</string>
+    <string name="wheel_home">Удома</string>
+    <string name="wheel_out">Поза домом</string>
+    <string-array name="wheel_budgets">
+        <item>0 ₴</item>
+        <item>₴</item>
+        <item>₴₴</item>
+    </string-array>
+    <string-array name="wheel_ideas">
+        <item>0|home|Настолки|Турнір у настільні ігри</item>
+        <item>0|home|Пікнік|Пікнік на підлозі з фільмом</item>
+        <item>0|home|Старі фото|Обрати топ-10 старих фото</item>
+        <item>0|home|Танці|Танці у вітальні</item>
+        <item>0|home|Відеопобачення|Приготувати одну страву по відеозв’язку</item>
+        <item>0|home|36 питань|36 запитань, щоб закохатися</item>
+        <item>1|home|Фондю|Сирне фондю і фільм</item>
+        <item>1|home|Суші|Зробити суші разом</item>
+        <item>1|home|Спа|Спа-вечір із масками для обличчя</item>
+        <item>2|home|Шеф-сет|Замовити ресторанний сет і приготувати разом</item>
+        <item>0|out|Світанок|Зустріти світанок із термосом</item>
+        <item>0|out|Пікнік|Пікнік у парку</item>
+        <item>0|out|Зорі|Дивитися на зорі за містом</item>
+        <item>0|out|Велик|Велопрогулянка в нове місце</item>
+        <item>0|out|Барахолка|Прогулянка блошиним ринком</item>
+        <item>1|out|Караоке|Караоке на двох</item>
+        <item>1|out|Музей|Музей, а потім кава</item>
+        <item>1|out|Сніданок|Сніданок у новій кав’ярні</item>
+        <item>2|out|Концерт|Квитки на концерт</item>
+        <item>2|out|Мандрівка|Ночівля за містом</item>
+    </string-array>
+
+    <string name="month_title">Наш місяць на відстані</string>
+    <string name="month_in_progress">Місяць ще триває</string>
+    <string name="month_example">Приклад: справжні цифри з’являться, коли під’єднається партнер</string>
+    <string name="stat_km">км між вами</string>
+    <string name="stat_hours">різниця в часі</string>
+    <string name="hours_short">%1$s год</string>
+    <string name="stat_taps">дотики «думаю про тебе»</string>
+    <string name="stat_taps_value">%1$d надіслано · %2$d отримано</string>
+    <string name="stat_doodles">малюнки</string>
+    <string name="stat_safe">статуси «Я в безпеці»</string>
+    <string name="stat_mood">середній настрій</string>
+    <string name="month_share">Поділитися в сторіс</string>
+    <string name="month_save">Зберегти в галерею</string>
+    <string name="month_saved">Збережено в «Зображення»</string>
+    <string name="story_title">Наш %1$s на відстані</string>
+    <string name="story_footer">Зроблено в Belong</string>
+
+    <string name="settings_title">Ваша пара</string>
+    <string name="settings_my_name">Твоє ім’я</string>
+    <string name="settings_partner_name">Ім’я партнера</string>
+    <string name="settings_my_city">Твоє місто</string>
+    <string name="settings_partner_city">Місто партнера</string>
+    <string name="settings_meeting">Наступна зустріч</string>
+    <string name="settings_save">Зберегти</string>
+    <string name="settings_cancel">Скасувати</string>
+    <string name="settings_demo">Демо-режим: сервера ще немає, тому партнер працює як демо на цьому телефоні.</string>
+</resources>

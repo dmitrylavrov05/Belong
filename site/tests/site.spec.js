@@ -42,7 +42,7 @@ test.describe('translations', () => {
     const allowed = /^(iPhone|Android|Belong\+|Belong|© \d{4} Belong)$/;
     const walk = (en, uk, path) => {
       if (typeof en === 'string') {
-        if (en === uk && /[A-Za-z]{3,}/.test(en) && !allowed.test(en) && !/\.w$/.test(path)) same.push(path);
+        if (en === uk && /[A-Za-z]{3,}/.test(en) && !allowed.test(en) && !/\.(w|id|zone)$/.test(path)) same.push(path);
         return;
       }
       if (en && typeof en === 'object') for (const k of Object.keys(en)) walk(en[k], uk[k], `${path}.${k}`);
@@ -148,20 +148,20 @@ test.describe('Date Match', () => {
     const M = D[lang].runtime.match;
     test(`${lang}: two partners on one phone see only their mutual yeses`, async ({ page }) => {
       await page.goto(PAGES[lang]);
-      await page.fill('#match-name-a', 'Anya');
+      await page.fill('#match-name-a', 'Yulia');
       await page.locator('#match [data-act="start-a"]').click();
       await expect(page.locator('#match .game__count')).toHaveText(fmt(M.progress, { i: 1, n: 10 }));
       await swipe(page, A, M);
 
-      await expect(page.locator('#match .game__title')).toHaveText(fmt(M.handoffTitle, { name: 'Anya' }));
-      await page.fill('#match-name-b', 'Max');
+      await expect(page.locator('#match .game__title')).toHaveText(fmt(M.handoffTitle, { name: 'Yulia' }));
+      await page.fill('#match-name-b', 'Igor');
       await page.locator('#match [data-act="start-b"]').click();
       await swipe(page, B, M);
 
       const want = expectedMatches(M.cards, A, B);
       await expect(page.locator('#match .game__title')).toHaveText(fmt(M.resultTitle, { k: want.length, n: 10 }));
       await expect(page.locator('#match .result__list li')).toHaveText(want);
-      await expect(page.locator('#match .result__names')).toHaveText('Anya & Max');
+      await expect(page.locator('#match .result__names')).toHaveText('Yulia & Igor');
     });
   }
 
@@ -172,13 +172,13 @@ test.describe('Date Match', () => {
     await expect(page.locator('#match-name-a-err')).toHaveText(M.nameRequired);
     await expect(page.locator('#match-name-a')).toHaveAttribute('aria-invalid', 'true');
     await expect(page.locator('#match-name-a')).toBeFocused();
-    await page.fill('#match-name-a', 'Anya');
+    await page.fill('#match-name-a', 'Yulia');
     await expect(page.locator('#match-name-a-err')).toBeHidden();
   });
 
   test('arrow keys answer the cards', async ({ page }) => {
     await page.goto('/');
-    await page.fill('#match-name-a', 'Anya');
+    await page.fill('#match-name-a', 'Yulia');
     await page.locator('#match [data-act="start-a"]').click();
     await expect(page.locator('#match [data-deck]')).toBeFocused();
     for (let i = 0; i < 10; i += 1) {
@@ -193,30 +193,30 @@ test.describe('Date Match', () => {
     test.setTimeout(90000); // three pages and twenty swipes
     const M = D.en.runtime.match;
     await page.goto('/');
-    await page.fill('#match-name-a', 'Anya');
+    await page.fill('#match-name-a', 'Yulia');
     await page.locator('#match [data-act="start-a"]').click();
     await swipe(page, A);
     const invite = await page.locator('#match-link').inputValue();
-    expect(invite).toBe(`http://localhost:4173/#v=1&match=${A}&from=Anya`);
+    expect(invite).toBe(`http://localhost:4173/#v=1&match=${A}&from=Yulia`);
     await expect(page.locator('#match .sharerow a[href*="t.me/share"]')).toHaveAttribute('href', new RegExp(encodeURIComponent(invite).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 
     const partner = await context.newPage();
     await partner.goto(invite);
-    await expect(partner.locator('#match .game__title')).toHaveText(fmt(M.invitedTitle, { name: 'Anya' }));
+    await expect(partner.locator('#match .game__title')).toHaveText(fmt(M.invitedTitle, { name: 'Yulia' }));
     await partner.locator('#match [data-act="start-b"]').click();
     await expect(partner.locator('#match-name-b-err')).toHaveText(M.yourNameRequired);
-    await partner.fill('#match-name-b', 'Max');
+    await partner.fill('#match-name-b', 'Igor');
     await partner.locator('#match [data-act="start-b"]').click();
     await swipe(partner, B);
     const want = expectedMatches(M.cards, A, B);
     await expect(partner.locator('#match .result__list li')).toHaveText(want);
     const reply = await partner.locator('#match-link').inputValue();
-    expect(reply).toBe(`http://localhost:4173/#v=1&match=${A}&from=Anya&reply=${B}&to=Max`);
+    expect(reply).toBe(`http://localhost:4173/#v=1&match=${A}&from=Yulia&reply=${B}&to=Igor`);
 
     const back = await context.newPage();
     await back.goto(reply);
     await expect(back.locator('#match .result__list li')).toHaveText(want);
-    await expect(back.locator('#match .result__names')).toHaveText('Anya & Max');
+    await expect(back.locator('#match .result__names')).toHaveText('Yulia & Igor');
     await expect(back.locator('#match-link')).toHaveCount(0);
 
     await back.locator('#match [data-act="again"]').click();
@@ -226,7 +226,7 @@ test.describe('Date Match', () => {
 
   test('ignores broken links and never renders names as HTML', async ({ context }) => {
     const broken = await context.newPage();
-    await broken.goto('/#v=1&match=101&from=Anya');
+    await broken.goto('/#v=1&match=101&from=Yulia');
     await expect(broken.locator('#match-name-a')).toBeVisible();
 
     const hostile = await context.newPage();
@@ -239,10 +239,10 @@ test.describe('Date Match', () => {
 
   test('saves a story card as a PNG', async ({ page }) => {
     await page.goto('/');
-    await page.fill('#match-name-a', 'Anya');
+    await page.fill('#match-name-a', 'Yulia');
     await page.locator('#match [data-act="start-a"]').click();
     await swipe(page, A);
-    await page.fill('#match-name-b', 'Max');
+    await page.fill('#match-name-b', 'Igor');
     await page.locator('#match [data-act="start-b"]').click();
     await swipe(page, B);
     const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#match [data-act="story"]').click()]);
@@ -258,7 +258,7 @@ test.describe('Date Match with animation', () => {
   test('dragging the card answers it', async ({ page }, testInfo) => {
     desktopOnly(testInfo);
     await page.goto('/');
-    await page.fill('#match-name-a', 'Anya');
+    await page.fill('#match-name-a', 'Yulia');
     await page.locator('#match [data-act="start-a"]').click();
     const drag = async (dx) => {
       const box = await page.locator('#match [data-top]').boundingBox();
@@ -306,6 +306,88 @@ test.describe('Date wheel', () => {
     await expect(page.locator('#wheel-result')).toBeVisible({ timeout: 6000 });
     const ideas = D.uk.runtime.wheel.ideas.map((i) => i.t);
     expect(ideas).toContain(await page.locator('#wheel-result-title').textContent());
+  });
+});
+
+// ---------- Widgets demo ----------
+test.describe('Widgets demo', () => {
+  test('a drawing lands on the partner’s home-screen widget', async ({ page }) => {
+    const T = D.en.runtime.wid;
+    await page.goto('/');
+    const img = page.locator('#hw-doodle-img');
+    await expect(img).toHaveAttribute('src', /^data:image\/png/);
+    const before = await img.getAttribute('src');
+
+    await page.locator('#pad-send').click();
+    await expect(page.locator('#pad-note')).toHaveText(T.empty);
+
+    await page.locator('#pad-colors .swatch[data-color="#5C9DF2"]').click();
+    await expect(page.locator('#pad-colors .swatch[data-color="#5C9DF2"]')).toHaveAttribute('aria-pressed', 'true');
+    const pad = page.locator('#pad');
+    await pad.scrollIntoViewIfNeeded();
+    const box = await pad.boundingBox();
+    await page.mouse.move(box.x + box.width * 0.2, box.y + box.height * 0.3);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.8, box.y + box.height * 0.7, { steps: 10 });
+    await page.mouse.up();
+    await expect(page.locator('#pad-hint')).toHaveClass(/is-hidden/);
+
+    await page.locator('#pad-send').click();
+    await expect(page.locator('#pad-note')).toHaveText(T.sent);
+    await expect(page.locator('#hw-doodle-from')).toHaveText(T.from);
+    const after = await img.getAttribute('src');
+    expect(after).not.toBe(before);
+    // The sent drawing contains blue ink.
+    const hasBlue = await page.evaluate(async (src) => {
+      const im = new Image();
+      im.src = src;
+      await im.decode();
+      const c = document.createElement('canvas');
+      c.width = im.width;
+      c.height = im.height;
+      const g = c.getContext('2d');
+      g.drawImage(im, 0, 0);
+      const data = g.getImageData(0, 0, c.width, c.height).data;
+      for (let i = 0; i < data.length; i += 4) if (data[i + 2] > 200 && data[i] < 120) return true;
+      return false;
+    }, after);
+    expect(hasBlue).toBe(true);
+    await expect(page.locator('#pad-hint')).not.toHaveClass(/is-hidden/);
+  });
+});
+
+// ---------- Our month apart ----------
+test.describe('Monthly recap', () => {
+  for (const lang of LANGS) {
+    test(`${lang}: the story card follows the couple’s names and cities`, async ({ page }) => {
+      const M = D[lang].runtime.month;
+      await page.goto(PAGES[lang]);
+      await expect(page.locator('#story-names')).toHaveText(fmt(M.namesTpl, { a: M.defaultMe, b: M.defaultPartner }));
+      const title = await page.locator('#story-title').textContent();
+      expect(title.startsWith(M.titleTpl.split('{month}')[0])).toBe(true);
+      expect(title).not.toContain('{month}');
+      await expect(page.locator('#story-km')).toHaveText(/^7.560$/);
+      await expect(page.locator('#story-hours')).toHaveText(new RegExp(`^${fmt(M.hoursTpl, { h: '(6|7)' })}$`));
+
+      await page.fill('#month-me', 'Oksana');
+      await page.fill('#month-partner', 'Taras');
+      await expect(page.locator('#story-names')).toHaveText(fmt(M.namesTpl, { a: 'Oksana', b: 'Taras' }));
+      await page.selectOption('#month-city-me', 'kyiv');
+      await page.selectOption('#month-city-partner', 'london');
+      await expect(page.locator('#story-km')).toHaveText(/^2.130$/);
+      await page.selectOption('#month-city-partner', 'lviv');
+      await expect(page.locator('#story-hours')).toHaveText(M.sameZone);
+    });
+  }
+
+  test('saves the month story card as a PNG', async ({ page }) => {
+    await page.goto('/uk/index.html');
+    const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#month-save').click()]);
+    expect(download.suggestedFilename()).toBe('belong-our-month.png');
+    const file = await download.path();
+    expect(statSync(file).size).toBeGreaterThan(20000);
+    expect(readFileSync(file).subarray(1, 4).toString()).toBe('PNG');
+    await expect(page.locator('#month-note')).toHaveText(D.uk.runtime.month.saved);
   });
 });
 
@@ -408,7 +490,7 @@ test.describe('Day demos', () => {
     await expect(page.locator('#clock-a')).toHaveText(/^\d{1,2}:\d{2}/);
     await expect(page.locator('#clock-diff')).toHaveText(/^\d+(\.5)? h apart$/);
     await page.locator('#safe-btn').click();
-    await expect(page.locator('#safe-note')).toContainText('Anya is safe');
+    await expect(page.locator('#safe-note')).toContainText('Yulia is safe');
   });
 });
 
