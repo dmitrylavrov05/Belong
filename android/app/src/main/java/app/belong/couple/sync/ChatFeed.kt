@@ -6,7 +6,7 @@ import org.json.JSONObject
 
 /**
  * The pair's chat as the server sees it, kept up to date from the database event stream.
- * Each message is stored under its key as {from, text, at, heart}.
+ * Each message is stored under its key as {from, text?, photo?, voice?, dur?, at, heart}.
  */
 class ChatFeed {
     private val messages = HashMap<String, JSONObject>()
@@ -43,7 +43,7 @@ class ChatFeed {
     /** Messages as this phone shows them, oldest first. */
     fun toList(me: Role): List<ChatMessage> =
         messages.entries
-            .filter { (_, m) -> m.has("text") && m.has("from") }
+            .filter { (_, m) -> m.has("from") && (m.has("text") || m.has("photo") || m.has("voice")) }
             .map { (key, m) ->
                 ChatMessage(
                     id = idFor(key),
@@ -52,6 +52,9 @@ class ChatFeed {
                     at = m.optLong("at"),
                     hearted = m.optBoolean("heart"),
                     key = key,
+                    photo = m.optString("photo").ifEmpty { null },
+                    voice = m.optString("voice").ifEmpty { null },
+                    dur = m.optInt("dur"),
                 )
             }
             .sortedWith(compareBy({ it.at }, { it.key }))

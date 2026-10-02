@@ -54,6 +54,10 @@ data class ChatMessage(
     val hearted: Boolean,
     val key: String = "",
     val pending: Boolean = false,
+    /** A photo (its key in photo_data) or a voice message (voice_data) with its length in seconds. */
+    val photo: String? = null,
+    val voice: String? = null,
+    val dur: Int = 0,
 )
 
 object Links {

@@ -251,6 +251,7 @@
         <item>partner|Доброго ранку! До обіду в мене дзвінки 😴</item>
         <item>me|Тримайся! Увечері відеодзвінок?</item>
         <item>partner|Так, о 21:00 за Києвом ❤️</item>
+        <item>partner|photo:demo-p0</item>
     </string-array>
     <string-array name="chat_replies">
         <item>❤️</item>
@@ -789,6 +790,7 @@
     <string name="stat_thanks">вечірні записки</string>
     <string name="stat_dreams">мрії збулися</string>
     <string name="stat_goals">цілі досягнуто</string>
+    <string name="stat_movies">фільми, які подивилися разом</string>
     <string name="stat_talks">чесні розмови</string>
     <!-- Почуття після сварки -->
     <string name="feelings_title">Поговорімо про почуття</string>
@@ -819,4 +821,103 @@
     <string name="feelings_today_text">Напишіть свою, щоб прочитати</string>
     <string name="us_feelings_text">Нотатки після сварки: відкриються, коли напишете обоє</string>
     <string name="feelings_demo">Посперечалися через плани на вихідні|Трохи образливо, але найбільше я сумую за тобою|Знати, що мої плани для тебе теж важливі|Давай увечері разом сплануємо наступні вихідні?</string>
+    <!-- Листи «Відкрий, коли…» -->
+    <string name="letters_title">Відкрий, коли…</string>
+    <string name="letters_intro">Листи на потім: до особливого дня або на той момент, коли твої слова знадобляться. %1$s не зможе прочитати запечатаний лист раніше строку.</string>
+    <string name="letters_for_me">Для вас</string>
+    <string name="letters_for_me_empty">Поки немає листів. Коли %1$s напише, конверт з’явиться тут.</string>
+    <string name="letters_from_me">Від вас</string>
+    <string name="letters_from_me_empty">Напишіть перший: до річниці, дня народження чи на дощовий вечір.</string>
+    <string name="letters_write">Написати лист</string>
+    <string name="letters_write_hint">%1$s побачить, що лист чекає, але прочитати зможе лише у свій час.</string>
+    <string name="letters_when_title">Коли відкрити</string>
+    <string name="letters_kind_date">У день…</string>
+    <string name="letters_kind_when">Коли…</string>
+    <string name="letters_when_sad">Відкрий, коли сумно</string>
+    <string name="letters_when_miss">Відкрий, коли сумуєш за мною</string>
+    <string name="letters_when_sleep">Відкрий, коли не спиться</string>
+    <string name="letters_when_quarrel">Відкрий, коли ми посварилися</string>
+    <string name="letters_when_proud">Відкрий, коли в тебе вийшло</string>
+    <string name="letters_when_doubt">Відкрий, коли сумніваєшся в собі</string>
+    <string name="letters_open_on">Відкрий %1$s</string>
+    <string name="letters_field_title">Напис на конверті</string>
+    <string name="letters_field_text">%1$s, привіт…</string>
+    <string name="letters_sealed_note">Запечатаний лист не можна змінити, лише забрати назад.</string>
+    <string name="letters_seal">Запечатати лист</string>
+    <string name="letters_text_required">Напишіть хоча б кілька слів</string>
+    <string name="letters_sent">Запечатано. %1$s побачить конверт 💌</string>
+    <plurals name="letters_in_days">
+        <item quantity="one">через %d день</item>
+        <item quantity="few">через %d дні</item>
+        <item quantity="many">через %d днів</item>
+        <item quantity="other">через %d дня</item>
+    </plurals>
+    <string name="letters_opens">Відкриється %1$s</string>
+    <string name="letters_sealed_toast">Ще зарано: відкриється %1$s 🤫</string>
+    <string name="letters_open_now">Можна відкрити</string>
+    <string name="letters_opened">Прочитано</string>
+    <string name="letters_can_open_now">Уже можна відкрити</string>
+    <string name="letters_waiting_moment">Чекає свого моменту</string>
+    <string name="letters_read_by">Прочитано: %1$s 💞</string>
+    <string name="letters_from">Від: %1$s · %2$s</string>
+    <string name="letters_loading">Відкриваємо…</string>
+    <string name="letters_unavailable">Не вдалося відкрити лист. Перевірте інтернет і спробуйте ще раз.</string>
+    <string name="letters_delete">Забрати цей лист?</string>
+    <string name="letters_today">%1$s: лист уже можна відкрити</string>
+    <string name="us_letters_text">Листи до особливого дня або на потрібний момент</string>
+    <string-array name="letter_seeds">
+        <item>date|-1|partner|Відкрий у п’ятницю|Просто нагадування у звичайну п’ятницю: я пишаюся тобою, люблю тебе і вже чекаю наших вихідних. Зроби собі чай і всміхнися 🙂</item>
+        <item>when|0|partner|Відкрий, коли сумно|Привіт. Якщо ти це читаєш, сьогодні непростий день. Це нормально. Видихни, загорнися в плед і пам’ятай: ти не сама, я завжди на твоєму боці. Дзвони мені, навіть о третій ночі.</item>
+        <item>date|136|partner|Відкрий у нашу річницю|Цей лист запечатано до нашого дня 💞</item>
+        <item>date|42|me|Відкрий у свій день народження|Запечатано до дня народження 🎂</item>
+    </string-array>
+
+    <!-- Фільми та серіали -->
+    <string name="movies_title">Фільми та серіали</string>
+    <string name="movies_counts">Хочемо подивитися: %1$d · подивилися: %2$d</string>
+    <string name="movies_to_watch">Хочемо подивитися</string>
+    <string name="movies_watched">Подивилися</string>
+    <string name="movies_empty">Поки порожньо. Додайте те, що давно збиралися подивитися разом.</string>
+    <string name="movies_watched_empty">Тут будуть переглянуті фільми та ваші оцінки.</string>
+    <string name="movies_tonight">Що дивимося сьогодні?</string>
+    <string name="movies_pick">Вибрати за нас 🎲</string>
+    <string name="movies_pick_again">Інший варіант 🎲</string>
+    <string name="movies_movie">Фільм</string>
+    <string name="movies_series">Серіал</string>
+    <string name="movies_idea_of">Ідея: %1$s</string>
+    <string name="movies_rate_to_see">Оцініть, щоб побачити оцінку: %1$s</string>
+    <string name="movies_add">Додати</string>
+    <string name="movies_field_title">Назва</string>
+    <string name="movies_delete">Прибрати зі списку?</string>
+    <string name="movies_watched_question">Подивилися? Скільки зірок від вас?</string>
+    <string name="movies_your_rating">Ваша оцінка</string>
+    <string name="movies_not_watched">Повернути в «Хочемо подивитися»</string>
+    <string name="movies_rated">Додано в «Подивилися»</string>
+    <plurals name="movies_stars">
+        <item quantity="one">%d зірка</item>
+        <item quantity="few">%d зірки</item>
+        <item quantity="many">%d зірок</item>
+        <item quantity="other">%d зірки</item>
+    </plurals>
+    <string name="us_movies_text">Що подивитися разом і ваші оцінки</string>
+    <string-array name="movie_seeds">
+        <item>movie|partner||Минулі життя</item>
+        <item>series|me||Убивства в одній будівлі</item>
+        <item>movie|me||Амелі</item>
+        <item>movie|partner|5,4|Перед світанком</item>
+        <item>series|me|4,|Ведмідь</item>
+        <item>movie|me|3,5|Інтерстеллар</item>
+    </string-array>
+    <!-- Фото та голосові в чаті -->
+    <string name="chat_photo">Надіслати фото</string>
+    <string name="chat_voice">Записати голосове</string>
+    <string name="chat_voice_cancel">Скасувати запис</string>
+    <string name="chat_recording">Іде запис…</string>
+    <string name="chat_voice_failed">Не вдалося увімкнути мікрофон</string>
+    <string name="chat_voice_denied">Дозвольте мікрофон у налаштуваннях застосунку, щоб надсилати голосові</string>
+    <string name="chat_voice_short">Надто коротко: натисніть на мікрофон і говоріть</string>
+    <string name="chat_photo_message">Фото</string>
+    <string name="chat_voice_message">Голосове, %1$s</string>
+    <string name="chat_voice_play">Слухати</string>
+    <string name="chat_voice_pause">Пауза</string>
 </resources>

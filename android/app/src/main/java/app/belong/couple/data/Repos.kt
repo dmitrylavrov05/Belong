@@ -181,16 +181,21 @@ class ChatRepo(context: Context) : JsonList<ChatMessage>(context, "chat") {
     override fun write(item: ChatMessage) = JSONObject()
         .put("id", item.id).put("me", item.fromMe).put("text", item.text).put("at", item.at).put("heart", item.hearted)
         .put("key", item.key).put("pending", item.pending)
+        .apply {
+            item.photo?.let { put("photo", it) }
+            item.voice?.let { put("voice", it).put("dur", item.dur) }
+        }
 
     override fun read(o: JSONObject) = ChatMessage(
         o.getLong("id"), o.optBoolean("me"), o.getString("text"), o.optLong("at"), o.optBoolean("heart"),
         o.optString("key"), o.optBoolean("pending"),
+        o.optString("photo").ifEmpty { null }, o.optString("voice").ifEmpty { null }, o.optInt("dur"),
     )
 
-    fun send(text: String, fromMe: Boolean = true): ChatMessage? {
+    fun send(text: String, fromMe: Boolean = true, photo: String? = null, voice: String? = null, dur: Int = 0): ChatMessage? {
         val body = text.trim().take(2000)
-        if (body.isEmpty()) return null
-        val message = ChatMessage(newId(), fromMe, body, System.currentTimeMillis(), false)
+        if (body.isEmpty() && photo == null && voice == null) return null
+        val message = ChatMessage(newId(), fromMe, body, System.currentTimeMillis(), false, photo = photo, voice = voice, dur = dur)
         save((all() + message).takeLast(500))
         return message
     }
@@ -206,7 +211,9 @@ class ChatRepo(context: Context) : JsonList<ChatMessage>(context, "chat") {
         app.resources.getStringArray(R.array.seed_chat).mapIndexed { i, line ->
             val (who, text) = line.split('|', limit = 2)
             val at = LocalDate.now().atTime(times.getOrElse(i) { LocalTime.NOON }).atZone(zone).toInstant().toEpochMilli()
-            ChatMessage(newId(), who == "me", text, minOf(at, System.currentTimeMillis()), i == 2)
+            // "photo:<key>" shows one of the example couple's photos of the day.
+            val photo = text.removePrefix("photo:").takeIf { text.startsWith("photo:") }
+            ChatMessage(newId(), who == "me", if (photo != null) "" else text, minOf(at, System.currentTimeMillis()), i == 2, photo = photo)
         }
     }
 }

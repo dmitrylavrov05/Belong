@@ -308,6 +308,7 @@ class MonthScreen(private val activity: MainActivity) : Screen {
         tiles += stat(nf.format(h.questions), ctx.getString(R.string.stat_questions))
         if (h.thanks > 0) tiles += stat(nf.format(h.thanks), ctx.getString(R.string.stat_thanks))
         if (h.talks > 0) tiles += stat(nf.format(h.talks), ctx.getString(R.string.stat_talks))
+        if (h.movies > 0) tiles += stat(nf.format(h.movies), ctx.getString(R.string.stat_movies))
         if (apart) {
             tiles += stat(nf.format(s.safeCheckins), ctx.getString(R.string.stat_safe))
             if (s.inProgress) s.daysToMeeting?.let { days -> tiles += stat(nf.format(days), ctx.resources.getQuantityString(R.plurals.days_until_label, days.toInt())) }
@@ -369,6 +370,7 @@ class MonthScreen(private val activity: MainActivity) : Screen {
         )
         if (h.thanks > 0) tiles += stat(nf.format(h.thanks), ctx.getString(R.string.stat_thanks))
         if (h.talks > 0) tiles += stat(nf.format(h.talks), ctx.getString(R.string.stat_talks))
+        if (h.movies > 0) tiles += stat(nf.format(h.movies), ctx.getString(R.string.stat_movies))
         if (apart) tiles += stat(nf.format(stats.sumOf { it.safeCheckins }), ctx.getString(R.string.stat_safe))
         grid(tiles)
         listCard(R.string.report_came_true, h.dreams + h.goals)

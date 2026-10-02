@@ -27,6 +27,7 @@ Five tabs: Today, Dreams, Chat, Photos, Us.
   - the gift **wishlist** opens from here and from More.
 - **Chat:**
   - messages grouped by day;
+  - **photos** (compressed like photos of the day; tap to open full screen) and **voice messages** (tap the microphone when nothing is typed; up to 2 minutes, AAC 24 kbps; needs microphone access);
   - a long press puts ❤️ on a message;
   - the heart button sends “Thinking of you” and counts towards the month.
 - **Wishlist:**
@@ -35,6 +36,8 @@ Five tabs: Today, Dreams, Chat, Photos, Us.
 - **Photos:** each of you adds up to 5 photos a day (from the gallery, with an optional caption). They're grouped by day, filter by whose they are, open full screen, and your own can be deleted. Photos are compressed on the phone (1280 px, plus a 360 px thumbnail) and stored in the pair's database, which keeps them within the free Spark plan.
 - **Important dates** (Us → Important dates): a month calendar with dots, what's coming up (birthdays with the age, your anniversary, plans; yearly or once) and, for a couple apart, the meeting.
 - **Our month / Our year** (Us): a report for any month or year with a collage of your photos of the day, taps, doodles, mood, questions answered together, evening notes, dreams that came true, goals and memories. Distance, time zones and the meeting only for a couple apart. The story card shows up to three photos as polaroids.
+- **Open when…** (Us): letters for later, either on a day (“Open on our anniversary”) or for a moment (“Open when you're sad”). The database itself keeps a dated letter unreadable until its day; the writer sees when it has been read. A card on Today says when a letter has opened.
+- **Films and series** (Us): a shared to-watch list (who suggested what), “What shall we watch tonight?” picks one at random, and watched titles get each partner's own stars (the partner's stars show once you've given yours) and your average. Films watched count in the month report.
 - **Talking about feelings** (Us): after a quarrel each of you writes what happened, what you feel, what you need and what you'd ask for. Your partner's note opens only once you've written yours (the database enforces it).
 - **Places** (Us → Places):
   - an offline world map (Natural Earth land outlines);

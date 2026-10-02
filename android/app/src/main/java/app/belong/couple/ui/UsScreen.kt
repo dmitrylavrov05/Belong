@@ -56,6 +56,8 @@ class UsScreen(private val activity: MainActivity) : Screen {
 
         body.addView(ctx.text(ctx.getString(R.string.more_title), 22f, 700).lp(top = 32))
         val menu = ctx.column(12)
+        menu.addView(entry(R.drawable.ic_mail, R.string.letters_title, R.string.us_letters_text) { activity.select(MainActivity.TAB_LETTERS) })
+        menu.addView(entry(R.drawable.ic_film, R.string.movies_title, R.string.us_movies_text) { activity.select(MainActivity.TAB_MOVIES) })
         menu.addView(entry(R.drawable.ic_calendar, R.string.calendar_title, R.string.us_calendar_text) { activity.select(MainActivity.TAB_CALENDAR) })
         menu.addView(entry(R.drawable.ic_heart, R.string.feelings_title, R.string.us_feelings_text) { activity.select(MainActivity.TAB_FEELINGS) })
         menu.addView(entry(R.drawable.ic_tab_games, R.string.quiz_title, R.string.us_quiz_text) { QuizScreen.show(activity) })

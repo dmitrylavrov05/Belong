@@ -339,6 +339,65 @@ class CloudEmulatorTest {
     }
 
     @Test
+    fun chatMediaLettersAndMoviesFollowTheirRules() {
+        val yulia = pairing.create("Yulia", "sunflower1")
+        val igor = pairing.join(yulia.code, "Igor", "maple-leaf")
+        val pair = "pairs/${yulia.code}"
+        val y = yulia.session.idToken
+        val i = igor.session.idToken
+        val jpeg = "/9j/" + "A".repeat(100)
+
+        // Chat photos and voice messages: the media must be uploaded by the sender first.
+        expect(Reason.DENIED) { db.put("$pair/chat/c1", JSONObject().put("from", "a").put("photo", "p1").put("at", Db.serverTime()), y) }
+        db.put("$pair/photo_data/p1", JSONObject().put("by", "a").put("thumb", jpeg).put("full", jpeg), y)
+        db.put("$pair/chat/c1", JSONObject().put("from", "a").put("photo", "p1").put("at", Db.serverTime()), y)
+        expect(Reason.DENIED) { db.put("$pair/chat/c2", JSONObject().put("from", "b").put("photo", "p1").put("at", Db.serverTime()), i) }
+        expect(Reason.DENIED) { db.put("$pair/chat/c1/photo", "p2", y) }
+        db.put("$pair/chat/c1/heart", true, i)
+        db.put("$pair/voice_data/v1", JSONObject().put("by", "b").put("data", "AAAAGGZ0eXBtcDQy").put("dur", 4), i)
+        expect(Reason.DENIED) { db.put("$pair/voice_data/v1", JSONObject().put("by", "b").put("data", "changed").put("dur", 4), i) }
+        expect(Reason.DENIED) { db.put("$pair/voice_data/v2", JSONObject().put("by", "a").put("data", "x").put("dur", 4), i) }
+        db.put("$pair/chat/c3", JSONObject().put("from", "b").put("voice", "v1").put("dur", 4).put("at", Db.serverTime()), i)
+        expect(Reason.DENIED) { db.put("$pair/chat/c4", JSONObject().put("from", "b").put("at", Db.serverTime()), i) }
+        assertEquals("AAAAGGZ0eXBtcDQy", db.get("$pair/voice_data/v1/data", y))
+
+        // Letters: the text opens to the partner on its day; "when…" letters at any time.
+        val now = System.currentTimeMillis()
+        val letter = { text: String -> JSONObject().put("by", "a").put("text", text).put("at", Db.serverTime()) }
+        db.put("$pair/letters/sealed", letter("Happy anniversary"), y)
+        db.put("$pair/live/letters/sealed", JSONObject().put("by", "a").put("at", 1).put("kind", "date").put("openAt", now + 86_400_000L).put("title", "Open on our anniversary"), y)
+        expect(Reason.DENIED) { db.get("$pair/letters/sealed", i) }
+        assertEquals("Happy anniversary", (db.get("$pair/letters/sealed", y) as JSONObject).getString("text"))
+        expect(Reason.DENIED) { db.put("$pair/live/letters/sealed/openAt", now - 1000, i) }
+        expect(Reason.DENIED) { db.put("$pair/letters/sealed", letter("Edited"), y) }
+        db.put("$pair/live/letters/sealed/openAt", now - 1000, y)
+        assertEquals("Happy anniversary", (db.get("$pair/letters/sealed", i) as JSONObject).getString("text"))
+        db.put("$pair/live/letters/sealed/opened", true, i)
+        db.put("$pair/letters/sad", letter("I'm here"), y)
+        expect(Reason.DENIED) { db.get("$pair/letters/sad", i) } // no envelope yet
+        expect(Reason.DENIED) { db.put("$pair/live/letters/sad", JSONObject().put("by", "a").put("at", 1).put("kind", "date").put("title", "No date"), y) }
+        db.put("$pair/live/letters/sad", JSONObject().put("by", "a").put("at", 1).put("kind", "when").put("title", "Open when you're sad"), y)
+        assertEquals("I'm here", (db.get("$pair/letters/sad", i) as JSONObject).getString("text"))
+        expect(Reason.DENIED) { db.put("$pair/letters/fake", JSONObject().put("by", "a").put("text", "Forged").put("at", 1), i) }
+
+        // Films: both edit the list, each rates only for themselves.
+        db.put("$pair/live/movies/m1", JSONObject().put("title", "Past Lives").put("kind", "movie").put("by", "b").put("at", 1).put("watched", false), i)
+        db.put("$pair/live/movies/m1/watched", true, y)
+        db.put("$pair/live/movies/m1/rate/a", 5, y)
+        expect(Reason.DENIED) { db.put("$pair/live/movies/m1/rate/b", 1, y) }
+        expect(Reason.DENIED) { db.put("$pair/live/movies/m1/rate/b", 6, i) }
+        db.put("$pair/live/movies/m1/rate/b", 4, i)
+        db.put("$pair/live/movies/m1/title", "Past Lives (2023)", y)
+        expect(Reason.DENIED) { db.put("$pair/live/movies/m2", JSONObject().put("title", "x").put("kind", "cartoon").put("by", "a").put("at", 1), y) }
+
+        val live = JSONObject(db.get("$pair/live", y).toString())
+        val movie = app.belong.couple.core.MoviesModel.movies(live, Role.A).single()
+        assertEquals(5, movie.myRating)
+        assertEquals(4, movie.partnerRating)
+        assertEquals(true, app.belong.couple.core.LettersModel.letters(live, Role.B).first { it.key == "sealed" }.opened)
+    }
+
+    @Test
     fun partnerHelpsResetAForgottenPassword() {
         val yulia = pairing.create("Yulia", "sunflower1")
         val igor = pairing.join(yulia.code, "Igor", "maple-leaf")

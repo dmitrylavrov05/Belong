@@ -114,16 +114,18 @@ class MainActivity : Activity() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_PHOTOS) (screens[TAB_MAP] as? MapScreen)?.onPermissionsResult()
+        if (requestCode == REQUEST_MIC) (screens[TAB_CHAT] as? ChatScreen)?.onMicPermission(grantResults.firstOrNull() == android.content.pm.PackageManager.PERMISSION_GRANTED)
     }
 
     @Deprecated("Activity results without AndroidX")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         @Suppress("DEPRECATION") super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_DAY_PHOTOS && resultCode == RESULT_OK) PhotosScreen.picked(this, data)
+        if (requestCode == REQUEST_CHAT_PHOTO && resultCode == RESULT_OK) (screens[TAB_CHAT] as? ChatScreen)?.onPhotoPicked(data)
     }
 
     fun select(destination: Int) {
-        current = if (destination in 0..TAB_FEELINGS) destination else TAB_TODAY
+        current = if (destination in 0..TAB_MOVIES) destination else TAB_TODAY
         val screen = screens.getOrPut(current) { create(current) }
         val parent = PARENT[current]
         val view = if (parent != null) framed.getOrPut(current) { withBackBar(screen.view, parent) } else screen.view
@@ -153,6 +155,8 @@ class MainActivity : Activity() {
         TAB_CALENDAR -> CalendarScreen(this)
         TAB_PHOTOS -> PhotosScreen(this)
         TAB_FEELINGS -> FeelingsScreen(this)
+        TAB_LETTERS -> LettersScreen(this)
+        TAB_MOVIES -> MoviesScreen(this)
         else -> TodayScreen(this)
     }
 
@@ -209,6 +213,8 @@ class MainActivity : Activity() {
         private const val STATE_TAB = "tab"
         const val REQUEST_PHOTOS = 41
         const val REQUEST_DAY_PHOTOS = 42
+        const val REQUEST_CHAT_PHOTO = 43
+        const val REQUEST_MIC = 44
 
         const val TAB_TODAY = 0
         const val TAB_CHAT = 1
@@ -222,6 +228,8 @@ class MainActivity : Activity() {
         const val TAB_CALENDAR = 9
         const val TAB_PHOTOS = 10
         const val TAB_FEELINGS = 11
+        const val TAB_LETTERS = 12
+        const val TAB_MOVIES = 13
 
         /** Screens reached from a tab, with a back button to it. */
         private val PARENT = mapOf(
@@ -232,6 +240,8 @@ class MainActivity : Activity() {
             TAB_CALENDAR to TAB_MORE,
             TAB_MAP to TAB_MORE,
             TAB_FEELINGS to TAB_MORE,
+            TAB_LETTERS to TAB_MORE,
+            TAB_MOVIES to TAB_MORE,
         )
 
         private val TABS = listOf(

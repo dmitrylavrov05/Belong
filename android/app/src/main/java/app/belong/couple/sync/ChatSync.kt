@@ -6,6 +6,8 @@ import app.belong.couple.data.Account
 import app.belong.couple.data.ChatRepo
 import app.belong.couple.data.CoupleStore
 import app.belong.couple.data.DataEvents
+import app.belong.couple.data.DayPhotos
+import app.belong.couple.data.VoiceNotes
 import org.json.JSONObject
 import java.security.SecureRandom
 import java.util.concurrent.Executors
@@ -58,6 +60,18 @@ object ChatSync {
         return true
     }
 
+    /** Sends a photo or a voice message already saved on this phone (see DayPhotos.prepare and VoiceNotes). */
+    fun sendMedia(context: Context, photo: String?, voice: String?, dur: Int) {
+        val app = context.applicationContext
+        val now = System.currentTimeMillis()
+        val key = ChatFeed.newKey(now, random)
+        synchronized(lock) {
+            val repo = ChatRepo(app)
+            repo.save(repo.all() + ChatMessage(ChatFeed.idFor(key), true, "", now, false, key, pending = true, photo = photo, voice = voice, dur = dur))
+        }
+        sender.execute { flush(app) }
+    }
+
     fun toggleHeart(context: Context, message: ChatMessage) {
         val app = context.applicationContext
         if (message.pending || message.key.isEmpty()) return
@@ -85,7 +99,21 @@ object ChatSync {
         for (m in pending) {
             val path = "pairs/${seat.code}/chat/${m.key}"
             try {
-                val value = JSONObject().put("from", seat.role.key).put("text", m.text).put("at", Db.serverTime())
+                // The picture or recording goes first: the database checks it's there before taking the message.
+                val mediaOk = (m.photo?.let { DayPhotos.upload(app, db, seat.code, seat.role.key, it) { account.token() } } ?: true) &&
+                    (m.voice?.let { VoiceNotes.upload(app, db, seat.code, seat.role.key, it, m.dur) { account.token() } } ?: true)
+                if (!mediaOk) {
+                    // The file is gone from this phone: drop the message rather than block the queue.
+                    synchronized(lock) {
+                        val repo = ChatRepo(app)
+                        repo.save(repo.all().filterNot { it.key == m.key })
+                    }
+                    continue
+                }
+                val value = JSONObject().put("from", seat.role.key).put("at", Db.serverTime())
+                if (m.text.isNotEmpty()) value.put("text", m.text)
+                m.photo?.let { value.put("photo", it) }
+                m.voice?.let { value.put("voice", it).put("dur", m.dur) }
                 db.put(path, value, account.token())
             } catch (e: CloudException) {
                 if (e.reason != Reason.DENIED) return // offline: retry on the next connect

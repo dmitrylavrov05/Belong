@@ -117,3 +117,63 @@ class PhotosAndReportTest {
         assertNull(FeelingsModel.waitingForMe(root, Role.B))
     }
 }
+
+class LettersAndMoviesTest {
+    private val day = 86_400_000L
+    private val now = 20_000 * day
+
+    private val root = JSONObject("""{
+        "letters": {
+            "l1": {"by": "b", "at": 1, "kind": "date", "openAt": ${now - day}, "title": "Friday"},
+            "l2": {"by": "b", "at": 2, "kind": "date", "openAt": ${now + 10 * day}, "title": "Anniversary"},
+            "l3": {"by": "b", "at": 3, "kind": "when", "title": "When you're sad", "opened": true},
+            "l4": {"by": "a", "at": 4, "kind": "date", "openAt": ${now + 5 * day}, "title": "Birthday"}
+        },
+        "movies": {
+            "m1": {"title": "Past Lives", "kind": "movie", "by": "b", "at": 10, "watched": false},
+            "m2": {"title": "The Bear", "kind": "series", "by": "a", "at": 20, "watched": false},
+            "m3": {"title": "Before Sunrise", "kind": "movie", "by": "b", "at": 5, "watched": true, "watchedAt": 30, "rate": {"a": 5, "b": 4}},
+            "m4": {"title": "Interstellar", "kind": "movie", "by": "a", "at": 6, "watched": true, "watchedAt": 40, "rate": {"b": 3}}
+        }
+    }""")
+
+    @Test
+    fun lettersForMeOpenableFirstAndReadyOnlyWhenDatedAndUnread() {
+        val letters = LettersModel.letters(root, Role.A)
+        assertEquals(listOf("l1", "l3", "l2"), LettersModel.forMe(letters, now).map { it.key })
+        assertEquals(listOf("l4"), LettersModel.fromMe(letters).map { it.key })
+        assertEquals("l1", LettersModel.ready(letters, now)?.key)
+        assertTrue(letters.first { it.key == "l3" }.canOpen(now))
+        assertEquals(false, letters.first { it.key == "l2" }.canOpen(now))
+        assertNull(LettersModel.ready(LettersModel.letters(root, Role.B), now))
+    }
+
+    @Test
+    fun moviesSplitAndRatingsBelongToEachSeat() {
+        val movies = MoviesModel.movies(root, Role.A)
+        assertEquals(listOf("m2", "m1"), MoviesModel.toWatch(movies).map { it.key })
+        assertEquals(listOf("m4", "m3"), MoviesModel.watched(movies).map { it.key })
+        val sunrise = movies.first { it.key == "m3" }
+        assertEquals(5, sunrise.myRating)
+        assertEquals(4, sunrise.partnerRating)
+        assertEquals(4.5, MoviesModel.together(sunrise)!!, 0.001)
+        assertNull(MoviesModel.together(movies.first { it.key == "m4" }))
+        assertEquals(3, MoviesModel.movies(root, Role.B).first { it.key == "m4" }.myRating)
+    }
+
+    @Test
+    fun pickSkipsTheLastOneWhenThereIsAChoice() {
+        val movies = MoviesModel.movies(root, Role.A)
+        val random = java.util.Random(1)
+        repeat(10) { assertEquals("m1", MoviesModel.pick(movies, null, random, last = "m2")?.key) }
+        assertEquals("m2", MoviesModel.pick(movies, series = true, random = random)?.key)
+        assertEquals("m2", MoviesModel.pick(movies, series = true, random = random, last = "m2")?.key)
+        assertNull(MoviesModel.pick(emptyList(), null, random))
+    }
+
+    @Test
+    fun watchedFilmsCountInTheMonth() {
+        val h = ReportModel.highlights(root, Role.A, 0, 0)
+        assertEquals(2, h.movies)
+    }
+}

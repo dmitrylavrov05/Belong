@@ -2,8 +2,10 @@ package app.belong.couple.data
 
 import android.content.Context
 import app.belong.couple.R
+import app.belong.couple.core.MoviesModel
 import app.belong.couple.core.Role
 import app.belong.couple.sync.JsonTree
+import app.belong.couple.sync.Letters
 import app.belong.couple.sync.LiveSync
 import org.json.JSONArray
 import org.json.JSONException
@@ -83,6 +85,29 @@ class SharedRepo(context: Context) {
         seedEveryday()
         seedCalendar()
         seedPhotos()
+        seedLetters()
+    }
+
+    /** Letters and a film list for the example couple. */
+    private fun seedLetters() {
+        if (prefs.getBoolean("seeded_letters", false)) return
+        prefs.edit().putBoolean("seeded_letters", true).apply()
+        if (me != null) return
+        Letters.seedDemo(app, app.resources.getStringArray(R.array.letter_seeds).toList())
+        val now = System.currentTimeMillis()
+        app.resources.getStringArray(R.array.movie_seeds).forEachIndexed { i, line ->
+            val (kind, by, rates, title) = line.split('|', limit = 4)
+            val movie = MoviesModel.json(title, kind == "series", by, now - (i + 1) * 3_600_000L)
+            if (rates.isNotEmpty()) {
+                val (mine, theirs) = rates.split(',')
+                movie.put("watched", true).put("watchedAt", now - (i + 1) * 86_400_000L)
+                val rate = JSONObject()
+                mine.toIntOrNull()?.let { rate.put("me", it) }
+                theirs.toIntOrNull()?.let { rate.put("partner", it) }
+                movie.put("rate", rate)
+            }
+            put("movies/demo-f$i", movie)
+        }
     }
 
     /** A few photos of the day for the example couple, so the gallery and the month report aren't empty. */
@@ -178,7 +203,7 @@ class SharedRepo(context: Context) {
     }
 
     /** A real pair starts with an empty map; the server fills it in. */
-    fun startReal() = prefs.edit().putBoolean("seeded", true).putBoolean("seeded_everyday", true).putBoolean("seeded_calendar", true).putBoolean("seeded_photos", true).remove("base").remove("ops").apply()
+    fun startReal() = prefs.edit().putBoolean("seeded", true).putBoolean("seeded_everyday", true).putBoolean("seeded_calendar", true).putBoolean("seeded_photos", true).putBoolean("seeded_letters", true).remove("base").remove("ops").apply()
 
     private fun base(): JSONObject = try {
         JSONObject(prefs.getString("base", "{}")!!)
@@ -190,7 +215,7 @@ class SharedRepo(context: Context) {
         private const val PREFS = "belong_dreams"
 
         /** Parts of live/ kept here; the rest (check-ins, tasks, wishes…) have their own stores. */
-        val SECTIONS = listOf("dreams", "goals", "shopping", "thanks", "flags", "couple", "moments", "dates", "photos", "feelings")
+        val SECTIONS = listOf("dreams", "goals", "shopping", "thanks", "flags", "couple", "moments", "dates", "photos", "feelings", "letters", "movies")
         private val lock = Any()
 
         fun apply(tree: JsonTree, op: JSONObject) {

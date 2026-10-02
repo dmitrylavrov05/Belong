@@ -171,7 +171,7 @@ class PhotosScreen(private val activity: MainActivity) : Screen {
         }
 
         /** Full screen, swipe or tap the sides to go through the photos; your own can be deleted. */
-        fun viewer(activity: MainActivity, photos: List<DayPhoto>, start: Int) {
+        fun viewer(activity: MainActivity, photos: List<DayPhoto>, start: Int, canDelete: Boolean = true) {
             val store = CoupleStore.get(activity)
             val dialog = Dialog(activity, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
             val stage = FrameLayout(activity).apply { setBackgroundColor(Color.BLACK) }
@@ -192,7 +192,7 @@ class PhotosScreen(private val activity: MainActivity) : Screen {
                 caption.visibility = if (p.caption.isEmpty()) View.GONE else View.VISIBLE
                 val who = if (p.by == Owner.ME) store.myName else store.partnerDisplay
                 meta.text = "$who · ${activity.formatLongDate(LocalDate.ofEpochDay(p.day))} · ${index + 1}/${photos.size}"
-                delete.visibility = if (p.by == Owner.ME) View.VISIBLE else View.GONE
+                delete.visibility = if (canDelete && p.by == Owner.ME) View.VISIBLE else View.GONE
             }
             stage.addView(image, FrameLayout.LayoutParams(MATCH, MATCH))
             var downX = 0f

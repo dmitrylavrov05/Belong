@@ -68,14 +68,7 @@ object DayPhotos {
             val room = (PhotosModel.PER_DAY - mineOn(app, day)).coerceAtLeast(0)
             var added = 0
             for (uri in uris.take(room)) {
-                val bitmap = try {
-                    decode(app, uri)
-                } catch (e: Exception) {
-                    null
-                } ?: continue
-                val key = newKey()
-                save(app, key, bitmap)
-                bitmap.recycle()
+                val key = prepare(app, uri) ?: continue
                 val repo = SharedRepo(app)
                 repo.put("photos/$day/$key", JSONObject()
                     .put("by", seatKey(repo.me, mine = true))
@@ -90,6 +83,38 @@ object DayPhotos {
                 done(added)
             }
         }
+    }
+
+    /** Compresses the picture at [uri] into this phone's files and returns its new key; null if it can't be read. Call off the main thread. */
+    fun prepare(context: Context, uri: Uri): String? {
+        val app = context.applicationContext
+        val bitmap = try {
+            decode(app, uri)
+        } catch (e: Exception) {
+            null
+        } ?: return null
+        val key = newKey()
+        save(app, key, bitmap)
+        bitmap.recycle()
+        return key
+    }
+
+    /** Puts photo [key] in the pair's database. True when it's there (now or from an earlier try); throws when offline. */
+    fun upload(app: Context, db: Db, code: String, me: String, key: String, token: () -> String): Boolean {
+        val full = file(app, key, false)
+        val thumb = file(app, key, true)
+        if (!full.exists() || !thumb.exists()) return false
+        try {
+            db.put("pairs/$code/photo_data/$key", JSONObject()
+                .put("by", me)
+                .put("thumb", Base64.encodeToString(thumb.readBytes(), Base64.NO_WRAP))
+                .put("full", Base64.encodeToString(full.readBytes(), Base64.NO_WRAP)), token())
+        } catch (e: CloudException) {
+            // Photos can't be overwritten, so a refusal usually means an earlier try got through.
+            if (e.reason != Reason.DENIED && e.reason != Reason.OTHER) throw e
+            return db.get("pairs/$code/photo_data/$key/by", token()) == me
+        }
+        return true
     }
 
     fun delete(context: Context, key: String, day: Long) {
@@ -116,19 +141,7 @@ object DayPhotos {
     /** Sends photos added offline and removes deleted ones. Called by LiveSync; throws when offline. */
     fun flush(app: Context, db: Db, code: String, me: String, token: () -> String) {
         for (key in prefs(app).getStringSet("upload", emptySet())!!.toList()) {
-            val full = file(app, key, false)
-            val thumb = file(app, key, true)
-            if (full.exists() && thumb.exists()) {
-                try {
-                    db.put("pairs/$code/photo_data/$key", JSONObject()
-                        .put("by", me)
-                        .put("thumb", Base64.encodeToString(thumb.readBytes(), Base64.NO_WRAP))
-                        .put("full", Base64.encodeToString(full.readBytes(), Base64.NO_WRAP)), token())
-                } catch (e: CloudException) {
-                    // Already uploaded (photos can't be overwritten) or refused: nothing more to do.
-                    if (e.reason != Reason.DENIED && e.reason != Reason.OTHER) throw e
-                }
-            }
+            upload(app, db, code, me, key, token)
             mark(app, "upload", key, false)
         }
         for (key in prefs(app).getStringSet("remove", emptySet())!!.toList()) {

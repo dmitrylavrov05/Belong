@@ -21,6 +21,7 @@ import android.widget.ScrollView
 import app.belong.couple.R
 import app.belong.couple.core.FeelingsModel
 import app.belong.couple.core.Geo
+import app.belong.couple.core.LettersModel
 import app.belong.couple.core.Owner
 import app.belong.couple.core.PartOfDay
 import app.belong.couple.core.PhotosModel
@@ -119,6 +120,7 @@ class TodayScreen(private val activity: MainActivity) : Screen {
         body.addView(header())
         if (store.apart == null) body.addView(modeCard().lp(top = 24))
         feelingsCard()?.let { body.addView(it.lp(top = 24)) }
+        letterCard()?.let { body.addView(it.lp(top = 24)) }
         body.addView(partnerCard().lp(top = 24))
         body.addView(checkInCard().lp(top = 12))
         body.addView(countdowns().lp(top = 28))
@@ -333,6 +335,19 @@ class TodayScreen(private val activity: MainActivity) : Screen {
     }
 
     /** Asked once for a new pair: everything about distance and meetings depends on the answer. */
+    /** A dated letter from the partner has opened today. */
+    private fun letterCard(): View? {
+        val repo = SharedRepo(ctx)
+        val letter = LettersModel.ready(LettersModel.letters(repo.root(), repo.me), System.currentTimeMillis()) ?: return null
+        return ctx.card(paddingDp = 18, spacingDp = 6, background = ctx.gradient(24f, ctx.col(R.color.her_tint), ctx.col(R.color.him_tint))).apply {
+            addView(ctx.text("💌 " + ctx.getString(R.string.letters_today, store.partnerDisplay), 17f, 700, ctx.col(R.color.on_tint)))
+            addView(ctx.text(letter.title, 14f, 500, ctx.col(R.color.on_tint)))
+            isClickable = true
+            foreground = ctx.ripple(android.graphics.drawable.ColorDrawable(0), 24f)
+            setOnClickListener { LettersScreen.read(activity, letter) }
+        }
+    }
+
     /** The partner wrote about their feelings and waits for my side. */
     private fun feelingsCard(): View? {
         val repo = SharedRepo(ctx)

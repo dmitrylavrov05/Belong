@@ -35,7 +35,7 @@
           ".read": "auth != null && (root.child('pairs').child($code).child('members/a').val() === auth.uid || root.child('pairs').child($code).child('members/b').val() === auth.uid)",
           "$msg": {
             ".write": "auth != null && newData.exists() && (root.child('pairs').child($code).child('members/a').val() === auth.uid || root.child('pairs').child($code).child('members/b').val() === auth.uid)",
-            ".validate": "newData.hasChildren(['from', 'text', 'at']) && (data.exists() ? newData.child('from').val() === data.child('from').val() && newData.child('text').val() === data.child('text').val() && newData.child('at').val() === data.child('at').val() : newData.child('at').val() === now && root.child('pairs').child($code).child('members').child(newData.child('from').val()).val() === auth.uid)",
+            ".validate": "newData.hasChildren(['from', 'at']) && (newData.hasChild('text') || newData.hasChild('photo') || newData.hasChild('voice')) && (data.exists() ? newData.child('from').val() === data.child('from').val() && newData.child('text').val() === data.child('text').val() && newData.child('at').val() === data.child('at').val() && newData.child('photo').val() === data.child('photo').val() && newData.child('voice').val() === data.child('voice').val() && newData.child('dur').val() === data.child('dur').val() : newData.child('at').val() === now && root.child('pairs').child($code).child('members').child(newData.child('from').val()).val() === auth.uid)",
             "from": {
               ".validate": "newData.val() === 'a' || newData.val() === 'b'"
             },
@@ -47,6 +47,15 @@
             },
             "heart": {
               ".validate": "newData.isBoolean()"
+            },
+            "photo": {
+              ".validate": "newData.isString() && newData.val().length <= 40 && root.child('pairs').child($code).child('photo_data').child(newData.val()).child('by').val() === newData.parent().child('from').val()"
+            },
+            "voice": {
+              ".validate": "newData.isString() && newData.val().length <= 40 && root.child('pairs').child($code).child('voice_data').child(newData.val()).child('by').val() === newData.parent().child('from').val()"
+            },
+            "dur": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 300"
             },
             "$other": {
               ".validate": false
@@ -458,6 +467,66 @@
                 ".validate": false
               }
             }
+          },
+          "letters": {
+            "$l": {
+              ".write": "auth != null && root.child('pairs').child($code).child('members').child(data.exists() ? data.child('by').val() : newData.child('by').val()).val() === auth.uid",
+              ".validate": "newData.hasChildren(['by', 'at', 'kind', 'title']) && (!data.exists() || newData.child('by').val() === data.child('by').val()) && (newData.child('kind').val() === 'when' || newData.hasChild('openAt'))",
+              "by": {
+                ".validate": "newData.val() === 'a' || newData.val() === 'b'"
+              },
+              "at": {
+                ".validate": "newData.isNumber()"
+              },
+              "kind": {
+                ".validate": "newData.val() === 'date' || newData.val() === 'when'"
+              },
+              "openAt": {
+                ".validate": "newData.isNumber()"
+              },
+              "title": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 80"
+              },
+              "opened": {
+                ".write": "auth != null && (root.child('pairs').child($code).child('members/a').val() === auth.uid || root.child('pairs').child($code).child('members/b').val() === auth.uid)",
+                ".validate": "newData.isBoolean()"
+              },
+              "$other": {
+                ".validate": false
+              }
+            }
+          },
+          "movies": {
+            "$m": {
+              ".write": "auth != null && (root.child('pairs').child($code).child('members/a').val() === auth.uid || root.child('pairs').child($code).child('members/b').val() === auth.uid)",
+              ".validate": "newData.hasChildren(['title', 'kind', 'by', 'at'])",
+              "title": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 100"
+              },
+              "kind": {
+                ".validate": "newData.val() === 'movie' || newData.val() === 'series'"
+              },
+              "by": {
+                ".validate": "newData.val() === 'a' || newData.val() === 'b'"
+              },
+              "at": {
+                ".validate": "newData.isNumber()"
+              },
+              "watched": {
+                ".validate": "newData.isBoolean()"
+              },
+              "watchedAt": {
+                ".validate": "newData.isNumber()"
+              },
+              "rate": {
+                "$role": {
+                  ".validate": "($role === 'a' || $role === 'b') && newData.isNumber() && newData.val() >= 1 && newData.val() <= 5 && (newData.val() === data.val() || root.child('pairs').child($code).child('members').child($role).val() === auth.uid)"
+                }
+              },
+              "$other": {
+                ".validate": false
+              }
+            }
           }
         },
         "secret": {
@@ -574,6 +643,44 @@
               "$other": {
                 ".validate": false
               }
+            }
+          }
+        },
+        "voice_data": {
+          "$v": {
+            ".read": "auth != null && (root.child('pairs').child($code).child('members/a').val() === auth.uid || root.child('pairs').child($code).child('members/b').val() === auth.uid)",
+            ".write": "auth != null && (data.exists() ? !newData.exists() : true) && root.child('pairs').child($code).child('members').child(data.exists() ? data.child('by').val() : newData.child('by').val()).val() === auth.uid",
+            ".validate": "newData.hasChildren(['by', 'data', 'dur'])",
+            "by": {
+              ".validate": "newData.val() === 'a' || newData.val() === 'b'"
+            },
+            "data": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 700000"
+            },
+            "dur": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 300"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+        "letters": {
+          "$l": {
+            ".read": "auth != null && (root.child('pairs').child($code).child('members').child(data.child('by').val()).val() === auth.uid || ((root.child('pairs').child($code).child('members/a').val() === auth.uid || root.child('pairs').child($code).child('members/b').val() === auth.uid) && root.child('pairs').child($code).child('live/letters').child($l).exists() && (root.child('pairs').child($code).child('live/letters').child($l).child('kind').val() === 'when' || root.child('pairs').child($code).child('live/letters').child($l).child('openAt').val() <= now)))",
+            ".write": "auth != null && (data.exists() ? !newData.exists() : true) && root.child('pairs').child($code).child('members').child(data.exists() ? data.child('by').val() : newData.child('by').val()).val() === auth.uid",
+            ".validate": "newData.hasChildren(['by', 'text', 'at'])",
+            "by": {
+              ".validate": "newData.val() === 'a' || newData.val() === 'b'"
+            },
+            "text": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 5000"
+            },
+            "at": {
+              ".validate": "newData.isNumber()"
+            },
+            "$other": {
+              ".validate": false
             }
           }
         }

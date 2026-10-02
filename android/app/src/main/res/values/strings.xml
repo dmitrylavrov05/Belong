@@ -249,6 +249,7 @@
         <item>partner|Morning! Calls until lunch for me 😴</item>
         <item>me|Hang in there! Video call tonight?</item>
         <item>partner|Yes, 9 pm Kyiv time ❤️</item>
+        <item>partner|photo:demo-p0</item>
     </string-array>
     <string-array name="chat_replies">
         <item>❤️</item>
@@ -766,6 +767,7 @@
     <string name="stat_thanks">evening notes</string>
     <string name="stat_dreams">dreams came true</string>
     <string name="stat_goals">goals reached</string>
+    <string name="stat_movies">films watched together</string>
     <string name="stat_talks">honest talks</string>
     <!-- Feelings after a quarrel -->
     <string name="feelings_title">Talking about feelings</string>
@@ -796,4 +798,99 @@
     <string name="feelings_today_text">Write your side to read it</string>
     <string name="us_feelings_text">Notes after a quarrel, private until you’ve both written</string>
     <string name="feelings_demo">We argued about the weekend plans|A little hurt, but mostly I miss you|To know that my plans matter to you too|Let’s plan next weekend together tonight?</string>
+    <!-- Letters "Open when…" -->
+    <string name="letters_title">Open when…</string>
+    <string name="letters_intro">Letters for later: for a special day or for a moment when %1$s needs your words. A sealed letter can’t be read before its day.</string>
+    <string name="letters_for_me">For you</string>
+    <string name="letters_for_me_empty">No letters from %1$s yet.</string>
+    <string name="letters_from_me">From you</string>
+    <string name="letters_from_me_empty">Write the first one: for your anniversary, a birthday or a rainy evening.</string>
+    <string name="letters_write">Write a letter</string>
+    <string name="letters_write_hint">%1$s will see that a letter is waiting, but can read it only when the time comes.</string>
+    <string name="letters_when_title">When to open it</string>
+    <string name="letters_kind_date">On a day</string>
+    <string name="letters_kind_when">When…</string>
+    <string name="letters_when_sad">Open when you’re sad</string>
+    <string name="letters_when_miss">Open when you miss me</string>
+    <string name="letters_when_sleep">Open when you can’t sleep</string>
+    <string name="letters_when_quarrel">Open when we’ve quarrelled</string>
+    <string name="letters_when_proud">Open when you did something great</string>
+    <string name="letters_when_doubt">Open when you doubt yourself</string>
+    <string name="letters_open_on">Open on %1$s</string>
+    <string name="letters_field_title">On the envelope</string>
+    <string name="letters_field_text">Dear %1$s…</string>
+    <string name="letters_sealed_note">Once sealed, the letter can’t be changed, only taken back.</string>
+    <string name="letters_seal">Seal the letter</string>
+    <string name="letters_text_required">Write a few words</string>
+    <string name="letters_sent">Sealed. %1$s will see the envelope 💌</string>
+    <plurals name="letters_in_days">
+        <item quantity="one">in %d day</item>
+        <item quantity="other">in %d days</item>
+    </plurals>
+    <string name="letters_opens">Opens %1$s</string>
+    <string name="letters_sealed_toast">Not yet: it opens %1$s 🤫</string>
+    <string name="letters_open_now">Can be opened now</string>
+    <string name="letters_opened">Opened</string>
+    <string name="letters_can_open_now">Can already be opened</string>
+    <string name="letters_waiting_moment">Waiting for its moment</string>
+    <string name="letters_read_by">%1$s has read it 💞</string>
+    <string name="letters_from">From %1$s · %2$s</string>
+    <string name="letters_loading">Opening…</string>
+    <string name="letters_unavailable">Couldn’t open the letter. Check the connection and try again.</string>
+    <string name="letters_delete">Take back this letter?</string>
+    <string name="letters_today">A letter from %1$s has opened</string>
+    <string name="us_letters_text">Letters to open on a special day or when needed</string>
+    <string-array name="letter_seeds">
+        <item>date|-1|partner|Open on Friday|Just a reminder for an ordinary Friday: I’m proud of you, I love you, and I’m already waiting for our weekend. Make yourself a tea and smile 🙂</item>
+        <item>when|0|partner|Open when you’re sad|Hey. If you’re reading this, today is hard. That’s okay. Breathe, wrap yourself in a blanket and remember: you’re not alone, I’m always on your side. Call me, even at 3 am.</item>
+        <item>date|136|partner|Open on our anniversary|This one is sealed until our day 💞</item>
+        <item>date|42|me|Open on your birthday|Sealed until your birthday 🎂</item>
+    </string-array>
+
+    <!-- Films and series -->
+    <string name="movies_title">Films and series</string>
+    <string name="movies_counts">%1$d to watch · %2$d watched</string>
+    <string name="movies_to_watch">To watch</string>
+    <string name="movies_watched">Watched</string>
+    <string name="movies_empty">Nothing here yet. Add something you’ve both been meaning to see.</string>
+    <string name="movies_watched_empty">Watched titles and your stars will be here.</string>
+    <string name="movies_tonight">What shall we watch tonight?</string>
+    <string name="movies_pick">Pick one for us 🎲</string>
+    <string name="movies_pick_again">Something else 🎲</string>
+    <string name="movies_movie">Film</string>
+    <string name="movies_series">Series</string>
+    <string name="movies_idea_of">%1$s’s idea</string>
+    <string name="movies_rate_to_see">Rate it to see %1$s’s stars</string>
+    <string name="movies_add">Add a title</string>
+    <string name="movies_field_title">Title</string>
+    <string name="movies_delete">Remove from the list?</string>
+    <string name="movies_watched_question">Watched it? How many stars from you?</string>
+    <string name="movies_your_rating">Your stars</string>
+    <string name="movies_not_watched">Back to “to watch”</string>
+    <string name="movies_rated">Saved to “Watched”</string>
+    <plurals name="movies_stars">
+        <item quantity="one">%d star</item>
+        <item quantity="other">%d stars</item>
+    </plurals>
+    <string name="us_movies_text">What to watch together, and your stars</string>
+    <string-array name="movie_seeds">
+        <item>movie|partner||Past Lives</item>
+        <item>series|me||Only Murders in the Building</item>
+        <item>movie|me||Amélie</item>
+        <item>movie|partner|5,4|Before Sunrise</item>
+        <item>series|me|4,|The Bear</item>
+        <item>movie|me|3,5|Interstellar</item>
+    </string-array>
+    <!-- Photos and voice in chat -->
+    <string name="chat_photo">Send a photo</string>
+    <string name="chat_voice">Record a voice message</string>
+    <string name="chat_voice_cancel">Cancel recording</string>
+    <string name="chat_recording">Recording…</string>
+    <string name="chat_voice_failed">Couldn’t start the microphone</string>
+    <string name="chat_voice_denied">Allow the microphone in the app’s settings to send voice messages</string>
+    <string name="chat_voice_short">Too short: tap the microphone and speak</string>
+    <string name="chat_photo_message">Photo</string>
+    <string name="chat_voice_message">Voice message, %1$s</string>
+    <string name="chat_voice_play">Play</string>
+    <string name="chat_voice_pause">Pause</string>
 </resources>

@@ -232,6 +232,7 @@ data class Highlights(
     val thanks: Int,
     val moments: List<String>,
     val talks: Int,
+    val movies: Int = 0,
 )
 
 object ReportModel {
@@ -249,7 +250,8 @@ object ReportModel {
         } ?: 0
         val moments = TogetherModel.moments(root).filter { inRange(it.day) }.sortedBy { it.day }.map { it.title }
         val talks = FeelingsModel.notes(root, me).count { inRange(it.at / 86_400_000L) }
-        return Highlights(photos.size, photos.map { it.day }.distinct().size, dreams, goals, questions, thanks, moments, talks)
+        val movies = MoviesModel.watched(MoviesModel.movies(root, me)).count { m -> m.watchedAt?.let { inRange(it / 86_400_000L) } == true }
+        return Highlights(photos.size, photos.map { it.day }.distinct().size, dreams, goals, questions, thanks, moments, talks, movies)
     }
 
     fun month(root: JSONObject, me: Role?, month: java.time.YearMonth): Highlights =
@@ -287,4 +289,99 @@ object FeelingsModel {
 
     /** The partner wrote and is waiting for my side. */
     fun waitingForMe(root: JSONObject, me: Role?): FeelingsNote? = notes(root, me).firstOrNull { it.partnerWritten && !it.mineWritten }
+}
+
+/** A letter to open later: on a day ([openAt], ms) or "when…" ([title] says when). */
+data class Letter(
+    val key: String,
+    val title: String,
+    val kind: Kind,
+    val openAt: Long?,
+    val by: Owner,
+    val at: Long,
+    val opened: Boolean,
+) {
+    enum class Kind { DATE, WHEN }
+
+    /** Whether the reader may open it at [now]. */
+    fun canOpen(now: Long): Boolean = kind == Kind.WHEN || (openAt != null && openAt <= now)
+}
+
+/** Letters to each other (live/letters); the text itself is in letters/{key} and opens on its day. */
+object LettersModel {
+    fun letters(root: JSONObject, me: Role?): List<Letter> {
+        val all = root.optJSONObject("letters") ?: return emptyList()
+        val mine = seatKey(me, mine = true)
+        return all.keys().asSequence().mapNotNull { key ->
+            val o = all.optJSONObject(key) ?: return@mapNotNull null
+            val title = o.optString("title")
+            if (title.isEmpty() || !o.has("by")) return@mapNotNull null
+            val kind = if (o.optString("kind") == "when") Letter.Kind.WHEN else Letter.Kind.DATE
+            Letter(key, title, kind, if (o.has("openAt")) o.optLong("openAt") else null,
+                if (o.optString("by") == mine) Owner.ME else Owner.PARTNER, o.optLong("at"), o.optBoolean("opened"))
+        }.toList()
+    }
+
+    /** Letters for me: the ones I can open first (dated ones by date), then sealed ones by when they open. */
+    fun forMe(letters: List<Letter>, now: Long): List<Letter> = letters.filter { it.by == Owner.PARTNER }
+        .sortedWith(compareBy<Letter>({ !it.canOpen(now) }, { it.opened }, { it.openAt ?: 0L }, { -it.at }))
+
+    fun fromMe(letters: List<Letter>): List<Letter> = letters.filter { it.by == Owner.ME }.sortedByDescending { it.at }
+
+    /** A dated letter that has just become openable and is still unread: worth a card on Today. */
+    fun ready(letters: List<Letter>, now: Long): Letter? =
+        letters.firstOrNull { it.by == Owner.PARTNER && it.kind == Letter.Kind.DATE && it.canOpen(now) && !it.opened }
+
+    fun metaJson(by: String, kind: Letter.Kind, title: String, openAt: Long?, at: Long): JSONObject = JSONObject()
+        .put("by", by).put("at", at).put("kind", if (kind == Letter.Kind.WHEN) "when" else "date").put("title", title)
+        .apply { if (openAt != null) put("openAt", openAt) }
+}
+
+data class Movie(
+    val key: String,
+    val title: String,
+    val series: Boolean,
+    val by: Owner,
+    val at: Long,
+    val watched: Boolean,
+    val watchedAt: Long?,
+    val myRating: Int?,
+    val partnerRating: Int?,
+)
+
+/** What you want to watch together and what you've watched, with each partner's own rating (live/movies). */
+object MoviesModel {
+    fun movies(root: JSONObject, me: Role?): List<Movie> {
+        val all = root.optJSONObject("movies") ?: return emptyList()
+        val mine = seatKey(me, mine = true)
+        val theirs = seatKey(me, mine = false)
+        return all.keys().asSequence().mapNotNull { key ->
+            val o = all.optJSONObject(key) ?: return@mapNotNull null
+            val title = o.optString("title")
+            if (title.isEmpty()) return@mapNotNull null
+            val rate = o.optJSONObject("rate")
+            Movie(key, title, o.optString("kind") == "series", if (o.optString("by") == mine) Owner.ME else Owner.PARTNER, o.optLong("at"),
+                o.optBoolean("watched"), if (o.has("watchedAt")) o.optLong("watchedAt") else null,
+                rate?.takeIf { it.has(mine) }?.optInt(mine), rate?.takeIf { it.has(theirs) }?.optInt(theirs))
+        }.toList()
+    }
+
+    /** Still to watch, newest suggestion first. */
+    fun toWatch(movies: List<Movie>): List<Movie> = movies.filter { !it.watched }.sortedByDescending { it.at }
+
+    /** Watched, most recent first. */
+    fun watched(movies: List<Movie>): List<Movie> = movies.filter { it.watched }.sortedByDescending { it.watchedAt ?: it.at }
+
+    /** Our average for a watched title, once both have rated it. */
+    fun together(m: Movie): Double? = if (m.myRating != null && m.partnerRating != null) (m.myRating + m.partnerRating) / 2.0 else null
+
+    /** Something for tonight from the to-watch list, skipping [last] when there's another option. */
+    fun pick(movies: List<Movie>, series: Boolean?, random: java.util.Random, last: String? = null): Movie? {
+        val options = toWatch(movies).filter { series == null || it.series == series }
+        val fresh = options.filter { it.key != last }.ifEmpty { options }
+        return if (fresh.isEmpty()) null else fresh[random.nextInt(fresh.size)]
+    }
+
+    fun json(title: String, series: Boolean, by: String, at: Long): JSONObject =
+        JSONObject().put("title", title).put("kind", if (series) "series" else "movie").put("by", by).put("at", at).put("watched", false)
 }

@@ -17,7 +17,8 @@ Under `pairs/<code>`:
 
 - `logins/<seat>`: name and account generation (readable by anyone with the code, for the sign-in screen);
 - `members`, `reset`: who holds each seat, and one-time help codes;
-- `chat/<key>`: messages `{from, text, at, heart}`;
+- `chat/<key>`: messages `{from, text?, photo?, voice?, dur?, at, heart}`; a photo or voice message must already be in `photo_data` or `voice_data` from the same sender;
+- `voice_data/<key>` `{by, data, dur}`: voice messages as base64 AAC, written once by their author;
 - `live/checkin/<seat>`: mood and energy `{mood, energy, at}`; each seat writes only its own;
 - `live/signal/<seat>`: the latest "think", "safe" or "support" tap, which the partner's phone shows as a toast;
 - `live/count/<seat>/<yyyy-MM>/<kind>`: monthly counts that can only go up by one;
@@ -34,6 +35,8 @@ Under `pairs/<code>`:
 - `live/dates/<key>`: important dates `{title, emoji, day, yearly, at}`;
 - `live/photos/<day>/<key>` `{by, at, caption}` and `photo_data/<key>` `{by, thumb, full}`: photos of the day as base64 JPEGs (thumb ≤ 80 000 characters, full ≤ 1 000 000). Only the author writes or deletes them, and a picture can't be replaced;
 - `live/feelings/<key>` `{by, at, title, wrote/<seat>}` and `feelings/<key>/<seat>` `{what, feel, need, ask, at}`: notes after a quarrel. The partner may read your note only once their own exists;
+- `live/letters/<key>` `{by, at, kind: date|when, openAt?, title, opened?}` and `letters/<key>` `{by, text, at}`: letters for later. The partner can read the text only once `openAt` has passed (or at any time for a "when…" letter); only the author can change the envelope, the reader can only mark it opened;
+- `live/movies/<key>` `{title, kind: movie|series, by, at, watched, watchedAt?, rate/<seat>}`: films and series; each partner sets only their own stars (1–5);
 - `secret/<seat>/reserved/<key>`: gifts this seat will give. Only that seat can read or write it, which is why members get read access per section (`chat`, `live`) and not to the whole pair.
 
 Nobody receives mail at `pair.belong.app`: the address is just an account name. `database.rules.json` enforces all of the above. Members alone read the pair. Messages can't be forged, edited or deleted; the other partner can only add a ❤️.

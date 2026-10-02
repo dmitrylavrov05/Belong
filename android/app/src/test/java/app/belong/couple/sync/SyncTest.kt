@@ -89,6 +89,18 @@ class ChatFeedTest {
     }
 
     @Test
+    fun photoAndVoiceMessagesComeThrough() {
+        val feed = ChatFeed()
+        put(feed, "/", """{"k1":{"from":"a","photo":"p1","at":1},"k2":{"from":"b","voice":"v1","dur":7,"at":2},"k3":{"from":"b","at":3}}""")
+        val list = feed.toList(Role.A)
+        assertEquals(listOf("k1", "k2"), list.map { it.key })
+        assertEquals("p1", list[0].photo)
+        assertEquals("", list[0].text)
+        assertEquals("v1", list[1].voice)
+        assertEquals(7, list[1].dur)
+    }
+
+    @Test
     fun patchMergesAndEmptySnapshotClears() {
         val feed = ChatFeed()
         put(feed, "/", "null")

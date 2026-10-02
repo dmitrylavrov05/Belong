@@ -5,10 +5,13 @@ import android.os.Handler
 import android.os.Looper
 import app.belong.couple.R
 import app.belong.couple.core.DailyQuestions
+import app.belong.couple.core.Letter
+import app.belong.couple.core.LettersModel
 import app.belong.couple.core.QuizModel
 import app.belong.couple.core.seatKey
 import app.belong.couple.data.Account
 import app.belong.couple.data.SharedRepo
+import app.belong.couple.ui.DreamsScreen
 import org.json.JSONObject
 import java.util.concurrent.Executors
 
@@ -207,4 +210,96 @@ object Feelings {
             main.post { done(note) }
         }
     }
+}
+
+/**
+ * Letters "open when…". The text goes to letters/{key}, which the database lets the partner read only
+ * from the day it opens (or at any time for a "when you're sad" letter); live/letters/{key} only says
+ * when, from whom and whether it's been opened.
+ */
+object Letters {
+    private fun cacheKey(key: String) = "letter_text_$key"
+
+    /** Seals a new letter. [done] gets whether the server has it (always true for the example couple). */
+    fun write(context: Context, kind: Letter.Kind, title: String, openAt: Long?, text: String, done: (Boolean) -> Unit) {
+        val app = context.applicationContext
+        val key = DreamsScreen.newKey()
+        prefs(app).edit().putString(cacheKey(key), text).apply()
+        val repo = SharedRepo(app)
+        val meta = LettersModel.metaJson(seatKey(repo.me, mine = true), kind, title.take(80), openAt, System.currentTimeMillis())
+        val account = Account.get(app)
+        val seat = account.seat
+        if (!account.paired || seat == null) {
+            repo.put("letters/$key", meta)
+            return done(true)
+        }
+        worker.execute {
+            val ok = try {
+                Db(account.config).put("pairs/${seat.code}/letters/$key", JSONObject().put("by", seat.role.key).put("text", text).put("at", Db.serverTime()), account.token())
+                true
+            } catch (e: CloudException) {
+                false
+            }
+            main.post {
+                if (ok) repo.put("letters/$key", meta)
+                done(ok)
+            }
+        }
+    }
+
+    /** The letter's text: mine always, the partner's once it may be opened. Null if it can't be read (yet). */
+    fun text(context: Context, key: String, done: (String?) -> Unit) {
+        val app = context.applicationContext
+        prefs(app).getString(cacheKey(key), null)?.let { return done(it) }
+        val account = Account.get(app)
+        val seat = account.seat
+        if (!account.paired || seat == null) return done(null)
+        worker.execute {
+            val text = try {
+                (Db(account.config).get("pairs/${seat.code}/letters/$key", account.token()) as? JSONObject)?.optString("text")?.takeIf { it.isNotEmpty() }
+            } catch (e: CloudException) {
+                null
+            }
+            if (text != null) prefs(app).edit().putString(cacheKey(key), text).apply()
+            main.post { done(text) }
+        }
+    }
+
+    fun markOpened(context: Context, key: String) = SharedRepo(context).put("letters/$key/opened", true)
+
+    /** Takes back one of my letters. */
+    fun delete(context: Context, key: String) {
+        val app = context.applicationContext
+        SharedRepo(app).delete("letters/$key")
+        prefs(app).edit().remove(cacheKey(key)).apply()
+        val account = Account.get(app)
+        val seat = account.seat ?: return
+        if (!account.paired) return
+        worker.execute {
+            try {
+                Db(account.config).delete("pairs/${seat.code}/letters/$key", account.token())
+            } catch (e: CloudException) {
+                // The description is gone already; the text stays unreadable without it.
+            }
+        }
+    }
+
+    /** The example couple's letters: "kind|days from now|by|title|text". */
+    fun seedDemo(context: Context, seeds: List<String>) {
+        val app = context.applicationContext
+        val repo = SharedRepo(app)
+        val now = System.currentTimeMillis()
+        val today = java.time.LocalDate.now(java.time.ZoneId.systemDefault())
+        seeds.forEachIndexed { i, line ->
+            val (kind, days, by, title, text) = line.split('|', limit = 5)
+            val key = "demo-l$i"
+            val k = if (kind == "when") Letter.Kind.WHEN else Letter.Kind.DATE
+            val openAt = if (k == Letter.Kind.DATE) openAtFor(today.plusDays(days.toLong())) else null
+            prefs(app).edit().putString(cacheKey(key), text).apply()
+            repo.put("letters/$key", LettersModel.metaJson(by, k, title, openAt, now - (i + 1) * 86_400_000L))
+        }
+    }
+
+    /** A dated letter opens at the start of its day on the writer's phone. */
+    fun openAtFor(day: java.time.LocalDate): Long = day.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
 }
