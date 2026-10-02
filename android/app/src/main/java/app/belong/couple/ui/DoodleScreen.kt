@@ -210,10 +210,20 @@ class DoodleScreen(private val activity: MainActivity) : Screen {
             return
         }
         haptic(button)
-        store.saveMyDoodle(doodle.export(600))
+        val picture = doodle.export(600)
+        store.saveMyDoodle(picture)
+        if (app.belong.couple.data.Account.get(ctx).paired) {
+            button.isEnabled = false
+            app.belong.couple.sync.LiveSync.sendDoodle(ctx, picture) { ok ->
+                button.isEnabled = true
+                if (ok) doodle.clear()
+                Toaster.show(activity, ctx.getString(if (ok) R.string.doodle_sent else R.string.pair_error_network, store.partnerDisplay))
+            }
+            return
+        }
         store.increment(Counter.DOODLES)
         doodle.clear()
-        ctx.toast(ctx.getString(R.string.doodle_sent, store.partnerDisplay))
+        Toaster.show(activity, ctx.getString(R.string.doodle_sent, store.partnerDisplay))
         Widgets.updateAll(ctx)
         DemoPartner.onDoodleSent(ctx)
     }

@@ -3,6 +3,7 @@ package app.belong.couple.sync
 import app.belong.couple.core.Owner
 import app.belong.couple.core.Role
 import app.belong.couple.core.Task
+import app.belong.couple.core.WishItem
 import org.json.JSONObject
 
 /** Any part of the database kept in step with the event stream's "put" and "patch" events. */
@@ -46,12 +47,15 @@ class JsonTree {
 /** A partner's mood and energy check-in. */
 data class CheckIn(val mood: Int, val energy: Int, val at: Long)
 
+/** A partner's latest doodle as base64 PNG. */
+data class Doodle(val png: String, val at: Long, val id: String)
+
 /** The last "thinking of you", "I'm safe" or "support" tap a partner sent. */
 data class Signal(val kind: String, val at: Long, val id: String)
 
 /**
- * The pair's "Today" as stored under pairs/{code}/live:
- * checkin/{role}, signal/{role}, count/{role}/{yyyy-MM}/{kind} and tasks/{key}.
+ * What the pair shares, as stored under pairs/{code}/live: checkin/{role}, signal/{role},
+ * count/{role}/{yyyy-MM}/{kind}, tasks/{key}, wishes/{role}/{key} and doodle/{role}.
  * Tasks are stored with the seat that owns them ("a", "b" or "both"), so each phone shows them as its own or the partner's.
  */
 object LiveModel {
@@ -108,9 +112,47 @@ object LiveModel {
      * The plan this phone shows: the server's tasks, with local edits that haven't reached it yet
      * on top ([dirty] keys use the local version, [deleted] keys are left out).
      */
-    fun mergeTasks(server: List<Task>, local: List<Task>, dirty: Set<String>, deleted: Set<String>): List<Task> {
-        val mine = local.filter { it.key in dirty }.associateBy { it.key }
-        val fromServer = server.filter { it.key !in deleted && it.key !in mine }
-        return (fromServer + mine.values).sortedBy { it.key }
+    fun mergeTasks(server: List<Task>, local: List<Task>, dirty: Set<String>, deleted: Set<String>): List<Task> =
+        merge(server, local, dirty, deleted) { it.key }
+
+    fun <T> merge(server: List<T>, local: List<T>, dirty: Set<String>, deleted: Set<String>, key: (T) -> String): List<T> {
+        val mine = local.filter { key(it) in dirty }.associateBy(key)
+        val fromServer = server.filter { key(it) !in deleted && key(it) !in mine }
+        return (fromServer + mine.values).sortedBy(key)
+    }
+
+    /** Both wishlists, stored as wishes/{seat}/{key}. Reservations are not here: see [withReservations]. */
+    fun wishes(tree: JsonTree, me: Role): List<WishItem> = Role.entries.flatMap { role ->
+        val all = tree.obj("wishes", role.key) ?: return@flatMap emptyList()
+        all.keys().asSequence().mapNotNull { key ->
+            val o = all.optJSONObject(key) ?: return@mapNotNull null
+            val title = o.optString("title")
+            if (title.isEmpty()) return@mapNotNull null
+            WishItem(
+                ChatFeed.idFor(key), if (role == me) Owner.ME else Owner.PARTNER, title, o.optString("price"),
+                o.optString("link"), o.optString("note"), false, o.optLong("at"), key,
+            )
+        }.toList()
+    }
+
+    fun wishJson(wish: WishItem): JSONObject = JSONObject()
+        .put("title", wish.title)
+        .put("price", wish.price)
+        .put("link", wish.link)
+        .put("note", wish.note)
+        .put("at", wish.createdAt)
+
+    /**
+     * Marks the partner's wishes this phone has reserved. The reservations live in a part of the
+     * database only this seat can read ([server]); [unsent] holds local changes not sent yet.
+     */
+    fun withReservations(wishes: List<WishItem>, server: Set<String>, unsent: Map<String, Boolean>): List<WishItem> =
+        wishes.map { w -> if (w.owner == Owner.PARTNER) w.copy(reserved = unsent[w.key] ?: (w.key in server)) else w }
+
+    fun doodle(tree: JsonTree, role: Role): Doodle? {
+        val o = tree.obj("doodle", role.key) ?: return null
+        val png = o.optString("png")
+        val id = o.optString("id")
+        return if (png.isEmpty() || id.isEmpty()) null else Doodle(png, o.optLong("at"), id)
     }
 }

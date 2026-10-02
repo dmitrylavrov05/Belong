@@ -48,9 +48,11 @@ Five tabs: Today, Chat, Wishlist, Places, More.
 Synced between the two phones:
 
 - **chat**, including ❤️ on messages;
-- **Today**: both mood and energy check-ins, “thinking of you”, “I’m safe” and “send support” taps (the partner sees a toast) with this month’s counts, and the shared plan for the day.
+- **Today**: both mood and energy check-ins, “thinking of you”, “I’m safe” and “send support” taps (the partner sees a toast) with this month’s counts, and the shared plan for the day;
+- **wishlists**: each partner edits their own list. “I'll give this” is stored in a part of the server only the reserver can read, so the owner can't find out even with a modified app;
+- **doodles**: the partner's latest doodle reaches the doodle screen and the home-screen widget.
 
-Both work offline: changes are saved on the phone first and sent on the next connection. Wishlists and doodles still stay on the phone. There are no push notifications yet: updates arrive while the app is open.
+All of it works offline: changes are saved on the phone first and sent on the next connection. There are no push notifications yet: updates arrive while the app is open.
 
 The server is a Firebase project used over REST (no Firebase SDK); see [`../firebase/README.md`](../firebase/README.md). Its details go into `app/src/main/res/values/cloud.xml`.
 

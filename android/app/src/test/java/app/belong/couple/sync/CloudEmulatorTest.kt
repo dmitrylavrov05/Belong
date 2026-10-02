@@ -162,6 +162,41 @@ class CloudEmulatorTest {
     }
 
     @Test
+    fun wishlistsAreSharedButGiftReservationsStaySecret() {
+        val yulia = pairing.create("Yulia", "sunflower1")
+        val igor = pairing.join(yulia.code, "Igor", "maple-leaf")
+        val live = "pairs/${yulia.code}/live"
+        val wish = JSONObject().put("title", "Film camera").put("price", "$90").put("link", "https://example.com").put("note", "").put("at", 1)
+
+        db.put("$live/wishes/a/w1", wish, yulia.session.idToken)
+        // Only the owner edits their list, and links must be web links.
+        expect(Reason.DENIED) { db.put("$live/wishes/a/w2", wish, igor.session.idToken) }
+        expect(Reason.DENIED) { db.put("$live/wishes/a/w3", JSONObject(wish.toString()).put("link", "javascript:alert(1)"), yulia.session.idToken) }
+
+        // Igor reserves Yulia's wish. It is stored where only Igor can read it.
+        val igorSecret = "pairs/${yulia.code}/secret/b/reserved"
+        db.put("$igorSecret/w1", true, igor.session.idToken)
+        assertEquals(true, (db.get(igorSecret, igor.session.idToken) as JSONObject).getBoolean("w1"))
+        expect(Reason.DENIED) { db.get(igorSecret, yulia.session.idToken) }
+        expect(Reason.DENIED) { db.get("pairs/${yulia.code}", yulia.session.idToken) }
+        expect(Reason.DENIED) { db.put("$igorSecret/w1", false, yulia.session.idToken) }
+
+        val tree = JsonTree()
+        tree.apply("put", JSONObject().put("path", "/").put("data", db.get(live, igor.session.idToken)).toString())
+        val seen = LiveModel.wishes(tree, Role.B).single()
+        assertEquals(app.belong.couple.core.Owner.PARTNER, seen.owner)
+        assertEquals("Film camera", seen.title)
+
+        // Doodles: PNG only, from the owner's seat.
+        val png = java.util.Base64.getEncoder().encodeToString(byteArrayOf(0x89.toByte(), 'P'.code.toByte(), 'N'.code.toByte(), 'G'.code.toByte(), 13, 10, 26, 10))
+        db.put("$live/doodle/b", JSONObject().put("png", png).put("at", Db.serverTime()).put("id", "d1"), igor.session.idToken)
+        expect(Reason.DENIED) { db.put("$live/doodle/b", JSONObject().put("png", "PHN2Zz4=").put("at", Db.serverTime()).put("id", "d2"), igor.session.idToken) }
+        expect(Reason.DENIED) { db.put("$live/doodle/a", JSONObject().put("png", png).put("at", Db.serverTime()).put("id", "d3"), igor.session.idToken) }
+        tree.apply("put", JSONObject().put("path", "/").put("data", db.get(live, yulia.session.idToken)).toString())
+        assertEquals("d1", LiveModel.doodle(tree, Role.B)!!.id)
+    }
+
+    @Test
     fun partnerHelpsResetAForgottenPassword() {
         val yulia = pairing.create("Yulia", "sunflower1")
         val igor = pairing.join(yulia.code, "Igor", "maple-leaf")

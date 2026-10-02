@@ -132,22 +132,39 @@ class WishRepo(context: Context) : JsonList<WishItem>(context, "wishes") {
     override fun write(item: WishItem) = JSONObject()
         .put("id", item.id).put("owner", item.owner.key).put("title", item.title).put("price", item.price)
         .put("link", item.link).put("note", item.note).put("reserved", item.reserved).put("at", item.createdAt)
+        .put("key", item.key)
 
     override fun read(o: JSONObject) = WishItem(
         o.getLong("id"), Owner.of(o.optString("owner")), o.getString("title"), o.optString("price"),
-        o.optString("link"), o.optString("note"), o.optBoolean("reserved"), o.optLong("at"),
+        o.optString("link"), o.optString("note"), o.optBoolean("reserved"), o.optLong("at"), o.optString("key"),
     )
 
     fun of(owner: Owner): List<WishItem> = all().filter { it.owner == owner }.sortedByDescending { it.createdAt }
 
+    /** Saves a wish of mine; a new one (no key yet) gets a server key. */
     fun upsert(item: WishItem) {
         val items = all()
-        save(if (items.any { it.id == item.id }) items.map { if (it.id == item.id) item else it } else items + item)
+        // Example wishes from before pairing have no key yet; they keep their id and get one now.
+        val wish = if (item.key.isNotEmpty()) item else {
+            val key = ChatFeed.newKey(System.currentTimeMillis(), keys)
+            item.copy(id = if (items.any { it.id == item.id }) item.id else ChatFeed.idFor(key), key = key)
+        }
+        save(if (items.any { it.id == wish.id }) items.map { if (it.id == wish.id) wish else it } else items + wish)
+        LiveSync.wishChanged(app, wish.key)
     }
 
-    fun toggleReserved(id: Long) = save(all().map { if (it.id == id) it.copy(reserved = !it.reserved) else it })
+    /** "I'll give this": only the reserver's phone knows about it. */
+    fun toggleReserved(id: Long) {
+        val items = all().map { if (it.id == id) it.copy(reserved = !it.reserved) else it }
+        save(items)
+        items.firstOrNull { it.id == id }?.key?.takeIf { it.isNotEmpty() }?.let { LiveSync.reservationChanged(app, it) }
+    }
 
-    fun remove(id: Long) = save(all().filterNot { it.id == id })
+    fun remove(id: Long) {
+        val wish = all().firstOrNull { it.id == id } ?: return
+        save(all().filterNot { it.id == id })
+        if (wish.key.isNotEmpty()) LiveSync.wishRemoved(app, wish.key)
+    }
 
     fun startReal() = startEmpty("seeded_wishes")
 

@@ -41,6 +41,8 @@ data class WishItem(
     val note: String,
     val reserved: Boolean,
     val createdAt: Long,
+    /** Names the wish on the server once the lists are shared with a partner. */
+    val key: String = "",
 )
 
 /** [key] is the server key once the chat is shared with a partner; [pending] means it hasn't reached the server yet. */

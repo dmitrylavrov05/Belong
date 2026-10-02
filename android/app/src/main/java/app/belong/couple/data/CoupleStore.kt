@@ -118,6 +118,14 @@ class CoupleStore private constructor(private val context: Context) {
         prefs.edit().putLong("partner_doodle_at", at).apply()
     }
 
+    /** Stores the partner's doodle exactly as it came from the server (PNG bytes). */
+    fun savePartnerDoodlePng(png: ByteArray, at: Long) {
+        val tmp = File(doodleDir, "partner_latest.png.tmp")
+        tmp.writeBytes(png)
+        tmp.renameTo(partnerDoodleFile)
+        prefs.edit().putLong("partner_doodle_at", at).apply()
+    }
+
     fun saveMyDoodle(bitmap: Bitmap) {
         writePng(bitmap, myDoodleFile)
         prefs.edit().putLong("my_doodle_at", System.currentTimeMillis()).apply()

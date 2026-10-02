@@ -2,7 +2,6 @@
   "rules": {
     "pairs": {
       "$code": {
-        ".read": "auth != null && (data.child('members/a').val() === auth.uid || data.child('members/b').val() === auth.uid)",
         "logins": {
           ".read": true,
           "$role": {
@@ -33,6 +32,7 @@
           }
         },
         "chat": {
+          ".read": "auth != null && (root.child('pairs').child($code).child('members/a').val() === auth.uid || root.child('pairs').child($code).child('members/b').val() === auth.uid)",
           "$msg": {
             ".write": "auth != null && newData.exists() && (root.child('pairs').child($code).child('members/a').val() === auth.uid || root.child('pairs').child($code).child('members/b').val() === auth.uid)",
             ".validate": "newData.hasChildren(['from', 'text', 'at']) && (data.exists() ? newData.child('from').val() === data.child('from').val() && newData.child('text').val() === data.child('text').val() && newData.child('at').val() === data.child('at').val() : newData.child('at').val() === now && root.child('pairs').child($code).child('members').child(newData.child('from').val()).val() === auth.uid)",
@@ -54,6 +54,7 @@
           }
         },
         "live": {
+          ".read": "auth != null && (root.child('pairs').child($code).child('members/a').val() === auth.uid || root.child('pairs').child($code).child('members/b').val() === auth.uid)",
           "checkin": {
             "$role": {
               ".write": "auth != null && root.child('pairs').child($code).child('members').child($role).val() === auth.uid",
@@ -119,6 +120,64 @@
               "$other": {
                 ".validate": false
               }
+            }
+          },
+          "wishes": {
+            "$role": {
+              "$wish": {
+                ".write": "auth != null && root.child('pairs').child($code).child('members').child($role).val() === auth.uid",
+                ".validate": "newData.hasChildren(['title', 'at'])",
+                "title": {
+                  ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 80"
+                },
+                "price": {
+                  ".validate": "newData.isString() && newData.val().length <= 24"
+                },
+                "link": {
+                  ".validate": "newData.isString() && newData.val().length <= 500 && (newData.val() === '' || newData.val().beginsWith('https://') || newData.val().beginsWith('http://'))"
+                },
+                "note": {
+                  ".validate": "newData.isString() && newData.val().length <= 200"
+                },
+                "at": {
+                  ".validate": "newData.isNumber()"
+                },
+                "$other": {
+                  ".validate": false
+                }
+              }
+            }
+          },
+          "doodle": {
+            "$role": {
+              ".write": "auth != null && root.child('pairs').child($code).child('members').child($role).val() === auth.uid",
+              ".validate": "newData.hasChildren(['png', 'at', 'id']) && newData.child('at').val() === now",
+              "png": {
+                ".validate": "newData.isString() && newData.val().length < 700000 && newData.val().beginsWith('iVBOR')"
+              },
+              "at": {
+                ".validate": "newData.isNumber()"
+              },
+              "id": {
+                ".validate": "newData.isString() && newData.val().length <= 24"
+              },
+              "$other": {
+                ".validate": false
+              }
+            }
+          }
+        },
+        "secret": {
+          "$role": {
+            ".read": "auth != null && root.child('pairs').child($code).child('members').child($role).val() === auth.uid",
+            ".write": "auth != null && root.child('pairs').child($code).child('members').child($role).val() === auth.uid",
+            "reserved": {
+              "$wish": {
+                ".validate": "newData.isBoolean()"
+              }
+            },
+            "$other": {
+              ".validate": false
             }
           }
         }

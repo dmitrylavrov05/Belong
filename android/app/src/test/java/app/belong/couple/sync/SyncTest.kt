@@ -166,4 +166,27 @@ class LiveModelTest {
 
     private fun task(key: String, title: String) =
         app.belong.couple.core.Task(ChatFeed.idFor(key), title, app.belong.couple.core.Owner.ME, false, 1, key)
+
+    @Test
+    fun wishesComeFromBothListsAndReservationsAreLocalOnly() {
+        val t = tree("""{"wishes":{"a":{"w1":{"title":"Camera","price":"$90","link":"","note":"","at":5}},"b":{"w2":{"title":"Sweater","at":6},"w3":{"title":"","at":7}}}}""")
+        val forA = LiveModel.wishes(t, Role.A).associateBy { it.key }
+        assertEquals(setOf("w1", "w2"), forA.keys)
+        assertEquals(app.belong.couple.core.Owner.ME, forA["w1"]!!.owner)
+        assertEquals(app.belong.couple.core.Owner.PARTNER, forA["w2"]!!.owner)
+        assertEquals("Camera", LiveModel.wishJson(forA["w1"]!!).getString("title"))
+
+        val marked = LiveModel.withReservations(forA.values.toList(), server = setOf("w2", "w1"), unsent = emptyMap()).associateBy { it.key }
+        assertTrue(marked["w2"]!!.reserved)
+        assertFalse(marked["w1"]!!.reserved) // my own wishes never show reservations
+        val undone = LiveModel.withReservations(forA.values.toList(), server = setOf("w2"), unsent = mapOf("w2" to false))
+        assertFalse(undone.single { it.key == "w2" }.reserved)
+    }
+
+    @Test
+    fun doodleNeedsPngAndId() {
+        assertEquals("d1", LiveModel.doodle(tree("""{"doodle":{"b":{"png":"iVBOR","at":3,"id":"d1"}}}"""), Role.B)!!.id)
+        assertNull(LiveModel.doodle(tree("""{"doodle":{"b":{"png":"","at":3,"id":"d1"}}}"""), Role.B))
+        assertNull(LiveModel.doodle(tree("""{"doodle":{"b":{"png":"iVBOR","at":3,"id":"d1"}}}"""), Role.A))
+    }
 }

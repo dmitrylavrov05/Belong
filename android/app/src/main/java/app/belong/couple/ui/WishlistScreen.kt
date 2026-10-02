@@ -17,7 +17,6 @@ import app.belong.couple.core.WishItem
 import app.belong.couple.data.CoupleStore
 import app.belong.couple.data.DataEvents
 import app.belong.couple.data.WishRepo
-import app.belong.couple.data.newId
 
 /** Each partner's wishlist. You edit yours; on your partner's you can quietly reserve a gift. */
 class WishlistScreen(private val activity: MainActivity) : Screen {
@@ -42,16 +41,10 @@ class WishlistScreen(private val activity: MainActivity) : Screen {
     override fun refresh() {
         body.removeAllViews()
         body.addView(ctx.text(ctx.getString(R.string.wish_title), 28f, 800).apply { letterSpacing = -0.02f })
-        val tabs = ctx.row(8)
-        tabs.addView(ctx.chip(ctx.getString(R.string.wish_mine), showing == Owner.ME) {
-            showing = Owner.ME
+        body.addView(ctx.segmented(listOf(ctx.getString(R.string.wish_mine), store.partnerDisplay), if (showing == Owner.ME) 0 else 1) {
+            showing = if (it == 0) Owner.ME else Owner.PARTNER
             refresh()
         })
-        tabs.addView(ctx.chip(store.partnerDisplay, showing == Owner.PARTNER) {
-            showing = Owner.PARTNER
-            refresh()
-        })
-        body.addView(tabs)
 
         val items = repo.of(showing)
         if (showing == Owner.ME) {
@@ -152,7 +145,7 @@ class WishlistScreen(private val activity: MainActivity) : Screen {
                     return@setOnClickListener
                 }
                 repo.upsert(WishItem(
-                    id = existing?.id ?: newId(),
+                    id = existing?.id ?: 0L,
                     owner = Owner.ME,
                     title = name,
                     price = price.text.toString().trim(),
@@ -160,6 +153,7 @@ class WishlistScreen(private val activity: MainActivity) : Screen {
                     note = note.text.toString().trim(),
                     reserved = false,
                     createdAt = existing?.createdAt ?: System.currentTimeMillis(),
+                    key = existing?.key ?: "",
                 ))
                 dialog.dismiss()
             }

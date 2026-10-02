@@ -21,7 +21,10 @@ Under `pairs/<code>`:
 - `live/checkin/<seat>`: mood and energy `{mood, energy, at}`; each seat writes only its own;
 - `live/signal/<seat>`: the latest "think", "safe" or "support" tap, which the partner's phone shows as a toast;
 - `live/count/<seat>/<yyyy-MM>/<kind>`: monthly counts that can only go up by one;
-- `live/tasks/<key>`: the shared plan `{title, owner: a|b|both, done, day}`.
+- `live/tasks/<key>`: the shared plan `{title, owner: a|b|both, done, day}`;
+- `live/wishes/<seat>/<key>`: each partner's wishlist `{title, price, link, note, at}`; only the owner writes it;
+- `live/doodle/<seat>`: the latest doodle as a base64 PNG `{png, at, id}`;
+- `secret/<seat>/reserved/<key>`: gifts this seat will give. Only that seat can read or write it, which is why members get read access per section (`chat`, `live`) and not to the whole pair.
 
 Nobody receives mail at `pair.belong.app`: the address is just an account name. `database.rules.json` enforces all of the above. Members alone read the pair. Messages can't be forged, edited or deleted; the other partner can only add a ❤️.
 
