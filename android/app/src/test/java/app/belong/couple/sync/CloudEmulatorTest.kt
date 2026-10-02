@@ -197,6 +197,50 @@ class CloudEmulatorTest {
     }
 
     @Test
+    fun dreamsAndGoalsAreSharedAndMatchesRevealOnlyMutualYes() {
+        val yulia = pairing.create("Yulia", "sunflower1")
+        val igor = pairing.join(yulia.code, "Igor", "maple-leaf")
+        val pair = "pairs/${yulia.code}"
+        val increment = { n: Long -> JSONObject().put(".sv", JSONObject().put("increment", n)) }
+
+        db.put("$pair/live/dreams/d1", app.belong.couple.core.DreamsModel.dreamJson("Japan", "🌸", app.belong.couple.core.DreamCategory.TRAVEL, app.belong.couple.core.Owner.OURS, 1, Role.A), yulia.session.idToken)
+        expect(Reason.DENIED) { db.put("$pair/live/dreams/d2", JSONObject().put("title", "x").put("emoji", "✨").put("cat", "cars").put("owner", "a").put("at", 1), igor.session.idToken) }
+
+        // A goal both edit; each adds to the savings only for themselves, and only upwards.
+        db.put("$pair/live/goals/g1", JSONObject().put("title", "Japan").put("emoji", "🌸").put("at", 1).put("target", 400000).put("unit", "₴"), igor.session.idToken)
+        db.put("$pair/live/goals/g1/saved/a", increment(1000), yulia.session.idToken)
+        db.put("$pair/live/goals/g1/saved/a", increment(500), yulia.session.idToken)
+        db.put("$pair/live/goals/g1/saved/b", increment(700), igor.session.idToken)
+        expect(Reason.DENIED) { db.put("$pair/live/goals/g1/saved/a", increment(1), igor.session.idToken) }
+        expect(Reason.DENIED) { db.put("$pair/live/goals/g1/saved/a", increment(-100), yulia.session.idToken) }
+        db.put("$pair/live/goals/g1/steps/s1", app.belong.couple.core.DreamsModel.stepJson("Tickets", app.belong.couple.core.Owner.ME, 2, Role.B), igor.session.idToken)
+        db.put("$pair/live/goals/g1/steps/s1/done", true, yulia.session.idToken)
+
+        val live = JSONObject(db.get("$pair/live", yulia.session.idToken).toString())
+        val goal = app.belong.couple.core.DreamsModel.goal(live, "g1", Role.A)!!
+        assertEquals(1500L, goal.savedMine)
+        assertEquals(700L, goal.savedPartner)
+        assertEquals(app.belong.couple.core.Owner.PARTNER, goal.steps.single().who)
+        assertEquals(1, goal.stepsDone)
+
+        // Matches: Yulia says yes to i01 and i02, Igor to i01 and i03.
+        db.put("$pair/votes/a/i01", true, yulia.session.idToken)
+        db.put("$pair/votes/a/i02", true, yulia.session.idToken)
+        db.put("$pair/secret/a/decided/i03", "no", yulia.session.idToken)
+        db.put("$pair/votes/b/i01", true, igor.session.idToken)
+        db.put("$pair/votes/b/i03", true, igor.session.idToken)
+        expect(Reason.DENIED) { db.put("$pair/votes/b/i02", false, igor.session.idToken) }
+        expect(Reason.DENIED) { db.put("$pair/votes/b/x1", true, igor.session.idToken) }
+
+        assertEquals(true, db.get("$pair/votes/a/i01", igor.session.idToken)) // mutual yes
+        assertNull(db.get("$pair/votes/a/i03", igor.session.idToken)) // Yulia's "no" looks like no answer
+        expect(Reason.DENIED) { db.get("$pair/votes/a/i02", igor.session.idToken) } // Igor didn't say yes to it
+        expect(Reason.DENIED) { db.get("$pair/votes/a", igor.session.idToken) } // no peeking at the whole list
+        expect(Reason.DENIED) { db.get("$pair/secret/a/decided", igor.session.idToken) }
+        assertEquals(setOf("i01", "i02"), (db.get("$pair/votes/a", yulia.session.idToken) as JSONObject).keys().asSequence().toSet())
+    }
+
+    @Test
     fun partnerHelpsResetAForgottenPassword() {
         val yulia = pairing.create("Yulia", "sunflower1")
         val igor = pairing.join(yulia.code, "Igor", "maple-leaf")

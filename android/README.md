@@ -4,13 +4,18 @@ Native Android app in Kotlin that uses only the Android framework (no AndroidX),
 
 ## What's inside
 
-Five tabs: Today, Chat, Wishlist, Places, More.
+Five tabs: Today, Dreams, Chat, Places, More.
 
 - **Today:**
   - greeting, the partner's mood and energy, and your own check-in;
   - **plan for the day**: mine, ours and the partner's tasks. Tap to tick off, long-press to delete. Unfinished tasks roll over to the next day;
   - both cities' clocks, the distance between you and the countdown to your next meeting;
   - the “Thinking of you” and “I'm safe” buttons and buttons to place widgets.
+- **Dreams** (from the design handoff):
+  - the **wish map**: dreams with a picture, a category and whose they are (mine, ours, the partner's); filter by category; “Me too 💞” turns the partner's dream into a shared one;
+  - **goals**: “Make it a goal” turns a dream into a goal with a progress ring, a **savings jar** (each partner's share in their colour, and when you'll get there at the current pace) and **steps** with who does them and by when; a step can go to today's plan; “We did it” marks the dream as come true;
+  - **Matches**: swipe date and life ideas (no / maybe / yes); you only ever see what you both said yes to, then “It's a match!” lets you plan it or put it on the map;
+  - the gift **wishlist** opens from here and from More.
 - **Chat:**
   - messages grouped by day;
   - a long press puts ❤️ on a message;
@@ -50,7 +55,9 @@ Synced between the two phones:
 - **chat**, including ❤️ on messages;
 - **Today**: both mood and energy check-ins, “thinking of you”, “I’m safe” and “send support” taps (the partner sees a toast) with this month’s counts, and the shared plan for the day;
 - **wishlists**: each partner edits their own list. “I'll give this” is stored in a part of the server only the reserver can read, so the owner can't find out even with a modified app;
-- **doodles**: the partner's latest doodle reaches the doodle screen and the home-screen widget.
+- **doodles**: the partner's latest doodle reaches the doodle screen and the home-screen widget;
+- **dreams and goals**, including money added on both phones at once (the server adds the amounts up);
+- **Matches** answers, kept so that neither partner can see the other's no or maybe.
 
 All of it works offline: changes are saved on the phone first and sent on the next connection. There are no push notifications yet: updates arrive while the app is open.
 

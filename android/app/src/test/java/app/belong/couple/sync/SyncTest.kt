@@ -190,3 +190,54 @@ class LiveModelTest {
         assertNull(LiveModel.doodle(tree("""{"doodle":{"b":{"png":"iVBOR","at":3,"id":"d1"}}}"""), Role.A))
     }
 }
+
+class DreamsModelTest {
+    private fun root(json: String) = org.json.JSONObject(json)
+
+    @Test
+    fun dreamsAreMineOursOrThePartnersFromEachSeat() {
+        val r = root("""{"dreams":{"d1":{"title":"Japan","emoji":"🌸","cat":"travel","owner":"both","at":2,"goal":"g1"},"d2":{"title":"Corgi","emoji":"🐶","cat":"family","owner":"b","at":3},"d3":{"title":""}}}""")
+        val forA = app.belong.couple.core.DreamsModel.dreams(r, Role.A)
+        assertEquals(listOf("Corgi", "Japan"), forA.map { it.title }) // newest first
+        assertEquals(app.belong.couple.core.Owner.PARTNER, forA[0].owner)
+        assertEquals(app.belong.couple.core.Owner.OURS, forA[1].owner)
+        assertEquals("g1", forA[1].goalKey)
+        assertEquals(app.belong.couple.core.Owner.ME, app.belong.couple.core.DreamsModel.dreams(r, Role.B)[0].owner)
+        // The demo couple is stored as me / ours / partner.
+        val demo = root("""{"dreams":{"x":{"title":"Salsa","emoji":"💃","cat":"fun","owner":"me","at":1}}}""")
+        assertEquals(app.belong.couple.core.Owner.ME, app.belong.couple.core.DreamsModel.dreams(demo, null).single().owner)
+    }
+
+    @Test
+    fun goalProgressAveragesSavingsAndSteps() {
+        val r = root("""{"goals":{"g1":{"title":"Japan","emoji":"🌸","at":0,"target":400,"unit":"₴",
+            "saved":{"a":100,"b":100},
+            "steps":{"s1":{"title":"Visa","who":"b","done":true,"at":1},"s2":{"title":"Tickets","who":"a","done":false,"at":2,"due":20000}}}}}""")
+        val g = app.belong.couple.core.DreamsModel.goal(r, "g1", Role.A)!!
+        assertEquals(200L, g.saved)
+        assertEquals(100L, g.savedMine)
+        assertEquals(50, g.progress) // savings 50%, steps 50%
+        assertEquals(listOf("Visa", "Tickets"), g.steps.map { it.title })
+        assertEquals(app.belong.couple.core.Owner.PARTNER, g.steps[0].who)
+        assertEquals(20000L, g.steps[1].due)
+        // At 200 saved in 10 days, the other 200 take 10 more.
+        assertEquals(10L, app.belong.couple.core.DreamsModel.daysToTarget(g, 10 * 86_400_000L))
+        assertNull(app.belong.couple.core.DreamsModel.daysToTarget(g.copy(savedMine = 300), 10 * 86_400_000L))
+        assertEquals(100, g.copy(done = true).progress)
+    }
+
+    @Test
+    fun queuedChangesApplyOverTheServerCopy() {
+        val tree = JsonTree(root("""{"goals":{"g1":{"title":"Japan","saved":{"a":100}}}}"""))
+        app.belong.couple.data.DreamsRepo.apply(tree, root("""{"op":"add","path":"goals/g1/saved/a","value":50}"""))
+        app.belong.couple.data.DreamsRepo.apply(tree, root("""{"op":"add","path":"goals/g1/saved/b","value":20}"""))
+        app.belong.couple.data.DreamsRepo.apply(tree, root("""{"op":"put","path":"dreams/d9","value":{"title":"Dog"}}"""))
+        app.belong.couple.data.DreamsRepo.apply(tree, root("""{"op":"del","path":"goals/g1/title"}"""))
+        assertEquals(150L, tree.obj("goals", "g1", "saved")!!.getLong("a"))
+        assertEquals(20L, tree.obj("goals", "g1", "saved")!!.getLong("b"))
+        assertEquals("Dog", tree.obj("dreams", "d9")!!.getString("title"))
+        assertFalse(tree.obj("goals", "g1")!!.has("title"))
+        assertEquals("i07", app.belong.couple.core.Ideas.key(6))
+        assertEquals(6, app.belong.couple.core.Ideas.index("i07"))
+    }
+}

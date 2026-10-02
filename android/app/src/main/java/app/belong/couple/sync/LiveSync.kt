@@ -11,6 +11,7 @@ import app.belong.couple.data.Account
 import app.belong.couple.data.CoupleStore
 import app.belong.couple.data.Counter
 import app.belong.couple.data.DataEvents
+import app.belong.couple.data.DreamsRepo
 import app.belong.couple.data.TaskRepo
 import app.belong.couple.data.WishRepo
 import app.belong.couple.widget.Widgets
@@ -159,6 +160,12 @@ object LiveSync {
         p.edit().putStringSet(set, p.getStringSet(set, emptySet())!! - key).apply()
     }
 
+    /** Sends queued changes (e.g. dreams and goals) as soon as possible. */
+    fun flushSoon(context: Context) {
+        val app = context.applicationContext
+        sender.execute { flush(app) }
+    }
+
     /** Forgets unsent changes and what was seen, e.g. after signing out. */
     fun reset(context: Context) = prefs(context.applicationContext).edit().clear().apply()
 
@@ -212,9 +219,29 @@ object LiveSync {
                 }
                 sent(app, "${RESERVED}_dirty", key)
             }
+            flushDreams(app, db, live, account)
         } catch (e: CloudException) {
             if (e.reason == Reason.DENIED) PairAccess.check(app)
             // Otherwise offline: retried on the next connect or change.
+        }
+    }
+
+    /** Sends dream and goal changes in the order they were made. A change the server refuses is dropped. */
+    private fun flushDreams(app: Context, db: Db, live: String, account: Account) {
+        val repo = DreamsRepo(app)
+        for (op in repo.ops()) {
+            val path = "$live/${op.optString("path")}"
+            try {
+                when (op.optString("op")) {
+                    "put" -> db.put(path, op.get("value"), account.token())
+                    "del" -> db.delete(path, account.token())
+                    "add" -> db.put(path, JSONObject().put(".sv", JSONObject().put("increment", op.optLong("value"))), account.token())
+                }
+            } catch (e: CloudException) {
+                if (e.reason != Reason.DENIED) throw e
+                if (!PairAccess.check(app)) return
+            }
+            repo.sent(op)
         }
     }
 
@@ -289,6 +316,8 @@ object LiveSync {
         }
         // Finished tasks from earlier days leave the plan; either phone may tidy them up.
         serverTasks.filter { it.done && it.day < today }.map(Task::key).forEach { taskRemoved(app, it) }
+
+        DreamsRepo(app).setBase(tree.obj("dreams"), tree.obj("goals"))
 
         DataEvents.changed()
         Widgets.updateAll(app)

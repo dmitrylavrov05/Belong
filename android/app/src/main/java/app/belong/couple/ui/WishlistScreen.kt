@@ -176,6 +176,7 @@ class MoreScreen(private val activity: MainActivity) : Screen {
     override fun refresh() {
         body.removeAllViews()
         body.addView(ctx.text(ctx.getString(R.string.more_title), 28f, 800).apply { letterSpacing = -0.02f })
+        body.addView(entry(R.drawable.ic_tab_gift, R.string.wish_title, R.string.more_wishlist_text) { activity.select(MainActivity.TAB_WISHLIST) })
         body.addView(entry(R.drawable.ic_tab_doodle, R.string.tab_doodle, R.string.more_doodle_text) { activity.select(MainActivity.TAB_DOODLE) })
         body.addView(entry(R.drawable.ic_tab_games, R.string.games_title, R.string.more_games_text) { activity.select(MainActivity.TAB_GAMES) })
         body.addView(entry(R.drawable.ic_tab_month, R.string.month_title, R.string.more_month_text) { activity.select(MainActivity.TAB_MONTH) })

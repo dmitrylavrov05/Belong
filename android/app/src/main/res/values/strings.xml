@@ -412,4 +412,134 @@
     <string name="chat_think_short">Thinking\nof you</string>
     <string name="settings_language">Language</string>
     <string name="language_system">Phone’s language</string>
+    <!-- Dreams -->
+    <string name="tab_dreams">Dreams</string>
+    <string name="dreams_title">Dreams</string>
+    <string name="dreams_wishlist">Gift wishlist</string>
+    <string name="dreams_matches_new">New matches: %1$d 💞</string>
+    <string name="dreams_matches_text">Swipe ideas and see only what you both want</string>
+    <string name="dreams_matches_view">View</string>
+    <string name="dreams_matches_play">Play</string>
+    <string name="dreams_none_here">No dreams in this category yet.</string>
+    <string name="dream_cat_all">All</string>
+    <string name="dream_cat_travel">Travel</string>
+    <string name="dream_cat_home">Home</string>
+    <string name="dream_cat_money">Finance</string>
+    <string name="dream_cat_health">Health</string>
+    <string name="dream_cat_fun">Experiences</string>
+    <string name="dream_cat_family">Family</string>
+    <string name="dream_owner_me">I want it</string>
+    <string name="dream_owner_partner">%1$s wants it</string>
+    <string name="dream_owner_ours">we both want it</string>
+    <string name="dream_owner_ours_short">Both of us</string>
+    <string name="dream_make_goal">Make it a goal →</string>
+    <string name="dream_goal_link">🎯 Goal · %1$d%%</string>
+    <string name="dream_came_true">Dream came true ✨</string>
+    <string name="dream_mark_true">Mark as come true</string>
+    <string name="dream_me_too">Me too 💞</string>
+    <string name="dream_me_too_done">Now it’s a dream for both of you</string>
+    <string name="dream_delete_title">Delete this dream?</string>
+    <string name="dreams_empty_title">Your shared dreams will live here</string>
+    <string name="dreams_empty_text">Add what you dream of. %1$s can mark whether they want it too.</string>
+    <string name="dreams_add_first">Add the first dream</string>
+    <string name="dream_add_title">New dream</string>
+    <string name="dream_field_title">What do you dream of?</string>
+    <string name="dream_picture">Picture</string>
+    <string name="dream_category">Category</string>
+    <string name="dream_whose">Whose dream?</string>
+
+    <!-- Goals -->
+    <string name="goals_title">Goals</string>
+    <string name="goal_label">Pair goal · from the dream map</string>
+    <string name="goal_menu">Goal options</string>
+    <string name="goal_savings">Savings</string>
+    <string name="goal_add_money">+ Add</string>
+    <string name="goal_saved_of">of %1$s</string>
+    <string name="goal_saved_short">%1$s of %2$s</string>
+    <string name="goal_no_target">No savings target yet. Add one if this dream needs money.</string>
+    <string name="goal_set_target">Set a savings target</string>
+    <string name="goal_target_hint">Target amount</string>
+    <string name="goal_unit">Currency</string>
+    <string name="goal_default_unit">$</string>
+    <string name="goal_money_title">Add to savings</string>
+    <string name="goal_money_hint">Amount, %1$s</string>
+    <string name="goal_money_added">Added %1$s</string>
+    <string name="goal_forecast">You’ll get there by %1$s</string>
+    <string name="goal_forecast_text">at the pace you’re saving now</string>
+    <string name="goal_target_reached">The savings are complete 🎉</string>
+    <string name="goal_steps">Steps</string>
+    <string name="goal_steps_count">%1$d of %2$d</string>
+    <string name="goal_steps_empty">Break the goal into small steps and share them out.</string>
+    <string name="goal_add_step">Add a step</string>
+    <string name="goal_new_step">New step</string>
+    <string name="goal_step_who">Who does it?</string>
+    <string name="goal_together">together</string>
+    <string name="goal_step_due">by %1$s</string>
+    <string name="goal_to_today">Add to today’s plan</string>
+    <string name="goal_added_today">Added to today’s plan</string>
+    <string name="goal_set_due">Set a date</string>
+    <string name="goal_complete">We did it ✨</string>
+    <string name="goal_reopen">Not done yet after all</string>
+    <string name="goal_completed">Goal reached! The dream came true ✨</string>
+    <string name="goal_done_short">Done ✨</string>
+    <string name="goal_delete">Delete goal</string>
+
+    <!-- Matches -->
+    <string name="matches_title">Matches</string>
+    <string name="matches_progress">%1$d of %2$d</string>
+    <string name="matches_hint">%1$s sees only what you both liked</string>
+    <string name="matches_maybe">Maybe</string>
+    <string name="match_title_big">It’s a match!</string>
+    <string name="match_both_want">You both want this: %1$s</string>
+    <string name="match_plan">Plan it</string>
+    <string name="match_to_map">Add to the dream map</string>
+    <string name="match_added_to_map">Added to your dream map</string>
+    <string name="match_keep_going">Keep swiping</string>
+    <string name="matches_list_title">Your matches</string>
+    <string name="matches_none">No matches yet. Maybe not both of you have swiped these ideas, or you want different things, and that’s fine too.</string>
+    <string name="matches_continue">Swipe %1$d more ideas</string>
+    <string name="more_wishlist_text">Gifts you’d love; your partner can secretly reserve them</string>
+
+    <string-array name="dream_ideas">
+        <item>⛺|fun|A night in a tent by a lake</item>
+        <item>🧀|fun|Floor picnic with a film and fondue</item>
+        <item>🌅|fun|A sunrise walk with coffee</item>
+        <item>🍜|fun|Cook a dish from our dream country</item>
+        <item>📵|fun|An evening without phones</item>
+        <item>💃|fun|A salsa class for beginners</item>
+        <item>🎤|fun|Karaoke night</item>
+        <item>🚆|travel|A weekend trip with no plan</item>
+        <item>🌸|travel|Japan in cherry blossom season</item>
+        <item>🌌|travel|See the northern lights</item>
+        <item>🏝️|travel|A week on a quiet island</item>
+        <item>🚐|travel|A road trip in a camper van</item>
+        <item>🏡|home|A flat with a balcony and plants</item>
+        <item>🛋️|home|Redecorate one room together</item>
+        <item>🌿|home|Grow herbs on the windowsill</item>
+        <item>🐶|family|Adopt a dog</item>
+        <item>👨‍👩‍👧|family|Host a dinner for both families</item>
+        <item>💰|money|Save an emergency fund together</item>
+        <item>📈|money|Start investing a little every month</item>
+        <item>🧘|health|Yoga together twice a week</item>
+        <item>🏃|health|Run our first 10 km together</item>
+        <item>🥗|health|A month of cooking at home</item>
+        <item>🎓|fun|Take an online course together</item>
+        <item>📸|fun|A photo walk around our city</item>
+    </string-array>
+    <string-array name="dream_seeds">
+        <item>🌸|travel|ours|Japan in spring</item>
+        <item>🐶|family|partner|A corgi called Doughnut</item>
+        <item>🏡|home|ours|Our own flat with a balcony</item>
+        <item>💃|fun|me|Learn to dance salsa</item>
+        <item>🌌|travel|partner|See the northern lights</item>
+    </string-array>
+    <string name="goal_seed_title">Japan, April 2027</string>
+    <string name="goal_seed_money">5000|1630|1470|$</string>
+    <string-array name="goal_seed_steps">
+        <item>partner|1|-|Renew passports</item>
+        <item>ours|1|-|Choose the dates</item>
+        <item>me|0|13|Buy the tickets</item>
+        <item>ours|0|-|Book a ryokan</item>
+        <item>ours|0|-|Plan the route</item>
+    </string-array>
 </resources>

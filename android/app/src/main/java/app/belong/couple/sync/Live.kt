@@ -7,9 +7,20 @@ import app.belong.couple.core.WishItem
 import org.json.JSONObject
 
 /** Any part of the database kept in step with the event stream's "put" and "patch" events. */
-class JsonTree {
-    var root = JSONObject()
+class JsonTree(start: JSONObject = JSONObject()) {
+    var root = start
         private set
+
+    /** Sets (or with null removes) the value at a slash-separated [path], creating parents as needed. */
+    fun set(path: String, value: Any?) = put(split(path), value)
+
+    /** Adds [amount] to the number at [path], as the server's increment does. */
+    fun add(path: String, amount: Long) {
+        val parts = split(path)
+        var node: JSONObject? = root
+        for (part in parts.dropLast(1)) node = node?.optJSONObject(part)
+        put(parts, (node?.optLong(parts.last()) ?: 0L) + amount)
+    }
 
     fun apply(event: String, data: String) {
         val o = JSONObject(data)

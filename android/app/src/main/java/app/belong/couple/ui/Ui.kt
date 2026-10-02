@@ -161,7 +161,7 @@ fun Context.secondaryButton(label: String, iconRes: Int? = null, onClick: (View)
 
 /** A borderless button for quieter actions ("Sign in", "Skip"). */
 fun Context.textButton(label: String, onClick: (View) -> Unit): TextView =
-    button(label, null, col(R.color.ink), rounded(col(R.color.bg), 12f), onClick).apply {
+    button(label, null, col(R.color.ink), rounded(Color.TRANSPARENT, 12f), onClick).apply {
         minHeight = dp(44)
         maxLines = 1
         setPadding(dp(8), 0, dp(8), 0)

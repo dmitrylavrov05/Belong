@@ -17,4 +17,6 @@
     <color name="shadow">#99000000</color>
     <color name="grabber">#3A3046</color>
     <color name="toast_bg">#3A3046</color>
+    <color name="honey_tint">#3D2F1A</color>
+    <color name="honey_ink">#F5C77E</color>
 </resources>

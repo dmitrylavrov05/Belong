@@ -96,6 +96,8 @@ object PairDialog {
             .setPositiveButton(R.string.pair_sign_out) { _, _ ->
                 PairSync.stop()
                 LiveSync.reset(activity)
+                app.belong.couple.data.DreamsRepo(activity).startReal()
+                app.belong.couple.sync.Matches.reset(activity)
                 ChatRepo(activity).startShared()
                 CoupleStore.get(activity).partnerNickname = ""
                 Account.get(activity).signOut()

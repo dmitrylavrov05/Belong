@@ -424,4 +424,134 @@
     <string name="chat_think_short">Думаю\nо тебе</string>
     <string name="settings_language">Язык</string>
     <string name="language_system">Язык телефона</string>
+    <!-- Мечты -->
+    <string name="tab_dreams">Мечты</string>
+    <string name="dreams_title">Мечты</string>
+    <string name="dreams_wishlist">Вишлист подарков</string>
+    <string name="dreams_matches_new">Новые совпадения: %1$d 💞</string>
+    <string name="dreams_matches_text">Листайте идеи — увидите только то, чего хотите оба</string>
+    <string name="dreams_matches_view">Смотреть</string>
+    <string name="dreams_matches_play">Играть</string>
+    <string name="dreams_none_here">В этой категории мечтаний пока нет.</string>
+    <string name="dream_cat_all">Все</string>
+    <string name="dream_cat_travel">Путешествия</string>
+    <string name="dream_cat_home">Дом</string>
+    <string name="dream_cat_money">Финансы</string>
+    <string name="dream_cat_health">Здоровье</string>
+    <string name="dream_cat_fun">Впечатления</string>
+    <string name="dream_cat_family">Семья</string>
+    <string name="dream_owner_me">хочу я</string>
+    <string name="dream_owner_partner">хочет %1$s</string>
+    <string name="dream_owner_ours">хотим вместе</string>
+    <string name="dream_owner_ours_short">Вместе</string>
+    <string name="dream_make_goal">Сделать целью →</string>
+    <string name="dream_goal_link">🎯 Цель · %1$d%%</string>
+    <string name="dream_came_true">Мечта сбылась ✨</string>
+    <string name="dream_mark_true">Отметить, что сбылась</string>
+    <string name="dream_me_too">Я тоже 💞</string>
+    <string name="dream_me_too_done">Теперь это ваша общая мечта</string>
+    <string name="dream_delete_title">Удалить мечту?</string>
+    <string name="dreams_empty_title">Здесь будут ваши общие мечты</string>
+    <string name="dreams_empty_text">Добавьте то, о чём мечтаете. %1$s сможет отметить, хочет ли того же.</string>
+    <string name="dreams_add_first">Добавить первую мечту</string>
+    <string name="dream_add_title">Новая мечта</string>
+    <string name="dream_field_title">О чём мечтаете?</string>
+    <string name="dream_picture">Картинка</string>
+    <string name="dream_category">Категория</string>
+    <string name="dream_whose">Чья мечта?</string>
+
+    <!-- Цели -->
+    <string name="goals_title">Цели</string>
+    <string name="goal_label">Цель пары · из карты желаний</string>
+    <string name="goal_menu">Действия с целью</string>
+    <string name="goal_savings">Копилка</string>
+    <string name="goal_add_money">+ Пополнить</string>
+    <string name="goal_saved_of">из %1$s</string>
+    <string name="goal_saved_short">%1$s из %2$s</string>
+    <string name="goal_no_target">Суммы накопления пока нет. Добавьте её, если для мечты нужны деньги.</string>
+    <string name="goal_set_target">Задать сумму накопления</string>
+    <string name="goal_target_hint">Сумма</string>
+    <string name="goal_unit">Валюта</string>
+    <string name="goal_default_unit">₴</string>
+    <string name="goal_money_title">Пополнить копилку</string>
+    <string name="goal_money_hint">Сумма, %1$s</string>
+    <string name="goal_money_added">Добавлено %1$s</string>
+    <string name="goal_forecast">Соберёте к %1$s</string>
+    <string name="goal_forecast_text">в нынешнем темпе</string>
+    <string name="goal_target_reached">Копилка собрана 🎉</string>
+    <string name="goal_steps">Шаги</string>
+    <string name="goal_steps_count">%1$d из %2$d</string>
+    <string name="goal_steps_empty">Разбейте цель на маленькие шаги и распределите их.</string>
+    <string name="goal_add_step">Добавить шаг</string>
+    <string name="goal_new_step">Новый шаг</string>
+    <string name="goal_step_who">Кто делает?</string>
+    <string name="goal_together">вместе</string>
+    <string name="goal_step_due">до %1$s</string>
+    <string name="goal_to_today">Добавить в план на сегодня</string>
+    <string name="goal_added_today">Добавлено в план на сегодня</string>
+    <string name="goal_set_due">Задать дату</string>
+    <string name="goal_complete">Мы это сделали ✨</string>
+    <string name="goal_reopen">Ещё не сделано</string>
+    <string name="goal_completed">Цель достигнута! Мечта сбылась ✨</string>
+    <string name="goal_done_short">Сделано ✨</string>
+    <string name="goal_delete">Удалить цель</string>
+
+    <!-- Совпадения -->
+    <string name="matches_title">Совпадения</string>
+    <string name="matches_progress">%1$d из %2$d</string>
+    <string name="matches_hint">%1$s увидит только то, что понравилось вам обоим</string>
+    <string name="matches_maybe">Может быть</string>
+    <string name="match_title_big">Это совпадение!</string>
+    <string name="match_both_want">Вы оба этого хотите: %1$s</string>
+    <string name="match_plan">Запланировать</string>
+    <string name="match_to_map">На карту желаний</string>
+    <string name="match_added_to_map">Добавлено на карту желаний</string>
+    <string name="match_keep_going">Листать дальше</string>
+    <string name="matches_list_title">Ваши совпадения</string>
+    <string name="matches_none">Совпадений пока нет. Возможно, идеи ещё не просмотрены с обеих сторон, а может, вы хотите разного, и это тоже нормально.</string>
+    <string name="matches_continue">Ещё идей: %1$d</string>
+    <string name="more_wishlist_text">Подарки, которым вы обрадуетесь; партнёр может тайно их забронировать</string>
+
+    <string-array name="dream_ideas">
+        <item>⛺|fun|Ночь в палатке у озера</item>
+        <item>🧀|fun|Пикник на полу с фильмом и фондю</item>
+        <item>🌅|fun|Прогулка на рассвете с кофе</item>
+        <item>🍜|fun|Приготовить блюдо из страны мечты</item>
+        <item>📵|fun|Вечер без телефонов</item>
+        <item>💃|fun|Урок сальсы для начинающих</item>
+        <item>🎤|fun|Вечер караоке</item>
+        <item>🚆|travel|Поездка на выходные без плана</item>
+        <item>🌸|travel|Япония в сезон сакуры</item>
+        <item>🌌|travel|Увидеть северное сияние</item>
+        <item>🏝️|travel|Неделя на тихом острове</item>
+        <item>🚐|travel|Путешествие в кемпере</item>
+        <item>🏡|home|Квартира с балконом и растениями</item>
+        <item>🛋️|home|Вместе обновить одну комнату</item>
+        <item>🌿|home|Вырастить зелень на подоконнике</item>
+        <item>🐶|family|Завести собаку</item>
+        <item>👨‍👩‍👧|family|Ужин для обеих семей</item>
+        <item>💰|money|Вместе собрать подушку безопасности</item>
+        <item>📈|money|Каждый месяц немного инвестировать</item>
+        <item>🧘|health|Йога вместе дважды в неделю</item>
+        <item>🏃|health|Пробежать первые 10 км вместе</item>
+        <item>🥗|health|Месяц готовить дома</item>
+        <item>🎓|fun|Пройти онлайн-курс вместе</item>
+        <item>📸|fun|Фотопрогулка по нашему городу</item>
+    </string-array>
+    <string-array name="dream_seeds">
+        <item>🌸|travel|ours|Япония весной</item>
+        <item>🐶|family|partner|Корги по имени Пончик</item>
+        <item>🏡|home|ours|Своя квартира с балконом</item>
+        <item>💃|fun|me|Научиться танцевать сальсу</item>
+        <item>🌌|travel|partner|Увидеть северное сияние</item>
+    </string-array>
+    <string name="goal_seed_title">Япония, апрель 2027</string>
+    <string name="goal_seed_money">200000|65000|59000|₴</string>
+    <string-array name="goal_seed_steps">
+        <item>partner|1|-|Оформить загранпаспорта</item>
+        <item>ours|1|-|Выбрать даты</item>
+        <item>me|0|13|Купить билеты</item>
+        <item>ours|0|-|Забронировать рёкан</item>
+        <item>ours|0|-|Составить маршрут</item>
+    </string-array>
 </resources>

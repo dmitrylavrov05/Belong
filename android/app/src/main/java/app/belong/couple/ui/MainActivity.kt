@@ -41,6 +41,7 @@ class MainActivity : Activity() {
         CoupleStore.get(this).ensureSeeded()
         TaskRepo(this).ensureSeeded()
         WishRepo(this).ensureSeeded()
+        app.belong.couple.data.DreamsRepo(this).ensureSeeded()
         ChatRepo(this).ensureSeeded()
 
         val root = column().apply {
@@ -94,7 +95,7 @@ class MainActivity : Activity() {
     @Deprecated("Kept for Android 12 and older; newer versions call it too while targetSdk < 35")
     override fun onBackPressed() {
         when {
-            current >= TAB_DOODLE -> select(TAB_MORE)
+            current in PARENT -> select(PARENT.getValue(current))
             current != TAB_TODAY -> select(TAB_TODAY)
             else -> @Suppress("DEPRECATION") super.onBackPressed()
         }
@@ -106,15 +107,16 @@ class MainActivity : Activity() {
     }
 
     fun select(destination: Int) {
-        current = if (destination in 0..TAB_MONTH) destination else TAB_TODAY
+        current = if (destination in 0..TAB_DREAMS) destination else TAB_TODAY
         val screen = screens.getOrPut(current) { create(current) }
-        val view = if (current >= TAB_DOODLE) framed.getOrPut(current) { withBackBar(screen.view) } else screen.view
+        val parent = PARENT[current]
+        val view = if (parent != null) framed.getOrPut(current) { withBackBar(screen.view, parent) } else screen.view
         content.removeAllViews()
         (view.parent as? FrameLayout)?.removeView(view)
         content.addView(view, FrameLayout.LayoutParams(MATCH, MATCH))
         screen.refresh()
-        val tab = if (current >= TAB_DOODLE) TAB_MORE else current
-        tabViews.forEachIndexed { i, t -> styleTab(t, i == tab) }
+        val tab = parent ?: current
+        tabViews.forEachIndexed { i, t -> styleTab(t, TABS[i].first == tab) }
     }
 
     /** Redraws every created screen, e.g. after the couple settings change. */
@@ -131,20 +133,21 @@ class MainActivity : Activity() {
         TAB_DOODLE -> DoodleScreen(this)
         TAB_GAMES -> GamesScreen(this)
         TAB_MONTH -> MonthScreen(this)
+        TAB_DREAMS -> DreamsScreen(this)
         else -> TodayScreen(this)
     }
 
-    /** Sub-screens under "More" get a back button at the top. */
-    private fun withBackBar(child: View): View = column().apply {
+    /** Sub-screens get a back button to the tab they belong to. */
+    private fun withBackBar(child: View, parent: Int): View = column().apply {
         val bar = row(4).apply { setPadding(dp(8), dp(4), dp(16), 0) }
         bar.addView(ImageView(this@MainActivity).apply {
             setImageDrawable(icon(R.drawable.ic_back, col(R.color.ink), 22))
             scaleType = ImageView.ScaleType.CENTER
             contentDescription = getString(R.string.back)
             background = ripple(rounded(col(R.color.bg), 24f), 24f)
-            setOnClickListener { select(TAB_MORE) }
+            setOnClickListener { select(parent) }
         }, LinearLayout.LayoutParams(dp(48), dp(48)))
-        bar.addView(text(getString(R.string.more_title), 15f, 700, col(R.color.ink2)))
+        bar.addView(text(getString(if (parent == TAB_DREAMS) R.string.dreams_title else R.string.more_title), 15f, 700, col(R.color.ink2)))
         addView(bar)
         addView(child, LinearLayout.LayoutParams(MATCH, 0, 1f))
     }
@@ -156,7 +159,7 @@ class MainActivity : Activity() {
             android.graphics.drawable.InsetDrawable(android.graphics.drawable.ColorDrawable(col(R.color.surface)), 0, dp(1), 0, 0),
         ))
         setPadding(dp(2), dp(6), dp(2), dp(6))
-        TABS.forEachIndexed { index, (label, iconRes) ->
+        TABS.forEach { (destination, label, iconRes) ->
             val tab = text(getString(label), 12f, 600, col(R.color.ink2)).apply {
                 gravity = Gravity.CENTER
                 minHeight = dp(56)
@@ -164,7 +167,7 @@ class MainActivity : Activity() {
                 compoundDrawablePadding = dp(4)
                 setCompoundDrawablesRelative(null, icon(iconRes, col(R.color.ink2), 22), null, null)
                 background = ripple(rounded(col(R.color.surface), 16f), 16f)
-                setOnClickListener { select(index) }
+                setOnClickListener { select(destination) }
                 tag = iconRes
             }
             tabViews += tab
@@ -194,13 +197,22 @@ class MainActivity : Activity() {
         const val TAB_DOODLE = 5
         const val TAB_GAMES = 6
         const val TAB_MONTH = 7
+        const val TAB_DREAMS = 8
+
+        /** Screens reached from a tab, with a back button to it. */
+        private val PARENT = mapOf(
+            TAB_WISHLIST to TAB_DREAMS,
+            TAB_DOODLE to TAB_MORE,
+            TAB_GAMES to TAB_MORE,
+            TAB_MONTH to TAB_MORE,
+        )
 
         private val TABS = listOf(
-            R.string.tab_today to R.drawable.ic_tab_today,
-            R.string.tab_chat to R.drawable.ic_tab_chat,
-            R.string.tab_wishlist to R.drawable.ic_tab_gift,
-            R.string.tab_map to R.drawable.ic_tab_map,
-            R.string.tab_more to R.drawable.ic_tab_more,
+            Triple(TAB_TODAY, R.string.tab_today, R.drawable.ic_tab_today),
+            Triple(TAB_DREAMS, R.string.tab_dreams, R.drawable.ic_tab_dreams),
+            Triple(TAB_CHAT, R.string.tab_chat, R.drawable.ic_tab_chat),
+            Triple(TAB_MAP, R.string.tab_map, R.drawable.ic_tab_map),
+            Triple(TAB_MORE, R.string.tab_more, R.drawable.ic_tab_more),
         )
     }
 }

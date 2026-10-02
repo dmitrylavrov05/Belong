@@ -205,8 +205,9 @@ class TaskRing(context: Context, private val shared: Boolean, private val color:
         }
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = stroke
+        // An opaque colour first: the paint's alpha also applies to the gradient shader.
+        paint.color = if (shared) Color.BLACK else color
         paint.shader = if (shared) LinearGradient(0f, 0f, s, s, context.col(R.color.her), context.col(R.color.him), Shader.TileMode.CLAMP) else null
-        paint.color = color
         canvas.drawCircle(cx, cy, r, paint)
     }
 }
@@ -371,6 +372,86 @@ class PulseRings(context: Context) : View(context) {
             paint.color = context.col(R.color.him)
             paint.alpha = ((1f - t) * 140).toInt()
             canvas.drawCircle(width / 2f, height / 2f, base * (1f + 0.4f * t), paint)
+        }
+    }
+}
+
+/** The progress ring: 8 dp stroke with round caps, the pair gradient, starting at the top. */
+class ProgressRing(context: Context, private val percent: Int, private val trackColor: Int, private val labelColor: Int) : View(context) {
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val box = android.graphics.RectF()
+
+    init {
+        contentDescription = "$percent%"
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        val s = minOf(width, height).toFloat()
+        val stroke = context.dp(8).toFloat()
+        box.set(stroke / 2, stroke / 2, s - stroke / 2, s - stroke / 2)
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = stroke
+        paint.strokeCap = Paint.Cap.ROUND
+        paint.shader = null
+        paint.color = trackColor
+        canvas.drawArc(box, 0f, 360f, false, paint)
+        if (percent > 0) {
+            paint.shader = android.graphics.SweepGradient(s / 2, s / 2, intArrayOf(context.col(R.color.her), context.col(R.color.him), context.col(R.color.her)), null).apply {
+                setLocalMatrix(android.graphics.Matrix().apply { setRotate(-90f, s / 2, s / 2) })
+            }
+            canvas.drawArc(box, -90f, 360f * percent.coerceAtMost(100) / 100, false, paint)
+        }
+        paint.shader = null
+        paint.style = Paint.Style.FILL
+        paint.color = labelColor
+        paint.textAlign = Paint.Align.CENTER
+        paint.textSize = s * 0.24f
+        paint.typeface = Fonts.get(context, 800)
+        canvas.drawText("$percent%", s / 2, s / 2 - (paint.descent() + paint.ascent()) / 2, paint)
+    }
+}
+
+/** Light confetti in the pair colours and honey, for matches and finished goals. */
+class Confetti(context: Context, seed: Long = 7L) : View(context) {
+    private val random = java.util.Random(seed)
+    private val pieces = List(36) { FloatArray(4).apply { this[0] = random.nextFloat(); this[1] = random.nextFloat(); this[2] = random.nextFloat() * 180; this[3] = random.nextInt(3).toFloat() } }
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private var fall = 0f
+    private val animator = ValueAnimator.ofFloat(0f, 1f).apply {
+        duration = 1400
+        interpolator = DecelerateInterpolator()
+        addUpdateListener {
+            fall = it.animatedValue as Float
+            invalidate()
+        }
+    }
+
+    init {
+        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        animator.start()
+    }
+
+    override fun onDetachedFromWindow() {
+        animator.cancel()
+        super.onDetachedFromWindow()
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        val colors = intArrayOf(context.col(R.color.her), context.col(R.color.him), context.col(R.color.honey))
+        val w = context.dp(8).toFloat()
+        val h = context.dp(3).toFloat()
+        for (p in pieces) {
+            paint.color = colors[p[3].toInt()]
+            val x = p[0] * width
+            val y = (p[1] * 0.8f - 0.3f + 0.3f * fall) * height
+            canvas.save()
+            canvas.rotate(p[2] + 90 * fall, x, y)
+            canvas.drawRoundRect(x - w / 2, y - h / 2, x + w / 2, y + h / 2, h / 2, h / 2, paint)
+            canvas.restore()
         }
     }
 }
