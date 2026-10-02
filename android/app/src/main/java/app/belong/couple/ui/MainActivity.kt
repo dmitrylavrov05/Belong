@@ -57,6 +57,7 @@ class MainActivity : Activity() {
 
         val fromIntent = intent?.getIntExtra(EXTRA_TAB, -1) ?: -1
         select(if (fromIntent >= 0) fromIntent else savedInstanceState?.getInt(STATE_TAB) ?: TAB_TODAY)
+        handleShare(intent)
         Widgets.updateAll(this)
     }
 
@@ -65,6 +66,7 @@ class MainActivity : Activity() {
         setIntent(intent)
         val tab = intent.getIntExtra(EXTRA_TAB, -1)
         if (tab >= 0) select(tab)
+        handleShare(intent)
     }
 
     override fun onStart() {
@@ -75,6 +77,14 @@ class MainActivity : Activity() {
     override fun onStop() {
         super.onStop()
         PairSync.stop()
+    }
+
+    /** A link shared into Belong becomes a new dream. */
+    private fun handleShare(intent: Intent?) {
+        val text = intent?.getStringExtra(EXTRA_SHARED_TEXT) ?: return
+        intent.removeExtra(EXTRA_SHARED_TEXT) // not again after rotation
+        select(TAB_DREAMS)
+        (screens[TAB_DREAMS] as? DreamsScreen)?.addFromShare(text)
     }
 
     private fun openPairing() {
@@ -186,6 +196,7 @@ class MainActivity : Activity() {
 
     companion object {
         const val EXTRA_TAB = "app.belong.couple.TAB"
+        const val EXTRA_SHARED_TEXT = "app.belong.couple.SHARED_TEXT"
         private const val STATE_TAB = "tab"
         const val REQUEST_PHOTOS = 41
 

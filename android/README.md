@@ -15,6 +15,8 @@ Five tabs: Today, Dreams, Chat, Places, More.
   - the **wish map**: dreams with a picture, a category and whose they are (mine, ours, the partner's); filter by category; “Me too 💞” turns the partner's dream into a shared one;
   - **goals**: “Make it a goal” turns a dream into a goal with a progress ring, a **savings jar** (each partner's share in their colour, and when you'll get there at the current pace) and **steps** with who does them and by when; a step can go to today's plan; “We did it” marks the dream as come true;
   - **Matches**: swipe date and life ideas (no / maybe / yes); you only ever see what you both said yes to, then “It's a match!” lets you plan it or put it on the map;
+  - **photos**: while you type a dream's title, the app suggests Unsplash photos for it (credited to the photographer, as Unsplash requires); the dream card and the goal cover show the chosen one;
+  - **“Share” from Pinterest** (or a browser): pick “Save as a dream” in the share menu, and the pin's title and picture fill in a new dream;
   - the gift **wishlist** opens from here and from More.
 - **Chat:**
   - messages grouped by day;

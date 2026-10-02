@@ -7,4 +7,8 @@
 <resources>
     <string name="cloud_api_key" translatable="false">AIzaSyCQm84O3Bi2lakpcr2nQK2nVgZOhvXrT8k</string>
     <string name="cloud_database_url" translatable="false">https://belong-72422-default-rtdb.europe-west1.firebasedatabase.app</string>
+
+    <!-- Unsplash photo suggestions for dreams (https://unsplash.com/developers). The access key is
+         meant for client apps; never put the secret key here. -->
+    <string name="unsplash_access_key" translatable="false">1Tp7HHk8TiDQ11oaZE47Q1v6GqUBFVBXJPoq6hr3Zx8</string>
 </resources>

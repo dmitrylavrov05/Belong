@@ -241,3 +241,55 @@ class DreamsModelTest {
         assertEquals(6, app.belong.couple.core.Ideas.index("i07"))
     }
 }
+
+class PicturesTest {
+    @Test
+    fun unsplashResultsBecomeCreditedPictures() {
+        val body = """{"total":2,"results":[
+            {"id":"a1","urls":{"regular":"https://images.unsplash.com/photo-1?w=1080","small":"https://images.unsplash.com/photo-1?w=400"},
+             "links":{"download_location":"https://api.unsplash.com/photos/a1/download?ixid=x"},
+             "user":{"name":"Aiko Tanaka","links":{"html":"https://unsplash.com/@aiko"}}},
+            {"id":"bad","urls":{"regular":"http://example.com/x.jpg"}}]}"""
+        val p = Unsplash.parse(body).single()
+        assertEquals("https://images.unsplash.com/photo-1?w=1080", p.url)
+        assertEquals("https://images.unsplash.com/photo-1?w=400", p.thumb)
+        assertEquals("Aiko Tanaka", p.by)
+        assertEquals("https://unsplash.com/@aiko?utm_source=belong&utm_medium=referral", p.link)
+        assertEquals("unsplash", p.source)
+        assertTrue(p.downloadLocation.startsWith("https://api.unsplash.com/"))
+        assertTrue(Unsplash.parse("not json").isEmpty())
+        assertTrue(Unsplash.parse("""{"errors":["Rate Limit Exceeded"]}""").isEmpty())
+    }
+
+    @Test
+    fun pinterestLinkPreviewReadsOpenGraph() {
+        val html = """<html><head>
+            <meta property="og:title" content="Cherry blossoms in Kyoto &amp; tea | Pinterest">
+            <meta name="og:site_name" content='Pinterest'>
+            <meta property="og:image" content="https://i.pinimg.com/736x/ab/cd/ef.jpg"/>
+            <meta name="twitter:image" content="https://i.pinimg.com/other.jpg"></head></html>"""
+        val p = LinkPreview.parse("https://www.pinterest.com/pin/123/", html)
+        assertEquals("Cherry blossoms in Kyoto & tea | Pinterest", p.title)
+        assertEquals("https://i.pinimg.com/736x/ab/cd/ef.jpg", p.image)
+        assertEquals("Pinterest", p.site)
+        // Images that aren't https are dropped; protocol-relative ones become https.
+        assertNull(LinkPreview.parse("https://x.com", """<meta property="og:image" content="http://x.com/a.jpg">""").image)
+        assertEquals("https://cdn.x.com/a.jpg", LinkPreview.parse("https://x.com", """<meta property="og:image" content="//cdn.x.com/a.jpg">""").image)
+        assertEquals("x.com", LinkPreview.parse("https://www.x.com/page", "").site)
+    }
+
+    @Test
+    fun sharedTextYieldsTheLink() {
+        assertEquals("https://pin.it/3abcDE", LinkPreview.firstUrl("Look at this Pin on Pinterest 😍 https://pin.it/3abcDE"))
+        assertEquals("https://example.com/a", LinkPreview.firstUrl("«Idea» (https://example.com/a)."))
+        assertNull(LinkPreview.firstUrl("just text"))
+    }
+
+    @Test
+    fun storedPicturesMustBeHttps() {
+        val ok = app.belong.couple.core.Picture.from(org.json.JSONObject("""{"url":"https://i.pinimg.com/a.jpg","by":"Pinterest","link":"https://pin.it/x","src":"web"}"""))!!
+        assertEquals("https://i.pinimg.com/a.jpg", ok.thumb)
+        assertNull(app.belong.couple.core.Picture.from(org.json.JSONObject("""{"url":"http://x/a.jpg"}""")))
+        assertNull(app.belong.couple.core.Picture.from(null))
+    }
+}

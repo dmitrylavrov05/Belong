@@ -542,4 +542,19 @@
         <item>ours|0|-|Book a ryokan</item>
         <item>ours|0|-|Plan the route</item>
     </string-array>
+    <!-- Photos for dreams -->
+    <string name="photo_title">Photo</string>
+    <string name="photo_no_photo">No photo</string>
+    <string name="photo_searching">Looking for photos…</string>
+    <string name="photo_none_found">No photos for this title. Try other words.</string>
+    <string name="photo_limit">Too many photo searches this hour. Try again later.</string>
+    <string name="photo_offline">No connection, so no photo suggestions right now.</string>
+    <string name="photo_unavailable">Photo suggestions aren’t set up in this build.</string>
+    <string name="photo_credit_unsplash">Photo: %1$s, Unsplash</string>
+    <string name="photo_credit_web">Picture: %1$s</string>
+    <string name="photo_by">Photo by %1$s</string>
+    <string name="photo_change">Change photo</string>
+    <string name="share_label">Save as a dream</string>
+    <string name="share_loading">Opening the link…</string>
+    <string name="photo_hint">Type what you dream of and photo ideas will appear here.</string>
 </resources>

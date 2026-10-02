@@ -551,4 +551,19 @@
         <item>ours|0|-|Забронювати рьокан</item>
         <item>ours|0|-|Скласти маршрут</item>
     </string-array>
+    <!-- Фото для мрій -->
+    <string name="photo_title">Фото</string>
+    <string name="photo_no_photo">Без фото</string>
+    <string name="photo_searching">Шукаємо фото…</string>
+    <string name="photo_none_found">Фото за цією назвою немає. Спробуйте інші слова.</string>
+    <string name="photo_limit">Забагато пошуків фото за годину. Спробуйте пізніше.</string>
+    <string name="photo_offline">Немає зв’язку, тож підказок фото зараз немає.</string>
+    <string name="photo_unavailable">Підказки фото в цій збірці не налаштовано.</string>
+    <string name="photo_credit_unsplash">Фото: %1$s, Unsplash</string>
+    <string name="photo_credit_web">Зображення: %1$s</string>
+    <string name="photo_by">Фото: %1$s</string>
+    <string name="photo_change">Змінити фото</string>
+    <string name="share_label">Зберегти як мрію</string>
+    <string name="share_loading">Відкриваємо посилання…</string>
+    <string name="photo_hint">Напишіть, про що мрієте, і тут з’являться ідеї фото.</string>
 </resources>

@@ -31,6 +31,33 @@ fun ownerKey(owner: Owner, me: Role?): String = when {
     else -> "both"
 }
 
+/**
+ * A picture for a dream: a photo found on Unsplash or the preview image of a shared link
+ * (Pinterest, a website). Only links are stored; the image stays where it is hosted.
+ */
+data class Picture(
+    val url: String,
+    val thumb: String,
+    /** Who to credit: the Unsplash photographer, or the website's name. */
+    val by: String,
+    /** Where the credit links to. */
+    val link: String,
+    /** "unsplash" or "web". */
+    val source: String,
+    /** Unsplash asks apps to call this when a photo is chosen; empty for other sources. */
+    val downloadLocation: String = "",
+) {
+    fun toJson(): JSONObject = JSONObject().put("url", url).put("thumb", thumb).put("by", by).put("link", link).put("src", source)
+
+    companion object {
+        fun from(o: JSONObject?): Picture? {
+            val url = o?.optString("url").orEmpty()
+            if (!url.startsWith("https://")) return null
+            return Picture(url, o!!.optString("thumb").ifEmpty { url }, o.optString("by"), o.optString("link"), o.optString("src", "web"))
+        }
+    }
+}
+
 data class Dream(
     val key: String,
     val title: String,
@@ -40,6 +67,7 @@ data class Dream(
     val at: Long,
     val goalKey: String?,
     val done: Boolean,
+    val photo: Picture? = null,
 )
 
 data class GoalStep(val key: String, val title: String, val who: Owner, val done: Boolean, val due: Long?, val at: Long)
@@ -87,6 +115,7 @@ object DreamsModel {
             Dream(
                 key, title, o.optString("emoji").ifEmpty { "✨" }, DreamCategory.of(o.optString("cat")),
                 ownerOf(o.optString("owner"), me), o.optLong("at"), o.optString("goal").ifEmpty { null }, o.optBoolean("done"),
+                Picture.from(o.optJSONObject("photo")),
             )
         }.sortedByDescending { it.at }.toList()
     }

@@ -205,6 +205,10 @@ class CloudEmulatorTest {
 
         db.put("$pair/live/dreams/d1", app.belong.couple.core.DreamsModel.dreamJson("Japan", "🌸", app.belong.couple.core.DreamCategory.TRAVEL, app.belong.couple.core.Owner.OURS, 1, Role.A), yulia.session.idToken)
         expect(Reason.DENIED) { db.put("$pair/live/dreams/d2", JSONObject().put("title", "x").put("emoji", "✨").put("cat", "cars").put("owner", "a").put("at", 1), igor.session.idToken) }
+        val photo = app.belong.couple.core.Picture("https://images.unsplash.com/p", "https://images.unsplash.com/t", "Aiko", "https://unsplash.com/@aiko", "unsplash").toJson()
+        db.put("$pair/live/dreams/d1/photo", photo, igor.session.idToken)
+        expect(Reason.DENIED) { db.put("$pair/live/dreams/d1/photo", JSONObject(photo.toString()).put("url", "http://evil.example/x.jpg"), igor.session.idToken) }
+        expect(Reason.DENIED) { db.put("$pair/live/dreams/d1/photo", JSONObject(photo.toString()).put("src", "gallery"), igor.session.idToken) }
 
         // A goal both edit; each adds to the savings only for themselves, and only upwards.
         db.put("$pair/live/goals/g1", JSONObject().put("title", "Japan").put("emoji", "🌸").put("at", 1).put("target", 400000).put("unit", "₴"), igor.session.idToken)

@@ -191,6 +191,27 @@
               "done": {
                 ".validate": "newData.isBoolean()"
               },
+              "photo": {
+                ".validate": "newData.hasChildren(['url', 'thumb', 'src'])",
+                "url": {
+                  ".validate": "newData.isString() && newData.val().length <= 600 && newData.val().beginsWith('https://')"
+                },
+                "thumb": {
+                  ".validate": "newData.isString() && newData.val().length <= 600 && newData.val().beginsWith('https://')"
+                },
+                "by": {
+                  ".validate": "newData.isString() && newData.val().length <= 80"
+                },
+                "link": {
+                  ".validate": "newData.isString() && newData.val().length <= 600 && newData.val().beginsWith('https://')"
+                },
+                "src": {
+                  ".validate": "newData.val() === 'unsplash' || newData.val() === 'web'"
+                },
+                "$other": {
+                  ".validate": false
+                }
+              },
               "$other": {
                 ".validate": false
               }

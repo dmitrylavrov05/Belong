@@ -188,11 +188,17 @@ class DreamsScreen(private val activity: MainActivity) : Screen {
     }
 
     private fun dreamCard(dream: Dream, goal: Goal?, tall: Boolean): View = ctx.card(paddingDp = 8, spacingDp = 8).apply {
-        addView(ctx.text(dream.emoji, if (tall) 52f else 40f).apply {
-            gravity = Gravity.CENTER
-            background = ownerTile(dream.owner)
-            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-        }, LinearLayout.LayoutParams(MATCH, ctx.dp(if (tall) 150 else 104)))
+        val tileHeight = ctx.dp(if (tall) 150 else 104)
+        val photo = dream.photo
+        if (photo != null) {
+            addView(photoTile(photo, tileHeight), LinearLayout.LayoutParams(MATCH, tileHeight))
+        } else {
+            addView(ctx.text(dream.emoji, if (tall) 52f else 40f).apply {
+                gravity = Gravity.CENTER
+                background = ownerTile(dream.owner)
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }, LinearLayout.LayoutParams(MATCH, tileHeight))
+        }
         val texts = ctx.column(4).apply { setPadding(ctx.dp(6), 0, ctx.dp(6), ctx.dp(4)) }
         texts.addView(ctx.text(dream.title, 16f, 700))
         val who = ctx.row(6)
@@ -216,6 +222,18 @@ class DreamsScreen(private val activity: MainActivity) : Screen {
         setOnLongClickListener {
             dreamMenu(dream)
             true
+        }
+    }
+
+    /** The dream's photo with a small credit in the corner, as Unsplash asks. */
+    private fun photoTile(photo: app.belong.couple.core.Picture, height: Int): View = FrameLayout(ctx).apply {
+        addView(roundedImage(ctx, 18f).also { RemoteImage.load(it, photo.thumb, height) }, FrameLayout.LayoutParams(MATCH, MATCH))
+        if (photo.by.isNotBlank()) {
+            addView(ctx.text(photo.by, 10f, 600, ctx.col(R.color.white)).apply {
+                maxLines = 1
+                setShadowLayer(4f, 0f, 1f, 0x99000000.toInt())
+                setPadding(ctx.dp(8), 0, ctx.dp(8), ctx.dp(6))
+            }, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.BOTTOM or Gravity.START))
         }
     }
 
@@ -250,6 +268,7 @@ class DreamsScreen(private val activity: MainActivity) : Screen {
     private fun dreamMenu(dream: Dream) {
         val actions = mutableListOf<Pair<String, () -> Unit>>()
         if (dream.goalKey == null && !dream.done) actions += ctx.getString(R.string.dream_make_goal) to { makeGoal(dream) }
+        actions += ctx.getString(R.string.photo_change) to { changePhoto(dream) }
         if (!dream.done) actions += ctx.getString(R.string.dream_mark_true) to {
             repo.put("dreams/${dream.key}/done", true)
             Toaster.show(activity, ctx.getString(R.string.dream_came_true))
@@ -290,14 +309,25 @@ class DreamsScreen(private val activity: MainActivity) : Screen {
 
     // ---------- Adding a dream ----------
 
-    private fun addDream() {
+    fun addDream(title: String = "", picture: app.belong.couple.core.Picture? = null) {
         var owner = Owner.OURS
         var category = filter ?: DreamCategory.TRAVEL
         var emoji = EMOJI.first()
         activity.bottomSheet { sheet, dialog ->
             sheet.addView(ctx.text(ctx.getString(R.string.dream_add_title), 22f, 700))
             val input = sheetInput(ctx.getString(R.string.dream_field_title), 60)
+            input.setText(title)
             sheet.addView(input)
+
+            sheet.addView(sheetLabel(R.string.photo_title))
+            val picker = PhotoPicker(activity, picture)
+            sheet.addView(picker.view)
+            input.addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+                override fun afterTextChanged(s: android.text.Editable?) = picker.search(s.toString())
+            })
+            if (title.isNotBlank()) picker.search(title)
 
             sheet.addView(sheetLabel(R.string.dream_picture))
             val emojis = FrameLayout(ctx)
@@ -347,7 +377,7 @@ class DreamsScreen(private val activity: MainActivity) : Screen {
             fun drawOwners() {
                 owners.removeAllViews()
                 owners.addView(ctx.segmented(
-                    listOf(ctx.getString(R.string.dream_owner_me), ctx.getString(R.string.dream_owner_ours_short), store.partnerDisplay),
+                    listOf(ctx.getString(R.string.dream_owner_me).replaceFirstChar { it.titlecase(ctx.locale()) }, ctx.getString(R.string.dream_owner_ours_short), store.partnerDisplay),
                     Owner.entries.indexOf(owner),
                 ) {
                     owner = Owner.entries[it]
@@ -363,11 +393,58 @@ class DreamsScreen(private val activity: MainActivity) : Screen {
                     input.error = ctx.getString(R.string.wish_title_required)
                     return@primaryButton
                 }
-                repo.put("dreams/${newKey()}", DreamsModel.dreamJson(title, emoji, category, owner, System.currentTimeMillis(), repo.me))
+                val dream = DreamsModel.dreamJson(title, emoji, category, owner, System.currentTimeMillis(), repo.me)
+                picker.picked?.let { dream.put("photo", it.toJson()) }
+                picker.confirm()
+                repo.put("dreams/${newKey()}", dream)
                 dialog.dismiss()
             }.lp(top = 8))
         }
     }
+
+    private fun changePhoto(dream: Dream) = activity.bottomSheet { sheet, dialog ->
+        sheet.addView(ctx.text(ctx.getString(R.string.photo_change), 22f, 700))
+        val picker = PhotoPicker(activity, dream.photo)
+        sheet.addView(picker.view)
+        picker.search(dream.title)
+        sheet.addView(ctx.primaryButton(ctx.getString(R.string.settings_save)) {
+            val p = picker.picked
+            if (p == null) repo.delete("dreams/${dream.key}/photo") else repo.put("dreams/${dream.key}/photo", p.toJson())
+            picker.confirm()
+            dialog.dismiss()
+        }.lp(top = 8))
+    }
+
+    /**
+     * Something shared into the app (a Pinterest pin, a web page): reads the link's title and
+     * picture, then opens "New dream" filled in with them.
+     */
+    fun addFromShare(text: String) {
+        val url = app.belong.couple.sync.LinkPreview.firstUrl(text)
+        val plain = (if (url != null) text.replace(url, "") else text).trim().take(60)
+        if (url == null) {
+            addDream(plain)
+            return
+        }
+        Toaster.show(activity, ctx.getString(R.string.share_loading))
+        Thread {
+            val preview = try {
+                app.belong.couple.sync.LinkPreview.fetch(url)
+            } catch (e: app.belong.couple.sync.CloudException) {
+                null
+            }
+            activity.runOnUiThread {
+                if (activity.isFinishing) return@runOnUiThread
+                val title = cleanTitle(preview?.title).ifEmpty { plain }
+                val picture = preview?.image?.let { app.belong.couple.core.Picture(it, it, preview.site ?: "", preview.url, "web") }
+                addDream(title, picture)
+            }
+        }.start()
+    }
+
+    /** Pinterest titles often end with " | Pinterest" or similar; keep the part that names the idea. */
+    private fun cleanTitle(title: String?): String =
+        title.orEmpty().split(" | ", " – ", " - ").first().trim().take(60)
 
     private fun sheetLabel(res: Int) = ctx.text(ctx.getString(res), 13f, 700, ctx.col(R.color.ink2)).lp(top = 4)
 

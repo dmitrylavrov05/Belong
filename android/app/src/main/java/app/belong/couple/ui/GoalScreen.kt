@@ -66,12 +66,30 @@ object GoalScreen {
     /** The cover: a soft pair gradient with the goal's emoji, its title in white and the ring. */
     private fun cover(a: MainActivity, dialog: Dialog, goal: Goal): View = FrameLayout(a).apply {
         background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(a.col(R.color.her_tint), a.col(R.color.her), a.col(R.color.us_end)))
-        minimumHeight = a.dp(300)
-        addView(a.text(goal.emoji, 96f).apply {
-            gravity = Gravity.CENTER
-            alpha = 0.9f
-            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-        }, FrameLayout.LayoutParams(MATCH, a.dp(200), Gravity.TOP))
+        minimumHeight = a.dp(320)
+        val repo = DreamsRepo(a)
+        val photo = goal.dreamKey?.let { key -> DreamsModel.dreams(repo.root(), repo.me).firstOrNull { it.key == key }?.photo }
+        if (photo != null) {
+            // The dream's photo under a veil that turns from clear to pink to blue, as in the design.
+            addView(ImageView(a).apply {
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                RemoteImage.load(this, photo.url, a.dp(400))
+            }, FrameLayout.LayoutParams(MATCH, MATCH))
+            addView(View(a).apply {
+                background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0x00F07DA1, 0x8CF07DA1.toInt(), 0xEB5C9DF2.toInt()))
+            }, FrameLayout.LayoutParams(MATCH, MATCH))
+            if (photo.by.isNotBlank()) addView(a.text(a.getString(if (photo.source == "unsplash") R.string.photo_credit_unsplash else R.string.photo_credit_web, photo.by), 11f, 600, Color.WHITE).apply {
+                setPadding(a.dp(20), a.dp(72), a.dp(20), 0)
+                setOnClickListener { if (photo.link.startsWith("https://")) a.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(photo.link))) }
+            }, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.TOP or Gravity.START))
+        } else {
+            addView(a.text(goal.emoji, 96f).apply {
+                gravity = Gravity.CENTER
+                alpha = 0.9f
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }, FrameLayout.LayoutParams(MATCH, a.dp(200), Gravity.TOP))
+        }
         val bar = a.row().apply { setPadding(a.dp(16), a.dp(16), a.dp(16), 0) }
         bar.addView(circleButton(a, R.drawable.ic_back, a.getString(R.string.back)) { dialog.dismiss() })
         bar.addView(View(a), LinearLayout.LayoutParams(0, 1, 1f))
