@@ -180,7 +180,7 @@
     <string name="tab_chat">Чат</string>
     <string name="tab_wishlist">Вішліст</string>
     <string name="tab_map">Місця</string>
-    <string name="tab_more">Ще</string>
+    <string name="tab_more">Ми</string>
     <string name="back">Назад</string>
     <string name="more_title">Ще</string>
     <string name="more_doodle_text">Малюнки на головний екран партнера</string>
@@ -566,4 +566,119 @@
     <string name="share_label">Зберегти як мрію</string>
     <string name="share_loading">Відкриваємо посилання…</string>
     <string name="photo_hint">Напишіть, про що мрієте, і тут з’являться ідеї фото.</string>
+    <!-- Покупки -->
+    <string name="shopping_title">Покупки</string>
+    <string name="shopping_add">+ Додати</string>
+    <string name="shopping_empty">Список порожній. Додайте, що треба купити.</string>
+    <string name="shopping_hint">Молоко, хліб…</string>
+    <string name="shopping_hint_more">Додавайте скільки завгодно; утримуйте пункт, щоб прибрати його.</string>
+    <string name="shopping_removed">Прибрано: %1$s</string>
+    <string-array name="shopping_seeds">
+        <item>partner|0|Молоко</item>
+        <item>me|1|Авокадо</item>
+        <item>partner|0|Корм для кота</item>
+    </string-array>
+
+    <!-- Питання дня -->
+    <string name="question_title">Питання дня</string>
+    <string name="question_hint">Ваша відповідь</string>
+    <string name="question_answer">Відповісти</string>
+    <string name="question_partner_not_yet">%1$s: відповіді поки немає. Вона з’явиться тут.</string>
+    <string name="question_locked">Дайте відповідь, щоб побачити відповідь: %1$s</string>
+    <string name="question_blur_filler">Той вечір під дощем, коли ми чекали останній трамвай і сміялися всю дорогу додому</string>
+    <string-array name="daily_questions">
+        <item>Який наш спогад ти переглядаєш найчастіше?</item>
+        <item>Яка дрібниця від мене робить твій день кращим?</item>
+        <item>Куди б ми поїхали завтра, якби гроші не мали значення?</item>
+        <item>Якою була твоя перша думка про мене?</item>
+        <item>Яка пісня нагадує тобі про нас?</item>
+        <item>Чим ти пишаєшся в мені?</item>
+        <item>Як виглядає ідеальна лінива неділя разом?</item>
+        <item>Що ти хочеш, щоб ми спробували цього року?</item>
+        <item>Коли ми були найближчі одне до одного?</item>
+        <item>Яка моя звичка таємно викликає в тебе усмішку?</item>
+        <item>Чого нам варто навчитися разом?</item>
+        <item>Яку нашу подорож варто повторити просто зараз?</item>
+        <item>Який мій подарунок був найкращим?</item>
+        <item>Що для тебе означає дім?</item>
+        <item>Що я можу зробити цього тижня, щоб тобі було легше?</item>
+        <item>Який наш найсмішніший жарт «для своїх»?</item>
+        <item>Який фільм нам подивитися разом наступним?</item>
+        <item>Яку традицію ти хочеш, щоб ми започаткували?</item>
+        <item>Як ти розумієш, що я тебе кохаю, без слів?</item>
+        <item>Чого ти найбільше чекаєш цього місяця?</item>
+    </string-array>
+    <string-array name="demo_answers">
+        <item>Той вечір у Львові, коли ми промокли під зливою і до ранку пили чай на кухні.</item>
+        <item>Коли ти надсилаєш фото свого сніданку. Дрібниця, а настрій на весь ранок.</item>
+        <item>Японія, звісно. Або будь-куди з тобою і хорошою кавою.</item>
+        <item>Що ти смієшся найголосніше з усіх, і мені захотілося розсмішити тебе ще раз.</item>
+        <item>Наша пісня з першого літа. Досі слухаю її дорогою на роботу.</item>
+    </string-array>
+
+    <!-- Підсумок дня -->
+    <string name="evening_title">Підсумок дня</string>
+    <string name="evening_question">За що сьогодні хочеться сказати «дякую»?</string>
+    <string name="evening_write">Написати «дякую»</string>
+    <string name="evening_send">Надіслати з теплом</string>
+    <string name="evening_note">%1$s побачить це вранці.</string>
+    <string name="evening_sent">Надіслано. %1$s побачить уранці</string>
+    <string name="evening_from">Від: %1$s, учора ввечері</string>
+    <string name="thanks_seed">Дякую, що була на дзвінку, поки я не заснув. Доброго ранку, сонечко ☀️</string>
+    <string-array name="evening_chips">
+        <item>за сніданок</item>
+        <item>за підтримку</item>
+        <item>за сміх</item>
+        <item>за терпіння</item>
+        <item>за дзвінок</item>
+    </string-array>
+
+    <!-- Ми -->
+    <string name="us_chronicle">Хроніка</string>
+    <string name="us_chronicle_empty">Тут почнеться ваша історія: мрії, що збулися, досягнуті цілі та збережені моменти.</string>
+    <string name="us_add_moment">Додати спогад</string>
+    <string name="us_moment_title">Що сталося?</string>
+    <string name="us_moment_text">Кілька слів (необов’язково)</string>
+    <string name="us_delete_moment">Видалити спогад?</string>
+    <string name="us_quiz_text">Десять питань щотижня: хто кого знає краще</string>
+    <string name="us_together">разом %1$s · з %2$s</string>
+    <string name="us_set_since">Коли ви почали зустрічатися? Натисніть, щоб задати дату</string>
+    <string name="us_since_title">Ми разом 💞</string>
+    <string name="us_goal_done">Ціль досягнута: %1$s</string>
+    <string name="us_on_this_day">Цього дня колись</string>
+    <plurals name="steps">
+        <item quantity="one">%d крок</item>
+        <item quantity="few">%d кроки</item>
+        <item quantity="many">%d кроків</item>
+        <item quantity="other">%d кроку</item>
+    </plurals>
+    <string name="moment_seed">Перший вечір у новій квартирі|Піца на коробках і гірлянда</string>
+
+    <!-- Квіз -->
+    <string name="quiz_title">Як добре ти мене знаєш?</string>
+    <string name="quiz_guess_hint">%1$s відповідає про себе, потім порівняємо</string>
+    <string name="quiz_self_hint">Тепер відповідь про себе</string>
+    <string name="quiz_answer">Відповісти</string>
+    <string name="quiz_waiting">Готово! Чекаємо, поки зіграє %1$s. Рахунок з’явиться тут.</string>
+    <string name="quiz_you_won">Цього тижня ти знаєш краще 🏆</string>
+    <string name="quiz_they_won">Цього тижня краще знає %1$s 🏆</string>
+    <string name="quiz_tie">Нічия: ви знаєте одне одного однаково добре 💞</string>
+    <string name="quiz_result_line">Відповідь: %1$s · твоя здогадка: %2$s</string>
+    <string name="quiz_next_week">Нові питання щопонеділка.</string>
+    <string-array name="quiz_bank">
+        <item>Що ти замовиш у кав’ярні?|Що %1$s замовить у кав’ярні?|Флет вайт на вівсяному|Подвійний еспресо|Лавандове лате|Матча-лате</item>
+        <item>Твій ідеальний вихідний?|%1$s: ідеальний вихідний?|Відіспатися і фільм|Довга прогулянка|Друзі й велика вечеря|Поїздка в нове місце</item>
+        <item>Що ти обереш на вечерю?|Що %1$s обере на вечерю?|Піцу|Суші|Щось домашнє|Бургер</item>
+        <item>Куди ти хочеш у відпустку?|Куди %1$s хоче у відпустку?|На море|У гори|У велике місто|У будиночок у лісі</item>
+        <item>Що найшвидше піднімає тобі настрій?|%1$s: що найшвидше піднімає настрій?|Обійми|Щось солодке|Прогулянка|Смішне відео</item>
+        <item>Жайворонок чи сова?|%1$s — жайворонок чи сова?|Жайворонок|Сова|Залежить від дня|Ні те, ні те, завжди сонно</item>
+        <item>Твоя улюблена пора року?|%1$s: улюблена пора року?|Весна|Літо|Осінь|Зима</item>
+        <item>Що ти зробиш із несподіваною вільною годиною?|Що %1$s зробить із несподіваною вільною годиною?|Поспати|Почитати чи подивитися щось|Вийти надвір|Комусь подзвонити</item>
+        <item>Улюбленець твоєї мрії?|%1$s: улюбленець мрії?|Собака|Кіт|Щось екзотичне|Без тварин, дякую</item>
+        <item>Як ти найчастіше показуєш любов?|Як %1$s найчастіше показує любов?|Словами|Дотиками|Маленькими подарунками|Справами</item>
+        <item>Яку суперсилу ти обереш?|Яку суперсилу обере %1$s?|Телепортацію|Політ|Читання думок|Зупинку часу</item>
+        <item>Улюблений жанр фільмів?|%1$s: улюблений жанр фільмів?|Комедія|Трилер|Мелодрама|Фантастика</item>
+        <item>Що тебе найбільше стресує?|%1$s: що найбільше стресує?|Запізнення|Натовп|Невизначеність|Недосипання</item>
+        <item>Твоє ідеальне побачення?|%1$s: ідеальне побачення?|Затишний вечір удома|Вечеря в ресторані|Щось активне|Сюрприз</item>
+    </string-array>
 </resources>

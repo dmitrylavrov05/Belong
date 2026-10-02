@@ -16,7 +16,7 @@ import app.belong.couple.core.DreamsModel
 import app.belong.couple.core.Ideas
 import app.belong.couple.core.Owner
 import app.belong.couple.data.CoupleStore
-import app.belong.couple.data.DreamsRepo
+import app.belong.couple.data.SharedRepo
 import app.belong.couple.data.TaskRepo
 import app.belong.couple.sync.Matches
 
@@ -199,7 +199,7 @@ object MatchesScreen {
             Toaster.show(a, a.getString(R.string.goal_added_today))
         }.apply { minHeight = a.dp(56) })
         page.addView(a.secondaryButton(a.getString(R.string.match_to_map)) {
-            val repo = DreamsRepo(a)
+            val repo = SharedRepo(a)
             repo.put("dreams/${DreamsScreen.newKey()}", DreamsModel.dreamJson(idea.title, idea.emoji, idea.category, Owner.OURS, System.currentTimeMillis(), repo.me))
             Toaster.show(a, a.getString(R.string.match_added_to_map))
         }.apply { minHeight = a.dp(56) })

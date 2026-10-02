@@ -68,6 +68,7 @@ data class Dream(
     val goalKey: String?,
     val done: Boolean,
     val photo: Picture? = null,
+    val doneAt: Long? = null,
 )
 
 data class GoalStep(val key: String, val title: String, val who: Owner, val done: Boolean, val due: Long?, val at: Long)
@@ -84,6 +85,7 @@ data class Goal(
     val steps: List<GoalStep>,
     val dreamKey: String?,
     val done: Boolean,
+    val doneAt: Long? = null,
 ) {
     val saved: Long get() = savedMine + savedPartner
     val hasSavings: Boolean get() = target > 0
@@ -116,6 +118,7 @@ object DreamsModel {
                 key, title, o.optString("emoji").ifEmpty { "✨" }, DreamCategory.of(o.optString("cat")),
                 ownerOf(o.optString("owner"), me), o.optLong("at"), o.optString("goal").ifEmpty { null }, o.optBoolean("done"),
                 Picture.from(o.optJSONObject("photo")),
+                if (o.has("doneAt")) o.optLong("doneAt") else null,
             )
         }.sortedByDescending { it.at }.toList()
     }
@@ -149,6 +152,7 @@ object DreamsModel {
         return Goal(
             key, title, o.optString("emoji").ifEmpty { "⭐" }, o.optLong("at"), o.optLong("target"), o.optString("unit"),
             saved?.optLong(mineKey) ?: 0, saved?.optLong(partnerKey) ?: 0, steps, o.optString("dream").ifEmpty { null }, o.optBoolean("done"),
+            if (o.has("doneAt")) o.optLong("doneAt") else null,
         )
     }
 

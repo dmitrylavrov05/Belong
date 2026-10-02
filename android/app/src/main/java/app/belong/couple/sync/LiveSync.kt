@@ -11,7 +11,7 @@ import app.belong.couple.data.Account
 import app.belong.couple.data.CoupleStore
 import app.belong.couple.data.Counter
 import app.belong.couple.data.DataEvents
-import app.belong.couple.data.DreamsRepo
+import app.belong.couple.data.SharedRepo
 import app.belong.couple.data.TaskRepo
 import app.belong.couple.data.WishRepo
 import app.belong.couple.widget.Widgets
@@ -228,7 +228,7 @@ object LiveSync {
 
     /** Sends dream and goal changes in the order they were made. A change the server refuses is dropped. */
     private fun flushDreams(app: Context, db: Db, live: String, account: Account) {
-        val repo = DreamsRepo(app)
+        val repo = SharedRepo(app)
         for (op in repo.ops()) {
             val path = "$live/${op.optString("path")}"
             try {
@@ -317,7 +317,7 @@ object LiveSync {
         // Finished tasks from earlier days leave the plan; either phone may tidy them up.
         serverTasks.filter { it.done && it.day < today }.map(Task::key).forEach { taskRemoved(app, it) }
 
-        DreamsRepo(app).setBase(tree.obj("dreams"), tree.obj("goals"))
+        SharedRepo(app).setBase(tree.root)
 
         DataEvents.changed()
         Widgets.updateAll(app)

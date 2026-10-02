@@ -27,6 +27,9 @@ Under `pairs/<code>`:
 - `live/dreams/<key>`: the wish map `{title, emoji, cat, owner: a|b|both, at, goal?, done?, photo?}`; `photo` is a link only (`{url, thumb, by, link, src: unsplash|web}`, https), the image stays on Unsplash or Pinterest;
 - `live/goals/<key>`: goals `{title, emoji, at, target?, unit?, dream?, done?}` with `saved/<seat>` (each partner adds only to their own amount, which can only grow) and `steps/<key>` `{title, who, done, at, due?}`;
 - `votes/<seat>/<idea>`: a "yes" in Matches. The partner may read it only for an idea they said yes to themselves, so they learn about mutual yeses and nothing else; `secret/<seat>/decided/<idea>` keeps "no" and "maybe" private;
+- `live/shopping/<key>` `{title, by, done, at}`, `live/thanks/<day>/<seat>` (the evening note, written only by its author), `live/couple/since`, `live/moments/<key>` and `live/flags/question|quiz/<id>/<seat>` (who has answered, without the answer);
+- `answers/<day>/<seat>`: the question of the day. The partner may read your answer only once their own answer for that day exists;
+- `quiz/<round>/<seat>`: a week's quiz `{self, guess, done}`, readable by the partner only after they have finished theirs;
 - `secret/<seat>/reserved/<key>`: gifts this seat will give. Only that seat can read or write it, which is why members get read access per section (`chat`, `live`) and not to the whole pair.
 
 Nobody receives mail at `pair.belong.app`: the address is just an account name. `database.rules.json` enforces all of the above. Members alone read the pair. Messages can't be forged, edited or deleted; the other partner can only add a ❤️.

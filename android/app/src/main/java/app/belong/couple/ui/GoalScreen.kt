@@ -22,7 +22,7 @@ import app.belong.couple.core.GoalStep
 import app.belong.couple.core.Owner
 import app.belong.couple.data.CoupleStore
 import app.belong.couple.data.DataEvents
-import app.belong.couple.data.DreamsRepo
+import app.belong.couple.data.SharedRepo
 import app.belong.couple.data.TaskRepo
 import java.time.LocalDate
 import java.time.ZoneId
@@ -39,7 +39,7 @@ object GoalScreen {
             addView(body)
         }
         fun render() {
-            val repo = DreamsRepo(activity)
+            val repo = SharedRepo(activity)
             val goal = DreamsModel.goal(repo.root(), goalKey, repo.me) ?: return dialog.dismiss()
             val y = scroll.scrollY
             body.removeAllViews()
@@ -67,7 +67,7 @@ object GoalScreen {
     private fun cover(a: MainActivity, dialog: Dialog, goal: Goal): View = FrameLayout(a).apply {
         background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(a.col(R.color.her_tint), a.col(R.color.her), a.col(R.color.us_end)))
         minimumHeight = a.dp(320)
-        val repo = DreamsRepo(a)
+        val repo = SharedRepo(a)
         val photo = goal.dreamKey?.let { key -> DreamsModel.dreams(repo.root(), repo.me).firstOrNull { it.key == key }?.photo }
         if (photo != null) {
             // The dream's photo under a veil that turns from clear to pink to blue, as in the design.
@@ -190,7 +190,7 @@ object GoalScreen {
                 input.error = a.getString(R.string.goal_money_hint, goal.unit)
                 return@primaryButton
             }
-            val repo = DreamsRepo(a)
+            val repo = SharedRepo(a)
             repo.add("goals/${goal.key}/saved/${repo.me?.key ?: "me"}", amount)
             dialog.dismiss()
             Toaster.show(a, a.getString(R.string.goal_money_added, formatMoney(a, amount, goal.unit)))
@@ -219,7 +219,7 @@ object GoalScreen {
                 amount.error = a.getString(R.string.goal_target_hint)
                 return@primaryButton
             }
-            val repo = DreamsRepo(a)
+            val repo = SharedRepo(a)
             repo.put("goals/${goal.key}/target", target)
             repo.put("goals/${goal.key}/unit", unit.text.toString().trim().take(4))
             dialog.dismiss()
@@ -285,7 +285,7 @@ object GoalScreen {
         background = a.ripple(a.rounded(a.col(R.color.surface), 12f), 12f)
         setOnClickListener { v ->
             haptic(v)
-            DreamsRepo(a).put("goals/${goal.key}/steps/${step.key}/done", !step.done)
+            SharedRepo(a).put("goals/${goal.key}/steps/${step.key}/done", !step.done)
         }
         setOnLongClickListener {
             stepMenu(a, goal, step)
@@ -294,7 +294,7 @@ object GoalScreen {
     }
 
     private fun stepMenu(a: MainActivity, goal: Goal, step: GoalStep) {
-        val repo = DreamsRepo(a)
+        val repo = SharedRepo(a)
         val actions = listOf<Pair<String, () -> Unit>>(
             a.getString(R.string.goal_to_today) to {
                 TaskRepo(a).add(step.title, step.who)
@@ -345,7 +345,7 @@ object GoalScreen {
             sheet.addView(a.primaryButton(a.getString(R.string.task_add)) {
                 val title = input.text.toString().trim()
                 if (title.isEmpty()) return@primaryButton
-                val repo = DreamsRepo(a)
+                val repo = SharedRepo(a)
                 repo.put("goals/${goal.key}/steps/${DreamsScreen.newKey()}", DreamsModel.stepJson(title, who, System.currentTimeMillis(), repo.me))
                 dialog.dismiss()
             }.lp(top = 8))
@@ -370,10 +370,15 @@ object GoalScreen {
             setLayerInset(1, inset, inset, inset, inset)
         }, 16f)
         setOnClickListener {
-            val repo = DreamsRepo(a)
+            val repo = SharedRepo(a)
             val done = !goal.done
             repo.put("goals/${goal.key}/done", done)
             goal.dreamKey?.let { repo.put("dreams/$it/done", done) }
+            if (done) {
+                val now = System.currentTimeMillis()
+                repo.put("goals/${goal.key}/doneAt", now)
+                goal.dreamKey?.let { repo.put("dreams/$it/doneAt", now) }
+            }
             if (done) {
                 celebrate(a)
                 Toaster.show(a, a.getString(R.string.goal_completed))
@@ -390,7 +395,7 @@ object GoalScreen {
     }
 
     private fun menu(a: MainActivity, dialog: Dialog, goal: Goal) {
-        val repo = DreamsRepo(a)
+        val repo = SharedRepo(a)
         val actions = listOf<Pair<String, () -> Unit>>(
             a.getString(R.string.goal_set_target) to { setTarget(a, goal) },
             a.getString(R.string.goal_delete) to {

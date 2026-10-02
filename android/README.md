@@ -4,13 +4,18 @@ Native Android app in Kotlin that uses only the Android framework (no AndroidX),
 
 ## What's inside
 
-Five tabs: Today, Dreams, Chat, Places, More.
+Five tabs: Today, Dreams, Chat, Places, Us.
 
 - **Today:**
   - greeting, the partner's mood and energy, and your own check-in;
   - **plan for the day**: mine, ours and the partner's tasks. Tap to tick off, long-press to delete. Unfinished tasks roll over to the next day;
   - both cities' clocks, the distance between you and the countdown to your next meeting;
   - the “Thinking of you” and “I'm safe” buttons and buttons to place widgets.
+- **On Today** also:
+  - **Shopping**: a shared list showing who added each item;
+  - **Question of the day**: the same question on both phones; your partner's answer stays blurred (and the server won't send it) until you answer too;
+  - **End of the day**: in the evening, a short “thank you” for your partner, with suggestion chips; they see it the next morning.
+- **Us** (replaces More): how long you've been together, the **chronicle** (dreams that came true, goals reached, your own memories with an optional photo, “On this day”), the weekly quiz **“How well do you know me?”** (guess your partner's answers, give your own, compare once both have played) and everything that was under More.
 - **Dreams** (from the design handoff):
   - the **wish map**: dreams with a picture, a category and whose they are (mine, ours, the partner's); filter by category; “Me too 💞” turns the partner's dream into a shared one;
   - **goals**: “Make it a goal” turns a dream into a goal with a progress ring, a **savings jar** (each partner's share in their colour, and when you'll get there at the current pace) and **steps** with who does them and by when; a step can go to today's plan; “We did it” marks the dream as come true;

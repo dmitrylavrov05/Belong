@@ -21,7 +21,7 @@ import app.belong.couple.core.Goal
 import app.belong.couple.core.Owner
 import app.belong.couple.data.CoupleStore
 import app.belong.couple.data.DataEvents
-import app.belong.couple.data.DreamsRepo
+import app.belong.couple.data.SharedRepo
 import app.belong.couple.sync.ChatFeed
 import app.belong.couple.sync.Matches
 import java.security.SecureRandom
@@ -34,7 +34,7 @@ import java.text.NumberFormat
 class DreamsScreen(private val activity: MainActivity) : Screen {
     private val ctx = activity
     private val store = CoupleStore.get(ctx)
-    private val repo = DreamsRepo(ctx)
+    private val repo = SharedRepo(ctx)
     private var filter: DreamCategory? = null
 
     private val body = ctx.column().apply {
@@ -271,6 +271,7 @@ class DreamsScreen(private val activity: MainActivity) : Screen {
         actions += ctx.getString(R.string.photo_change) to { changePhoto(dream) }
         if (!dream.done) actions += ctx.getString(R.string.dream_mark_true) to {
             repo.put("dreams/${dream.key}/done", true)
+            repo.put("dreams/${dream.key}/doneAt", System.currentTimeMillis())
             Toaster.show(activity, ctx.getString(R.string.dream_came_true))
         }
         actions += ctx.getString(R.string.delete) to {

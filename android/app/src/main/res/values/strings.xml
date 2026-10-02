@@ -178,7 +178,7 @@
     <string name="tab_chat">Chat</string>
     <string name="tab_wishlist">Wishlist</string>
     <string name="tab_map">Places</string>
-    <string name="tab_more">More</string>
+    <string name="tab_more">Us</string>
     <string name="back">Back</string>
     <string name="more_title">More</string>
     <string name="more_doodle_text">Draw for your partner’s home screen</string>
@@ -557,4 +557,117 @@
     <string name="share_label">Save as a dream</string>
     <string name="share_loading">Opening the link…</string>
     <string name="photo_hint">Type what you dream of and photo ideas will appear here.</string>
+    <!-- Shopping -->
+    <string name="shopping_title">Shopping</string>
+    <string name="shopping_add">+ Add</string>
+    <string name="shopping_empty">The list is empty. Add what you need to buy.</string>
+    <string name="shopping_hint">Milk, bread…</string>
+    <string name="shopping_hint_more">Add as many as you like; long-press an item to remove it.</string>
+    <string name="shopping_removed">Removed: %1$s</string>
+    <string-array name="shopping_seeds">
+        <item>partner|0|Milk</item>
+        <item>me|1|Avocados</item>
+        <item>partner|0|Cat food</item>
+    </string-array>
+
+    <!-- Question of the day -->
+    <string name="question_title">Question of the day</string>
+    <string name="question_hint">Your answer</string>
+    <string name="question_answer">Answer</string>
+    <string name="question_partner_not_yet">%1$s hasn’t answered yet. You’ll see it here.</string>
+    <string name="question_locked">Answer to see what %1$s wrote</string>
+    <string name="question_blur_filler">That evening in the rain when we waited for the last tram and laughed the whole way home</string>
+    <string-array name="daily_questions">
+        <item>Which memory of ours do you replay most often?</item>
+        <item>What small thing I do makes your day better?</item>
+        <item>Where would you go with me tomorrow if money didn’t matter?</item>
+        <item>What did you think the first time you saw me?</item>
+        <item>Which song reminds you of us?</item>
+        <item>What are you proud of me for?</item>
+        <item>What would a perfect lazy Sunday together look like?</item>
+        <item>What do you want us to try this year?</item>
+        <item>When did you feel closest to me?</item>
+        <item>What habit of mine secretly makes you smile?</item>
+        <item>What’s one thing you’d like to learn together?</item>
+        <item>Which of our trips would you repeat right now?</item>
+        <item>What’s the best gift you’ve ever got from me?</item>
+        <item>What does home mean to you?</item>
+        <item>What can I do this week to make things easier for you?</item>
+        <item>What’s our funniest inside joke?</item>
+        <item>Which film should we watch together next?</item>
+        <item>What tradition would you like us to start?</item>
+        <item>How do you know I love you, without words?</item>
+        <item>What are you looking forward to most this month?</item>
+    </string-array>
+    <string-array name="demo_answers">
+        <item>The night we got caught in the rain in Lviv and ended up drinking tea in the kitchen till morning.</item>
+        <item>When you send me a photo of your breakfast. Silly, but it makes my morning.</item>
+        <item>Japan, obviously. Or anywhere with you and a good coffee.</item>
+        <item>That you laugh louder than anyone I know, and I wanted to make you laugh again.</item>
+        <item>Our song from the first summer. I still play it on the way to work.</item>
+    </string-array>
+
+    <!-- Evening "thank you" -->
+    <string name="evening_title">End of the day</string>
+    <string name="evening_question">What are you thankful to %1$s for today?</string>
+    <string name="evening_write">Write a thank-you</string>
+    <string name="evening_send">Send with love</string>
+    <string name="evening_note">%1$s will see it in the morning.</string>
+    <string name="evening_sent">Sent. %1$s will see it in the morning</string>
+    <string name="evening_from">From %1$s last night</string>
+    <string name="thanks_seed">Thank you for staying on the call until I fell asleep. Good morning, sunshine ☀️</string>
+    <string-array name="evening_chips">
+        <item>for breakfast</item>
+        <item>for the support</item>
+        <item>for making me laugh</item>
+        <item>for your patience</item>
+        <item>for the call</item>
+    </string-array>
+
+    <!-- Us -->
+    <string name="us_chronicle">Chronicle</string>
+    <string name="us_chronicle_empty">Your story starts here: dreams that come true, goals you reach and the moments you save.</string>
+    <string name="us_add_moment">Add a memory</string>
+    <string name="us_moment_title">What happened?</string>
+    <string name="us_moment_text">A few words (optional)</string>
+    <string name="us_delete_moment">Delete this memory?</string>
+    <string name="us_quiz_text">Ten questions a week; see who knows whom better</string>
+    <string name="us_together">together %1$s · since %2$s</string>
+    <string name="us_set_since">When did you get together? Tap to set the date</string>
+    <string name="us_since_title">We got together 💞</string>
+    <string name="us_goal_done">Goal reached: %1$s</string>
+    <string name="us_on_this_day">On this day</string>
+    <plurals name="steps">
+        <item quantity="one">%d step</item>
+        <item quantity="other">%d steps</item>
+    </plurals>
+    <string name="moment_seed">Our first evening in the new flat|Pizza on the moving boxes and a string of fairy lights</string>
+
+    <!-- Quiz -->
+    <string name="quiz_title">How well do you know me?</string>
+    <string name="quiz_guess_hint">%1$s answers about themselves, then we compare</string>
+    <string name="quiz_self_hint">Now answer for yourself</string>
+    <string name="quiz_answer">Answer</string>
+    <string name="quiz_waiting">Done! Waiting for %1$s to play. You’ll see the score here once they finish.</string>
+    <string name="quiz_you_won">You know %1$s better this week 🏆</string>
+    <string name="quiz_they_won">%1$s knows you better this week 🏆</string>
+    <string name="quiz_tie">A draw: you know each other equally well 💞</string>
+    <string name="quiz_result_line">Answer: %1$s · your guess: %2$s</string>
+    <string name="quiz_next_week">New questions every Monday.</string>
+    <string-array name="quiz_bank">
+        <item>What would you order at a café?|What would %1$s order at a café?|Flat white with oat milk|Double espresso|Lavender latte|Matcha latte</item>
+        <item>Your ideal day off?|What’s %1$s’s ideal day off?|Sleeping in and a film|A long walk outside|Friends and a big dinner|A trip somewhere new</item>
+        <item>What would you pick for dinner?|What would %1$s pick for dinner?|Pizza|Sushi|Something home-made|A burger</item>
+        <item>Where would you go on holiday?|Where would %1$s go on holiday?|The sea|The mountains|A big city|A cabin in the woods</item>
+        <item>What cheers you up fastest?|What cheers %1$s up fastest?|A hug|Something sweet|A walk|A funny video</item>
+        <item>Morning person or night owl?|Is %1$s a morning person or a night owl?|Early bird|Night owl|Depends on the day|Neither, always sleepy</item>
+        <item>Your favourite season?|What’s %1$s’s favourite season?|Spring|Summer|Autumn|Winter</item>
+        <item>What would you do with an unexpected free hour?|What would %1$s do with an unexpected free hour?|Nap|Read or watch something|Go outside|Call someone</item>
+        <item>Your dream pet?|What’s %1$s’s dream pet?|A dog|A cat|Something exotic|No pets, thanks</item>
+        <item>How do you show love most?|How does %1$s show love most?|Words|Touch|Little gifts|Doing things for you</item>
+        <item>Which superpower would you choose?|Which superpower would %1$s choose?|Teleporting|Flying|Reading minds|Stopping time</item>
+        <item>Your go-to film genre?|What’s %1$s’s go-to film genre?|Comedy|Thriller|Romance|Sci-fi</item>
+        <item>What stresses you most?|What stresses %1$s most?|Being late|Crowds|Uncertainty|Lack of sleep</item>
+        <item>Your perfect date?|What’s %1$s’s perfect date?|A cosy night in|A fancy dinner|Something active|A surprise</item>
+    </string-array>
 </resources>

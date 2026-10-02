@@ -245,6 +245,49 @@ class CloudEmulatorTest {
     }
 
     @Test
+    fun dailyAnswersAndQuizStayHiddenUntilYouAnswerToo() {
+        val yulia = pairing.create("Yulia", "sunflower1")
+        val igor = pairing.join(yulia.code, "Igor", "maple-leaf")
+        val pair = "pairs/${yulia.code}"
+        val answer = { text: String -> JSONObject().put("text", text).put("at", Db.serverTime()) }
+
+        // Question of the day: Igor answers first; Yulia can't read it until she answers too.
+        db.put("$pair/answers/20730/b", answer("The rainy evening in Lviv"), igor.session.idToken)
+        expect(Reason.DENIED) { db.get("$pair/answers/20730/b", yulia.session.idToken) }
+        expect(Reason.DENIED) { db.put("$pair/answers/20730/b", answer("Changed by Yulia"), yulia.session.idToken) }
+        db.put("$pair/answers/20730/a", answer("Our first trip"), yulia.session.idToken)
+        assertEquals("The rainy evening in Lviv", (db.get("$pair/answers/20730/b", yulia.session.idToken) as JSONObject).getString("text"))
+        assertEquals("Our first trip", (db.get("$pair/answers/20730/a", igor.session.idToken) as JSONObject).getString("text"))
+        expect(Reason.DENIED) { db.get("$pair/answers/20730", yulia.session.idToken) }
+
+        // Quiz: a round is readable to the partner only after they finish theirs.
+        val round = "2961"
+        val entry = { done: Boolean -> JSONObject().put("self", JSONObject().put("q0", 1).put("q1", 3)).put("guess", JSONObject().put("q0", 2)).put("done", done) }
+        db.put("$pair/quiz/$round/a", entry(true), yulia.session.idToken)
+        expect(Reason.DENIED) { db.get("$pair/quiz/$round/a", igor.session.idToken) }
+        db.put("$pair/quiz/$round/b", entry(false), igor.session.idToken)
+        expect(Reason.DENIED) { db.get("$pair/quiz/$round/a", igor.session.idToken) } // still playing
+        db.put("$pair/quiz/$round/b/done", true, igor.session.idToken)
+        assertEquals(3, (db.get("$pair/quiz/$round/a", igor.session.idToken) as JSONObject).getJSONObject("self").getInt("q1"))
+        expect(Reason.DENIED) { db.put("$pair/quiz/$round/b/self/q2", 7, igor.session.idToken) }
+        expect(Reason.DENIED) { db.put("$pair/quiz/$round/b/self/x", 1, igor.session.idToken) }
+
+        // Shared everyday things: shopping, the evening note (own seat only), flags, memories.
+        db.put("$pair/live/shopping/s1", JSONObject().put("title", "Milk").put("by", "b").put("done", false).put("at", 1), igor.session.idToken)
+        db.put("$pair/live/shopping/s1/done", true, yulia.session.idToken)
+        db.put("$pair/live/thanks/20730/a", JSONObject().put("text", "Thank you for the call").put("at", 1), yulia.session.idToken)
+        expect(Reason.DENIED) { db.put("$pair/live/thanks/20730/a", JSONObject().put("text", "Fake").put("at", 1), igor.session.idToken) }
+        db.put("$pair/live/flags/question/20730/b", true, igor.session.idToken)
+        expect(Reason.DENIED) { db.put("$pair/live/flags/question/20730/a", true, igor.session.idToken) }
+        db.put("$pair/live/couple/since", 19770, igor.session.idToken)
+        db.put("$pair/live/moments/m1", JSONObject().put("title", "First evening").put("text", "").put("day", 20365).put("at", 1), yulia.session.idToken)
+        expect(Reason.DENIED) { db.put("$pair/live/moments/m2", JSONObject().put("title", "x").put("day", "soon").put("at", 1), yulia.session.idToken) }
+        val live = JSONObject(db.get("$pair/live", igor.session.idToken).toString())
+        assertEquals(19770L, app.belong.couple.core.TogetherModel.since(live))
+        assertEquals(true, app.belong.couple.core.TogetherModel.shopping(live, Role.B).single().done)
+    }
+
+    @Test
     fun partnerHelpsResetAForgottenPassword() {
         val yulia = pairing.create("Yulia", "sunflower1")
         val igor = pairing.join(yulia.code, "Igor", "maple-leaf")

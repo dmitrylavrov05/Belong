@@ -4,7 +4,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import app.belong.couple.data.Account
-import app.belong.couple.data.DreamsRepo
+import app.belong.couple.data.SharedRepo
 
 /**
  * Listens to one part of the pair's data while the app is open and reconnects with growing pauses.
@@ -104,7 +104,7 @@ object PairAccess {
 
     fun lose(app: Context) {
         LiveSync.reset(app)
-        DreamsRepo(app).startReal()
+        SharedRepo(app).startReal()
         Matches.reset(app)
         Account.get(app).signOut(lost = true)
         main.post { PairSync.stop() }

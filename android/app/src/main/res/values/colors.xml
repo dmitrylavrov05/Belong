@@ -27,4 +27,5 @@
     <color name="toast_bg">#2B2233</color>
     <color name="honey_tint">#FDF0DC</color>
     <color name="honey_ink">#8A5B12</color>
+    <color name="checkbox">#D9CFD4</color>
 </resources>

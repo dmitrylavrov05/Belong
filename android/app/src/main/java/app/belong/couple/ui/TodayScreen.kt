@@ -79,6 +79,8 @@ class TodayScreen(private val activity: MainActivity) : Screen {
         })
     }
 
+    private val everyday = EverydayCards(activity) { refresh() }
+
     /** Which part of the plan is shown: mine, ours or the partner's. */
     private var planFilter = Owner.ME
 
@@ -123,6 +125,10 @@ class TodayScreen(private val activity: MainActivity) : Screen {
             refresh()
         }.lp(top = 12))
         body.addView(planCard().lp(top = 12))
+        everyday.eveningCard()?.let { body.addView(it.lp(top = 28)) }
+        body.addView(everyday.shoppingHeader().lp(top = 28))
+        body.addView(everyday.shoppingCard().lp(top = 8))
+        body.addView(everyday.questionCard().lp(top = 28))
         body.addView(actions().lp(top = 28))
         body.addView(widgetsCard().lp(top = 28))
         clockUpdaters.forEach { it() }

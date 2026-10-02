@@ -12,18 +12,19 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 /**
- * Dreams and goals. For a pair: the server's copy plus changes not sent yet (an ordered queue of
- * put / delete / add operations, so offline edits and money added on both phones all count).
- * In demo mode the changes go straight into the example couple's copy on this phone.
+ * The pair's shared things that both can edit: dreams, goals, the shopping list, evening notes,
+ * memories and the date you got together. For a pair: the server's copy plus changes not sent yet
+ * (an ordered queue of put / delete / add operations, so offline edits and money added on both
+ * phones all count). In demo mode the changes go straight into the example couple's copy here.
  */
-class DreamsRepo(context: Context) {
+class SharedRepo(context: Context) {
     private val app = context.applicationContext
     private val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     /** This phone's seat, or null for the demo couple (whose data says me / ours / partner). */
     val me: Role? get() = Account.get(app).takeIf { it.paired }?.seat?.role
 
-    /** Everything as this phone should show it: { dreams: {...}, goals: {...} }. */
+    /** Everything as this phone should show it: { dreams: {...}, goals: {...}, shopping: {...}, ... }. */
     fun root(): JSONObject = synchronized(lock) {
         val tree = JsonTree(base())
         ops().forEach { apply(tree, it) }
@@ -68,17 +69,21 @@ class DreamsRepo(context: Context) {
         if (rest.firstOrNull()?.toString() == op.toString()) prefs.edit().putString("ops", JSONArray(rest.drop(1)).toString()).apply()
     }
 
-    /** The server's latest copy of dreams and goals. */
-    fun setBase(dreams: JSONObject?, goals: JSONObject?) = synchronized(lock) {
+    /** The server's latest copy of the sections this repo shows (see [SECTIONS]). */
+    fun setBase(live: JSONObject) = synchronized(lock) {
         val root = JSONObject()
-        dreams?.let { root.put("dreams", JSONObject(it.toString())) }
-        goals?.let { root.put("goals", JSONObject(it.toString())) }
+        for (section in SECTIONS) live.optJSONObject(section)?.let { root.put(section, JSONObject(it.toString())) }
         prefs.edit().putString("base", root.toString()).apply()
     }
 
     // ---------- Example couple ----------
 
     fun ensureSeeded() {
+        seedDreams()
+        seedEveryday()
+    }
+
+    private fun seedDreams() {
         if (prefs.getBoolean("seeded", false)) return
         val now = System.currentTimeMillis()
         val dreams = JSONObject()
@@ -106,8 +111,40 @@ class DreamsRepo(context: Context) {
         prefs.edit().putBoolean("seeded", true).putString("base", root.toString()).apply()
     }
 
+    /** The example couple's shopping list, evening note, memories and anniversary. */
+    private fun seedEveryday() {
+        if (prefs.getBoolean("seeded_everyday", false)) return
+        if (me != null) {
+            prefs.edit().putBoolean("seeded_everyday", true).apply()
+            return
+        }
+        val now = System.currentTimeMillis()
+        val today = LocalDate.now(ZoneId.systemDefault()).toEpochDay()
+        val shopping = JSONObject()
+        app.resources.getStringArray(R.array.shopping_seeds).forEachIndexed { i, line ->
+            val (who, done, title) = line.split('|', limit = 3)
+            shopping.put("demo-s$i", JSONObject().put("title", title).put("by", who).put("done", done == "1").put("at", now - (10 - i) * 60_000L))
+        }
+        val (title, text) = app.getString(R.string.moment_seed).split('|', limit = 2)
+        val moments = JSONObject().put("demo-m0", JSONObject().put("title", title).put("text", text).put("day", today - 365).put("at", now))
+        synchronized(lock) {
+            val tree = JsonTree(base())
+            tree.set("shopping", shopping)
+            tree.set("moments", moments)
+            tree.set("couple/since", today - 960)
+            tree.set("thanks/${today - 1}/partner", JSONObject().put("text", app.getString(R.string.thanks_seed)).put("at", now - 12 * 3600_000L))
+            tree.set("flags/question/$today/partner", true)
+            // The northern lights came true last March: something for the chronicle.
+            if (tree.obj("dreams", "demo-4") != null) {
+                tree.set("dreams/demo-4/done", true)
+                tree.set("dreams/demo-4/doneAt", now - 200L * 86_400_000L)
+            }
+            prefs.edit().putBoolean("seeded_everyday", true).putString("base", tree.root.toString()).apply()
+        }
+    }
+
     /** A real pair starts with an empty map; the server fills it in. */
-    fun startReal() = prefs.edit().putBoolean("seeded", true).remove("base").remove("ops").apply()
+    fun startReal() = prefs.edit().putBoolean("seeded", true).putBoolean("seeded_everyday", true).remove("base").remove("ops").apply()
 
     private fun base(): JSONObject = try {
         JSONObject(prefs.getString("base", "{}")!!)
@@ -117,6 +154,9 @@ class DreamsRepo(context: Context) {
 
     companion object {
         private const val PREFS = "belong_dreams"
+
+        /** Parts of live/ kept here; the rest (check-ins, tasks, wishes…) have their own stores. */
+        val SECTIONS = listOf("dreams", "goals", "shopping", "thanks", "flags", "couple", "moments")
         private val lock = Any()
 
         fun apply(tree: JsonTree, op: JSONObject) {

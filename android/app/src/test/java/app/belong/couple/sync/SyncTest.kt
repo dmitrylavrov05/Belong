@@ -229,10 +229,10 @@ class DreamsModelTest {
     @Test
     fun queuedChangesApplyOverTheServerCopy() {
         val tree = JsonTree(root("""{"goals":{"g1":{"title":"Japan","saved":{"a":100}}}}"""))
-        app.belong.couple.data.DreamsRepo.apply(tree, root("""{"op":"add","path":"goals/g1/saved/a","value":50}"""))
-        app.belong.couple.data.DreamsRepo.apply(tree, root("""{"op":"add","path":"goals/g1/saved/b","value":20}"""))
-        app.belong.couple.data.DreamsRepo.apply(tree, root("""{"op":"put","path":"dreams/d9","value":{"title":"Dog"}}"""))
-        app.belong.couple.data.DreamsRepo.apply(tree, root("""{"op":"del","path":"goals/g1/title"}"""))
+        app.belong.couple.data.SharedRepo.apply(tree, root("""{"op":"add","path":"goals/g1/saved/a","value":50}"""))
+        app.belong.couple.data.SharedRepo.apply(tree, root("""{"op":"add","path":"goals/g1/saved/b","value":20}"""))
+        app.belong.couple.data.SharedRepo.apply(tree, root("""{"op":"put","path":"dreams/d9","value":{"title":"Dog"}}"""))
+        app.belong.couple.data.SharedRepo.apply(tree, root("""{"op":"del","path":"goals/g1/title"}"""))
         assertEquals(150L, tree.obj("goals", "g1", "saved")!!.getLong("a"))
         assertEquals(20L, tree.obj("goals", "g1", "saved")!!.getLong("b"))
         assertEquals("Dog", tree.obj("dreams", "d9")!!.getString("title"))
@@ -291,5 +291,59 @@ class PicturesTest {
         assertEquals("https://i.pinimg.com/a.jpg", ok.thumb)
         assertNull(app.belong.couple.core.Picture.from(org.json.JSONObject("""{"url":"http://x/a.jpg"}""")))
         assertNull(app.belong.couple.core.Picture.from(null))
+    }
+}
+
+class TogetherModelTest {
+    private fun root(json: String) = org.json.JSONObject(json)
+
+    @Test
+    fun shoppingShowsWhoAddedItAndOpenItemsFirst() {
+        val r = root("""{"shopping":{"s1":{"title":"Milk","by":"b","done":false,"at":2},"s2":{"title":"Bread","by":"a","done":true,"at":1},"s3":{"title":"Tea","by":"a","done":false,"at":3}}}""")
+        val items = app.belong.couple.core.TogetherModel.shopping(r, Role.A)
+        assertEquals(listOf("Milk", "Tea", "Bread"), items.map { it.title })
+        assertEquals(app.belong.couple.core.Owner.PARTNER, items[0].by)
+        assertEquals(app.belong.couple.core.Owner.ME, items[1].by)
+        assertEquals("b", app.belong.couple.core.TogetherModel.shoppingJson("Eggs", Role.B, 5).getString("by"))
+        assertEquals("me", app.belong.couple.core.TogetherModel.shoppingJson("Eggs", null, 5).getString("by"))
+    }
+
+    @Test
+    fun chronicleCollectsMilestonesNewestFirstWithOnThisDayOnTop() {
+        val today = java.time.LocalDate.of(2026, 10, 2).toEpochDay()
+        val day = 86_400_000L
+        val r = root("""{
+            "dreams":{"d1":{"title":"Northern lights","emoji":"🌌","cat":"travel","owner":"b","at":1,"done":true,"doneAt":${(today - 200) * day}},
+                      "d2":{"title":"Salsa","emoji":"💃","cat":"fun","owner":"a","at":1}},
+            "goals":{"g1":{"title":"Move","emoji":"🏡","at":1,"done":true,"doneAt":${(today - 30) * day},"steps":{"s":{"title":"Pack","who":"both","done":true,"at":1}}}},
+            "moments":{"m1":{"title":"First evening in the flat","text":"Pizza","day":${today - 365},"at":1},
+                       "m2":{"title":"Future","day":${today + 3},"at":1}},
+            "couple":{"since":${today - 960}},
+            "thanks":{"${today - 1}":{"b":{"text":"Thanks for the call","at":1}}},
+            "flags":{"question":{"$today":{"b":true}}}}""")
+        val items = app.belong.couple.core.TogetherModel.chronicle(r, Role.A, today)
+        assertEquals(listOf("MOMENT", "GOAL", "DREAM", "SINCE"), items.map { it.kind.name })
+        assertTrue(items[0].anniversary) // same date last year
+        assertEquals("1", items[1].text) // one step
+        assertEquals(today - 960, app.belong.couple.core.TogetherModel.since(r))
+        assertEquals("Thanks for the call", app.belong.couple.core.TogetherModel.thanks(r, today - 1, "b"))
+        assertNull(app.belong.couple.core.TogetherModel.thanks(r, today, "b"))
+        assertTrue(app.belong.couple.core.TogetherModel.flag(r, "question", today, "b"))
+        assertFalse(app.belong.couple.core.TogetherModel.flag(r, "question", today, "a"))
+    }
+
+    @Test
+    fun quizRoundsAreWeeklyAndTheSameOnBothPhones() {
+        val monday = java.time.LocalDate.of(2026, 9, 28).toEpochDay()
+        val q = app.belong.couple.core.QuizModel
+        assertEquals(q.round(monday), q.round(monday + 6)) // Monday to Sunday
+        assertNotEquals(q.round(monday), q.round(monday + 7))
+        assertEquals(q.questions(q.round(monday), 14), q.questions(q.round(monday), 14))
+        assertEquals(10, q.questions(q.round(monday), 14).toSet().size)
+        assertNotEquals(q.questions(1L, 14), q.questions(2L, 14))
+        assertEquals(2, q.score(mapOf(0 to 1, 1 to 2, 2 to 3), mapOf(0 to 1, 1 to 2, 2 to 0)))
+        assertEquals(mapOf(0 to 1, 9 to 3), q.answers(q.answersJson(mapOf(0 to 1, 9 to 3))))
+        assertEquals(3, app.belong.couple.core.DailyQuestions.index(23, 20))
+        assertEquals(17, app.belong.couple.core.DailyQuestions.index(-3, 20))
     }
 }

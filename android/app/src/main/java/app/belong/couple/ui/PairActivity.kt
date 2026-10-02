@@ -359,7 +359,7 @@ class PairActivity : Activity() {
         store.partnerNickname = ""
         ChatRepo(this).startShared()
         LiveSync.reset(this)
-        app.belong.couple.data.DreamsRepo(this).startReal()
+        app.belong.couple.data.SharedRepo(this).startReal()
         app.belong.couple.sync.Matches.reset(this)
     }
 

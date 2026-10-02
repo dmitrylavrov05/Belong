@@ -41,7 +41,7 @@ class MainActivity : Activity() {
         CoupleStore.get(this).ensureSeeded()
         TaskRepo(this).ensureSeeded()
         WishRepo(this).ensureSeeded()
-        app.belong.couple.data.DreamsRepo(this).ensureSeeded()
+        app.belong.couple.data.SharedRepo(this).ensureSeeded()
         ChatRepo(this).ensureSeeded()
 
         val root = column().apply {
@@ -139,7 +139,7 @@ class MainActivity : Activity() {
         TAB_CHAT -> ChatScreen(this)
         TAB_WISHLIST -> WishlistScreen(this)
         TAB_MAP -> MapScreen(this)
-        TAB_MORE -> MoreScreen(this)
+        TAB_MORE -> UsScreen(this)
         TAB_DOODLE -> DoodleScreen(this)
         TAB_GAMES -> GamesScreen(this)
         TAB_MONTH -> MonthScreen(this)
@@ -157,7 +157,7 @@ class MainActivity : Activity() {
             background = ripple(rounded(col(R.color.bg), 24f), 24f)
             setOnClickListener { select(parent) }
         }, LinearLayout.LayoutParams(dp(48), dp(48)))
-        bar.addView(text(getString(if (parent == TAB_DREAMS) R.string.dreams_title else R.string.more_title), 15f, 700, col(R.color.ink2)))
+        bar.addView(text(getString(if (parent == TAB_DREAMS) R.string.dreams_title else R.string.tab_more), 15f, 700, col(R.color.ink2)))
         addView(bar)
         addView(child, LinearLayout.LayoutParams(MATCH, 0, 1f))
     }
@@ -223,7 +223,7 @@ class MainActivity : Activity() {
             Triple(TAB_DREAMS, R.string.tab_dreams, R.drawable.ic_tab_dreams),
             Triple(TAB_CHAT, R.string.tab_chat, R.drawable.ic_tab_chat),
             Triple(TAB_MAP, R.string.tab_map, R.drawable.ic_tab_map),
-            Triple(TAB_MORE, R.string.tab_more, R.drawable.ic_tab_more),
+            Triple(TAB_MORE, R.string.tab_more, R.drawable.ic_tab_us),
         )
     }
 }
