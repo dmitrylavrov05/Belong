@@ -11,4 +11,7 @@
     <!-- Unsplash photo suggestions for dreams (https://unsplash.com/developers). The access key is
          meant for client apps; never put the secret key here. -->
     <string name="unsplash_access_key" translatable="false">1Tp7HHk8TiDQ11oaZE47Q1v6GqUBFVBXJPoq6hr3Zx8</string>
+
+    <!-- TMDB film and series data (https://developer.themoviedb.org). The API key is meant for client apps. -->
+    <string name="tmdb_api_key" translatable="false">6249181f81f300b0736a8eaabbcc578c</string>
 </resources>

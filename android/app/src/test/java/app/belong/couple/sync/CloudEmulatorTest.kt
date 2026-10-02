@@ -389,11 +389,19 @@ class CloudEmulatorTest {
         db.put("$pair/live/movies/m1/rate/b", 4, i)
         db.put("$pair/live/movies/m1/title", "Past Lives (2023)", y)
         expect(Reason.DENIED) { db.put("$pair/live/movies/m2", JSONObject().put("title", "x").put("kind", "cartoon").put("by", "a").put("at", 1), y) }
+        db.put("$pair/live/movies/m1/tmdb", 666277, y)
+        db.put("$pair/live/movies/m1/poster", "/k3waqVXSnvCZWfJYNtdamTgTtTA.jpg", i)
+        db.put("$pair/live/movies/m1/genres", "18,10749", y)
+        db.put("$pair/live/movies/m1/year", 2023, y)
+        expect(Reason.DENIED) { db.put("$pair/live/movies/m1/poster", "https://evil.example/x.jpg", y) }
+        expect(Reason.DENIED) { db.put("$pair/live/movies/m1/genres", "drama", y) }
 
         val live = JSONObject(db.get("$pair/live", y).toString())
         val movie = app.belong.couple.core.MoviesModel.movies(live, Role.A).single()
         assertEquals(5, movie.myRating)
         assertEquals(4, movie.partnerRating)
+        assertEquals("m666277", movie.tmdbKey)
+        assertEquals(listOf(18, 10749), movie.genreIds)
         assertEquals(true, app.belong.couple.core.LettersModel.letters(live, Role.B).first { it.key == "sealed" }.opened)
     }
 

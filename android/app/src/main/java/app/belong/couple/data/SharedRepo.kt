@@ -96,8 +96,9 @@ class SharedRepo(context: Context) {
         Letters.seedDemo(app, app.resources.getStringArray(R.array.letter_seeds).toList())
         val now = System.currentTimeMillis()
         app.resources.getStringArray(R.array.movie_seeds).forEachIndexed { i, line ->
-            val (kind, by, rates, title) = line.split('|', limit = 4)
+            val (kind, by, rates, tmdb, genres, year, title) = line.split('|', limit = 7).let { p -> Seed(p[0], p[1], p[2], p[3], p[4], p[5], p[6]) }
             val movie = MoviesModel.json(title, kind == "series", by, now - (i + 1) * 3_600_000L)
+                .put("tmdb", tmdb.toInt()).put("genres", genres).put("year", year.toInt())
             if (rates.isNotEmpty()) {
                 val (mine, theirs) = rates.split(',')
                 movie.put("watched", true).put("watchedAt", now - (i + 1) * 86_400_000L)
@@ -210,6 +211,9 @@ class SharedRepo(context: Context) {
     } catch (e: JSONException) {
         JSONObject()
     }
+
+    /** One line of an example list, split up. */
+    private data class Seed(val a: String, val b: String, val c: String, val d: String, val e: String, val f: String, val g: String)
 
     companion object {
         private const val PREFS = "belong_dreams"

@@ -874,12 +874,12 @@
     </plurals>
     <string name="us_movies_text">What to watch together, and your stars</string>
     <string-array name="movie_seeds">
-        <item>movie|partner||Past Lives</item>
-        <item>series|me||Only Murders in the Building</item>
-        <item>movie|me||Amélie</item>
-        <item>movie|partner|5,4|Before Sunrise</item>
-        <item>series|me|4,|The Bear</item>
-        <item>movie|me|3,5|Interstellar</item>
+        <item>movie|partner||666277|18,10749|2023|Past Lives</item>
+        <item>series|me||107113|35,9648,80|2021|Only Murders in the Building</item>
+        <item>movie|me||194|35,10749|2001|Amélie</item>
+        <item>movie|partner|5,4|76|18,10749|1995|Before Sunrise</item>
+        <item>series|me|4,|136315|18,35|2022|The Bear</item>
+        <item>movie|me|3,5|157336|12,18,878|2014|Interstellar</item>
     </string-array>
     <!-- Photos and voice in chat -->
     <string name="chat_photo">Send a photo</string>
@@ -893,4 +893,61 @@
     <string name="chat_voice_message">Voice message, %1$s</string>
     <string name="chat_voice_play">Play</string>
     <string name="chat_voice_pause">Pause</string>
+    <!-- TMDB catalog and suggestions -->
+    <string name="movies_tab_want">Want</string>
+    <string name="movies_tab_watched">Watched</string>
+    <string name="movies_catalog">Discover ✨</string>
+    <string name="movies_search">Search films and series</string>
+    <string name="movies_tmdb_credit">Film and series data: TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</string>
+    <string name="movies_find_more">Find something to watch ✨</string>
+    <string name="movies_for_you">For the two of you</string>
+    <string name="movies_popular">Popular this week</string>
+    <string name="movies_top_films">Best films</string>
+    <string name="movies_top_series">Best series</string>
+    <string name="movies_no_key">The catalog needs a TMDB key in cloud.xml.</string>
+    <string name="movies_for_you_start">The more you both rate, the better the picks. Open any title you’ve seen and give it stars.</string>
+    <string name="movies_more">Show more</string>
+    <string name="movies_nothing_found">Nothing found. Try another spelling or the original title.</string>
+    <string name="movies_loading">Loading…</string>
+    <string name="movies_offline">Couldn’t reach TMDB. Check the connection and try again.</string>
+    <string name="movies_because_both">You both liked “%1$s”</string>
+    <string name="movies_because_one">%1$s liked “%2$s”</string>
+    <string name="movies_because_genre">You both enjoy %1$s</string>
+    <string name="movies_because_popular">Loved by many viewers</string>
+    <string name="movies_already_watched">You’ve watched it ✓</string>
+    <string name="movies_already_listed">Already in your list ♥</string>
+    <string name="movies_want">We want to watch it</string>
+    <string name="movies_added">Added. %1$s will see it in your list</string>
+    <string name="movies_seen_it">Already seen it? Your stars:</string>
+    <string name="movies_not_interested">Not for us</string>
+    <string name="movies_or_manual">Or keep it as typed:</string>
+    <string-array name="tmdb_genres">
+        <item>28|Action</item>
+        <item>12|Adventure</item>
+        <item>16|Animation</item>
+        <item>35|Comedy</item>
+        <item>80|Crime</item>
+        <item>99|Documentary</item>
+        <item>18|Drama</item>
+        <item>10751|Family</item>
+        <item>14|Fantasy</item>
+        <item>36|History</item>
+        <item>27|Horror</item>
+        <item>10402|Music</item>
+        <item>9648|Mystery</item>
+        <item>10749|Romance</item>
+        <item>878|Sci-fi</item>
+        <item>10770|TV film</item>
+        <item>53|Thriller</item>
+        <item>10752|War</item>
+        <item>37|Western</item>
+        <item>10759|Action &amp; adventure</item>
+        <item>10762|Kids</item>
+        <item>10763|News</item>
+        <item>10764|Reality</item>
+        <item>10765|Sci-fi &amp; fantasy</item>
+        <item>10766|Soap</item>
+        <item>10767|Talk show</item>
+        <item>10768|War &amp; politics</item>
+    </string-array>
 </resources>

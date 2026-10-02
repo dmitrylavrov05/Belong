@@ -347,7 +347,15 @@ data class Movie(
     val watchedAt: Long?,
     val myRating: Int?,
     val partnerRating: Int?,
-)
+    /** TMDB data when the title was picked from search or the catalog. */
+    val tmdb: Int? = null,
+    val poster: String? = null,
+    val year: Int? = null,
+    val genreIds: List<Int> = emptyList(),
+) {
+    /** The TMDB key ("m157336", "t1399") when known: matches [Title.key]. */
+    val tmdbKey: String? get() = tmdb?.let { (if (series) "t" else "m") + it }
+}
 
 /** What you want to watch together and what you've watched, with each partner's own rating (live/movies). */
 object MoviesModel {
@@ -362,7 +370,10 @@ object MoviesModel {
             val rate = o.optJSONObject("rate")
             Movie(key, title, o.optString("kind") == "series", if (o.optString("by") == mine) Owner.ME else Owner.PARTNER, o.optLong("at"),
                 o.optBoolean("watched"), if (o.has("watchedAt")) o.optLong("watchedAt") else null,
-                rate?.takeIf { it.has(mine) }?.optInt(mine), rate?.takeIf { it.has(theirs) }?.optInt(theirs))
+                rate?.takeIf { it.has(mine) }?.optInt(mine), rate?.takeIf { it.has(theirs) }?.optInt(theirs),
+                if (o.has("tmdb")) o.optInt("tmdb") else null, o.optString("poster").ifEmpty { null },
+                if (o.has("year")) o.optInt("year") else null,
+                o.optString("genres").split(',').mapNotNull { it.trim().toIntOrNull() })
         }.toList()
     }
 
@@ -384,4 +395,15 @@ object MoviesModel {
 
     fun json(title: String, series: Boolean, by: String, at: Long): JSONObject =
         JSONObject().put("title", title).put("kind", if (series) "series" else "movie").put("by", by).put("at", at).put("watched", false)
+
+    /** A title from TMDB, with its id, poster, year and genres for posters and suggestions. */
+    fun json(t: Title, by: String, at: Long): JSONObject = json(t.name.take(100), t.series, by, at).also { o ->
+        o.put("tmdb", t.id)
+        t.poster?.takeIf { it.length <= 64 }?.let { o.put("poster", it) }
+        t.year?.let { o.put("year", it) }
+        if (t.genres.isNotEmpty()) o.put("genres", t.genres.take(8).joinToString(","))
+    }
+
+    /** Titles in the pair's list, by TMDB key, so the catalog can show "in your list" / "watched". */
+    fun byTmdbKey(movies: List<Movie>): Map<String, Movie> = movies.filter { it.tmdbKey != null }.associateBy { it.tmdbKey!! }
 }

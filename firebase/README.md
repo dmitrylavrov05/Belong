@@ -36,7 +36,7 @@ Under `pairs/<code>`:
 - `live/photos/<day>/<key>` `{by, at, caption}` and `photo_data/<key>` `{by, thumb, full}`: photos of the day as base64 JPEGs (thumb ≤ 80 000 characters, full ≤ 1 000 000). Only the author writes or deletes them, and a picture can't be replaced;
 - `live/feelings/<key>` `{by, at, title, wrote/<seat>}` and `feelings/<key>/<seat>` `{what, feel, need, ask, at}`: notes after a quarrel. The partner may read your note only once their own exists;
 - `live/letters/<key>` `{by, at, kind: date|when, openAt?, title, opened?}` and `letters/<key>` `{by, text, at}`: letters for later. The partner can read the text only once `openAt` has passed (or at any time for a "when…" letter); only the author can change the envelope, the reader can only mark it opened;
-- `live/movies/<key>` `{title, kind: movie|series, by, at, watched, watchedAt?, rate/<seat>}`: films and series; each partner sets only their own stars (1–5);
+- `live/movies/<key>` `{title, kind: movie|series, by, at, watched, watchedAt?, rate/<seat>, tmdb?, poster?, year?, genres?}` (`poster` is a TMDB image path, `genres` TMDB genre ids): films and series; each partner sets only their own stars (1–5);
 - `secret/<seat>/reserved/<key>`: gifts this seat will give. Only that seat can read or write it, which is why members get read access per section (`chat`, `live`) and not to the whole pair.
 
 Nobody receives mail at `pair.belong.app`: the address is just an account name. `database.rules.json` enforces all of the above. Members alone read the pair. Messages can't be forged, edited or deleted; the other partner can only add a ❤️.

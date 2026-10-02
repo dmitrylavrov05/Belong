@@ -523,6 +523,18 @@
                   ".validate": "($role === 'a' || $role === 'b') && newData.isNumber() && newData.val() >= 1 && newData.val() <= 5 && (newData.val() === data.val() || root.child('pairs').child($code).child('members').child($role).val() === auth.uid)"
                 }
               },
+              "tmdb": {
+                ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() % 1 === 0"
+              },
+              "poster": {
+                ".validate": "newData.isString() && newData.val().length <= 64 && newData.val().beginsWith('/')"
+              },
+              "year": {
+                ".validate": "newData.isNumber() && newData.val() >= 1870 && newData.val() <= 2200"
+              },
+              "genres": {
+                ".validate": "newData.isString() && newData.val().length <= 60 && newData.val().matches(/^[0-9,]*$/)"
+              },
               "$other": {
                 ".validate": false
               }

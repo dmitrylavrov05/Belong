@@ -901,12 +901,12 @@
     </plurals>
     <string name="us_movies_text">Що подивитися разом і ваші оцінки</string>
     <string-array name="movie_seeds">
-        <item>movie|partner||Минулі життя</item>
-        <item>series|me||Убивства в одній будівлі</item>
-        <item>movie|me||Амелі</item>
-        <item>movie|partner|5,4|Перед світанком</item>
-        <item>series|me|4,|Ведмідь</item>
-        <item>movie|me|3,5|Інтерстеллар</item>
+        <item>movie|partner||666277|18,10749|2023|Минулі життя</item>
+        <item>series|me||107113|35,9648,80|2021|Убивства в одній будівлі</item>
+        <item>movie|me||194|35,10749|2001|Амелі</item>
+        <item>movie|partner|5,4|76|18,10749|1995|Перед світанком</item>
+        <item>series|me|4,|136315|18,35|2022|Ведмідь</item>
+        <item>movie|me|3,5|157336|12,18,878|2014|Інтерстеллар</item>
     </string-array>
     <!-- Фото та голосові в чаті -->
     <string name="chat_photo">Надіслати фото</string>
@@ -920,4 +920,61 @@
     <string name="chat_voice_message">Голосове, %1$s</string>
     <string name="chat_voice_play">Слухати</string>
     <string name="chat_voice_pause">Пауза</string>
+    <!-- Каталог TMDB і добірки -->
+    <string name="movies_tab_want">Хочемо</string>
+    <string name="movies_tab_watched">Бачили</string>
+    <string name="movies_catalog">Добірка ✨</string>
+    <string name="movies_search">Пошук фільмів і серіалів</string>
+    <string name="movies_tmdb_credit">Дані про фільми та серіали: TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</string>
+    <string name="movies_find_more">Знайти, що подивитися ✨</string>
+    <string name="movies_for_you">Для вас двох</string>
+    <string name="movies_popular">Популярне за тиждень</string>
+    <string name="movies_top_films">Найкращі фільми</string>
+    <string name="movies_top_series">Найкращі серіали</string>
+    <string name="movies_no_key">Для каталогу потрібен ключ TMDB у cloud.xml.</string>
+    <string name="movies_for_you_start">Що більше ви обоє оціните, то точніша добірка. Відкрийте будь-який фільм, який уже бачили, і поставте зірки.</string>
+    <string name="movies_more">Показати ще</string>
+    <string name="movies_nothing_found">Нічого не знайшлося. Спробуйте інше написання або оригінальну назву.</string>
+    <string name="movies_loading">Завантажуємо…</string>
+    <string name="movies_offline">Не вдалося зв’язатися з TMDB. Перевірте інтернет і спробуйте ще раз.</string>
+    <string name="movies_because_both">Вам обом сподобалося «%1$s»</string>
+    <string name="movies_because_one">%1$s: сподобалося «%2$s»</string>
+    <string name="movies_because_genre">Ви обоє любите жанр «%1$s»</string>
+    <string name="movies_because_popular">Подобається багатьом глядачам</string>
+    <string name="movies_already_watched">Ви це бачили ✓</string>
+    <string name="movies_already_listed">Уже у вашому списку ♥</string>
+    <string name="movies_want">Хочемо подивитися</string>
+    <string name="movies_added">Додано. %1$s побачить це у вашому списку</string>
+    <string name="movies_seen_it">Уже бачили? Ваша оцінка:</string>
+    <string name="movies_not_interested">Не для нас</string>
+    <string name="movies_or_manual">Або залишити як написано:</string>
+    <string-array name="tmdb_genres">
+        <item>28|Бойовик</item>
+        <item>12|Пригоди</item>
+        <item>16|Мультфільм</item>
+        <item>35|Комедія</item>
+        <item>80|Кримінал</item>
+        <item>99|Документальний</item>
+        <item>18|Драма</item>
+        <item>10751|Сімейний</item>
+        <item>14|Фентезі</item>
+        <item>36|Історичний</item>
+        <item>27|Жахи</item>
+        <item>10402|Музика</item>
+        <item>9648|Детектив</item>
+        <item>10749|Мелодрама</item>
+        <item>878|Фантастика</item>
+        <item>10770|Телефільм</item>
+        <item>53|Трилер</item>
+        <item>10752|Воєнний</item>
+        <item>37|Вестерн</item>
+        <item>10759|Бойовик і пригоди</item>
+        <item>10762|Дитячий</item>
+        <item>10763|Новини</item>
+        <item>10764|Реаліті-шоу</item>
+        <item>10765|Фантастика і фентезі</item>
+        <item>10766|Мильна опера</item>
+        <item>10767|Ток-шоу</item>
+        <item>10768|Війна і політика</item>
+    </string-array>
 </resources>
