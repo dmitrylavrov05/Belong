@@ -1,0 +1,427 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="default_my_name">Юля</string>
+    <string name="default_partner_name">Игорь</string>
+
+    <string name="tab_today">Сегодня</string>
+    <string name="tab_doodle">Рисунок</string>
+    <string name="tab_games">Игры</string>
+    <string name="tab_month">Месяц</string>
+
+    <string name="greeting_morning">Доброе утро</string>
+    <string name="greeting_day">Добрый день</string>
+    <string name="greeting_evening">Добрый вечер</string>
+    <string name="greeting_night">Доброй ночи</string>
+    <string name="couple_line">%1$s и %2$s</string>
+    <string name="settings">Настройки</string>
+
+    <string name="partner_now">%1$s сейчас</string>
+    <string name="mood_line">Настроение %1$s · энергия %2$d из 5</string>
+    <string name="updated_at">обновлено в %1$s</string>
+    <string name="support">Отправить поддержку</string>
+    <string name="support_sent">%1$s почувствует маленькие объятия.</string>
+    <string name="checkin_title">Как ты сегодня?</string>
+    <string name="checkin_hint">%1$s увидит</string>
+    <string name="energy">Энергия</string>
+    <string name="mood_1">Грустно</string>
+    <string name="mood_2">Так себе</string>
+    <string name="mood_3">Нормально</string>
+    <string name="mood_4">Хорошо</string>
+    <string name="mood_5">Отлично</string>
+    <string name="energy_level">Энергия %1$d из 5</string>
+
+    <string name="distance_title">Между вами</string>
+    <string name="km">%1$s км</string>
+    <string name="hours_apart">разница %1$s ч</string>
+    <string name="same_zone">Один часовой пояс</string>
+
+    <string name="countdown_title">До встречи</string>
+    <plurals name="days">
+        <item quantity="one">%d день</item>
+        <item quantity="few">%d дня</item>
+        <item quantity="many">%d дней</item>
+        <item quantity="other">%d дня</item>
+    </plurals>
+    <plurals name="days_until_label">
+        <item quantity="one">день до встречи</item>
+        <item quantity="few">дня до встречи</item>
+        <item quantity="many">дней до встречи</item>
+        <item quantity="other">дня до встречи</item>
+    </plurals>
+    <string name="countdown_today">Сегодня встреча!</string>
+    <string name="countdown_past">Выберите дату следующей встречи</string>
+    <string name="change_date">Изменить дату</string>
+
+    <string name="think">Думаю о тебе</string>
+    <string name="think_sent">Отправлено. %1$s почувствует лёгкую вибрацию.</string>
+    <string name="think_back">%1$s тоже думает о тебе 💗</string>
+    <string name="safe">Я в безопасности</string>
+    <string name="safe_sent">%1$s получит спокойное уведомление: ты в безопасности.</string>
+
+    <string name="widgets_title">Виджеты на главный экран</string>
+    <string name="widgets_text">Настроение партнёра, отсчёт до встречи и новые рисунки без открытия приложения.</string>
+    <string name="add_widget_mood">Настроение</string>
+    <string name="add_widget_countdown">Отсчёт</string>
+    <string name="add_widget_doodle">Рисунки</string>
+    <string name="widget_pin_unsupported">Удерживайте палец на главном экране, откройте «Виджеты» и найдите Belong.</string>
+    <string name="widget_mood_desc">Настроение и местное время партнёра</string>
+    <string name="widget_countdown_desc">Дни до встречи</string>
+    <string name="widget_doodle_desc">Рисунки от партнёра</string>
+    <string name="widget_from">От: %1$s · %2$s</string>
+    <string name="widget_doodle_empty">Здесь появятся рисунки партнёра</string>
+    <string name="widget_energy">энергия %1$d/5</string>
+
+    <string name="doodle_title">Нарисуй что-нибудь</string>
+    <string name="doodle_hint">%1$s увидит это на главном экране.</string>
+    <string name="doodle_send">Отправить</string>
+    <string name="doodle_clear">Очистить</string>
+    <string name="doodle_undo">Отменить</string>
+    <string name="doodle_canvas">Поле для рисования</string>
+    <string name="doodle_sent">Отправлено. %1$s увидит рисунок на главном экране.</string>
+    <string name="doodle_empty_warn">Сначала нарисуй что-нибудь.</string>
+    <string name="doodle_latest">Последний рисунок · %1$s</string>
+    <string name="doodle_reply">Новый рисунок · %1$s</string>
+    <string name="doodle_none">Рисунков пока нет</string>
+    <string name="color_pink">Розовый</string>
+    <string name="color_blue">Синий</string>
+    <string name="color_ink">Тёмный</string>
+    <string name="color_honey">Медовый</string>
+
+    <string name="games_title">Игры</string>
+    <string name="match_title">«Совпадения»</string>
+    <string name="match_text">Каждый листает 10 идей для свиданий. Вы увидите только те, которых хотите оба.</string>
+    <string name="match_start">Начать</string>
+    <string name="match_turn">Листает: %1$s</string>
+    <string name="match_progress">%1$d из %2$d</string>
+    <string name="match_yes">Да</string>
+    <string name="match_no">Нет</string>
+    <string name="match_pass">Передай телефон: %1$s</string>
+    <string name="match_continue">Продолжить</string>
+    <string name="match_result">Совпадений: %1$d из %2$d</string>
+    <string name="match_none">В этот раз без совпадений. Покрутите колесо, чтобы найти новые идеи.</string>
+    <string name="match_again">Сыграть ещё раз</string>
+    <string name="share">Поделиться</string>
+    <string name="match_share_text">«Совпадения» в Belong: %1$d из %2$d 💞</string>
+    <string-array name="match_cards">
+        <item>⛺|Ночь в палатке у озера</item>
+        <item>🧀|Пикник на полу с фильмом и фондю</item>
+        <item>🌅|Прогулка на рассвете с кофе</item>
+        <item>🍜|Приготовить блюдо из страны мечты</item>
+        <item>📵|Вечер без телефонов, только вы двое</item>
+        <item>💃|Урок сальсы для начинающих</item>
+        <item>🎤|Вечер караоке</item>
+        <item>🚆|Поездка на выходные без плана</item>
+        <item>🛁|Спа-вечер дома</item>
+        <item>🔭|Смотреть на звёзды с крыши</item>
+    </string-array>
+
+    <string name="wheel_title">Колесо свиданий</string>
+    <string name="wheel_text">Не можете решить? Пусть выберет колесо.</string>
+    <string name="wheel_spin">Крутить</string>
+    <string name="wheel_result">Выпало</string>
+    <string name="wheel_home">Дома</string>
+    <string name="wheel_out">Вне дома</string>
+    <string-array name="wheel_budgets">
+        <item>0 ₴</item>
+        <item>₴</item>
+        <item>₴₴</item>
+    </string-array>
+    <string-array name="wheel_ideas">
+        <item>0|home|Настолки|Турнир по настольным играм</item>
+        <item>0|home|Пикник|Пикник на полу с фильмом</item>
+        <item>0|home|Старые фото|Выбрать топ-10 старых фото</item>
+        <item>0|home|Танцы|Танцы в гостиной</item>
+        <item>0|home|Видеосвидание|Приготовить одно блюдо по видеосвязи</item>
+        <item>0|home|36 вопросов|36 вопросов, чтобы влюбиться</item>
+        <item>1|home|Фондю|Сырное фондю и фильм</item>
+        <item>1|home|Суши|Сделать суши вместе</item>
+        <item>1|home|Спа|Спа-вечер с масками для лица</item>
+        <item>2|home|Шеф-сет|Заказать ресторанный сет и приготовить вместе</item>
+        <item>0|out|Рассвет|Встретить рассвет с термосом</item>
+        <item>0|out|Пикник|Пикник в парке</item>
+        <item>0|out|Звёзды|Смотреть на звёзды за городом</item>
+        <item>0|out|Велосипед|Велопрогулка в новое место</item>
+        <item>0|out|Барахолка|Прогулка по блошиному рынку</item>
+        <item>1|out|Караоке|Караоке на двоих</item>
+        <item>1|out|Музей|Музей, а потом кофе</item>
+        <item>1|out|Завтрак|Завтрак в новой кофейне</item>
+        <item>2|out|Концерт|Билеты на концерт</item>
+        <item>2|out|Поездка|Ночёвка за городом</item>
+    </string-array>
+
+    <string name="month_title">Наш месяц на расстоянии</string>
+    <string name="month_in_progress">Месяц ещё идёт</string>
+    <string name="month_example">Пример: настоящие цифры появятся, когда подключится партнёр</string>
+    <string name="stat_km">км между вами</string>
+    <string name="stat_hours">разница во времени</string>
+    <string name="hours_short">%1$s ч</string>
+    <string name="stat_taps">касания «думаю о тебе»</string>
+    <string name="stat_taps_value">%1$d отправлено · %2$d получено</string>
+    <string name="stat_doodles">рисунки</string>
+    <string name="stat_safe">статусы «Я в безопасности»</string>
+    <string name="stat_mood">среднее настроение</string>
+    <string name="month_share">Поделиться в сторис</string>
+    <string name="month_save">Сохранить в галерею</string>
+    <string name="month_saved">Сохранено в «Изображения»</string>
+    <string name="story_title">Наш %1$s на расстоянии</string>
+    <string name="story_footer">Сделано в Belong</string>
+
+    <string name="settings_title">Ваша пара</string>
+    <string name="settings_my_name">Твоё имя</string>
+    <string name="settings_partner_name">Имя партнёра</string>
+    <string name="settings_my_city">Твой город</string>
+    <string name="settings_partner_city">Город партнёра</string>
+    <string name="settings_meeting">Следующая встреча</string>
+    <string name="settings_save">Сохранить</string>
+    <string name="settings_cancel">Отмена</string>
+    <string name="settings_demo">Демо-режим: партнёр работает как демо на этом телефоне.</string>
+
+    <!-- Навигация -->
+    <string name="tab_chat">Чат</string>
+    <string name="tab_wishlist">Вишлист</string>
+    <string name="tab_map">Места</string>
+    <string name="tab_more">Ещё</string>
+    <string name="back">Назад</string>
+    <string name="more_title">Ещё</string>
+    <string name="more_doodle_text">Рисунки на главный экран партнёра</string>
+    <string name="more_games_text">«Совпадения» и колесо свиданий</string>
+    <string name="more_month_text">Ваш месяц на расстоянии карточкой для сторис</string>
+    <string name="more_settings_text">Имена, ласковое имя, города, дата встречи и язык</string>
+    <string name="delete">Удалить</string>
+
+    <!-- Дела -->
+    <string name="tasks_title">План на день</string>
+    <string name="tasks_progress">Сделано %1$d из %2$d</string>
+    <string name="tasks_empty">Дел пока нет. Добавьте первое.</string>
+    <string name="task_hint">Новое дело</string>
+    <string name="task_add">Добавить</string>
+    <string name="owner_me">Мои</string>
+    <string name="owner_ours">Общие</string>
+    <string name="task_delete_title">Удалить дело?</string>
+    <string name="task_done_cd">%1$s, сделано</string>
+    <string name="task_open_cd">%1$s, не сделано</string>
+    <string name="add_widget_tasks">Дела</string>
+    <string name="widget_tasks_desc">Дела на сегодня с галочками</string>
+    <string name="widget_tasks_more">ещё %1$d</string>
+    <string name="widget_tasks_empty">На сегодня дел нет</string>
+    <string-array name="seed_tasks">
+        <item>me|Купить билеты в Торонто</item>
+        <item>ours|Видеозвонок в 21:00</item>
+        <item>partner|Забронировать столик на нашу встречу</item>
+        <item>me|Забрать посылку</item>
+        <item>partner|Отправить фото с прогулки</item>
+    </string-array>
+
+    <!-- Вишлист -->
+    <string name="wish_title">Вишлист</string>
+    <string name="wish_mine">Мой</string>
+    <string name="wish_add">Добавить желание</string>
+    <string name="wish_edit">Изменить желание</string>
+    <string name="wish_field_title">Что хочешь?</string>
+    <string name="wish_field_price">Цена</string>
+    <string name="wish_field_link">Ссылка</string>
+    <string name="wish_field_note">Заметка</string>
+    <string name="wish_open">Открыть ссылку</string>
+    <string name="wish_reserve">Подарю я 🎁</string>
+    <string name="wish_reserved">Забронировано тобой · отменить</string>
+    <string name="wish_secret">%1$s не увидит, что подарок забронирован.</string>
+    <string name="wish_empty_mine">Добавь то, что хотелось бы получить: подарки, впечатления, поездки.</string>
+    <string name="wish_empty_partner">Список пока пуст.</string>
+    <string name="wish_bad_link">Проверьте ссылку: она должна выглядеть как https://example.com</string>
+    <string name="wish_title_required">Напишите, что хотите</string>
+    <string name="wish_tap_hint">Нажмите на желание, чтобы изменить его.</string>
+    <string-array name="seed_wishes">
+        <item>me|Плёночный фотоаппарат|3 500 ₴|Для наших поездок</item>
+        <item>me|Свеча с ароматом инжира|450 ₴|</item>
+        <item>me|Билеты на концерт|1 800 ₴|Любой концерт во Львове</item>
+        <item>partner|Наушники с шумоподавлением|9 000 ₴|Для перелётов к тебе</item>
+        <item>partner|Набор для кофе V60|1 200 ₴|</item>
+        <item>partner|Тёплый свитер|2 000 ₴|Размер L</item>
+    </string-array>
+
+    <!-- Чат -->
+    <string name="chat_hint">Сообщение</string>
+    <string name="chat_send">Отправить</string>
+    <string name="chat_heart">Отправить «думаю о тебе»</string>
+    <string name="chat_heart_text">Думаю о тебе 💗</string>
+    <string name="chat_typing">%1$s печатает…</string>
+    <string name="chat_hearted">понравилось</string>
+    <string name="chat_heart_action">Нравится</string>
+    <string-array name="seed_chat">
+        <item>partner|Доброе утро! До обеда у меня созвоны 😴</item>
+        <item>me|Держись! Вечером видеозвонок?</item>
+        <item>partner|Да, в 21:00 по Киеву ❤️</item>
+    </string-array>
+    <string-array name="chat_replies">
+        <item>❤️</item>
+        <item>Скучаю по тебе</item>
+        <item>Ахах 😄</item>
+        <item>Расскажи подробнее!</item>
+        <item>Я тоже думаю о тебе</item>
+        <item>Уже считаю дни до встречи</item>
+        <item>Обнимаю 🤗</item>
+        <item>Договорились!</item>
+    </string-array>
+
+    <!-- Карта мест -->
+    <string name="map_title">Наши места</string>
+    <string name="map_text">Фото с геометкой из вашей галереи на карте мира. Всё остаётся на этом телефоне.</string>
+    <string name="map_allow">Показать мои фото на карте</string>
+    <string name="map_example">Пример мест, пока нет доступа к вашим фото</string>
+    <string name="map_example_photo">Это фото для примера</string>
+    <string name="map_scanning">Ищем геометки в фото… %1$d из %2$d</string>
+    <string name="map_none">В галерее пока нет фото с геометкой. Включите геометки в настройках камеры.</string>
+    <string name="map_no_location">Разрешите доступ к геометкам в фото, чтобы увидеть, где их сделали.</string>
+    <string name="map_denied">Доступ к фото выключен. Его можно включить в настройках приложения.</string>
+    <string name="map_open_settings">Открыть настройки</string>
+    <string name="map_rescan">Обновить</string>
+    <string name="map_zoom_in">Приблизить</string>
+    <string name="map_zoom_out">Отдалить</string>
+    <string name="map_places_title">Места</string>
+    <string name="map_canvas">Карта мира с вашими фото</string>
+    <plurals name="photos">
+        <item quantity="one">%d фото</item>
+        <item quantity="few">%d фото</item>
+        <item quantity="many">%d фото</item>
+        <item quantity="other">%d фото</item>
+    </plurals>
+    <plurals name="places">
+        <item quantity="one">%d место</item>
+        <item quantity="few">%d места</item>
+        <item quantity="many">%d мест</item>
+        <item quantity="other">%d места</item>
+    </plurals>
+    <string-array name="map_examples">
+        <item>50.45|30.52|📸|Киев|24</item>
+        <item>49.84|24.03|☕|Львов|9</item>
+        <item>48.45|24.55|⛰️|Карпаты|12</item>
+        <item>43.65|-79.38|🍁|Торонто|31</item>
+        <item>38.72|-9.14|🌅|Лиссабон|6</item>
+    </string-array>
+
+    <!-- Ласковое имя -->
+    <string name="settings_nickname">Как ты называешь партнёра?</string>
+    <string name="settings_nickname_hint">Например, Солнышко</string>
+    <string name="settings_nickname_note">Будем показывать в приложении вместо имени.</string>
+    <string-array name="nickname_ideas">
+        <item>Солнышко ☀️</item>
+        <item>Котик 🐱</item>
+        <item>Зайчик 🐰</item>
+        <item>Любимый ❤️</item>
+    </string-array>
+
+    <!-- Пара и синхронизация -->
+    <string name="pair_title">Наша пара</string>
+    <string name="more_pair_text">Код пары, помощь партнёру со входом, выход</string>
+    <string name="pair_intro">Общее пространство для вас двоих. Один из вас создаёт пару и передаёт код другому.</string>
+    <string name="pair_create">Создать пространство пары</string>
+    <string name="pair_join">У меня есть код</string>
+    <string name="pair_sign_in">Войти</string>
+    <string name="pair_demo">Попробовать демо</string>
+    <string name="pair_lost_access">На этом телефоне выполнен выход, потому что пароль сменили на другом телефоне. Войдите с кодом и новым паролем.</string>
+    <string name="pair_create_text">Вы получите код, который нужно передать партнёру.</string>
+    <string name="pair_your_name">Ваше имя</string>
+    <string name="pair_password">Пароль</string>
+    <string name="pair_password_repeat">Повторите пароль</string>
+    <string name="pair_new_password">Новый пароль</string>
+    <string name="pair_password_note">Запишите код пары и свой пароль: оба понадобятся, чтобы войти на новом телефоне. Почты нет, поэтому если вы забудете пароль, партнёр поможет задать новый.</string>
+    <string name="pair_create_button">Создать</string>
+    <string name="pair_code_title">Ваш код пары</string>
+    <string name="pair_code_text">Передайте его партнёру: пусть нажмёт «У меня есть код» и введёт его.</string>
+    <string name="pair_code_note">Сохраните этот код. Вы входите с ним и своим паролем.</string>
+    <string name="pair_share">Отправить код</string>
+    <string name="pair_share_text">Присоединяйся ко мне в Belong 💞 Нажми «У меня есть код» и введи: %1$s</string>
+    <string name="pair_copy">Копировать</string>
+    <string name="pair_copied">Код скопирован</string>
+    <string name="pair_continue">Дальше</string>
+    <string name="pair_join_text">Введите код, который дал партнёр, и придумайте свой пароль.</string>
+    <string name="pair_code">Код пары</string>
+    <string name="pair_join_button">Присоединиться</string>
+    <string name="pair_joined">Теперь вы в паре: %1$s 💞</string>
+    <string name="pair_sign_in_text">Введите код пары, а потом выберите, кто вы.</string>
+    <string name="pair_next">Дальше</string>
+    <string name="pair_who">Кто вы?</string>
+    <string name="pair_sign_in_button">Войти</string>
+    <string name="pair_forgot">Забыли пароль?</string>
+    <string name="pair_recover_title">Новый пароль</string>
+    <string name="pair_recover_text">Пусть %1$s откроет Ещё → Наша пара → «Помочь войти». Появится одноразовый код: введите его здесь. Он действует 30 минут.</string>
+    <string name="pair_help_code">Одноразовый код</string>
+    <string name="pair_recover_button">Задать новый пароль</string>
+    <string name="pair_recovered">Новый пароль задан. На другом телефоне выполнен выход.</string>
+    <string name="pair_partner_placeholder">Партнёр</string>
+    <string name="pair_signed_in_as">Вы вошли как %1$s.</string>
+    <string name="pair_partner_joined">%1$s уже с вами в паре.</string>
+    <string name="pair_partner_waiting">Партнёр ещё не присоединился. Отправьте код партнёру.</string>
+    <string name="pair_help_partner">Помочь войти: %1$s</string>
+    <string name="pair_help_making">Создаём одноразовый код…</string>
+    <string name="pair_help_title">Одноразовый код</string>
+    <string name="pair_help_text">%1$s\n\nСообщите этот код: %2$s. С ним можно задать новый пароль; он срабатывает один раз и действует 30 минут.</string>
+    <string name="pair_remember">Чтобы войти на другом телефоне, нужны код %1$s и ваш пароль.</string>
+    <string name="pair_close">Закрыть</string>
+    <string name="pair_sign_out">Выйти</string>
+    <string name="pair_sign_out_title">Выйти на этом телефоне?</string>
+    <string name="pair_sign_out_text">Чат сохранится. Чтобы войти снова, нужны код %1$s и ваш пароль.</string>
+    <string name="pair_error_network">Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.</string>
+    <string name="pair_error_wrong_password">Неверный пароль.</string>
+    <string name="pair_error_too_many">Слишком много попыток. Подождите несколько минут и попробуйте ещё раз.</string>
+    <string name="pair_error_weak">Пароль слишком простой. Выберите подлиннее.</string>
+    <string name="pair_error_no_pair">Пары с таким кодом нет. Сверьте код с партнёром.</string>
+    <string name="pair_error_code_used">По этому коду уже кто-то присоединился.</string>
+    <string name="pair_error_code_format">Код состоит из 8 букв и цифр, например K7M3-Q9XP.</string>
+    <string name="pair_error_help_code">Одноразовый код состоит из 8 букв и цифр.</string>
+    <string name="pair_error_help_code_wrong">Одноразовый код неверный, уже использован или истёк. Попросите новый.</string>
+    <string name="pair_error_name">Введите имя.</string>
+    <string name="pair_error_password_short">Пароль должен содержать не меньше %1$d символов.</string>
+    <string name="pair_error_password_mismatch">Пароли не совпадают.</string>
+    <string name="pair_error_other">Что-то пошло не так. Попробуйте ещё раз.</string>
+    <string name="chat_pending">Отправляется…</string>
+    <string name="safe_received">%1$s в безопасности 🛡️</string>
+    <string name="support_received">%1$s обнимает тебя 🤗</string>
+
+    <!-- Сегодня -->
+    <string name="greeting_morning_name">Доброе утро, %1$s</string>
+    <string name="greeting_day_name">Добрый день, %1$s</string>
+    <string name="greeting_evening_name">Добрый вечер, %1$s</string>
+    <string name="greeting_night_name">Доброй ночи, %1$s</string>
+    <string name="partner_today">%1$s сегодня %2$s</string>
+    <string name="partner_energy_line"> · энергия %1$d из 5 — %2$s</string>
+    <string name="energy_note_low">непростой день</string>
+    <string name="energy_note_mid">обычный день</string>
+    <string name="energy_note_high">сил хватает</string>
+    <string name="partner_no_checkin">%1$s: настроения за сегодня ещё нет</string>
+    <string name="checkin_title_name">Как ты, %1$s?</string>
+    <string name="km_unit">км</string>
+    <string name="time_in">%1$s сейчас</string>
+    <plurals name="days_word">
+        <item quantity="one">день</item>
+        <item quantity="few">дня</item>
+        <item quantity="many">дней</item>
+        <item quantity="other">дня</item>
+    </plurals>
+    <plurals name="tasks_open">
+        <item quantity="one">%d дело</item>
+        <item quantity="few">%d дела</item>
+        <item quantity="many">%d дел</item>
+        <item quantity="other">%d дела</item>
+    </plurals>
+    <string name="plan_empty">Здесь пока пусто. Нажмите +, чтобы добавить дело.</string>
+    <string name="owner_ours_meta">общее</string>
+    <string name="add_task_title">Новое дело</string>
+    <string name="add_task_owner">Чьё это дело?</string>
+
+    <!-- Приветствие и приглашение -->
+    <string name="welcome_title">Ваша общая жизнь — в одном месте</string>
+    <string name="welcome_text">Мечтайте, планируйте, делайте и вспоминайте. Всё, что важно вам двоим, — рядом.</string>
+    <string name="step_of">Шаг %1$d из %2$d</string>
+    <string name="invite_title">Пригласите партнёра</string>
+    <string name="invite_text">Отправьте код — пространство откроется, когда партнёр присоединится.</string>
+    <string name="waiting_title">Ждём партнёра…</string>
+    <string name="waiting_text">Как только партнёр введёт код, вы окажетесь вместе.</string>
+    <string name="joined_title">%1$s с вами 💞</string>
+    <string name="joined_text">Ваше общее пространство открыто.</string>
+    <string name="pair_open_app">Открыть Belong</string>
+    <string name="pair_later">Позже</string>
+    <string name="chat_think_short">Думаю\nо тебе</string>
+    <string name="settings_language">Язык</string>
+    <string name="language_system">Язык телефона</string>
+</resources>

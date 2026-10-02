@@ -1,6 +1,6 @@
 # Belong for Android
 
-Native Android app in Kotlin that uses only the Android framework (no AndroidX), minSdk 26 (Android 8.0). The UI is in English and Ukrainian, and the example couple is Yulia and Igor.
+Native Android app in Kotlin that uses only the Android framework (no AndroidX), minSdk 26 (Android 8.0). The UI is in English, Ukrainian and Russian, and the example couple is Yulia and Igor. The look follows the Belong design system: her pink, his blue, and the gradient where they meet (“two colours that become one”).
 
 ## What's inside
 
@@ -29,7 +29,7 @@ Five tabs: Today, Chat, Wishlist, Places, More.
   - **Doodle:** draw and send. The partner's latest doodle appears on the home-screen widget;
   - **Games:** Date Match on one phone and the date wheel;
   - **Our month apart:** a story card you can share or save;
-  - **Settings:** names, a **pet name for your partner** (Sunshine ☀️, Котик 🐱, … shown everywhere instead of the name), cities and the meeting date.
+  - **Settings:** names, a **pet name for your partner** (Sunshine ☀️, Котик 🐱, … shown everywhere instead of the name), cities, the meeting date and the **app language** (phone’s language, English, Українська or Русский; on Android 13+ it is also in the system’s per-app language settings).
 - **Home-screen widgets:**
   - partner's mood with live local time;
   - countdown to your meeting;
@@ -45,7 +45,12 @@ Five tabs: Today, Chat, Wishlist, Places, More.
 - on a new phone you **Sign in** with the code, then choose who you are and enter your password;
 - a forgotten password is replaced with a one-time code from your partner (More → Our pair → Help sign in). It works once, for 30 minutes, and the old phone is signed out.
 
-For now only the **chat** is synced. It works offline: messages wait marked “Sending…” and go out on the next connection. Tasks, wishlists, moods and doodles still stay on the phone. There are no push notifications yet: the chat updates while the app is open.
+Synced between the two phones:
+
+- **chat**, including ❤️ on messages;
+- **Today**: both mood and energy check-ins, “thinking of you”, “I’m safe” and “send support” taps (the partner sees a toast) with this month’s counts, and the shared plan for the day.
+
+Both work offline: changes are saved on the phone first and sent on the next connection. Wishlists and doodles still stay on the phone. There are no push notifications yet: updates arrive while the app is open.
 
 The server is a Firebase project used over REST (no Firebase SDK); see [`../firebase/README.md`](../firebase/README.md). Its details go into `app/src/main/res/values/cloud.xml`.
 

@@ -10,12 +10,15 @@ import app.belong.couple.core.Owner
 import app.belong.couple.core.Task
 import app.belong.couple.core.TaskList
 import app.belong.couple.core.WishItem
+import app.belong.couple.sync.ChatFeed
+import app.belong.couple.sync.LiveSync
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.util.concurrent.CopyOnWriteArraySet
+import java.security.SecureRandom
 import java.util.concurrent.atomic.AtomicLong
 
 /** Tells open screens that tasks, wishes or messages changed (for example from a widget or the demo partner). */
@@ -44,6 +47,8 @@ object DataEvents {
 private val ids = AtomicLong(System.currentTimeMillis())
 
 fun newId(): Long = ids.incrementAndGet()
+
+private val keys = SecureRandom()
 
 /** A list of items kept as JSON in the app's SharedPreferences. */
 abstract class JsonList<T>(context: Context, private val key: String) {
@@ -83,10 +88,10 @@ abstract class JsonList<T>(context: Context, private val key: String) {
 class TaskRepo(context: Context) : JsonList<Task>(context, "tasks") {
     override fun write(item: Task) = JSONObject()
         .put("id", item.id).put("title", item.title).put("owner", item.owner.key)
-        .put("done", item.done).put("day", item.day)
+        .put("done", item.done).put("day", item.day).put("key", item.key)
 
     override fun read(o: JSONObject) = Task(
-        o.getLong("id"), o.getString("title"), Owner.of(o.optString("owner")), o.optBoolean("done"), o.optLong("day"),
+        o.getLong("id"), o.getString("title"), Owner.of(o.optString("owner")), o.optBoolean("done"), o.optLong("day"), o.optString("key"),
     )
 
     private fun today(): Long = LocalDate.now().toEpochDay()
@@ -96,12 +101,22 @@ class TaskRepo(context: Context) : JsonList<Task>(context, "tasks") {
     fun add(title: String, owner: Owner) {
         val text = title.trim().take(80)
         if (text.isEmpty()) return
-        save(TaskList.prune(all(), today()) + Task(newId(), text, owner, false, today()))
+        val key = ChatFeed.newKey(System.currentTimeMillis(), keys)
+        save(TaskList.prune(all(), today()) + Task(ChatFeed.idFor(key), text, owner, false, today(), key))
+        LiveSync.taskChanged(app, key)
     }
 
-    fun toggle(id: Long) = save(TaskList.prune(all(), today()).map { if (it.id == id) it.copy(done = !it.done, day = today()) else it })
+    fun toggle(id: Long) {
+        val tasks = TaskList.prune(all(), today()).map { if (it.id == id) it.copy(done = !it.done, day = today()) else it }
+        save(tasks)
+        tasks.firstOrNull { it.id == id }?.key?.takeIf { it.isNotEmpty() }?.let { LiveSync.taskChanged(app, it) }
+    }
 
-    fun remove(id: Long) = save(all().filterNot { it.id == id })
+    fun remove(id: Long) {
+        val task = all().firstOrNull { it.id == id } ?: return
+        save(all().filterNot { it.id == id })
+        if (task.key.isNotEmpty()) LiveSync.taskRemoved(app, task.key)
+    }
 
     fun startReal() = startEmpty("seeded_tasks")
 

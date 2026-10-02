@@ -10,6 +10,7 @@ import android.text.InputType
 import android.view.Gravity
 import android.view.View
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -25,6 +26,7 @@ import app.belong.couple.sync.CloudException
 import app.belong.couple.sync.Pairing
 import app.belong.couple.sync.PublicPair
 import app.belong.couple.sync.Reason
+import app.belong.couple.sync.LiveSync
 import app.belong.couple.sync.Seat
 
 /**
@@ -43,6 +45,8 @@ class PairActivity : Activity() {
     private var info: PublicPair? = null
     private var role: Role? = null
     private var created: Seat? = null
+
+    override fun attachBaseContext(base: android.content.Context) = super.attachBaseContext(Language.wrap(base))
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -85,23 +89,40 @@ class PairActivity : Activity() {
     // ---------- Steps ----------
 
     private fun start() {
-        body.gravity = Gravity.CENTER_VERTICAL
-        body.addView(text(getString(R.string.app_name), 40f, 800).apply { letterSpacing = -0.03f })
-        body.addView(text(getString(R.string.pair_intro), 17f, 500, col(R.color.ink2)).lp(bottom = 16))
-        if (Account.get(this).lostAccess) {
-            body.addView(note(getString(R.string.pair_lost_access)))
+        body.gravity = Gravity.TOP
+        // The two circles drift together, as in the brand animation.
+        val art = FrameLayout(this)
+        art.addView(View(this).apply { background = glow() }, FrameLayout.LayoutParams(dp(300), dp(300), Gravity.CENTER))
+        val mark = PairMark(this, soft = true).apply { join = 0f }
+        art.addView(mark, FrameLayout.LayoutParams(WRAP, dp(150), Gravity.CENTER))
+        body.addView(art, LinearLayout.LayoutParams(MATCH, dp(320)))
+        android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 1000
+            interpolator = android.view.animation.PathInterpolator(0.6f, 0f, 0.3f, 1f)
+            addUpdateListener { mark.join = it.animatedValue as Float }
+            start()
         }
-        body.addView(primaryButton(getString(R.string.pair_create)) { show(Step.CREATE) })
-        body.addView(secondaryButton(getString(R.string.pair_join)) { show(Step.JOIN) })
-        body.addView(secondaryButton(getString(R.string.pair_sign_in)) { show(Step.SIGN_IN) })
-        body.addView(link(getString(R.string.pair_demo)) {
+
+        body.addView(text(getString(R.string.welcome_title), 32f, 800).apply {
+            letterSpacing = -0.01f
+            setLineSpacing(0f, 1f)
+        })
+        body.addView(text(getString(R.string.welcome_text), 16f, 400, col(R.color.ink2)).lp(top = 4, bottom = 20))
+        if (Account.get(this).lostAccess) body.addView(note(getString(R.string.pair_lost_access)).lp(bottom = 12))
+        body.addView(primaryButton(getString(R.string.pair_create)) { show(Step.CREATE) }.apply { minHeight = dp(56) })
+        body.addView(secondaryButton(getString(R.string.pair_join)) { show(Step.JOIN) }.apply { minHeight = dp(56) }.lp(top = 12))
+        val more = row(8)
+        more.addView(textButton(getString(R.string.pair_sign_in)) { show(Step.SIGN_IN) }, LinearLayout.LayoutParams(0, WRAP, 1f))
+        more.addView(textButton(getString(R.string.pair_demo)) {
             Account.get(this).demoChosen = true
             openApp()
-        })
+        }.apply { setTextColor(col(R.color.ink2)) }, LinearLayout.LayoutParams(0, WRAP, 1f))
+        body.addView(more.lp(top = 8))
     }
 
     private fun create() {
         body.gravity = Gravity.TOP
+        body.addView(text(getString(R.string.step_of, 1, 2), 13f, 600, col(R.color.ink2)).apply { gravity = Gravity.CENTER })
         heading(R.string.pair_create, R.string.pair_create_text)
         val name = field(R.string.pair_your_name, InputType.TYPE_TEXT_FLAG_CAP_WORDS, 24)
         val password = passwordField(R.string.pair_password)
@@ -121,30 +142,89 @@ class PairActivity : Activity() {
         })
     }
 
+    /** Step 2 of 2: pass the code on and wait until the partner joins. */
     private fun codeScreen() {
         val seat = created ?: return openApp()
         val formatted = PairCode.format(seat.code)
         body.gravity = Gravity.TOP
-        heading(R.string.pair_code_title, R.string.pair_code_text)
-        body.addView(text(formatted, 36f, 800).apply {
-            gravity = Gravity.CENTER
-            letterSpacing = 0.08f
+        body.addView(text(getString(R.string.step_of, 2, 2), 13f, 600, col(R.color.ink2)).apply { gravity = Gravity.CENTER })
+        heading(R.string.invite_title, R.string.invite_text)
+
+        val card = card(paddingDp = 20, spacingDp = 6)
+        card.addView(text(getString(R.string.pair_code), 13f, 600, col(R.color.ink2)).apply { gravity = Gravity.CENTER })
+        val codeRow = row(8).apply { gravity = Gravity.CENTER }
+        codeRow.addView(text(formatted, 32f, 800).apply {
+            letterSpacing = 0.06f
             setTextIsSelectable(true)
-            background = rounded(col(R.color.surface), 20f, col(R.color.line))
-            setPadding(0, dp(20), 0, dp(20))
-        }.lp(top = 8, bottom = 8))
-        body.addView(note(getString(R.string.pair_code_note)))
+        })
+        codeRow.addView(android.widget.ImageView(this).apply {
+            setImageDrawable(icon(R.drawable.ic_copy, col(R.color.ink2), 20))
+            scaleType = android.widget.ImageView.ScaleType.CENTER
+            contentDescription = getString(R.string.pair_copy)
+            background = ripple(rounded(col(R.color.surface), 22f), 22f)
+            setOnClickListener {
+                getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText(getString(R.string.app_name), formatted))
+                Toaster.show(this@PairActivity, getString(R.string.pair_copied), R.drawable.ic_copy)
+            }
+        }, LinearLayout.LayoutParams(dp(44), dp(44)))
+        card.addView(codeRow)
+        card.addView(text(getString(R.string.pair_code_note), 13f, 500, col(R.color.ink2)).apply { gravity = Gravity.CENTER })
+        body.addView(card.lp(top = 12))
+
         body.addView(primaryButton(getString(R.string.pair_share), R.drawable.ic_share) {
             startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
                 putExtra(Intent.EXTRA_TEXT, getString(R.string.pair_share_text, formatted))
             }, getString(R.string.pair_share)))
-        })
-        body.addView(secondaryButton(getString(R.string.pair_copy), R.drawable.ic_link) {
-            getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText(getString(R.string.app_name), formatted))
-            toast(getString(R.string.pair_copied))
-        })
-        body.addView(secondaryButton(getString(R.string.pair_continue)) { openApp() })
+        }.apply { minHeight = dp(56) }.lp(top = 20))
+
+        // "Waiting for your partner…" with a pulsing avatar; checks every few seconds whether they joined.
+        val waiting = row(14).apply {
+            background = rounded(col(R.color.him_tint), 20f)
+            setPadding(dp(14), dp(14), dp(16), dp(14))
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+        }
+        val pulse = FrameLayout(this)
+        pulse.addView(PulseRings(this), FrameLayout.LayoutParams(dp(64), dp(64), Gravity.CENTER))
+        pulse.addView(avatar("?", col(R.color.him), 40).apply { layoutParams = FrameLayout.LayoutParams(dp(40), dp(40), Gravity.CENTER) })
+        waiting.addView(pulse, LinearLayout.LayoutParams(dp(64), dp(64)))
+        val texts = column(2)
+        val title = text(getString(R.string.waiting_title), 16f, 700)
+        val caption = text(getString(R.string.waiting_text), 13f, 500, col(R.color.on_tint))
+        texts.addView(title)
+        texts.addView(caption)
+        waiting.addView(texts, LinearLayout.LayoutParams(0, WRAP, 1f))
+        body.addView(waiting.lp(top = 20))
+        val open = textButton(getString(R.string.pair_later)) { openApp() }
+        body.addView(open.lp(top = 8))
+
+        val config = Account.get(this).config
+        val check = object : Runnable {
+            override fun run() {
+                if (step != Step.CODE || isFinishing) return
+                Thread {
+                    val partner = try { Pairing(config).publicInfo(seat.code)?.names?.get(Role.B) } catch (e: CloudException) { null }
+                    runOnUiThread {
+                        if (step != Step.CODE || isFinishing) return@runOnUiThread
+                        if (partner.isNullOrBlank()) {
+                            body.postDelayed(this, 4_000)
+                            return@runOnUiThread
+                        }
+                        Account.get(this@PairActivity).setPartnerName(partner)
+                        CoupleStore.get(this@PairActivity).partnerName = partner
+                        pulse.removeAllViews()
+                        pulse.addView(PairMark(this@PairActivity).apply {
+                            initials = seat.myName.take(1).uppercase() to partner.take(1).uppercase()
+                        }, FrameLayout.LayoutParams(WRAP, dp(40), Gravity.CENTER))
+                        title.text = getString(R.string.joined_title, partner)
+                        caption.text = getString(R.string.joined_text)
+                        body.removeView(open)
+                        body.addView(primaryButton(getString(R.string.pair_open_app)) { openApp() }.apply { minHeight = dp(56) }.lp(top = 12))
+                    }
+                }.start()
+            }
+        }
+        body.postDelayed(check, 3_000)
     }
 
     private fun join() {
@@ -278,6 +358,7 @@ class PairActivity : Activity() {
         store.partnerName = seat.partnerName?.takeIf { it.isNotBlank() } ?: getString(R.string.pair_partner_placeholder)
         store.partnerNickname = ""
         ChatRepo(this).startShared()
+        LiveSync.reset(this)
     }
 
     private fun openApp() {
@@ -309,8 +390,8 @@ class PairActivity : Activity() {
     // ---------- Views ----------
 
     private fun heading(title: Int, subtitle: Int) {
-        body.addView(text(getString(title), 26f, 800))
-        body.addView(text(getString(subtitle), 15f, 500, col(R.color.ink2)).lp(bottom = 8))
+        body.addView(text(getString(title), 28f, 700).apply { letterSpacing = -0.01f }.lp(top = 8))
+        body.addView(text(getString(subtitle), 16f, 400, col(R.color.ink2)).lp(top = 4, bottom = 8))
     }
 
     private fun note(value: String): TextView = text(value, 13f, 500, col(R.color.ink2)).apply {

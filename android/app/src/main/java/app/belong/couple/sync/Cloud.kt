@@ -169,6 +169,10 @@ class Db(private val config: CloudConfig) {
 
     fun put(path: String, value: Any, token: String): Any? = value(Http.request(url(path, token), "PUT", json(value)))
 
+    fun delete(path: String, token: String) {
+        value(Http.request(url(path, token), "DELETE"))
+    }
+
     /** Writes several paths under [path] at once; the database checks the rules against the combined result. */
     fun update(path: String, values: JSONObject, token: String): Any? = value(Http.request(url(path, token), "PATCH", values.toString()))
 

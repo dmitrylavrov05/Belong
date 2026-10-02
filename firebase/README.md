@@ -11,6 +11,18 @@ The free Spark plan is enough: there are no Cloud Functions.
 - **Sign in.** The app reads the public `pairs/<code>/logins` (names and account generation), then signs in with the code, the seat and the password.
 - **Forgotten password.** The other partner writes a one-time help code to `pairs/<code>/reset/<seat>`. The person who forgot signs up a new account `<code>.<seat>.<gen+1>@…` and moves the seat to it by proving the help code. The code works once, for 30 minutes. The old account loses access.
 
+## What is stored
+
+Under `pairs/<code>`:
+
+- `logins/<seat>`: name and account generation (readable by anyone with the code, for the sign-in screen);
+- `members`, `reset`: who holds each seat, and one-time help codes;
+- `chat/<key>`: messages `{from, text, at, heart}`;
+- `live/checkin/<seat>`: mood and energy `{mood, energy, at}`; each seat writes only its own;
+- `live/signal/<seat>`: the latest "think", "safe" or "support" tap, which the partner's phone shows as a toast;
+- `live/count/<seat>/<yyyy-MM>/<kind>`: monthly counts that can only go up by one;
+- `live/tasks/<key>`: the shared plan `{title, owner: a|b|both, done, day}`.
+
 Nobody receives mail at `pair.belong.app`: the address is just an account name. `database.rules.json` enforces all of the above. Members alone read the pair. Messages can't be forged, edited or deleted; the other partner can only add a ❤️.
 
 ## Set up a project
@@ -41,4 +53,4 @@ cd firebase
 firebase emulators:exec --project demo-belong --only auth,database "cd ../android && ./gradlew test"
 ```
 
-`CloudEmulatorTest` then runs pairing, the live chat stream and password recovery against these rules. Without the emulators it is skipped.
+`CloudEmulatorTest` then runs pairing, the live chat stream, the shared Today data and password recovery against these rules. Without the emulators it is skipped.

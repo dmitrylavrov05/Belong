@@ -69,6 +69,9 @@ class CoupleStore private constructor(private val context: Context) {
     val partnerEnergy: Int get() = prefs.getInt("partner_energy", 2)
     val partnerMoodAt: Long get() = prefs.getLong("partner_mood_at", System.currentTimeMillis())
 
+    /** False for a real pair until the partner's first check-in arrives. */
+    val hasPartnerCheckIn: Boolean get() = prefs.contains("partner_mood")
+
     /** True while the numbers on screen are the example data for Yulia and Igor. */
     val isExample: Boolean get() = prefs.getBoolean("example", true)
 
@@ -89,6 +92,10 @@ class CoupleStore private constructor(private val context: Context) {
     }
 
     fun count(counter: Counter, month: YearMonth): Int = prefs.getInt("${counter.key}_$month", 0)
+
+    fun setCount(counter: Counter, month: YearMonth, value: Int) {
+        if (count(counter, month) != value) prefs.edit().putInt("${counter.key}_$month", value).apply()
+    }
 
     fun increment(counter: Counter, month: YearMonth = YearMonth.now(), by: Int = 1) {
         prefs.edit().putInt("${counter.key}_$month", count(counter, month) + by).apply()

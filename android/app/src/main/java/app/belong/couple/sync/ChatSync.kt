@@ -1,8 +1,6 @@
 package app.belong.couple.sync
 
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
 import app.belong.couple.core.ChatMessage
 import app.belong.couple.data.Account
 import app.belong.couple.data.ChatRepo
@@ -22,32 +20,28 @@ object ChatSync {
 
     private val lock = Any()
     private val sender = Executors.newSingleThreadExecutor()
-    private val main = Handler(Looper.getMainLooper())
     private val random = SecureRandom()
+    private var feed = ChatFeed()
 
-    @Volatile private var running = false
-    @Volatile private var stream: Db.Stream? = null
-    @Volatile private var thread: Thread? = null
+    private val loop = StreamLoop(
+        name = "chat-sync",
+        path = { "pairs/${it.code}/chat" },
+        query = "orderBy=%22%24key%22&limitToLast=$HISTORY",
+        onConnect = { app, seat ->
+            feed = ChatFeed()
+            refreshNames(app, seat)
+            sender.execute { flush(app) }
+        },
+        onEvent = { app, seat, event, data ->
+            feed.apply(event, data)
+            merge(app, feed, seat)
+        },
+    )
 
-    /** Starts listening; call from onStart. Does nothing unless the phone is paired. */
-    @Synchronized
-    fun start(context: Context) {
-        val app = context.applicationContext
-        if (running || !Account.get(app).paired) return
-        running = true
-        val worker = Thread({ loop(app) }, "chat-sync").apply { isDaemon = true }
-        thread = worker
-        worker.start()
-    }
+    /** Starts listening; does nothing unless the phone is paired. */
+    fun start(context: Context) = loop.start(context)
 
-    /** Stops listening; call from onStop. */
-    @Synchronized
-    fun stop() {
-        running = false
-        stream?.close()
-        thread?.interrupt()
-        thread = null
-    }
+    fun stop() = loop.stop()
 
     /** Saves the message and sends it when the network allows. */
     fun send(context: Context, text: String): Boolean {
@@ -98,7 +92,7 @@ object ChatSync {
                 // Denied also happens when an earlier attempt got through but its reply was lost.
                 val onServer = try { db.get(path, account.token()) } catch (e2: CloudException) { return }
                 if (onServer == null) {
-                    if (!checkAccess(app)) return
+                    if (!PairAccess.check(app)) return
                     continue
                 }
             }
@@ -106,54 +100,6 @@ object ChatSync {
                 val repo = ChatRepo(app)
                 repo.save(repo.all().map { if (it.key == m.key) it.copy(pending = false) else it })
             }
-        }
-    }
-
-    private fun loop(app: Context) {
-        var delay = 1_000L
-        // A quick stop() and start() leaves the old thread winding down; only the current one keeps going.
-        while (running && thread === Thread.currentThread()) {
-            val account = Account.get(app)
-            val seat = account.seat ?: break
-            val feed = ChatFeed()
-            try {
-                refreshNames(app, seat)
-                sender.execute { flush(app) }
-                val s = Db.Stream().also { stream = it }
-                if (!running) break
-                Db(account.config).listen("pairs/${seat.code}/chat", account.token(), "orderBy=%22%24key%22&limitToLast=$HISTORY", s) { event, data ->
-                    when (event) {
-                        "put", "patch" -> {
-                            feed.apply(event, data)
-                            merge(app, feed, seat)
-                            delay = 1_000L
-                        }
-                        "auth_revoked" -> {
-                            account.expireToken()
-                            s.close()
-                        }
-                        "cancel" -> throw CloudException(Reason.DENIED)
-                    }
-                }
-            } catch (e: CloudException) {
-                when (e.reason) {
-                    Reason.DENIED -> if (!checkAccess(app)) break
-                    Reason.SIGNED_OUT -> {
-                        Account.get(app).signOut(lost = true)
-                        break
-                    }
-                    else -> Unit
-                }
-            } catch (e: org.json.JSONException) {
-                // A malformed event: reconnect and get a fresh snapshot.
-            }
-            if (!running) break
-            try {
-                Thread.sleep(delay)
-            } catch (e: InterruptedException) {
-                break
-            }
-            delay = (delay * 2).coerceAtMost(60_000L)
         }
     }
 
@@ -178,19 +124,5 @@ object ChatSync {
             CoupleStore.get(app).partnerName = partner
             DataEvents.changed()
         }
-    }
-
-    /**
-     * After a denial, checks whether this phone still holds its seat. If the seat moved to another
-     * account (the password was reset with a help code), signs out and returns false.
-     */
-    private fun checkAccess(app: Context): Boolean {
-        val account = Account.get(app)
-        val seat = account.seat ?: return false
-        val info = try { Pairing(account.config).publicInfo(seat.code) } catch (e: CloudException) { return true }
-        if (info?.gens?.get(seat.role) == seat.gen) return true
-        account.signOut(lost = true)
-        main.post { stop() }
-        return false
     }
 }

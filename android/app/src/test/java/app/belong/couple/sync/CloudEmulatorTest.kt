@@ -120,6 +120,48 @@ class CloudEmulatorTest {
     }
 
     @Test
+    fun todayIsSharedAndEachSeatWritesOnlyItsOwnPart() {
+        val yulia = pairing.create("Yulia", "sunflower1")
+        val igor = pairing.join(yulia.code, "Igor", "maple-leaf")
+        val live = "pairs/${yulia.code}/live"
+        fun checkIn(mood: Int, energy: Int) = JSONObject().put("mood", mood).put("energy", energy).put("at", Db.serverTime())
+        val increment = JSONObject().put(".sv", JSONObject().put("increment", 1))
+
+        db.put("$live/checkin/a", checkIn(4, 3), yulia.session.idToken)
+        expect(Reason.DENIED) { db.put("$live/checkin/a", checkIn(1, 1), igor.session.idToken) }
+        expect(Reason.DENIED) { db.put("$live/checkin/b", checkIn(9, 1), igor.session.idToken) }
+
+        // "Thinking of you": the latest tap plus a monthly count that only ever goes up by one.
+        db.put("$live/signal/b", JSONObject().put("kind", "think").put("at", Db.serverTime()).put("id", "x1"), igor.session.idToken)
+        db.put("$live/count/b/2026-10/think", increment, igor.session.idToken)
+        db.put("$live/count/b/2026-10/think", increment, igor.session.idToken)
+        expect(Reason.DENIED) { db.put("$live/count/b/2026-10/think", 50, igor.session.idToken) }
+        expect(Reason.DENIED) { db.put("$live/count/a/2026-10/think", increment, igor.session.idToken) }
+        expect(Reason.DENIED) { db.put("$live/signal/b", JSONObject().put("kind", "spam").put("at", Db.serverTime()).put("id", "x2"), igor.session.idToken) }
+
+        // The plan is shared: Igor adds a task for both, Yulia ticks it off, either may remove it.
+        val task = JSONObject().put("title", "Video call at 9 pm").put("owner", "both").put("done", false).put("day", 20_000)
+        db.put("$live/tasks/t1", task, igor.session.idToken)
+        db.put("$live/tasks/t1", JSONObject(task.toString()).put("done", true), yulia.session.idToken)
+        expect(Reason.DENIED) { db.put("$live/tasks/t2", JSONObject(task.toString()).put("owner", "c"), yulia.session.idToken) }
+
+        val tree = JsonTree()
+        tree.apply("put", JSONObject().put("path", "/").put("data", db.get(live, yulia.session.idToken)).toString())
+        assertEquals(CheckIn(4, 3, LiveModel.checkIn(tree, Role.A)!!.at), LiveModel.checkIn(tree, Role.A))
+        assertEquals(2, LiveModel.count(tree, Role.B, "2026-10", LiveModel.THINK))
+        assertEquals("x1", LiveModel.signal(tree, Role.B)!!.id)
+        val seen = LiveModel.tasks(tree, Role.A).single()
+        assertEquals(app.belong.couple.core.Owner.OURS, seen.owner)
+        assertEquals(true, seen.done)
+
+        db.delete("$live/tasks/t1", yulia.session.idToken)
+        assertNull(db.get("$live/tasks", igor.session.idToken))
+        val stranger = pairing.create("Stranger", "password99")
+        expect(Reason.DENIED) { db.get(live, stranger.session.idToken) }
+        expect(Reason.DENIED) { db.put("$live/tasks/t3", task, stranger.session.idToken) }
+    }
+
+    @Test
     fun partnerHelpsResetAForgottenPassword() {
         val yulia = pairing.create("Yulia", "sunflower1")
         val igor = pairing.join(yulia.code, "Igor", "maple-leaf")

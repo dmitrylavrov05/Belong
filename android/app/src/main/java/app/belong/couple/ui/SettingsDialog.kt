@@ -75,6 +75,15 @@ object SettingsDialog {
             }, meeting.year, meeting.monthValue - 1, meeting.dayOfMonth).show()
         }
         form.addView(dateButton)
+
+        label(R.string.settings_language)
+        val languages = Language.choices.map { if (it.isEmpty()) ctx.getString(R.string.language_system) else Language.nameOf(it) }
+        val language = Spinner(ctx).apply {
+            adapter = ArrayAdapter(ctx, android.R.layout.simple_spinner_dropdown_item, languages)
+            setSelection(Language.choices.indexOf(Language.current(ctx)).coerceAtLeast(0))
+            minimumHeight = ctx.dp(48)
+        }
+        form.addView(language)
         val account = Account.get(ctx)
         if (!account.paired) form.addView(ctx.text(ctx.getString(R.string.settings_demo), 13f, 500, ctx.col(R.color.ink2)).lp(top = 12))
 
@@ -90,6 +99,8 @@ object SettingsDialog {
                 store.partnerCityId = Cities.all[partnerCity.selectedItemPosition].id
                 store.meetingDate = meeting
                 activity.refreshAll()
+                val tag = Language.choices[language.selectedItemPosition]
+                if (tag != Language.current(ctx)) Language.set(activity, tag)
             }
             .setNegativeButton(R.string.settings_cancel, null)
             .show()

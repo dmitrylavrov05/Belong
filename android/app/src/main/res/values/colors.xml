@@ -19,4 +19,10 @@
     <color name="ok_ink">#2E6E50</color>
     <color name="honey">#F5B85C</color>
     <color name="white">#FFFFFF</color>
+    <!-- Text on the partner colours (initials in the double avatar). -->
+    <color name="ink_on_partner">#2B2233</color>
+    <!-- Card shadow tint: plum at low strength (design: 0 8 24 rgba(43,34,51,.06)). -->
+    <color name="shadow">#552B2233</color>
+    <color name="grabber">#E6DCE0</color>
+    <color name="toast_bg">#2B2233</color>
 </resources>

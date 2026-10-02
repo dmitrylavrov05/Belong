@@ -11,18 +11,19 @@ enum class Owner(val key: String) {
     }
 }
 
-data class Task(val id: Long, val title: String, val owner: Owner, val done: Boolean, val day: Long)
+/** [key] names the task on the server once the plan is shared with a partner. */
+data class Task(val id: Long, val title: String, val owner: Owner, val done: Boolean, val day: Long, val key: String = "")
 
 object TaskList {
     /**
      * Today's plan: today's tasks plus anything left unfinished on earlier days, which rolls over.
-     * Open tasks come first, then mine, ours and the partner's, in the order they were added.
+     * Open tasks come first, then mine, ours and the partner's, in the order they were added (keys sort by time).
      */
     fun forDay(all: List<Task>, today: Long): List<Task> =
         all.asSequence()
             .filter { it.day == today || (it.day < today && !it.done) }
             .map { if (it.day < today) it.copy(day = today) else it }
-            .sortedWith(compareBy<Task>({ it.done }, { it.owner.ordinal }, { it.id }))
+            .sortedWith(compareBy<Task>({ it.done }, { it.owner.ordinal }, { it.key }, { it.id }))
             .toList()
 
     /** Drops finished tasks from earlier days so the stored list doesn't grow forever. */

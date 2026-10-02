@@ -16,7 +16,7 @@ import app.belong.couple.data.CoupleStore
 import app.belong.couple.data.DataEvents
 import app.belong.couple.data.TaskRepo
 import app.belong.couple.data.WishRepo
-import app.belong.couple.sync.ChatSync
+import app.belong.couple.sync.PairSync
 import app.belong.couple.widget.Widgets
 
 /** One screen of the app. */
@@ -32,6 +32,8 @@ class MainActivity : Activity() {
     private val screens = HashMap<Int, Screen>()
     private val framed = HashMap<Int, View>()
     private var current = TAB_TODAY
+
+    override fun attachBaseContext(base: android.content.Context) = super.attachBaseContext(Language.wrap(base))
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,12 +68,12 @@ class MainActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
-        ChatSync.start(this)
+        PairSync.start(this)
     }
 
     override fun onStop() {
         super.onStop()
-        ChatSync.stop()
+        PairSync.stop()
     }
 
     private fun openPairing() {
@@ -149,11 +151,13 @@ class MainActivity : Activity() {
 
     private fun tabBar(): View = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
-        setBackgroundColor(col(R.color.surface))
-        elevation = dp(8).toFloat()
+        background = android.graphics.drawable.LayerDrawable(arrayOf(
+            android.graphics.drawable.ColorDrawable(col(R.color.line)),
+            android.graphics.drawable.InsetDrawable(android.graphics.drawable.ColorDrawable(col(R.color.surface)), 0, dp(1), 0, 0),
+        ))
         setPadding(dp(2), dp(6), dp(2), dp(6))
         TABS.forEachIndexed { index, (label, iconRes) ->
-            val tab = text(getString(label), 11f, 600, col(R.color.ink2)).apply {
+            val tab = text(getString(label), 12f, 600, col(R.color.ink2)).apply {
                 gravity = Gravity.CENTER
                 minHeight = dp(56)
                 maxLines = 1
@@ -168,12 +172,12 @@ class MainActivity : Activity() {
         }
     }
 
+    /** The chosen tab's icon takes the pair gradient and its label turns dark and bold. */
     private fun styleTab(tab: TextView, selected: Boolean) {
-        val color = col(if (selected) R.color.ink else R.color.ink2)
-        val iconColor = col(if (selected) R.color.us_end else R.color.ink2)
-        tab.setTextColor(color)
-        tab.typeface = Fonts.get(this, if (selected) 800 else 600)
-        tab.setCompoundDrawablesRelative(null, icon(tab.tag as Int, iconColor, 22), null, null)
+        tab.setTextColor(col(if (selected) R.color.ink else R.color.ink2))
+        tab.typeface = Fonts.get(this, if (selected) 700 else 600)
+        val iconRes = tab.tag as Int
+        tab.setCompoundDrawablesRelative(null, if (selected) gradientIcon(iconRes, 24) else icon(iconRes, col(R.color.ink2), 24), null, null)
         tab.isSelected = selected
     }
 

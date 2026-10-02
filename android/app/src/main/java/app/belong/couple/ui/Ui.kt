@@ -117,7 +117,7 @@ fun Context.card(paddingDp: Int = 18, spacingDp: Int = 12, background: Drawable?
         this.background = background ?: rounded(col(R.color.surface), 24f)
         val p = dp(paddingDp)
         setPadding(p, p, p, p)
-        elevation = dp(1.5f).toFloat()
+        softShadow()
     }
 
 fun Context.icon(res: Int, color: Int, sizeDp: Int = 20): Drawable =
@@ -139,13 +139,34 @@ private fun Context.button(label: String, iconRes: Int?, textColor: Int, backgro
             compoundDrawablePadding = dp(8)
         }
         setOnClickListener(onClick)
+        pressable()
     }
 
+/**
+ * The pair gradient with white text and a blue glow. The gradient is a shade deeper than the
+ * design's #F07DA1 → #5C9DF2 so the white label stays readable (contrast above 4.5:1).
+ */
 fun Context.primaryButton(label: String, iconRes: Int? = null, onClick: (View) -> Unit): TextView =
-    button(label, iconRes, Color.WHITE, gradient(16f, col(R.color.us_start), col(R.color.us_end)), onClick)
+    button(label, iconRes, Color.WHITE, gradient(16f, col(R.color.us_start), col(R.color.us_end)), onClick).apply {
+        elevation = dp(6).toFloat()
+        if (android.os.Build.VERSION.SDK_INT >= 28) {
+            outlineSpotShadowColor = col(R.color.him)
+            outlineAmbientShadowColor = col(R.color.him)
+        }
+    }
 
+/** White with the card shadow, as in the design. */
 fun Context.secondaryButton(label: String, iconRes: Int? = null, onClick: (View) -> Unit): TextView =
-    button(label, iconRes, col(R.color.ink), rounded(col(R.color.surface), 16f, col(R.color.line)), onClick)
+    button(label, iconRes, col(R.color.ink), rounded(col(R.color.surface), 16f), onClick).apply { softShadow(3f) }
+
+/** A borderless button for quieter actions ("Sign in", "Skip"). */
+fun Context.textButton(label: String, onClick: (View) -> Unit): TextView =
+    button(label, null, col(R.color.ink), rounded(col(R.color.bg), 12f), onClick).apply {
+        minHeight = dp(44)
+        maxLines = 1
+        setPadding(dp(8), 0, dp(8), 0)
+        setAutoSizeTextTypeUniformWithConfiguration(12, 16, 1, android.util.TypedValue.COMPLEX_UNIT_SP)
+    }
 
 fun Context.tintButton(label: String, iconRes: Int?, bg: Int, fg: Int, onClick: (View) -> Unit): TextView =
     button(label, iconRes, fg, rounded(bg, 16f), onClick)

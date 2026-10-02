@@ -31,10 +31,12 @@ class GeoTest {
     }
 
     @Test
-    fun everyCityHasAValidZoneAndBothNames() {
+    fun everyCityHasAValidZoneAndAllNames() {
         for (city in Cities.all) {
             ZoneId.of(city.zone)
-            assertTrue(city.nameEn.isNotBlank() && city.nameUk.isNotBlank())
+            assertTrue(city.nameEn.isNotBlank() && city.nameUk.isNotBlank() && city.nameRu.isNotBlank())
+            assertEquals(city.nameEn, city.name("en"))
+            assertEquals(city.nameRu, city.name("ru"))
         }
         assertEquals(Cities.all.size, Cities.all.map { it.id }.toSet().size)
     }

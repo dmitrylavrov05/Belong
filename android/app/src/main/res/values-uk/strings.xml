@@ -186,7 +186,7 @@
     <string name="more_doodle_text">Малюнки на головний екран партнера</string>
     <string name="more_games_text">«Збіги» і колесо побачень</string>
     <string name="more_month_text">Ваш місяць на відстані карткою для сторіс</string>
-    <string name="more_settings_text">Імена, ласкаве ім’я, міста й дата зустрічі</string>
+    <string name="more_settings_text">Імена, ласкаве ім’я, міста, дата зустрічі й мова</string>
     <string name="delete">Видалити</string>
 
     <!-- Справи -->
@@ -313,10 +313,10 @@
     <string name="pair_title">Наша пара</string>
     <string name="more_pair_text">Код пари, допомога партнеру з входом, вихід</string>
     <string name="pair_intro">Спільний простір для вас двох. Один із вас створює пару й передає код іншому.</string>
-    <string name="pair_create">Створити пару</string>
+    <string name="pair_create">Створити простір пари</string>
     <string name="pair_join">У мене є код</string>
     <string name="pair_sign_in">Увійти</string>
-    <string name="pair_demo">Просто подивитися (демо)</string>
+    <string name="pair_demo">Спробувати демо</string>
     <string name="pair_lost_access">На цьому телефоні виконано вихід, бо пароль змінили на іншому телефоні. Увійдіть з кодом і новим паролем.</string>
     <string name="pair_create_text">Ви отримаєте код, який треба передати партнеру.</string>
     <string name="pair_your_name">Ваше ім’я</string>
@@ -343,7 +343,7 @@
     <string name="pair_sign_in_button">Увійти</string>
     <string name="pair_forgot">Забули пароль?</string>
     <string name="pair_recover_title">Новий пароль</string>
-    <string name="pair_recover_text">%1$s має відкрити Ще → Наша пара → «Допомогти увійти». З’явиться одноразовий код: введіть його тут. Він діє 30 хвилин.</string>
+    <string name="pair_recover_text">Хай %1$s відкриє Ще → Наша пара → «Допомогти увійти». З’явиться одноразовий код: введіть його тут. Він діє 30 хвилин.</string>
     <string name="pair_help_code">Одноразовий код</string>
     <string name="pair_recover_button">Встановити новий пароль</string>
     <string name="pair_recovered">Новий пароль встановлено. На іншому телефоні виконано вихід.</string>
@@ -374,4 +374,51 @@
     <string name="pair_error_password_mismatch">Паролі не збігаються.</string>
     <string name="pair_error_other">Щось пішло не так. Спробуйте ще раз.</string>
     <string name="chat_pending">Надсилається…</string>
+    <string name="safe_received">%1$s у безпеці 🛡️</string>
+    <string name="support_received">%1$s обіймає тебе 🤗</string>
+    <!-- Today (design) -->
+    <string name="greeting_morning_name">Доброго ранку, %1$s</string>
+    <string name="greeting_day_name">Добрий день, %1$s</string>
+    <string name="greeting_evening_name">Добрий вечір, %1$s</string>
+    <string name="greeting_night_name">Добраніч, %1$s</string>
+    <string name="partner_today">%1$s сьогодні %2$s</string>
+    <string name="partner_energy_line"> · енергія %1$d з 5 — %2$s</string>
+    <string name="energy_note_low">непростий день</string>
+    <string name="energy_note_mid">звичайний день</string>
+    <string name="energy_note_high">повно енергії</string>
+    <string name="partner_no_checkin">%1$s: настрою за сьогодні ще немає</string>
+    <string name="checkin_title_name">Як ти, %1$s?</string>
+    <string name="km_unit">км</string>
+    <string name="time_in">%1$s зараз</string>
+    <plurals name="days_word">
+        <item quantity="one">день</item>
+        <item quantity="few">дні</item>
+        <item quantity="many">днів</item>
+        <item quantity="other">дня</item>
+    </plurals>
+    <plurals name="tasks_open">
+        <item quantity="one">%d справа</item>
+        <item quantity="few">%d справи</item>
+        <item quantity="many">%d справ</item>
+        <item quantity="other">%d справи</item>
+    </plurals>
+    <string name="plan_empty">Тут поки порожньо. Натисніть +, щоб додати справу.</string>
+    <string name="owner_ours_meta">спільне</string>
+    <string name="add_task_title">Нова справа</string>
+    <string name="add_task_owner">Чия це справа?</string>
+    <!-- Welcome and invite (design) -->
+    <string name="welcome_title">Ваше спільне життя в одному місці</string>
+    <string name="welcome_text">Мрійте, плануйте, робіть і згадуйте. Усе, що важливо вам двом, поруч.</string>
+    <string name="step_of">Крок %1$d з %2$d</string>
+    <string name="invite_title">Запросіть партнера</string>
+    <string name="invite_text">Надішліть код. Простір відкриється, щойно партнер приєднається.</string>
+    <string name="waiting_title">Чекаємо на партнера…</string>
+    <string name="waiting_text">Щойно партнер введе код, ви будете разом.</string>
+    <string name="joined_title">%1$s з вами 💞</string>
+    <string name="joined_text">Ваш спільний простір відкрито.</string>
+    <string name="pair_open_app">Відкрити Belong</string>
+    <string name="pair_later">Пізніше</string>
+    <string name="chat_think_short">Думаю\nпро тебе</string>
+    <string name="settings_language">Мова</string>
+    <string name="language_system">Мова телефона</string>
 </resources>

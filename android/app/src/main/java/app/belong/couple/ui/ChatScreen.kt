@@ -35,7 +35,7 @@ class ChatScreen(private val activity: MainActivity) : Screen {
     private val avatarHolder = LinearLayout(ctx)
     private val messages = ctx.column(6).apply {
         val p = ctx.dp(16)
-        setPadding(p, ctx.dp(8), p, ctx.dp(8))
+        setPadding(p, ctx.dp(8), p, ctx.dp(96)) // room for the floating "thinking of you" button
     }
     private val scroll = ScrollView(ctx).apply {
         isFillViewport = true
@@ -66,7 +66,14 @@ class ChatScreen(private val activity: MainActivity) : Screen {
 
     override val view: View = ctx.column().apply {
         addView(header())
-        addView(scroll, LinearLayout.LayoutParams(MATCH, 0, 1f))
+        addView(View(ctx).apply { setBackgroundColor(ctx.col(R.color.line)) }, LinearLayout.LayoutParams(MATCH, ctx.dp(1)))
+        // The "thinking of you" button floats over the bottom of the conversation with two pulsing rings.
+        val stage = android.widget.FrameLayout(ctx)
+        stage.addView(scroll, android.widget.FrameLayout.LayoutParams(MATCH, MATCH))
+        stage.addView(thinkButton(), android.widget.FrameLayout.LayoutParams(ctx.dp(96), ctx.dp(96), android.view.Gravity.BOTTOM or android.view.Gravity.END).apply {
+            setMargins(0, 0, ctx.dp(4), 0)
+        })
+        addView(stage, LinearLayout.LayoutParams(MATCH, 0, 1f))
         addView(typing)
         addView(composer())
     }
@@ -93,13 +100,32 @@ class ChatScreen(private val activity: MainActivity) : Screen {
             setOnClickListener { onClick() }
         }
 
+    private fun thinkButton(): View = android.widget.FrameLayout(ctx).apply {
+        addView(PulseRings(ctx), android.widget.FrameLayout.LayoutParams(MATCH, MATCH))
+        addView(ctx.text(ctx.getString(R.string.chat_think_short), 11f, 800, ctx.col(R.color.white)).apply {
+            gravity = android.view.Gravity.CENTER
+            setLineSpacing(0f, 0.95f)
+            background = android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                intArrayOf(ctx.col(R.color.us_start), ctx.col(R.color.us_end)),
+            ).apply { shape = android.graphics.drawable.GradientDrawable.OVAL }
+            contentDescription = ctx.getString(R.string.chat_heart)
+            elevation = ctx.dp(6).toFloat()
+            setOnClickListener { v ->
+                haptic(v)
+                if (Account.get(ctx).paired) {
+                    app.belong.couple.sync.LiveSync.signal(ctx, app.belong.couple.sync.LiveModel.THINK) {}
+                } else {
+                    store.increment(Counter.TAPS_SENT)
+                }
+                post(ctx.getString(R.string.chat_heart_text))
+            }
+            pressable()
+        }, android.widget.FrameLayout.LayoutParams(ctx.dp(60), ctx.dp(60), android.view.Gravity.CENTER))
+    }
+
     private fun composer(): View = ctx.row(8).apply {
-        setPadding(ctx.dp(12), ctx.dp(6), ctx.dp(12), ctx.dp(10))
-        addView(circleButton(R.drawable.ic_heart, R.string.chat_heart, ctx.rounded(ctx.col(R.color.her_tint), 24f), ctx.col(R.color.on_tint)) {
-            haptic(view)
-            store.increment(Counter.TAPS_SENT)
-            post(ctx.getString(R.string.chat_heart_text))
-        }, LinearLayout.LayoutParams(ctx.dp(48), ctx.dp(48)))
+        setPadding(ctx.dp(16), ctx.dp(8), ctx.dp(12), ctx.dp(10))
         addView(input, LinearLayout.LayoutParams(0, WRAP, 1f))
         addView(circleButton(R.drawable.ic_send, R.string.chat_send, ctx.gradient(24f, ctx.col(R.color.us_start), ctx.col(R.color.us_end)), ctx.col(R.color.white)) {
             send()
@@ -158,7 +184,7 @@ class ChatScreen(private val activity: MainActivity) : Screen {
         val city = store.partnerCity
         subtitle.text = "${city.name(ctx.language())} ${ctx.timeIn(city.zone)}"
         avatarHolder.removeAllViews()
-        avatarHolder.addView(ctx.avatar(store.partnerDisplay, ctx.col(R.color.us_end), 42))
+        avatarHolder.addView(ctx.avatar(store.partnerDisplay, ctx.col(R.color.him), 42))
 
         val all = repo.all()
         if (all.lastOrNull()?.fromMe == false) typing.visibility = View.GONE

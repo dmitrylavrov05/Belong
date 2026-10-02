@@ -184,7 +184,7 @@
     <string name="more_doodle_text">Draw for your partner’s home screen</string>
     <string name="more_games_text">Date Match and the date wheel</string>
     <string name="more_month_text">Your month apart as a story card</string>
-    <string name="more_settings_text">Names, pet name, cities and meeting date</string>
+    <string name="more_settings_text">Names, pet name, cities, meeting date and language</string>
     <string name="delete">Delete</string>
 
     <!-- Tasks -->
@@ -308,10 +308,10 @@
     <string name="pair_title">Our pair</string>
     <string name="more_pair_text">Pair code, help your partner sign in, sign out</string>
     <string name="pair_intro">A shared space for the two of you. One of you creates a pair and passes the code to the other.</string>
-    <string name="pair_create">Create a pair</string>
+    <string name="pair_create">Create a pair space</string>
     <string name="pair_join">I have a code</string>
     <string name="pair_sign_in">Sign in</string>
-    <string name="pair_demo">Just look around (demo)</string>
+    <string name="pair_demo">Try the demo</string>
     <string name="pair_lost_access">This phone was signed out because the password was reset on another phone. Sign in with the code and the new password.</string>
     <string name="pair_create_text">You’ll get a code to pass to your partner.</string>
     <string name="pair_your_name">Your name</string>
@@ -369,4 +369,47 @@
     <string name="pair_error_password_mismatch">The passwords don’t match.</string>
     <string name="pair_error_other">Something went wrong. Try again.</string>
     <string name="chat_pending">Sending…</string>
+    <string name="safe_received">%1$s is safe 🛡️</string>
+    <string name="support_received">%1$s sends you a hug 🤗</string>
+    <!-- Today (design) -->
+    <string name="greeting_morning_name">Good morning, %1$s</string>
+    <string name="greeting_day_name">Good afternoon, %1$s</string>
+    <string name="greeting_evening_name">Good evening, %1$s</string>
+    <string name="greeting_night_name">Good night, %1$s</string>
+    <string name="partner_today">%1$s today %2$s</string>
+    <string name="partner_energy_line"> · energy %1$d of 5 — %2$s</string>
+    <string name="energy_note_low">a tough day</string>
+    <string name="energy_note_mid">an ordinary day</string>
+    <string name="energy_note_high">full of energy</string>
+    <string name="partner_no_checkin">%1$s: no check-in yet today</string>
+    <string name="checkin_title_name">How are you, %1$s?</string>
+    <string name="km_unit">km</string>
+    <string name="time_in">%1$s now</string>
+    <plurals name="days_word">
+        <item quantity="one">day</item>
+        <item quantity="other">days</item>
+    </plurals>
+    <plurals name="tasks_open">
+        <item quantity="one">%d to do</item>
+        <item quantity="other">%d to do</item>
+    </plurals>
+    <string name="plan_empty">Nothing here yet. Tap + to add a task.</string>
+    <string name="owner_ours_meta">shared</string>
+    <string name="add_task_title">New task</string>
+    <string name="add_task_owner">Whose task?</string>
+    <!-- Welcome and invite (design) -->
+    <string name="welcome_title">Your shared life, all in one place</string>
+    <string name="welcome_text">Dream, plan, do and remember. Everything that matters to the two of you, side by side.</string>
+    <string name="step_of">Step %1$d of %2$d</string>
+    <string name="invite_title">Invite your partner</string>
+    <string name="invite_text">Send them the code. Your space opens as soon as they join.</string>
+    <string name="waiting_title">Waiting for your partner…</string>
+    <string name="waiting_text">As soon as they enter the code, you’ll be together.</string>
+    <string name="joined_title">%1$s has joined 💞</string>
+    <string name="joined_text">Your shared space is open.</string>
+    <string name="pair_open_app">Open Belong</string>
+    <string name="pair_later">Later</string>
+    <string name="chat_think_short">Thinking\nof you</string>
+    <string name="settings_language">Language</string>
+    <string name="language_system">Phone’s language</string>
 </resources>

@@ -2,7 +2,7 @@
 <resources>
     <color name="bg">#1C1622</color>
     <color name="surface">#2A2131</color>
-    <color name="sunk">#231B29</color>
+    <color name="sunk">#3A3042</color>
     <color name="line">#3A3046</color>
     <color name="ink">#F3ECF5</color>
     <color name="ink2">#A79CAD</color>
@@ -13,4 +13,8 @@
     <color name="him_tint">#22304A</color>
     <color name="ok_tint">#1D3A2D</color>
     <color name="ok_ink">#8FD3B0</color>
+    <color name="ink_on_partner">#1C1622</color>
+    <color name="shadow">#99000000</color>
+    <color name="grabber">#3A3046</color>
+    <color name="toast_bg">#3A3046</color>
 </resources>

@@ -8,7 +8,8 @@ import app.belong.couple.core.PairCode
 import app.belong.couple.data.Account
 import app.belong.couple.data.ChatRepo
 import app.belong.couple.data.CoupleStore
-import app.belong.couple.sync.ChatSync
+import app.belong.couple.sync.LiveSync
+import app.belong.couple.sync.PairSync
 import app.belong.couple.sync.CloudException
 import app.belong.couple.sync.Pairing
 
@@ -93,7 +94,8 @@ object PairDialog {
             .setTitle(R.string.pair_sign_out_title)
             .setMessage(activity.getString(R.string.pair_sign_out_text, code))
             .setPositiveButton(R.string.pair_sign_out) { _, _ ->
-                ChatSync.stop()
+                PairSync.stop()
+                LiveSync.reset(activity)
                 ChatRepo(activity).startShared()
                 CoupleStore.get(activity).partnerNickname = ""
                 Account.get(activity).signOut()

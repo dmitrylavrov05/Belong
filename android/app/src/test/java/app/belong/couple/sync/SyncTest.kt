@@ -121,3 +121,49 @@ class ChatFeedTest {
         assertTrue(earlier.all { it.isLetterOrDigit() })
     }
 }
+
+class LiveModelTest {
+    private fun tree(json: String) = JsonTree().apply { apply("put", """{"path":"/","data":$json}""") }
+
+    @Test
+    fun treeAppliesNestedPutsAndPatches() {
+        val t = tree("""{"checkin":{"a":{"mood":4,"energy":3,"at":5}}}""")
+        t.apply("put", """{"path":"/checkin/b","data":{"mood":2,"energy":1,"at":6}}""")
+        t.apply("patch", """{"path":"/count/a/2026-10","data":{"think":3}}""")
+        t.apply("put", """{"path":"/checkin/a/mood","data":5}""")
+        assertEquals(CheckIn(5, 3, 5), LiveModel.checkIn(t, Role.A))
+        assertEquals(CheckIn(2, 1, 6), LiveModel.checkIn(t, Role.B))
+        assertEquals(3, LiveModel.count(t, Role.A, "2026-10", LiveModel.THINK))
+        assertEquals(0, LiveModel.count(t, Role.B, "2026-10", LiveModel.THINK))
+        t.apply("put", """{"path":"/checkin/b","data":null}""")
+        assertNull(LiveModel.checkIn(t, Role.B))
+        t.apply("put", """{"path":"/","data":null}""")
+        assertNull(LiveModel.checkIn(t, Role.A))
+    }
+
+    @Test
+    fun tasksAreMineOursOrThePartnersFromEachSide() {
+        val t = tree("""{"tasks":{"k1":{"title":"Tickets","owner":"a","done":false,"day":10},"k2":{"title":"Call","owner":"both","done":true,"day":10},"k3":{"title":"x"}}}""")
+        val forA = LiveModel.tasks(t, Role.A).associateBy { it.key }
+        val forB = LiveModel.tasks(t, Role.B).associateBy { it.key }
+        assertEquals(setOf("k1", "k2"), forA.keys)
+        assertEquals(app.belong.couple.core.Owner.ME, forA["k1"]!!.owner)
+        assertEquals(app.belong.couple.core.Owner.PARTNER, forB["k1"]!!.owner)
+        assertEquals(app.belong.couple.core.Owner.OURS, forB["k2"]!!.owner)
+        // Written back from either phone, the task still belongs to seat "a".
+        assertEquals("a", LiveModel.taskJson(forA["k1"]!!, Role.A).getString("owner"))
+        assertEquals("a", LiveModel.taskJson(forB["k1"]!!, Role.B).getString("owner"))
+        assertEquals("both", LiveModel.taskJson(forB["k2"]!!, Role.B).getString("owner"))
+    }
+
+    @Test
+    fun unsentLocalEditsWinOverTheServer() {
+        val server = listOf(task("k1", "Server"), task("k2", "Gone"), task("k3", "Kept"))
+        val local = listOf(task("k1", "Edited here"), task("k4", "New here"), task("k3", "Old local"))
+        val merged = LiveModel.mergeTasks(server, local, dirty = setOf("k1", "k4"), deleted = setOf("k2"))
+        assertEquals(listOf("Edited here", "Kept", "New here"), merged.map { it.title })
+    }
+
+    private fun task(key: String, title: String) =
+        app.belong.couple.core.Task(ChatFeed.idFor(key), title, app.belong.couple.core.Owner.ME, false, 1, key)
+}
