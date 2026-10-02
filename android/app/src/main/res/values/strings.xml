@@ -950,4 +950,42 @@
         <item>10767|Talk show</item>
         <item>10768|War &amp; politics</item>
     </string-array>
+    <!-- Today: layout, cover, notes -->
+    <string name="home_customize">Customise Today</string>
+    <string name="home_customize_text">Choose which cards to show and in what order. This only changes this phone.</string>
+    <string name="home_reset">Back to the original layout</string>
+    <string name="home_move_up">Move %1$s up</string>
+    <string name="home_move_down">Move %1$s down</string>
+    <string name="home_card_cover">Our photo</string>
+    <string name="home_card_partner">Partner and taps</string>
+    <string name="home_card_checkin">How are you?</string>
+    <string name="home_card_note">Notes for each other</string>
+    <string name="home_card_dates">Dates and countdown</string>
+    <string name="home_card_onthisday">On this day</string>
+    <string name="home_card_evening">End of the day</string>
+    <string name="home_card_shopping">Shopping</string>
+    <string name="home_card_question">Question of the day</string>
+    <string name="home_together">Together for %1$s</string>
+    <string name="home_cover_add">Tap to add your photo together</string>
+    <string name="home_cover_change">Choose a photo</string>
+    <string name="home_cover_remove">Remove the photo</string>
+    <plurals name="home_years_ago">
+        <item quantity="one">%d year ago today</item>
+        <item quantity="other">%d years ago today</item>
+    </plurals>
+    <string name="checkin_done">Your mood is set · energy %1$d/5</string>
+    <string name="checkin_change">Change</string>
+    <string name="note_from">A note from %1$s</string>
+    <string name="note_none">No note from %1$s yet. Start with yours 🙂</string>
+    <string name="note_leave">Leave a note for %1$s</string>
+    <string name="note_yours">Your note: “%1$s” · change</string>
+    <string name="note_hint">%1$s will see it at the top of Today until you write a new one.</string>
+    <string name="note_placeholder">A few warm words</string>
+    <string name="note_idea_1">Have a wonderful day ☀️</string>
+    <string name="note_idea_2">I’m proud of you</string>
+    <string name="note_idea_3">Can’t wait to see you tonight 💞</string>
+    <string name="note_save">Leave the note</string>
+    <string name="note_sent">%1$s will see your note 💌</string>
+    <string name="note_seed">Good luck at the meeting today, you’ve got this! 💪</string>
+    <string name="photo_seed_year_ago">🏡|365|me|Our first evening in the new flat</string>
 </resources>

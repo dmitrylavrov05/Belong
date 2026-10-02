@@ -349,6 +349,9 @@
             "meeting": {
               ".validate": "newData.isNumber() && newData.val() % 1 === 0"
             },
+            "cover": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40 && newData.val().matches(/^[a-z0-9-]+$/)"
+            },
             "$other": {
               ".validate": false
             }
@@ -534,6 +537,21 @@
               },
               "genres": {
                 ".validate": "newData.isString() && newData.val().length <= 60 && newData.val().matches(/^[0-9,]*$/)"
+              },
+              "$other": {
+                ".validate": false
+              }
+            }
+          },
+          "note": {
+            "$role": {
+              ".write": "auth != null && root.child('pairs').child($code).child('members').child($role).val() === auth.uid",
+              ".validate": "newData.hasChildren(['text', 'at'])",
+              "text": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 200"
+              },
+              "at": {
+                ".validate": "newData.isNumber()"
               },
               "$other": {
                 ".validate": false

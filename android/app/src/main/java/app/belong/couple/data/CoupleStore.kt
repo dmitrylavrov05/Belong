@@ -93,6 +93,9 @@ class CoupleStore private constructor(private val context: Context) {
             .apply()
     }
 
+    /** Whether I've set my mood today. */
+    fun checkedInToday(today: LocalDate = LocalDate.now()): Boolean = prefs.contains("mood_$today")
+
     fun setPartnerCheckIn(mood: Int, energy: Int, at: Long = System.currentTimeMillis()) {
         prefs.edit()
             .putInt("partner_mood", mood.coerceIn(1, 5))

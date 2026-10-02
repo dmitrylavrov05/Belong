@@ -396,6 +396,13 @@ class CloudEmulatorTest {
         expect(Reason.DENIED) { db.put("$pair/live/movies/m1/poster", "https://evil.example/x.jpg", y) }
         expect(Reason.DENIED) { db.put("$pair/live/movies/m1/genres", "drama", y) }
 
+        // Notes on Today: each writes only their own; the cover is a photo key.
+        db.put("$pair/live/note/a", JSONObject().put("text", "Have a great day").put("at", 1), y)
+        expect(Reason.DENIED) { db.put("$pair/live/note/a", JSONObject().put("text", "Forged").put("at", 1), i) }
+        expect(Reason.DENIED) { db.put("$pair/live/note/b", JSONObject().put("text", "x".repeat(201)).put("at", 1), i) }
+        db.put("$pair/live/couple/cover", "p1", i)
+        expect(Reason.DENIED) { db.put("$pair/live/couple/cover", "../secret", i) }
+
         val live = JSONObject(db.get("$pair/live", y).toString())
         val movie = app.belong.couple.core.MoviesModel.movies(live, Role.A).single()
         assertEquals(5, movie.myRating)

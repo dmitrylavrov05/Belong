@@ -86,6 +86,17 @@ class SharedRepo(context: Context) {
         seedCalendar()
         seedPhotos()
         seedLetters()
+        seedHome()
+    }
+
+    /** The example couple's cover photo and a note from the partner on Today. */
+    private fun seedHome() {
+        if (prefs.getBoolean("seeded_home", false)) return
+        prefs.edit().putBoolean("seeded_home", true).apply()
+        if (me != null) return
+        DayPhotos.seedDemo(app, listOf(app.getString(R.string.photo_seed_year_ago)), first = 20)
+        put("couple/cover", "demo-p7")
+        put("note/partner", JSONObject().put("text", app.getString(R.string.note_seed)).put("at", System.currentTimeMillis() - 2 * 3_600_000L))
     }
 
     /** Letters and a film list for the example couple. */
@@ -204,7 +215,7 @@ class SharedRepo(context: Context) {
     }
 
     /** A real pair starts with an empty map; the server fills it in. */
-    fun startReal() = prefs.edit().putBoolean("seeded", true).putBoolean("seeded_everyday", true).putBoolean("seeded_calendar", true).putBoolean("seeded_photos", true).putBoolean("seeded_letters", true).remove("base").remove("ops").apply()
+    fun startReal() = prefs.edit().putBoolean("seeded", true).putBoolean("seeded_everyday", true).putBoolean("seeded_calendar", true).putBoolean("seeded_photos", true).putBoolean("seeded_letters", true).putBoolean("seeded_home", true).remove("base").remove("ops").apply()
 
     private fun base(): JSONObject = try {
         JSONObject(prefs.getString("base", "{}")!!)
@@ -219,7 +230,7 @@ class SharedRepo(context: Context) {
         private const val PREFS = "belong_dreams"
 
         /** Parts of live/ kept here; the rest (check-ins, tasks, wishes…) have their own stores. */
-        val SECTIONS = listOf("dreams", "goals", "shopping", "thanks", "flags", "couple", "moments", "dates", "photos", "feelings", "letters", "movies")
+        val SECTIONS = listOf("dreams", "goals", "shopping", "thanks", "flags", "couple", "moments", "dates", "photos", "feelings", "letters", "movies", "note")
         private val lock = Any()
 
         fun apply(tree: JsonTree, op: JSONObject) {

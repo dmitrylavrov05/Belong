@@ -977,4 +977,44 @@
         <item>10767|Ток-шоу</item>
         <item>10768|Війна і політика</item>
     </string-array>
+    <!-- Сьогодні: налаштування, обкладинка, записки -->
+    <string name="home_customize">Налаштувати головну</string>
+    <string name="home_customize_text">Виберіть, які картки показувати і в якому порядку. Налаштування лише для цього телефона.</string>
+    <string name="home_reset">Повернути як було</string>
+    <string name="home_move_up">Підняти: %1$s</string>
+    <string name="home_move_down">Опустити: %1$s</string>
+    <string name="home_card_cover">Наше фото</string>
+    <string name="home_card_partner">Партнер і кнопки</string>
+    <string name="home_card_checkin">Як ти?</string>
+    <string name="home_card_note">Записки одне одному</string>
+    <string name="home_card_dates">Дати й відлік</string>
+    <string name="home_card_onthisday">У цей день</string>
+    <string name="home_card_evening">Підсумок дня</string>
+    <string name="home_card_shopping">Покупки</string>
+    <string name="home_card_question">Питання дня</string>
+    <string name="home_together">Разом %1$s</string>
+    <string name="home_cover_add">Натисніть, щоб додати ваше спільне фото</string>
+    <string name="home_cover_change">Вибрати фото</string>
+    <string name="home_cover_remove">Прибрати фото</string>
+    <plurals name="home_years_ago">
+        <item quantity="one">%d рік тому в цей день</item>
+        <item quantity="few">%d роки тому в цей день</item>
+        <item quantity="many">%d років тому в цей день</item>
+        <item quantity="other">%d року тому в цей день</item>
+    </plurals>
+    <string name="checkin_done">Настрій відзначено · енергія %1$d/5</string>
+    <string name="checkin_change">Змінити</string>
+    <string name="note_from">%1$s пише:</string>
+    <string name="note_none">Записок поки немає. Почніть першими 🙂</string>
+    <string name="note_leave">Залишити записку</string>
+    <string name="note_yours">Ваша записка: «%1$s» · змінити</string>
+    <string name="note_hint">%1$s побачить її вгорі «Сьогодні», доки ви не напишете нову.</string>
+    <string name="note_placeholder">Кілька теплих слів</string>
+    <string name="note_idea_1">Гарного тобі дня ☀️</string>
+    <string name="note_idea_2">Я тобою пишаюся</string>
+    <string name="note_idea_3">Чекаю вечора з тобою 💞</string>
+    <string name="note_save">Залишити записку</string>
+    <string name="note_sent">%1$s побачить вашу записку 💌</string>
+    <string name="note_seed">Удачі сьогодні на зустрічі, у тебе все вийде! 💪</string>
+    <string name="photo_seed_year_ago">🏡|365|me|Наш перший вечір у новій квартирі</string>
 </resources>

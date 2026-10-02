@@ -117,6 +117,23 @@ object DayPhotos {
         return true
     }
 
+    /** Makes the picture at [uri] the couple's cover on Today, for both phones. [done] gets whether it worked. */
+    fun setCover(context: Context, uri: Uri, done: (Boolean) -> Unit) {
+        val app = context.applicationContext
+        pool.execute {
+            val key = prepare(app, uri)
+            if (key != null) {
+                val repo = SharedRepo(app)
+                if (repo.me != null) {
+                    mark(app, "upload", key, true)
+                    LiveSync.flushSoon(app)
+                }
+                repo.put("couple/cover", key)
+            }
+            main.post { done(key != null) }
+        }
+    }
+
     fun delete(context: Context, key: String, day: Long) {
         val app = context.applicationContext
         val repo = SharedRepo(app)
@@ -260,13 +277,13 @@ object DayPhotos {
     private fun newKey(): String = System.currentTimeMillis().toString(36) + (1000..9999).random().toString(36)
 
     /** The example couple's photos: soft gradients with an emoji, drawn on the phone. */
-    fun seedDemo(context: Context, seeds: List<String>) {
+    fun seedDemo(context: Context, seeds: List<String>, first: Int = 0) {
         val app = context.applicationContext
         val repo = SharedRepo(app)
         val today = today()
         seeds.forEachIndexed { i, line ->
             val (emoji, daysAgo, owner, caption) = line.split('|', limit = 4)
-            val key = "demo-p$i"
+            val key = "demo-p${first + i}"
             val day = today - daysAgo.toLong()
             val bmp = drawDemo(emoji, i)
             save(app, key, bmp)

@@ -407,3 +407,73 @@ object MoviesModel {
     /** Titles in the pair's list, by TMDB key, so the catalog can show "in your list" / "watched". */
     fun byTmdbKey(movies: List<Movie>): Map<String, Movie> = movies.filter { it.tmdbKey != null }.associateBy { it.tmdbKey!! }
 }
+
+/**
+ * The cards on Today that each person can show, hide and reorder. Notices (a letter that opened,
+ * a feelings note waiting, the month report) always come first and aren't part of the layout.
+ */
+object HomeLayout {
+    const val COVER = "cover"
+    const val PARTNER = "partner"
+    const val CHECKIN = "checkin"
+    const val NOTE = "note"
+    const val DATES = "dates"
+    const val ON_THIS_DAY = "onthisday"
+    const val PHOTO = "photo"
+    const val PLAN = "plan"
+    const val EVENING = "evening"
+    const val SHOPPING = "shopping"
+    const val QUESTION = "question"
+    const val WIDGETS = "widgets"
+
+    val DEFAULT = listOf(COVER, PARTNER, CHECKIN, NOTE, DATES, ON_THIS_DAY, PHOTO, PLAN, EVENING, SHOPPING, QUESTION, WIDGETS)
+
+    /** The saved order with unknown ids dropped and cards added in a later version put where they belong by default. */
+    fun order(saved: List<String>): List<String> {
+        val known = saved.filter { it in DEFAULT }.distinct()
+        if (known.isEmpty()) return DEFAULT
+        val result = known.toMutableList()
+        // A missing card goes right after its neighbour in the default order (the first one, before its follower).
+        DEFAULT.forEachIndexed { i, id ->
+            if (id !in result) {
+                val at = if (i > 0) result.indexOf(DEFAULT[i - 1]) + 1 else DEFAULT.drop(1).firstOrNull { it in result }?.let { result.indexOf(it) } ?: 0
+                result.add(at, id)
+            }
+        }
+        return result
+    }
+
+    /** [order] with [id] moved one place up (-1) or down (+1). */
+    fun move(order: List<String>, id: String, by: Int): List<String> {
+        val i = order.indexOf(id)
+        val j = i + by
+        if (i < 0 || j !in order.indices) return order
+        return order.toMutableList().apply { add(j, removeAt(i)) }
+    }
+}
+
+/** A short note one partner leaves for the other on Today (live/note/{seat}); it stays until replaced. */
+data class LoveNote(val text: String, val at: Long)
+
+/** "On this day": photos of the day and memories from this date in earlier years. */
+data class OnThisDay(val years: Int, val photos: List<DayPhoto>, val moments: List<Moment>)
+
+object TodayModel {
+    fun note(root: JSONObject, seat: String): LoveNote? =
+        root.optJSONObject("note")?.optJSONObject(seat)?.let { o -> o.optString("text").takeIf { it.isNotBlank() }?.let { LoveNote(it, o.optLong("at")) } }
+
+    fun cover(root: JSONObject): String? = root.optJSONObject("couple")?.optString("cover")?.takeIf { it.isNotEmpty() }
+
+    /** The most recent earlier year with photos or memories on today's date, if any. */
+    fun onThisDay(root: JSONObject, me: Role?, today: Long): OnThisDay? {
+        val date = java.time.LocalDate.ofEpochDay(today)
+        fun sameDay(day: Long): Int? {
+            val d = java.time.LocalDate.ofEpochDay(day)
+            return (date.year - d.year).takeIf { it > 0 && d.monthValue == date.monthValue && d.dayOfMonth == date.dayOfMonth }
+        }
+        val photos = PhotosModel.photos(root, me).mapNotNull { p -> sameDay(p.day)?.let { it to p } }
+        val moments = TogetherModel.moments(root).mapNotNull { m -> sameDay(m.day)?.let { it to m } }
+        val years = (photos.map { it.first } + moments.map { it.first }).minOrNull() ?: return null
+        return OnThisDay(years, photos.filter { it.first == years }.map { it.second }, moments.filter { it.first == years }.map { it.second })
+    }
+}

@@ -177,3 +177,38 @@ class LettersAndMoviesTest {
         assertEquals(2, h.movies)
     }
 }
+
+class HomeLayoutTest {
+    @Test
+    fun savedOrderKeepsChoicesAndAddsNewCardsInPlace() {
+        assertEquals(HomeLayout.DEFAULT, HomeLayout.order(emptyList()))
+        val saved = listOf(HomeLayout.QUESTION, HomeLayout.PARTNER, "gone", HomeLayout.PLAN)
+        val order = HomeLayout.order(saved)
+        assertEquals(HomeLayout.DEFAULT.toSet(), order.toSet())
+        assertEquals(HomeLayout.QUESTION, order.first())
+        assertEquals(order.indexOf(HomeLayout.PARTNER) - 1, order.indexOf(HomeLayout.COVER))
+        assertTrue(order.indexOf(HomeLayout.CHECKIN) == order.indexOf(HomeLayout.PARTNER) + 1)
+        val moved = HomeLayout.move(order, HomeLayout.PLAN, -1)
+        assertEquals(order.indexOf(HomeLayout.PLAN) - 1, moved.indexOf(HomeLayout.PLAN))
+        assertEquals(order, HomeLayout.move(order, order.first(), -1))
+    }
+
+    @Test
+    fun onThisDayFindsTheSameDateInEarlierYearsAndNotes() {
+        val today = LocalDate.of(2026, 10, 2).toEpochDay()
+        val root = JSONObject("""{
+            "photos": {"${LocalDate.of(2025, 10, 2).toEpochDay()}": {"p1": {"by": "a", "at": 1}}, "${LocalDate.of(2025, 10, 3).toEpochDay()}": {"p2": {"by": "a", "at": 2}}},
+            "moments": {"m": {"title": "Flat", "day": ${LocalDate.of(2023, 10, 2).toEpochDay()}}},
+            "note": {"b": {"text": "Good luck!", "at": 5}},
+            "couple": {"cover": "p1"}
+        }""")
+        val d = TodayModel.onThisDay(root, Role.A, today)!!
+        assertEquals(1, d.years)
+        assertEquals(listOf("p1"), d.photos.map { it.key })
+        assertTrue(d.moments.isEmpty())
+        assertNull(TodayModel.onThisDay(root, Role.A, LocalDate.of(2026, 10, 5).toEpochDay()))
+        assertEquals("Good luck!", TodayModel.note(root, "b")?.text)
+        assertNull(TodayModel.note(root, "a"))
+        assertEquals("p1", TodayModel.cover(root))
+    }
+}

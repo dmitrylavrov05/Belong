@@ -210,6 +210,13 @@ object Widgets {
     }
 
     /** Asks the launcher to place a widget; returns false when the launcher can't do it. */
+    /** True once any Belong widget is on the home screen: then the "add a widget" card isn't needed. */
+    fun anyPlaced(context: Context): Boolean {
+        val manager = AppWidgetManager.getInstance(context) ?: return false
+        return listOf(MoodWidget::class.java, CountdownWidget::class.java, DoodleWidget::class.java, TasksWidget::class.java)
+            .any { manager.getAppWidgetIds(ComponentName(context, it)).isNotEmpty() }
+    }
+
     fun requestPin(context: Context, cls: Class<out BelongWidget>): Boolean {
         val manager = AppWidgetManager.getInstance(context) ?: return false
         if (!manager.isRequestPinAppWidgetSupported) return false

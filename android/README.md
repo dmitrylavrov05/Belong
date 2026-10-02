@@ -7,6 +7,11 @@ Native Android app in Kotlin that uses only the Android framework (no AndroidX),
 Five tabs: Today, Dreams, Chat, Photos, Us.
 
 - **Today:**
+  - **customise it**: “Customise Today” at the bottom shows and hides cards and moves them up or down (saved per phone; “Back to the original layout” resets). Notices — a letter that opened, a feelings note waiting, the month report — always come first;
+  - **our photo**: a cover photo of the two of you with “Together for N days”, shared by both phones (tap to change or remove);
+  - **notes for each other**: a short note each of you leaves for the other, shown until it's replaced;
+  - **on this day**: photos of the day and memories from this date a year or more ago;
+  - “Thinking of you”, “I'm safe” and “Send support” now sit in the partner's card; after you check in, your mood folds into one line (tap to change); the widgets card hides once a widget is on the home screen;
   - greeting, the partner's mood and energy, and your own check-in;
   - **plan for the day**: mine, ours and the partner's tasks. Tap to tick off, long-press to delete. Unfinished tasks roll over to the next day;
   - **together or apart**: on first launch Today asks whether you live together or apart (also in Settings). Apart: both cities' clocks, the distance and the countdown to your next meeting. Together: the next important dates from the calendar instead;

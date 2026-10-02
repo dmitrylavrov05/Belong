@@ -20,6 +20,8 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import app.belong.couple.R
 import app.belong.couple.core.FeelingsModel
+import app.belong.couple.core.HomeLayout
+import app.belong.couple.core.LoveNote
 import app.belong.couple.core.Geo
 import app.belong.couple.core.LettersModel
 import app.belong.couple.core.Owner
@@ -28,6 +30,9 @@ import app.belong.couple.core.PhotosModel
 import app.belong.couple.core.Recap
 import app.belong.couple.core.Task
 import app.belong.couple.core.TimeMath
+import app.belong.couple.core.TodayModel
+import app.belong.couple.core.TogetherModel
+import app.belong.couple.core.seatKey
 import app.belong.couple.data.Account
 import app.belong.couple.data.CoupleStore
 import app.belong.couple.data.Counter
@@ -113,36 +118,294 @@ class TodayScreen(private val activity: MainActivity) : Screen {
         DataEvents.follow(view) { if (view.isShown) refresh() }
     }
 
+    /** The card order and hidden cards on this phone (see [HomeLayout]). */
+    private val home = ctx.getSharedPreferences("belong_home", android.content.Context.MODE_PRIVATE)
+    private var checkInOpen = false
+
+    private fun layout(): List<String> = HomeLayout.order(home.getString("order", "").orEmpty().split(',').filter { it.isNotEmpty() })
+    private fun hidden(): Set<String> = home.getStringSet("hidden", emptySet())!!
+
     override fun refresh() {
         val scrollY = scroll.scrollY
         body.removeAllViews()
         clockUpdaters.clear()
         body.addView(header())
+        // Notices first: they need an answer or have just become available.
         if (store.apart == null) body.addView(modeCard().lp(top = 24))
         feelingsCard()?.let { body.addView(it.lp(top = 24)) }
         letterCard()?.let { body.addView(it.lp(top = 24)) }
-        body.addView(partnerCard().lp(top = 24))
-        body.addView(checkInCard().lp(top = 12))
-        body.addView(countdowns().lp(top = 28))
-        reportCard()?.let { body.addView(it.lp(top = 28)) }
-        body.addView(photoCard().lp(top = 28))
-        body.addView(planHeader().lp(top = 28))
-        body.addView(ctx.segmented(
-            listOf(ctx.getString(R.string.owner_me), ctx.getString(R.string.owner_ours), store.partnerDisplay),
-            Owner.entries.indexOf(planFilter),
-        ) {
-            planFilter = Owner.entries[it]
-            refresh()
-        }.lp(top = 12))
-        body.addView(planCard().lp(top = 12))
-        everyday.eveningCard()?.let { body.addView(it.lp(top = 28)) }
-        body.addView(everyday.shoppingHeader().lp(top = 28))
-        body.addView(everyday.shoppingCard().lp(top = 8))
-        body.addView(everyday.questionCard().lp(top = 28))
-        body.addView(actions().lp(top = 28))
-        body.addView(widgetsCard().lp(top = 28))
+        reportCard()?.let { body.addView(it.lp(top = 24)) }
+        val off = hidden()
+        for (id in layout()) {
+            if (id in off) continue
+            card(id)?.let { body.addView(it.lp(top = if (id == HomeLayout.CHECKIN) 12 else 24)) }
+        }
+        body.addView(ctx.textButton("✏️ " + ctx.getString(R.string.home_customize)) { customize() }.apply { gravity = Gravity.CENTER }.lp(top = 24))
         clockUpdaters.forEach { it() }
         scroll.post { scroll.scrollTo(0, scrollY) }
+    }
+
+    private fun card(id: String): View? = when (id) {
+        HomeLayout.COVER -> coverCard()
+        HomeLayout.PARTNER -> partnerCard()
+        HomeLayout.CHECKIN -> checkInCard()
+        HomeLayout.NOTE -> noteCard()
+        HomeLayout.DATES -> countdowns()
+        HomeLayout.ON_THIS_DAY -> onThisDayCard()
+        HomeLayout.PHOTO -> photoCard()
+        HomeLayout.PLAN -> ctx.column().apply {
+            addView(planHeader())
+            addView(ctx.segmented(
+                listOf(ctx.getString(R.string.owner_me), ctx.getString(R.string.owner_ours), store.partnerDisplay),
+                Owner.entries.indexOf(planFilter),
+            ) {
+                planFilter = Owner.entries[it]
+                refresh()
+            }.lp(top = 12))
+            addView(planCard().lp(top = 12))
+        }
+        HomeLayout.EVENING -> everyday.eveningCard()
+        HomeLayout.SHOPPING -> ctx.column().apply {
+            addView(everyday.shoppingHeader())
+            addView(everyday.shoppingCard().lp(top = 8))
+        }
+        HomeLayout.QUESTION -> everyday.questionCard()
+        HomeLayout.WIDGETS -> if (Widgets.anyPlaced(ctx)) null else widgetsCard()
+        else -> null
+    }
+
+    private fun cardName(id: String): String = ctx.getString(when (id) {
+        HomeLayout.COVER -> R.string.home_card_cover
+        HomeLayout.PARTNER -> R.string.home_card_partner
+        HomeLayout.CHECKIN -> R.string.home_card_checkin
+        HomeLayout.NOTE -> R.string.home_card_note
+        HomeLayout.DATES -> R.string.home_card_dates
+        HomeLayout.ON_THIS_DAY -> R.string.home_card_onthisday
+        HomeLayout.PHOTO -> R.string.photos_card_title
+        HomeLayout.PLAN -> R.string.tasks_title
+        HomeLayout.EVENING -> R.string.home_card_evening
+        HomeLayout.SHOPPING -> R.string.home_card_shopping
+        HomeLayout.QUESTION -> R.string.home_card_question
+        else -> R.string.widgets_title
+    })
+
+    /** "Customise Today": each card with a switch and arrows to move it; saved on this phone. */
+    private fun customize() {
+        val dialog = android.app.Dialog(activity, R.style.Theme_Belong)
+        val col = ctx.column(10).apply { setPadding(ctx.dp(20), ctx.dp(12), ctx.dp(20), ctx.dp(28)) }
+        val list = ctx.column(8)
+        fun draw() {
+            list.removeAllViews()
+            val order = layout()
+            val off = hidden()
+            order.forEachIndexed { i, id ->
+                list.addView(ctx.card(paddingDp = 10, spacingDp = 0).apply {
+                    val r = ctx.row(6)
+                    val check = android.widget.CheckBox(ctx).apply {
+                        isChecked = id !in off
+                        text = cardName(id)
+                        textSize = 16f
+                        typeface = Fonts.get(ctx, 600)
+                        setTextColor(ctx.col(R.color.ink))
+                        buttonTintList = android.content.res.ColorStateList.valueOf(ctx.col(R.color.her))
+                        setOnCheckedChangeListener { _, on ->
+                            home.edit().putStringSet("hidden", if (on) hidden() - id else hidden() + id).apply()
+                        }
+                    }
+                    r.addView(check, LinearLayout.LayoutParams(0, WRAP, 1f))
+                    fun arrow(label: Int, by: Int, enabled: Boolean) = android.widget.ImageView(ctx).apply {
+                        setImageDrawable(ctx.icon(R.drawable.ic_chevron, ctx.col(R.color.ink), 18))
+                        rotation = if (by < 0) -90f else 90f
+                        scaleType = android.widget.ImageView.ScaleType.CENTER
+                        contentDescription = ctx.getString(label, cardName(id))
+                        background = ctx.ripple(ctx.rounded(ctx.col(R.color.bg), 20f), 20f)
+                        isEnabled = enabled
+                        alpha = if (enabled) 1f else 0.25f
+                        setOnClickListener {
+                            home.edit().putString("order", HomeLayout.move(layout(), id, by).joinToString(",")).apply()
+                            draw()
+                        }
+                    }
+                    r.addView(arrow(R.string.home_move_up, -1, i > 0), LinearLayout.LayoutParams(ctx.dp(44), ctx.dp(44)))
+                    r.addView(arrow(R.string.home_move_down, 1, i < order.lastIndex), LinearLayout.LayoutParams(ctx.dp(44), ctx.dp(44)))
+                    addView(r)
+                })
+            }
+        }
+        val top = ctx.row(8)
+        top.addView(ctx.text(ctx.getString(R.string.home_customize), 24f, 700), LinearLayout.LayoutParams(0, WRAP, 1f))
+        top.addView(android.widget.ImageView(ctx).apply {
+            setImageDrawable(ctx.icon(R.drawable.ic_close, ctx.col(R.color.ink), 22))
+            scaleType = android.widget.ImageView.ScaleType.CENTER
+            contentDescription = ctx.getString(R.string.pair_close)
+            background = ctx.ripple(ctx.rounded(ctx.col(R.color.bg), 22f), 22f)
+            setOnClickListener { dialog.dismiss() }
+        }, LinearLayout.LayoutParams(ctx.dp(44), ctx.dp(44)))
+        col.addView(top)
+        col.addView(ctx.text(ctx.getString(R.string.home_customize_text), 14f, 500, ctx.col(R.color.ink2)))
+        draw()
+        col.addView(list)
+        col.addView(ctx.textButton(ctx.getString(R.string.home_reset)) {
+            home.edit().clear().apply()
+            draw()
+        })
+        dialog.setContentView(ScrollView(ctx).apply {
+            setBackgroundColor(ctx.col(R.color.bg))
+            addView(col)
+        })
+        dialog.window?.setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT)
+        dialog.setOnDismissListener { refresh() }
+        dialog.show()
+    }
+
+    // ---------- Cover, note and "on this day" ----------
+
+    /** The couple's photo with your names and how long you've been together; tap to change it. */
+    private fun coverCard(): View {
+        val repo = SharedRepo(ctx)
+        val root = repo.root()
+        val cover = TodayModel.cover(root)
+        val since = TogetherModel.since(root)
+        val today = LocalDate.now(ZoneId.systemDefault()).toEpochDay()
+        val line = if (since != null) {
+            val days = (today - since).toInt()
+            ctx.getString(R.string.home_together, ctx.resources.getQuantityString(R.plurals.days, days, days))
+        } else ctx.getString(R.string.couple_line, store.myName, store.partnerDisplay)
+        val frame = FrameLayout(ctx).apply {
+            background = ctx.gradient(24f, ctx.col(R.color.her_tint), ctx.col(R.color.him_tint))
+            outlineProvider = object : android.view.ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: android.graphics.Outline) = outline.setRoundRect(0, 0, view.width, view.height, ctx.dp(24).toFloat())
+            }
+            clipToOutline = true
+        }
+        if (cover != null) {
+            frame.addView(android.widget.ImageView(ctx).apply {
+                scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                DayPhotos.load(this, cover, thumb = false)
+            }, FrameLayout.LayoutParams(MATCH, ctx.dp(210)))
+            frame.addView(View(ctx).apply {
+                background = android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.BOTTOM_TOP, intArrayOf(0x99000000.toInt(), 0))
+            }, FrameLayout.LayoutParams(MATCH, ctx.dp(110), Gravity.BOTTOM))
+            frame.addView(ctx.column(2).apply {
+                setPadding(ctx.dp(18), 0, ctx.dp(18), ctx.dp(16))
+                addView(ctx.text(ctx.getString(R.string.couple_line, store.myName, store.partnerDisplay), 20f, 800, ctx.col(R.color.white)))
+                if (since != null) addView(ctx.text(line, 14f, 600, 0xE6FFFFFF.toInt()))
+            }, FrameLayout.LayoutParams(MATCH, WRAP, Gravity.BOTTOM))
+        } else {
+            frame.addView(ctx.column(6).apply {
+                setPadding(ctx.dp(18), ctx.dp(18), ctx.dp(18), ctx.dp(18))
+                addView(ctx.text(line, 20f, 800, ctx.col(R.color.on_tint)))
+                addView(ctx.text(ctx.getString(R.string.home_cover_add), 14f, 600, ctx.col(R.color.on_tint)))
+            }, FrameLayout.LayoutParams(MATCH, WRAP))
+        }
+        frame.contentDescription = ctx.getString(R.string.home_cover_change)
+        frame.isClickable = true
+        frame.foreground = ctx.ripple(android.graphics.drawable.ColorDrawable(0), 24f)
+        frame.setOnClickListener { pickCover(cover != null) }
+        return frame
+    }
+
+    private fun pickCover(hasCover: Boolean) {
+        val pick = {
+            val intent = android.content.Intent(android.content.Intent.ACTION_GET_CONTENT).apply {
+                type = "image/*"
+                addCategory(android.content.Intent.CATEGORY_OPENABLE)
+            }
+            try {
+                @Suppress("DEPRECATION")
+                activity.startActivityForResult(android.content.Intent.createChooser(intent, ctx.getString(R.string.home_cover_change)), MainActivity.REQUEST_COVER)
+            } catch (e: android.content.ActivityNotFoundException) {
+                Toaster.show(activity, ctx.getString(R.string.photos_no_gallery))
+            }
+        }
+        if (!hasCover) return pick()
+        android.app.AlertDialog.Builder(activity)
+            .setItems(arrayOf(ctx.getString(R.string.home_cover_change), ctx.getString(R.string.home_cover_remove))) { _, which ->
+                if (which == 0) pick() else SharedRepo(ctx).delete("couple/cover")
+            }
+            .show()
+    }
+
+    /** Called by MainActivity with the picked cover photo. */
+    fun onCoverPicked(data: android.content.Intent?) {
+        val uri = data?.data ?: return
+        DayPhotos.setCover(ctx, uri) { ok -> if (!ok) Toaster.show(activity, ctx.getString(R.string.photos_failed)) }
+    }
+
+    /** The partner's note for me, and leaving or changing mine for them. */
+    private fun noteCard(): View {
+        val repo = SharedRepo(ctx)
+        val root = repo.root()
+        val theirs = TodayModel.note(root, seatKey(repo.me, mine = false))
+        val mine = TodayModel.note(root, seatKey(repo.me, mine = true))
+        return ctx.card(paddingDp = 16, spacingDp = 8, background = if (theirs != null) ctx.rounded(ctx.col(R.color.him_tint), 24f) else null).apply {
+            if (theirs != null) {
+                addView(ctx.text("💌 " + ctx.getString(R.string.note_from, store.partnerDisplay), 13f, 700, ctx.col(R.color.on_tint)))
+                addView(ctx.text(theirs.text, 18f, 600))
+            } else {
+                addView(ctx.text(ctx.getString(R.string.note_none, store.partnerDisplay), 14f, 500, ctx.col(R.color.ink2)))
+            }
+            addView(ctx.textButton(
+                if (mine == null) "+ " + ctx.getString(R.string.note_leave, store.partnerDisplay) else ctx.getString(R.string.note_yours, mine.text),
+            ) { writeNote(mine) }.apply {
+                gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                maxLines = 2
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            })
+        }
+    }
+
+    private fun writeNote(current: LoveNote?) {
+        val repo = SharedRepo(ctx)
+        activity.bottomSheet { sheet, dialog ->
+            sheet.addView(ctx.text(ctx.getString(R.string.note_leave, store.partnerDisplay), 22f, 700))
+            sheet.addView(ctx.text(ctx.getString(R.string.note_hint, store.partnerDisplay), 14f, 500, ctx.col(R.color.ink2)))
+            val input = EditText(ctx).apply {
+                setText(current?.text.orEmpty())
+                hint = ctx.getString(R.string.note_placeholder)
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                filters = arrayOf(InputFilter.LengthFilter(200))
+                typeface = Fonts.get(ctx, 500)
+                setTextColor(ctx.col(R.color.ink))
+                setHintTextColor(ctx.col(R.color.ink2))
+                background = ctx.rounded(ctx.col(R.color.bg), 16f, ctx.col(R.color.line))
+                setPadding(ctx.dp(16), ctx.dp(12), ctx.dp(16), ctx.dp(12))
+                minLines = 2
+            }
+            sheet.addView(input)
+            val chips = ctx.row(8)
+            listOf(R.string.note_idea_1, R.string.note_idea_2, R.string.note_idea_3).forEach { res ->
+                chips.addView(ctx.chip(ctx.getString(res), false) { input.setText(ctx.getString(res)) })
+            }
+            sheet.addView(HorizontalScrollView(ctx).apply {
+                isHorizontalScrollBarEnabled = false
+                addView(chips)
+            })
+            sheet.addView(ctx.primaryButton(ctx.getString(R.string.note_save)) {
+                val t = input.text.toString().trim()
+                if (t.isEmpty()) repo.delete("note/${seatKey(repo.me, mine = true)}")
+                else repo.put("note/${seatKey(repo.me, mine = true)}", org.json.JSONObject().put("text", t).put("at", System.currentTimeMillis()))
+                dialog.dismiss()
+                if (t.isNotEmpty()) Toaster.show(activity, ctx.getString(R.string.note_sent, store.partnerDisplay))
+            }.lp(top = 8))
+            input.requestFocus()
+        }
+    }
+
+    /** Photos and memories from this date a year (or more) ago. */
+    private fun onThisDayCard(): View? {
+        val repo = SharedRepo(ctx)
+        val today = LocalDate.now(ZoneId.systemDefault()).toEpochDay()
+        val day = TodayModel.onThisDay(repo.root(), repo.me, today) ?: return null
+        return ctx.card(paddingDp = 16, spacingDp = 10, background = ctx.rounded(ctx.col(R.color.honey_tint), 24f)).apply {
+            addView(ctx.text("🕰 " + ctx.resources.getQuantityString(R.plurals.home_years_ago, day.years, day.years), 17f, 700, ctx.col(R.color.honey_ink)))
+            day.moments.forEach { m ->
+                addView(ctx.text(m.title, 16f, 700))
+                if (m.text.isNotBlank()) addView(ctx.text(m.text, 14f, 500, ctx.col(R.color.ink2)))
+            }
+            if (day.photos.isNotEmpty()) addView(PhotosScreen.grid(activity, day.photos.take(4), 4))
+        }
     }
 
     // ---------- Header ----------
@@ -205,13 +468,33 @@ class TodayScreen(private val activity: MainActivity) : Screen {
         if (store.hasPartnerCheckIn) info.addView(ctx.meter(store.partnerEnergy, ctx.col(R.color.him), 6).lp(width = ctx.dp(156), top = 4))
         top.addView(info, LinearLayout.LayoutParams(0, WRAP, 1f))
         addView(top)
+        // Everything you can send lives here, next to the person it goes to.
+        addView(actions())
         addView(ctx.tintButton(ctx.getString(R.string.support), R.drawable.ic_heart, ctx.col(R.color.him_tint), ctx.col(R.color.ink)) { v ->
             haptic(v)
             tap(LiveModel.SUPPORT, ctx.getString(R.string.support_sent, store.partnerDisplay), null)
         }.apply { minHeight = ctx.dp(44) })
     }
 
-    private fun checkInCard(): View = ctx.card(paddingDp = 16, spacingDp = 14).apply {
+    private fun checkInCard(): View {
+        if (!store.checkedInToday() || checkInOpen) return fullCheckIn()
+        // Already checked in today: one line, tap to change.
+        return ctx.card(paddingDp = 16, spacingDp = 0).apply {
+            val r = ctx.row(12)
+            r.addView(ctx.text(Recap.emojiFor(store.myMood), 26f))
+            r.addView(ctx.text(ctx.getString(R.string.checkin_done, store.myEnergy), 15f, 600), LinearLayout.LayoutParams(0, WRAP, 1f))
+            r.addView(ctx.text(ctx.getString(R.string.checkin_change), 14f, 700, ctx.col(R.color.him)))
+            addView(r)
+            isClickable = true
+            background = ctx.ripple(background, 24f)
+            setOnClickListener {
+                checkInOpen = true
+                refresh()
+            }
+        }
+    }
+
+    private fun fullCheckIn(): View = ctx.card(paddingDp = 16, spacingDp = 14).apply {
         val head = ctx.row(8)
         head.addView(ctx.text(ctx.getString(R.string.checkin_title_name, store.myName), 17f, 700), LinearLayout.LayoutParams(0, WRAP, 1f))
         head.addView(ctx.text(ctx.getString(R.string.checkin_hint, store.partnerDisplay), 13f, 500, ctx.col(R.color.ink2)))
@@ -235,6 +518,7 @@ class TodayScreen(private val activity: MainActivity) : Screen {
                 setOnClickListener { v ->
                     haptic(v)
                     LiveSync.checkIn(ctx, mood, store.myEnergy)
+                    checkInOpen = true
                     refresh()
                 }
             }
@@ -259,6 +543,7 @@ class TodayScreen(private val activity: MainActivity) : Screen {
                 isSelected = level == store.myEnergy
                 setOnClickListener {
                     LiveSync.checkIn(ctx, store.myMood, level)
+                    checkInOpen = false
                     refresh()
                 }
             }, LinearLayout.LayoutParams(0, ctx.dp(22), 1f))
