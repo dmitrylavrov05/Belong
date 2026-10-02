@@ -13,11 +13,13 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import app.belong.couple.R
 import app.belong.couple.core.ChatMessage
+import app.belong.couple.data.Account
 import app.belong.couple.data.ChatRepo
 import app.belong.couple.data.CoupleStore
 import app.belong.couple.data.Counter
 import app.belong.couple.data.DataEvents
 import app.belong.couple.demo.DemoPartner
+import app.belong.couple.sync.ChatSync
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -96,8 +98,7 @@ class ChatScreen(private val activity: MainActivity) : Screen {
         addView(circleButton(R.drawable.ic_heart, R.string.chat_heart, ctx.rounded(ctx.col(R.color.her_tint), 24f), ctx.col(R.color.on_tint)) {
             haptic(view)
             store.increment(Counter.TAPS_SENT)
-            repo.send(ctx.getString(R.string.chat_heart_text))
-            DemoPartner.onChatMessage(ctx) { showTyping() }
+            post(ctx.getString(R.string.chat_heart_text))
         }, LinearLayout.LayoutParams(ctx.dp(48), ctx.dp(48)))
         addView(input, LinearLayout.LayoutParams(0, WRAP, 1f))
         addView(circleButton(R.drawable.ic_send, R.string.chat_send, ctx.gradient(24f, ctx.col(R.color.us_start), ctx.col(R.color.us_end)), ctx.col(R.color.white)) {
@@ -106,10 +107,15 @@ class ChatScreen(private val activity: MainActivity) : Screen {
     }
 
     private fun send() {
-        val text = input.text.toString()
-        if (repo.send(text) == null) return
-        input.setText("")
+        if (post(input.text.toString())) input.setText("")
+    }
+
+    /** Sends to the partner's phone when paired; in demo mode the simulated partner answers. */
+    private fun post(text: String): Boolean {
+        if (Account.get(ctx).paired) return ChatSync.send(ctx, text)
+        if (repo.send(text) == null) return false
         DemoPartner.onChatMessage(ctx) { showTyping() }
+        return true
     }
 
     private fun showTyping() {
@@ -125,7 +131,7 @@ class ChatScreen(private val activity: MainActivity) : Screen {
             setColor(ctx.col(if (mine) R.color.her_tint else R.color.him_tint))
             cornerRadii = if (mine) floatArrayOf(r, r, r, r, small, small, r, r) else floatArrayOf(r, r, r, r, r, r, small, small)
         }
-        val time = DateFormat.getTimeFormat(ctx).format(Date(m.at))
+        val time = if (m.pending) ctx.getString(R.string.chat_pending) else DateFormat.getTimeFormat(ctx).format(Date(m.at))
         val body = ctx.column(2).apply {
             background = shape
             setPadding(ctx.dp(14), ctx.dp(9), ctx.dp(14), ctx.dp(8))
@@ -137,7 +143,7 @@ class ChatScreen(private val activity: MainActivity) : Screen {
             contentDescription = if (m.hearted) "${m.text}, $time, ${ctx.getString(R.string.chat_hearted)}" else "${m.text}, $time"
             setOnLongClickListener { v ->
                 haptic(v)
-                repo.toggleHeart(m.id)
+                if (Account.get(ctx).paired) ChatSync.toggleHeart(ctx, m) else repo.toggleHeart(m.id)
                 true
             }
         }

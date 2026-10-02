@@ -174,7 +174,7 @@
     <string name="settings_meeting">Наступна зустріч</string>
     <string name="settings_save">Зберегти</string>
     <string name="settings_cancel">Скасувати</string>
-    <string name="settings_demo">Демо-режим: сервера ще немає, тому партнер працює як демо на цьому телефоні.</string>
+    <string name="settings_demo">Демо-режим: партнер працює як демо на цьому телефоні.</string>
 
     <!-- Навігація -->
     <string name="tab_chat">Чат</string>
@@ -309,4 +309,69 @@
         <item>Зайчик 🐰</item>
         <item>Серденько ❤️</item>
     </string-array>
+    <!-- Pairing and sync -->
+    <string name="pair_title">Наша пара</string>
+    <string name="more_pair_text">Код пари, допомога партнеру з входом, вихід</string>
+    <string name="pair_intro">Спільний простір для вас двох. Один із вас створює пару й передає код іншому.</string>
+    <string name="pair_create">Створити пару</string>
+    <string name="pair_join">У мене є код</string>
+    <string name="pair_sign_in">Увійти</string>
+    <string name="pair_demo">Просто подивитися (демо)</string>
+    <string name="pair_lost_access">На цьому телефоні виконано вихід, бо пароль змінили на іншому телефоні. Увійдіть з кодом і новим паролем.</string>
+    <string name="pair_create_text">Ви отримаєте код, який треба передати партнеру.</string>
+    <string name="pair_your_name">Ваше ім’я</string>
+    <string name="pair_password">Пароль</string>
+    <string name="pair_password_repeat">Повторіть пароль</string>
+    <string name="pair_new_password">Новий пароль</string>
+    <string name="pair_password_note">Запишіть код пари й свій пароль: обидва знадобляться, щоб увійти на новому телефоні. Пошти немає, тож якщо ви забудете пароль, партнер допоможе встановити новий.</string>
+    <string name="pair_create_button">Створити</string>
+    <string name="pair_code_title">Ваш код пари</string>
+    <string name="pair_code_text">Передайте його партнеру: хай натисне «У мене є код» і введе його.</string>
+    <string name="pair_code_note">Збережіть цей код. Ви входите з ним і своїм паролем.</string>
+    <string name="pair_share">Надіслати код</string>
+    <string name="pair_share_text">Приєднуйся до мене в Belong 💞 Натисни «У мене є код» і введи: %1$s</string>
+    <string name="pair_copy">Копіювати</string>
+    <string name="pair_copied">Код скопійовано</string>
+    <string name="pair_continue">Далі</string>
+    <string name="pair_join_text">Введіть код, який дав партнер, і придумайте власний пароль.</string>
+    <string name="pair_code">Код пари</string>
+    <string name="pair_join_button">Приєднатися</string>
+    <string name="pair_joined">Ви тепер у парі: %1$s 💞</string>
+    <string name="pair_sign_in_text">Введіть код пари, а потім виберіть, хто ви.</string>
+    <string name="pair_next">Далі</string>
+    <string name="pair_who">Хто ви?</string>
+    <string name="pair_sign_in_button">Увійти</string>
+    <string name="pair_forgot">Забули пароль?</string>
+    <string name="pair_recover_title">Новий пароль</string>
+    <string name="pair_recover_text">%1$s має відкрити Ще → Наша пара → «Допомогти увійти». З’явиться одноразовий код: введіть його тут. Він діє 30 хвилин.</string>
+    <string name="pair_help_code">Одноразовий код</string>
+    <string name="pair_recover_button">Встановити новий пароль</string>
+    <string name="pair_recovered">Новий пароль встановлено. На іншому телефоні виконано вихід.</string>
+    <string name="pair_partner_placeholder">Партнер</string>
+    <string name="pair_signed_in_as">Ви увійшли як %1$s.</string>
+    <string name="pair_partner_joined">%1$s уже з вами в парі.</string>
+    <string name="pair_partner_waiting">Партнер ще не приєднався. Надішліть код партнеру.</string>
+    <string name="pair_help_partner">Допомогти увійти: %1$s</string>
+    <string name="pair_help_making">Створюємо одноразовий код…</string>
+    <string name="pair_help_title">Одноразовий код</string>
+    <string name="pair_help_text">%1$s\n\nПовідомте цей код: %2$s. З ним можна встановити новий пароль; він спрацьовує один раз і діє 30 хвилин.</string>
+    <string name="pair_remember">Щоб увійти на іншому телефоні, потрібні код %1$s і ваш пароль.</string>
+    <string name="pair_close">Закрити</string>
+    <string name="pair_sign_out">Вийти</string>
+    <string name="pair_sign_out_title">Вийти на цьому телефоні?</string>
+    <string name="pair_sign_out_text">Чат збережеться. Щоб увійти знову, потрібні код %1$s і ваш пароль.</string>
+    <string name="pair_error_network">Немає зв’язку із сервером. Перевірте інтернет і спробуйте ще раз.</string>
+    <string name="pair_error_wrong_password">Неправильний пароль.</string>
+    <string name="pair_error_too_many">Забагато спроб. Зачекайте кілька хвилин і спробуйте ще раз.</string>
+    <string name="pair_error_weak">Пароль надто простий. Виберіть довший.</string>
+    <string name="pair_error_no_pair">Пари з таким кодом немає. Перевірте код із партнером.</string>
+    <string name="pair_error_code_used">За цим кодом уже хтось приєднався.</string>
+    <string name="pair_error_code_format">Код складається з 8 літер і цифр, наприклад K7M3-Q9XP.</string>
+    <string name="pair_error_help_code">Одноразовий код складається з 8 літер і цифр.</string>
+    <string name="pair_error_help_code_wrong">Одноразовий код неправильний, уже використаний або прострочений. Попросіть новий.</string>
+    <string name="pair_error_name">Введіть ім’я.</string>
+    <string name="pair_error_password_short">Пароль має містити щонайменше %1$d символів.</string>
+    <string name="pair_error_password_mismatch">Паролі не збігаються.</string>
+    <string name="pair_error_other">Щось пішло не так. Спробуйте ще раз.</string>
+    <string name="chat_pending">Надсилається…</string>
 </resources>

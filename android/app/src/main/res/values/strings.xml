@@ -172,7 +172,7 @@
     <string name="settings_meeting">Next meeting</string>
     <string name="settings_save">Save</string>
     <string name="settings_cancel">Cancel</string>
-    <string name="settings_demo">Demo mode: there’s no server yet, so your partner is simulated on this phone.</string>
+    <string name="settings_demo">Demo mode: your partner is simulated on this phone.</string>
 
     <!-- Navigation -->
     <string name="tab_chat">Chat</string>
@@ -304,4 +304,69 @@
         <item>Love ❤️</item>
         <item>Kitten 🐱</item>
     </string-array>
+    <!-- Pairing and sync -->
+    <string name="pair_title">Our pair</string>
+    <string name="more_pair_text">Pair code, help your partner sign in, sign out</string>
+    <string name="pair_intro">A shared space for the two of you. One of you creates a pair and passes the code to the other.</string>
+    <string name="pair_create">Create a pair</string>
+    <string name="pair_join">I have a code</string>
+    <string name="pair_sign_in">Sign in</string>
+    <string name="pair_demo">Just look around (demo)</string>
+    <string name="pair_lost_access">This phone was signed out because the password was reset on another phone. Sign in with the code and the new password.</string>
+    <string name="pair_create_text">You’ll get a code to pass to your partner.</string>
+    <string name="pair_your_name">Your name</string>
+    <string name="pair_password">Password</string>
+    <string name="pair_password_repeat">Repeat the password</string>
+    <string name="pair_new_password">New password</string>
+    <string name="pair_password_note">Write down the pair code and your password: you’ll need both to sign in on a new phone. There’s no email, so if you forget the password, your partner can help you set a new one.</string>
+    <string name="pair_create_button">Create</string>
+    <string name="pair_code_title">Your pair code</string>
+    <string name="pair_code_text">Give it to your partner: they tap “I have a code” and enter it.</string>
+    <string name="pair_code_note">Keep this code. You sign in with it and your password.</string>
+    <string name="pair_share">Share the code</string>
+    <string name="pair_share_text">Join me in Belong 💞 Tap “I have a code” and enter: %1$s</string>
+    <string name="pair_copy">Copy</string>
+    <string name="pair_copied">Code copied</string>
+    <string name="pair_continue">Continue</string>
+    <string name="pair_join_text">Enter the code your partner gave you and choose your own password.</string>
+    <string name="pair_code">Pair code</string>
+    <string name="pair_join_button">Join</string>
+    <string name="pair_joined">You’re paired with %1$s 💞</string>
+    <string name="pair_sign_in_text">Enter your pair code, then choose who you are.</string>
+    <string name="pair_next">Next</string>
+    <string name="pair_who">Who are you?</string>
+    <string name="pair_sign_in_button">Sign in</string>
+    <string name="pair_forgot">Forgot your password?</string>
+    <string name="pair_recover_title">New password</string>
+    <string name="pair_recover_text">Ask %1$s to open More → Our pair → “Help sign in”. They’ll get a one-time code: enter it here. It works for 30 minutes.</string>
+    <string name="pair_help_code">One-time code</string>
+    <string name="pair_recover_button">Set the new password</string>
+    <string name="pair_recovered">New password set. Your other phone is now signed out.</string>
+    <string name="pair_partner_placeholder">Partner</string>
+    <string name="pair_signed_in_as">You’re signed in as %1$s.</string>
+    <string name="pair_partner_joined">%1$s has joined.</string>
+    <string name="pair_partner_waiting">Your partner hasn’t joined yet. Send them the code.</string>
+    <string name="pair_help_partner">Help %1$s sign in</string>
+    <string name="pair_help_making">Making a one-time code…</string>
+    <string name="pair_help_title">One-time code</string>
+    <string name="pair_help_text">%1$s\n\nTell %2$s this code. It lets them set a new password, works once and expires in 30 minutes.</string>
+    <string name="pair_remember">To sign in on another phone you need the code %1$s and your password.</string>
+    <string name="pair_close">Close</string>
+    <string name="pair_sign_out">Sign out</string>
+    <string name="pair_sign_out_title">Sign out on this phone?</string>
+    <string name="pair_sign_out_text">Your chat stays saved. To sign in again you’ll need the code %1$s and your password.</string>
+    <string name="pair_error_network">No connection to the server. Check the internet and try again.</string>
+    <string name="pair_error_wrong_password">Wrong password.</string>
+    <string name="pair_error_too_many">Too many attempts. Wait a few minutes and try again.</string>
+    <string name="pair_error_weak">This password is too simple. Choose a longer one.</string>
+    <string name="pair_error_no_pair">There’s no pair with this code. Check it with your partner.</string>
+    <string name="pair_error_code_used">Someone has already joined with this code.</string>
+    <string name="pair_error_code_format">The code has 8 letters and digits, like K7M3-Q9XP.</string>
+    <string name="pair_error_help_code">The one-time code has 8 letters and digits.</string>
+    <string name="pair_error_help_code_wrong">This one-time code is wrong, already used or expired. Ask for a new one.</string>
+    <string name="pair_error_name">Enter your name.</string>
+    <string name="pair_error_password_short">The password needs at least %1$d characters.</string>
+    <string name="pair_error_password_mismatch">The passwords don’t match.</string>
+    <string name="pair_error_other">Something went wrong. Try again.</string>
+    <string name="chat_pending">Sending…</string>
 </resources>

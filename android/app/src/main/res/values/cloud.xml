@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The Firebase project that syncs the pair (see firebase/README.md).
+    Fill both in to enable pairing; while they are empty the app runs in demo mode.
+    The web API key is not a secret: access is controlled by firebase/database.rules.json.
+-->
+<resources>
+    <string name="cloud_api_key" translatable="false"></string>
+    <string name="cloud_database_url" translatable="false"></string>
+</resources>

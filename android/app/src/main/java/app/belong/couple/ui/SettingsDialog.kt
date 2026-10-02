@@ -10,7 +10,10 @@ import android.widget.ScrollView
 import android.widget.Spinner
 import app.belong.couple.R
 import app.belong.couple.core.Cities
+import app.belong.couple.data.Account
 import app.belong.couple.data.CoupleStore
+import app.belong.couple.sync.CloudException
+import app.belong.couple.sync.Pairing
 
 /** Names, cities and the next meeting date for the couple. */
 object SettingsDialog {
@@ -72,13 +75,15 @@ object SettingsDialog {
             }, meeting.year, meeting.monthValue - 1, meeting.dayOfMonth).show()
         }
         form.addView(dateButton)
-        form.addView(ctx.text(ctx.getString(R.string.settings_demo), 13f, 500, ctx.col(R.color.ink2)).lp(top = 12))
+        val account = Account.get(ctx)
+        if (!account.paired) form.addView(ctx.text(ctx.getString(R.string.settings_demo), 13f, 500, ctx.col(R.color.ink2)).lp(top = 12))
 
         AlertDialog.Builder(activity)
             .setTitle(R.string.settings_title)
             .setView(ScrollView(ctx).apply { addView(form) })
             .setPositiveButton(R.string.settings_save) { _, _ ->
                 myName.text.toString().takeIf { it.isNotBlank() }?.let { store.myName = it }
+                renameOnServer(account, store.myName)
                 partnerName.text.toString().takeIf { it.isNotBlank() }?.let { store.partnerName = it }
                 store.partnerNickname = nickname.text.toString()
                 store.myCityId = Cities.all[myCity.selectedItemPosition].id
@@ -88,5 +93,20 @@ object SettingsDialog {
             }
             .setNegativeButton(R.string.settings_cancel, null)
             .show()
+    }
+
+    /** The partner and the sign-in screen see the name stored with the pair. */
+    private fun renameOnServer(account: Account, name: String) {
+        val seat = account.seat ?: return
+        if (name == seat.myName) return
+        account.setMyName(name)
+        Thread {
+            try {
+                Pairing(account.config).rename(seat, name.take(24), account.token())
+            } catch (e: CloudException) {
+                // Offline: the name stays local for now.
+                account.setMyName(seat.myName)
+            }
+        }.start()
     }
 }

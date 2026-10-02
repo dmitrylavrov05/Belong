@@ -34,4 +34,5 @@ android {
 
 dependencies {
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303") // android.jar only has stubs of org.json
 }

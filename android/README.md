@@ -38,7 +38,18 @@ Five tabs: Today, Chat, Wishlist, Places, More.
 
   The widgets also declare the lock-screen (keyguard) category, but most Android phones only allow widgets on the home screen.
 
-**Demo mode.** There is no sync server yet. Everything is stored on the phone, and the partner is simulated:
+**Pairing and sync.** There is no Google or email sign-in:
+
+- one partner taps **Create a pair**, picks a password and gets a code like `K7M3-Q9XP`;
+- the other taps **I have a code**, enters it and picks their own password;
+- on a new phone you **Sign in** with the code, then choose who you are and enter your password;
+- a forgotten password is replaced with a one-time code from your partner (More → Our pair → Help sign in). It works once, for 30 minutes, and the old phone is signed out.
+
+For now only the **chat** is synced. It works offline: messages wait marked “Sending…” and go out on the next connection. Tasks, wishlists, moods and doodles still stay on the phone. There are no push notifications yet: the chat updates while the app is open.
+
+The server is a Firebase project used over REST (no Firebase SDK); see [`../firebase/README.md`](../firebase/README.md). Its details go into `app/src/main/res/values/cloud.xml`.
+
+**Demo mode.** While `cloud.xml` is empty, or after **Just look around**, the partner is simulated:
 
 - Igor replies in chat after a few seconds (“typing…” first);
 - he answers some “thinking of you” taps;
@@ -53,7 +64,7 @@ Open this folder in Android Studio, or run:
 ./gradlew test assembleDebug     # APK in app/build/outputs/apk/debug/
 ```
 
-`.github/workflows/android.yml` does the same on GitHub and uploads the APK as an artifact.
+`.github/workflows/android.yml` does the same on GitHub with the Firebase emulators running, so the server rules are tested too, and uploads the APK as an artifact.
 
 ## Build without the Android Gradle Plugin
 

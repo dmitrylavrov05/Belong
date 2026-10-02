@@ -10,10 +10,13 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import app.belong.couple.R
+import app.belong.couple.data.Account
 import app.belong.couple.data.ChatRepo
 import app.belong.couple.data.CoupleStore
+import app.belong.couple.data.DataEvents
 import app.belong.couple.data.TaskRepo
 import app.belong.couple.data.WishRepo
+import app.belong.couple.sync.ChatSync
 import app.belong.couple.widget.Widgets
 
 /** One screen of the app. */
@@ -32,6 +35,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (Account.get(this).needsPairing) return openPairing()
         CoupleStore.get(this).ensureSeeded()
         TaskRepo(this).ensureSeeded()
         WishRepo(this).ensureSeeded()
@@ -45,6 +49,8 @@ class MainActivity : Activity() {
         root.addView(content, LinearLayout.LayoutParams(MATCH, 0, 1f))
         root.addView(tabBar(), LinearLayout.LayoutParams(MATCH, WRAP))
         setContentView(root)
+        // Signing out, or losing access after a password reset on another phone, returns to pairing.
+        DataEvents.follow(root) { if (Account.get(this).needsPairing && !isFinishing) openPairing() }
 
         val fromIntent = intent?.getIntExtra(EXTRA_TAB, -1) ?: -1
         select(if (fromIntent >= 0) fromIntent else savedInstanceState?.getInt(STATE_TAB) ?: TAB_TODAY)
@@ -56,6 +62,21 @@ class MainActivity : Activity() {
         setIntent(intent)
         val tab = intent.getIntExtra(EXTRA_TAB, -1)
         if (tab >= 0) select(tab)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        ChatSync.start(this)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        ChatSync.stop()
+    }
+
+    private fun openPairing() {
+        startActivity(Intent(this, PairActivity::class.java))
+        finish()
     }
 
     override fun onResume() {

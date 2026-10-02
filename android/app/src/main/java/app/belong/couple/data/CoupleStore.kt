@@ -154,6 +154,15 @@ class CoupleStore private constructor(private val context: Context) {
 
     // ---------- Example data ----------
 
+    /** Drops Yulia and Igor's example month for a real pair. */
+    fun startReal() {
+        val editor = prefs.edit().putBoolean("seeded", true).putBoolean("example", false)
+        val example = Counter.entries.map { it.key + "_" } + "mood_" + "partner_mood" + "partner_energy"
+        prefs.all.keys.filter { key -> example.any { key.startsWith(it) } }.forEach { editor.remove(it) }
+        editor.remove("partner_doodle_at").apply()
+        partnerDoodleFile.delete()
+    }
+
     /** Fills in Yulia and Igor's example month on first launch so every screen has something to show. */
     fun ensureSeeded(today: LocalDate = LocalDate.now()) {
         if (prefs.getBoolean("seeded", false)) return

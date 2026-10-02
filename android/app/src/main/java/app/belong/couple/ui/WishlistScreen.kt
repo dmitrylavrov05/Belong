@@ -185,6 +185,9 @@ class MoreScreen(private val activity: MainActivity) : Screen {
         body.addView(entry(R.drawable.ic_tab_doodle, R.string.tab_doodle, R.string.more_doodle_text) { activity.select(MainActivity.TAB_DOODLE) })
         body.addView(entry(R.drawable.ic_tab_games, R.string.games_title, R.string.more_games_text) { activity.select(MainActivity.TAB_GAMES) })
         body.addView(entry(R.drawable.ic_tab_month, R.string.month_title, R.string.more_month_text) { activity.select(MainActivity.TAB_MONTH) })
+        if (app.belong.couple.data.Account.get(ctx).available) {
+            body.addView(entry(R.drawable.ic_heart, R.string.pair_title, R.string.more_pair_text) { PairDialog.show(activity) })
+        }
         body.addView(entry(R.drawable.ic_settings, R.string.settings_title, R.string.more_settings_text) { SettingsDialog.show(activity) })
     }
 

@@ -42,7 +42,16 @@ data class WishItem(
     val createdAt: Long,
 )
 
-data class ChatMessage(val id: Long, val fromMe: Boolean, val text: String, val at: Long, val hearted: Boolean)
+/** [key] is the server key once the chat is shared with a partner; [pending] means it hasn't reached the server yet. */
+data class ChatMessage(
+    val id: Long,
+    val fromMe: Boolean,
+    val text: String,
+    val at: Long,
+    val hearted: Boolean,
+    val key: String = "",
+    val pending: Boolean = false,
+)
 
 object Links {
     private val SCHEME = Regex("^[a-zA-Z][a-zA-Z0-9+.-]*:")

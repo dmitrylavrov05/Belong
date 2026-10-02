@@ -2,9 +2,9 @@ name: Android
 
 on:
   push:
-    paths: ["android/**", ".github/workflows/android.yml"]
+    paths: ["android/**", "firebase/**", ".github/workflows/android.yml"]
   pull_request:
-    paths: ["android/**", ".github/workflows/android.yml"]
+    paths: ["android/**", "firebase/**", ".github/workflows/android.yml"]
   workflow_dispatch:
 
 jobs:
@@ -20,8 +20,14 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: android-actions/setup-android@v3
-      - name: Unit tests and debug APK
-        run: ./gradlew --no-daemon test assembleDebug
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Firebase emulators
+        run: npm install -g firebase-tools@13
+      - name: Tests (with the server rules on the emulators) and debug APK
+        working-directory: firebase
+        run: firebase emulators:exec --project demo-belong --only auth,database "cd ../android && ./gradlew --no-daemon test assembleDebug"
       - uses: actions/upload-artifact@v4
         with:
           name: belong-debug-apk

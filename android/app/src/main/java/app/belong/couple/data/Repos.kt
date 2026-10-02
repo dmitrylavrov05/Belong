@@ -67,6 +67,12 @@ abstract class JsonList<T>(context: Context, private val key: String) {
         DataEvents.changed()
     }
 
+    /** Drops the example items for a real pair and keeps them from coming back. */
+    protected fun startEmpty(flag: String) {
+        prefs.edit().putBoolean(flag, true).apply()
+        save(emptyList())
+    }
+
     protected fun seededOnce(flag: String, seed: () -> List<T>) {
         if (prefs.getBoolean(flag, false)) return
         prefs.edit().putBoolean(flag, true).apply()
@@ -97,6 +103,8 @@ class TaskRepo(context: Context) : JsonList<Task>(context, "tasks") {
 
     fun remove(id: Long) = save(all().filterNot { it.id == id })
 
+    fun startReal() = startEmpty("seeded_tasks")
+
     fun ensureSeeded() = seededOnce("seeded_tasks") {
         app.resources.getStringArray(R.array.seed_tasks).mapIndexed { i, line ->
             val (owner, title) = line.split('|', limit = 2)
@@ -126,6 +134,8 @@ class WishRepo(context: Context) : JsonList<WishItem>(context, "wishes") {
 
     fun remove(id: Long) = save(all().filterNot { it.id == id })
 
+    fun startReal() = startEmpty("seeded_wishes")
+
     fun ensureSeeded() = seededOnce("seeded_wishes") {
         val now = System.currentTimeMillis()
         app.resources.getStringArray(R.array.seed_wishes).mapIndexed { i, line ->
@@ -138,9 +148,11 @@ class WishRepo(context: Context) : JsonList<WishItem>(context, "wishes") {
 class ChatRepo(context: Context) : JsonList<ChatMessage>(context, "chat") {
     override fun write(item: ChatMessage) = JSONObject()
         .put("id", item.id).put("me", item.fromMe).put("text", item.text).put("at", item.at).put("heart", item.hearted)
+        .put("key", item.key).put("pending", item.pending)
 
     override fun read(o: JSONObject) = ChatMessage(
         o.getLong("id"), o.optBoolean("me"), o.getString("text"), o.optLong("at"), o.optBoolean("heart"),
+        o.optString("key"), o.optBoolean("pending"),
     )
 
     fun send(text: String, fromMe: Boolean = true): ChatMessage? {
@@ -152,6 +164,9 @@ class ChatRepo(context: Context) : JsonList<ChatMessage>(context, "chat") {
     }
 
     fun toggleHeart(id: Long) = save(all().map { if (it.id == id) it.copy(hearted = !it.hearted) else it })
+
+    /** Empties the chat for a real pair: no example messages, the server fills it in. */
+    fun startShared() = startEmpty("seeded_chat")
 
     fun ensureSeeded() = seededOnce("seeded_chat") {
         val zone = ZoneId.systemDefault()

@@ -1,0 +1,47 @@
+{
+  "rules": {
+    "pairs": {
+      "$code": {
+        ".read": "auth != null && (data.child('members/a').val() === auth.uid || data.child('members/b').val() === auth.uid)",
+
+        "logins": {
+          ".read": true,
+          "$role": {
+            ".write": "auth != null && newData.exists() && newData.parent().parent().child('members').child($role).val() === auth.uid",
+            ".validate": "newData.hasChildren(['gen', 'name']) && auth.token.email === $code + '.' + $role + '.' + newData.child('gen').val() + '@pair.belong.app'",
+            "gen": { ".validate": "newData.isString() && newData.val().matches(/^[1-9][0-9]{0,3}$/)" },
+            "name": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 24" },
+            "$other": { ".validate": false }
+          }
+        },
+
+        "members": {
+          "$role": {
+            ".write": "auth != null && newData.val() === auth.uid && $code.matches(/^[a-z0-9]{8}$/) && ($role === 'a' || $role === 'b') && auth.token.email === $code + '.' + $role + '.' + newData.parent().parent().child('logins').child($role).child('gen').val() + '@pair.belong.app' && (($role === 'a' && !data.parent().parent().exists()) || ($role === 'b' && !data.exists() && data.parent().child('a').exists()) || (data.exists() && data.parent().parent().child('reset').child($role).child('at').val() > now - 1800000 && !data.parent().parent().child('reset').child($role).child('used').exists() && newData.parent().parent().child('reset').child($role).child('used').val() === data.parent().parent().child('reset').child($role).child('code').val()))"
+          }
+        },
+
+        "reset": {
+          "$role": {
+            ".write": "auth != null && newData.exists() && !newData.hasChild('used') && newData.child('code').isString() && newData.child('code').val().matches(/^[a-z0-9]{8}$/) && newData.child('at').val() === now && root.child('pairs').child($code).child('members').child($role).exists() && root.child('pairs').child($code).child('members').child($role).val() !== auth.uid && (root.child('pairs').child($code).child('members/a').val() === auth.uid || root.child('pairs').child($code).child('members/b').val() === auth.uid)",
+            "used": {
+              ".write": "auth != null && newData.parent().parent().parent().child('members').child($role).val() === auth.uid"
+            }
+          }
+        },
+
+        "chat": {
+          "$msg": {
+            ".write": "auth != null && newData.exists() && (root.child('pairs').child($code).child('members/a').val() === auth.uid || root.child('pairs').child($code).child('members/b').val() === auth.uid)",
+            ".validate": "newData.hasChildren(['from', 'text', 'at']) && (data.exists() ? newData.child('from').val() === data.child('from').val() && newData.child('text').val() === data.child('text').val() && newData.child('at').val() === data.child('at').val() : newData.child('at').val() === now && root.child('pairs').child($code).child('members').child(newData.child('from').val()).val() === auth.uid)",
+            "from": { ".validate": "newData.val() === 'a' || newData.val() === 'b'" },
+            "text": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 2000" },
+            "at": { ".validate": "newData.isNumber()" },
+            "heart": { ".validate": "newData.isBoolean()" },
+            "$other": { ".validate": false }
+          }
+        }
+      }
+    }
+  }
+}
