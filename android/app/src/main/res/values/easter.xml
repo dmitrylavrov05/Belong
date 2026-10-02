@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    A secret for Yulia. Opens after seven taps on the two dots at the top of the "Us" tab,
+    and only when the name in the settings is Юля / Юлия / Yulia / Julia.
+    Change any text here as you like: these words are the same in every language of the app.
+-->
+<resources>
+    <string name="easter_found" translatable="false">Ты нашла секрет 🤫</string>
+    <string name="easter_title" translatable="false">Юля, это всё — для тебя</string>
+    <string name="easter_letter" translatable="false">Привет, моя любимая.\n\nЭто приложение я делаю для тебя. Каждый экран, каждая кнопка и каждая мелочь здесь появились потому, что мне хочется быть рядом с тобой — даже когда мы заняты, устали или далеко друг от друга.\n\nСпасибо тебе за твою улыбку, за терпение и за то, как ты смеёшься над моими шутками, даже не самыми смешными. Рядом с тобой мне спокойно и тепло.\n\nПусть здесь собираются наши фото, мечты и маленькие победы. А если мы когда-нибудь поссоримся — пусть здесь будут и наши честные слова друг другу. Я всегда хочу тебя слышать.\n\nЯ тебя люблю. Очень.</string>
+    <string name="easter_signature" translatable="false">С любовью, %1$s ❤️</string>
+    <string name="easter_reasons_title" translatable="false">За что я тебя люблю</string>
+    <string name="easter_reason_number" translatable="false">Причина %1$d из %2$d</string>
+    <string name="easter_more" translatable="false">Ещё одна причина 💗</string>
+    <string-array name="easter_reasons" translatable="false">
+        <item>За то, как ты смеёшься — громко и по-настоящему</item>
+        <item>За твои тёплые руки</item>
+        <item>За то, что с тобой можно молчать, и это совсем не неловко</item>
+        <item>За то, как ты заботишься обо всех вокруг</item>
+        <item>За твоё «доброе утро»</item>
+        <item>За то, что ты веришь в меня</item>
+        <item>За твои глаза, когда ты чем-то увлечена</item>
+        <item>За твою смелость</item>
+        <item>За то, что ты — мой дом</item>
+        <item>За то, как ты танцуешь, когда думаешь, что никто не видит</item>
+        <item>За твои объятия, после которых всё проходит</item>
+        <item>За то, что ты умеешь прощать</item>
+        <item>За наши шутки, понятные только нам двоим</item>
+        <item>За то, что ты умеешь радоваться мелочам</item>
+        <item>За твоё терпение</item>
+        <item>За то, какая ты сонная по утрам</item>
+        <item>За то, что с тобой хочется строить планы на годы вперёд</item>
+        <item>За твою доброту</item>
+        <item>За то, что ты есть</item>
+        <item>Просто потому, что ты — это ты</item>
+    </string-array>
+</resources>

@@ -19,9 +19,11 @@ import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import app.belong.couple.R
+import app.belong.couple.core.FeelingsModel
 import app.belong.couple.core.Geo
 import app.belong.couple.core.Owner
 import app.belong.couple.core.PartOfDay
+import app.belong.couple.core.PhotosModel
 import app.belong.couple.core.Recap
 import app.belong.couple.core.Task
 import app.belong.couple.core.TimeMath
@@ -29,6 +31,8 @@ import app.belong.couple.data.Account
 import app.belong.couple.data.CoupleStore
 import app.belong.couple.data.Counter
 import app.belong.couple.data.DataEvents
+import app.belong.couple.data.DayPhotos
+import app.belong.couple.data.SharedRepo
 import app.belong.couple.data.TaskRepo
 import app.belong.couple.demo.DemoPartner
 import app.belong.couple.sync.LiveModel
@@ -113,9 +117,13 @@ class TodayScreen(private val activity: MainActivity) : Screen {
         body.removeAllViews()
         clockUpdaters.clear()
         body.addView(header())
+        if (store.apart == null) body.addView(modeCard().lp(top = 24))
+        feelingsCard()?.let { body.addView(it.lp(top = 24)) }
         body.addView(partnerCard().lp(top = 24))
         body.addView(checkInCard().lp(top = 12))
         body.addView(countdowns().lp(top = 28))
+        reportCard()?.let { body.addView(it.lp(top = 28)) }
+        body.addView(photoCard().lp(top = 28))
         body.addView(planHeader().lp(top = 28))
         body.addView(ctx.segmented(
             listOf(ctx.getString(R.string.owner_me), ctx.getString(R.string.owner_ours), store.partnerDisplay),
@@ -183,11 +191,13 @@ class TodayScreen(private val activity: MainActivity) : Screen {
         info.addView(ctx.text(line, 16f, 500))
         val time = ctx.text("", 13f, 500, ctx.col(R.color.ink2))
         val city = store.partnerCity
+        val apart = store.apart == true
         clockUpdaters += {
-            val local = "${city.name(ctx.language())} ${ctx.timeIn(city.zone)}"
-            time.text = if (store.hasPartnerCheckIn) {
-                "$local · ${ctx.getString(R.string.updated_at, DateFormat.getTimeFormat(ctx).format(Date(store.partnerMoodAt)))}"
-            } else local
+            // The partner's city and local time matter only when you live apart.
+            val local = if (apart) "${city.name(ctx.language())} ${ctx.timeIn(city.zone)}" else ""
+            val updated = if (store.hasPartnerCheckIn) ctx.getString(R.string.updated_at, DateFormat.getTimeFormat(ctx).format(Date(store.partnerMoodAt))) else ""
+            time.text = listOf(local, updated).filter { it.isNotEmpty() }.joinToString(" · ")
+            time.visibility = if (time.text.isEmpty()) View.GONE else View.VISIBLE
         }
         info.addView(time)
         if (store.hasPartnerCheckIn) info.addView(ctx.meter(store.partnerEnergy, ctx.col(R.color.him), 6).lp(width = ctx.dp(156), top = 4))
@@ -266,7 +276,34 @@ class TodayScreen(private val activity: MainActivity) : Screen {
         isHorizontalScrollBarEnabled = false
         clipToPadding = false
         val row = ctx.row(12).apply { setPadding(0, ctx.dp(4), ctx.dp(4), ctx.dp(12)) }
+        addView(row)
+        if (store.apart == true) apartCards(row)
+        val today = LocalDate.now(ZoneId.systemDefault()).toEpochDay()
+        val upcoming = app.belong.couple.core.CalendarModel.upcoming(
+            app.belong.couple.data.SharedRepo(ctx).root(), today, ctx.getString(R.string.calendar_anniversary), ctx.getString(R.string.countdown_title),
+        ).filter { it.kind != app.belong.couple.core.Upcoming.Kind.MEETING }.take(3)
+        upcoming.forEachIndexed { i, u ->
+            row.addView(miniCard(
+                R.drawable.ic_calendar, "${u.emoji} ${u.title}",
+                if (u.daysLeft > 0) u.daysLeft.toString() else ctx.getString(R.string.countdown_today),
+                if (u.daysLeft > 0) ctx.resources.getQuantityString(R.plurals.days_word, u.daysLeft.toInt()) else "",
+                listOfNotNull(ctx.formatLongDate(LocalDate.ofEpochDay(u.date)), u.years?.let { ctx.resources.getQuantityString(R.plurals.years, it, it) }).joinToString(" · "),
+                if (i == 0 && store.apart != true) ctx.gradient(24f, ctx.col(R.color.her_tint), ctx.col(R.color.him_tint)) else null,
+            ).apply { setOnClickListener { activity.select(MainActivity.TAB_CALENDAR) } })
+        }
+        row.addView(ctx.card(paddingDp = 16, spacingDp = 6).apply {
+            layoutParams = LinearLayout.LayoutParams(ctx.dp(150), MATCH)
+            gravity = Gravity.CENTER
+            addView(android.widget.ImageView(ctx).apply { setImageDrawable(ctx.icon(R.drawable.ic_calendar, ctx.col(R.color.ink2), 26)) })
+            addView(ctx.text(ctx.getString(if (upcoming.isEmpty()) R.string.calendar_add_first else R.string.calendar_all), 14f, 700).apply { gravity = Gravity.CENTER })
+            isClickable = true
+            background = ctx.ripple(background, 24f)
+            setOnClickListener { activity.select(MainActivity.TAB_CALENDAR) }
+        })
+    }
 
+    /** For a couple living apart: until we meet, the distance and the partner's clock. */
+    private fun apartCards(row: LinearLayout) {
         val days = TimeMath.daysUntil(LocalDate.now(ZoneId.systemDefault()), store.meetingDate)
         row.addView(miniCard(
             R.drawable.ic_heart, ctx.getString(R.string.countdown_title),
@@ -293,7 +330,66 @@ class TodayScreen(private val activity: MainActivity) : Screen {
         val big = clock.findViewWithTag<android.widget.TextView>("big")
         clockUpdaters += { big.text = ctx.timeIn(city.zone) }
         row.addView(clock)
-        addView(row)
+    }
+
+    /** Asked once for a new pair: everything about distance and meetings depends on the answer. */
+    /** The partner wrote about their feelings and waits for my side. */
+    private fun feelingsCard(): View? {
+        val repo = SharedRepo(ctx)
+        val note = FeelingsModel.waitingForMe(repo.root(), repo.me) ?: return null
+        return ctx.card(paddingDp = 18, spacingDp = 6, background = ctx.rounded(ctx.col(R.color.her_tint), 24f)).apply {
+            addView(ctx.text("💌 " + ctx.getString(R.string.feelings_today, store.partnerDisplay), 17f, 700, ctx.col(R.color.on_tint)))
+            addView(ctx.text(ctx.getString(R.string.feelings_today_text), 14f, 500, ctx.col(R.color.on_tint)))
+            isClickable = true
+            foreground = ctx.ripple(android.graphics.drawable.ColorDrawable(0), 24f)
+            setOnClickListener { FeelingsScreen.write(activity, note) }
+        }
+    }
+
+    /** In the first week of a month: last month's report is ready, until it's opened. */
+    private fun reportCard(): View? {
+        val today = java.time.LocalDate.now()
+        val month = TimeMath.recapMonth(today)
+        if (month == java.time.YearMonth.from(today)) return null
+        val prefs = ctx.getSharedPreferences("belong_reports", android.content.Context.MODE_PRIVATE)
+        if (prefs.getBoolean("seen_$month", false)) return null
+        return ctx.card(paddingDp = 18, spacingDp = 6, background = ctx.gradient(24f, ctx.col(R.color.her_tint), ctx.col(R.color.him_tint))).apply {
+            addView(ctx.text("✨ " + ctx.getString(R.string.report_ready, StoryRenderer.monthName(ctx, month)), 18f, 700, ctx.col(R.color.on_tint)))
+            addView(ctx.text(ctx.getString(R.string.report_ready_text), 14f, 500, ctx.col(R.color.on_tint)))
+            isClickable = true
+            foreground = ctx.ripple(android.graphics.drawable.ColorDrawable(0), 24f)
+            setOnClickListener {
+                prefs.edit().putBoolean("seen_$month", true).apply()
+                activity.select(MainActivity.TAB_MONTH)
+            }
+        }
+    }
+
+    /** Today's photos from both of you, or an invitation to add one. */
+    private fun photoCard(): View = ctx.card(paddingDp = 16, spacingDp = 12).apply {
+        val today = DayPhotos.today()
+        val photos = PhotosModel.photos(SharedRepo(ctx).root(), SharedRepo(ctx).me).filter { it.day == today }
+        val head = ctx.row(8)
+        head.addView(ctx.text(ctx.getString(R.string.photos_card_title), 17f, 700), LinearLayout.LayoutParams(0, WRAP, 1f))
+        head.addView(ctx.textButton(ctx.getString(R.string.photos_see_all)) { activity.select(MainActivity.TAB_PHOTOS) })
+        addView(head)
+        if (photos.isEmpty()) {
+            addView(ctx.text(ctx.getString(R.string.photos_today_none), 14f, 500, ctx.col(R.color.ink2)))
+        } else {
+            addView(PhotosScreen.grid(activity, photos.take(4), 4))
+        }
+        if (photos.count { it.by == Owner.ME } < PhotosModel.PER_DAY) {
+            addView(ctx.secondaryButton(ctx.getString(R.string.photos_add), R.drawable.ic_plus) { PhotosScreen.pick(activity) })
+        }
+    }
+
+    private fun modeCard(): View = ctx.card(paddingDp = 16, spacingDp = 10).apply {
+        addView(ctx.text(ctx.getString(R.string.mode_question), 18f, 700))
+        addView(ctx.text(ctx.getString(R.string.mode_text), 14f, 500, ctx.col(R.color.ink2)))
+        val buttons = ctx.row(10)
+        buttons.addView(ctx.secondaryButton(ctx.getString(R.string.mode_together)) { store.setApart(false) }, LinearLayout.LayoutParams(0, WRAP, 1f))
+        buttons.addView(ctx.secondaryButton(ctx.getString(R.string.mode_apart)) { store.setApart(true) }, LinearLayout.LayoutParams(0, WRAP, 1f))
+        addView(buttons)
     }
 
     private fun miniCard(iconRes: Int, title: String, big: String, unit: String, caption: String, background: android.graphics.drawable.Drawable?): LinearLayout =

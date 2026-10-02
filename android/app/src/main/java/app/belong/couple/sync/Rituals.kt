@@ -134,3 +134,77 @@ object Quiz {
 
     fun partnerSeat(me: app.belong.couple.core.Role?) = seatKey(me, mine = false)
 }
+
+/**
+ * Notes about feelings after a quarrel. Each of you writes what happened, what you feel, what you
+ * need and what you'd ask for. The note lives at feelings/{key}/{seat}; the database lets the
+ * partner read it only once they've written their own, so both speak first and listen second.
+ * live/feelings/{key} only says who has written.
+ */
+object Feelings {
+    data class Note(val what: String, val feel: String, val need: String, val ask: String) {
+        fun toJson(): JSONObject = JSONObject().put("what", what).put("feel", feel).put("need", need).put("ask", ask)
+
+        companion object {
+            fun from(o: JSONObject?): Note? = o?.takeIf { it.has("feel") }?.let { Note(it.optString("what"), it.optString("feel"), it.optString("need"), it.optString("ask")) }
+        }
+    }
+
+    fun mine(context: Context, key: String): Note? = prefs(context).getString("feel_mine_$key", null)?.let { Note.from(JSONObject(it)) }
+
+    /** Saves my side of [key] (a new note when [title] is given) and sends it. [done] gets whether the server has it. */
+    fun write(context: Context, key: String, title: String?, note: Note, done: (Boolean) -> Unit) {
+        val app = context.applicationContext
+        prefs(app).edit().putString("feel_mine_$key", note.toJson().toString()).apply()
+        val repo = SharedRepo(app)
+        val me = seatKey(repo.me, mine = true)
+        fun record() {
+            if (title != null) {
+                repo.put("feelings/$key", JSONObject().put("by", me).put("at", System.currentTimeMillis()).put("title", title.take(80)).put("wrote", JSONObject().put(me, true)))
+            } else {
+                repo.put("feelings/$key/wrote/$me", true)
+            }
+        }
+        val account = Account.get(app)
+        val seat = account.seat
+        if (!account.paired || seat == null) {
+            record()
+            // The example partner answers a moment later, so the demo shows both sides.
+            if (title != null) main.postDelayed({ repo.put("feelings/$key/wrote/partner", true) }, 1500)
+            return done(true)
+        }
+        worker.execute {
+            val ok = try {
+                Db(account.config).put("pairs/${seat.code}/feelings/$key/${seat.role.key}", note.toJson().put("at", Db.serverTime()), account.token())
+                true
+            } catch (e: CloudException) {
+                false
+            }
+            main.post {
+                if (ok) record()
+                done(ok)
+            }
+        }
+    }
+
+    /** The partner's side, readable once mine is written; null if they haven't written yet. */
+    fun partner(context: Context, key: String, done: (Note?) -> Unit) {
+        val app = context.applicationContext
+        val account = Account.get(app)
+        val seat = account.seat
+        if (!account.paired || seat == null) {
+            val (what, feel, need, ask) = app.getString(R.string.feelings_demo).split('|', limit = 4)
+            return done(Note(what, feel, need, ask))
+        }
+        prefs(app).getString("feel_partner_$key", null)?.let { return done(Note.from(JSONObject(it))) }
+        worker.execute {
+            val note = try {
+                Note.from(Db(account.config).get("pairs/${seat.code}/feelings/$key/${seat.role.other.key}", account.token()) as? JSONObject)
+            } catch (e: CloudException) {
+                null
+            }
+            if (note != null) prefs(app).edit().putString("feel_partner_$key", note.toJson().toString()).apply()
+            main.post { done(note) }
+        }
+    }
+}

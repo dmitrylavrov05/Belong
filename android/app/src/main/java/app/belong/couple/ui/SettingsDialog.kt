@@ -60,12 +60,25 @@ object SettingsDialog {
         })
         form.addView(ctx.text(ctx.getString(R.string.settings_nickname_note), 12f, 500, ctx.col(R.color.ink2)))
 
-        label(R.string.settings_my_city)
-        val myCity = cityPicker(store.myCityId).also { form.addView(it) }
-        label(R.string.settings_partner_city)
-        val partnerCity = cityPicker(store.partnerCityId).also { form.addView(it) }
+        // Cities and the next meeting only matter for a couple living apart.
+        val apart = android.widget.CheckBox(ctx).apply {
+            text = ctx.getString(R.string.settings_apart)
+            isChecked = store.apart == true
+            typeface = Fonts.get(ctx, 600)
+            minHeight = ctx.dp(48)
+        }
+        form.addView(apart.lp(top = 8))
+        val apartFields = ctx.column(8)
+        form.addView(apartFields)
+        fun apartLabel(res: Int) = apartFields.addView(ctx.text(ctx.getString(res), 13f, 700, ctx.col(R.color.ink2)).lp(top = 8))
+        apartLabel(R.string.settings_my_city)
+        val myCity = cityPicker(store.myCityId).also { apartFields.addView(it) }
+        apartLabel(R.string.settings_partner_city)
+        val partnerCity = cityPicker(store.partnerCityId).also { apartFields.addView(it) }
+        apartLabel(R.string.settings_meeting)
+        apartFields.visibility = if (apart.isChecked) android.view.View.VISIBLE else android.view.View.GONE
+        apart.setOnCheckedChangeListener { _, on -> apartFields.visibility = if (on) android.view.View.VISIBLE else android.view.View.GONE }
 
-        label(R.string.settings_meeting)
         var meeting = store.meetingDate
         val dateButton = ctx.secondaryButton(ctx.formatLongDate(meeting)) {}
         dateButton.setOnClickListener {
@@ -74,7 +87,7 @@ object SettingsDialog {
                 dateButton.text = ctx.formatLongDate(meeting)
             }, meeting.year, meeting.monthValue - 1, meeting.dayOfMonth).show()
         }
-        form.addView(dateButton)
+        apartFields.addView(dateButton)
 
         label(R.string.settings_language)
         val languages = Language.choices.map { if (it.isEmpty()) ctx.getString(R.string.language_system) else Language.nameOf(it) }
@@ -97,7 +110,8 @@ object SettingsDialog {
                 store.partnerNickname = nickname.text.toString()
                 store.myCityId = Cities.all[myCity.selectedItemPosition].id
                 store.partnerCityId = Cities.all[partnerCity.selectedItemPosition].id
-                store.meetingDate = meeting
+                if (apart.isChecked != (store.apart == true)) store.setApart(apart.isChecked)
+                if (apart.isChecked && meeting != store.meetingDate) store.meetingDate = meeting
                 activity.refreshAll()
                 val tag = Language.choices[language.selectedItemPosition]
                 if (tag != Language.current(ctx)) Language.set(activity, tag)

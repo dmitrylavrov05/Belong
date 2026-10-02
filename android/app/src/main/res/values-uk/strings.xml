@@ -149,7 +149,7 @@
         <item>2|out|Мандрівка|Ночівля за містом</item>
     </string-array>
 
-    <string name="month_title">Наш місяць на відстані</string>
+    <string name="month_title">Наш місяць</string>
     <string name="month_in_progress">Місяць ще триває</string>
     <string name="month_example">Приклад: справжні цифри з’являться, коли під’єднається партнер</string>
     <string name="stat_km">км між вами</string>
@@ -185,7 +185,7 @@
     <string name="more_title">Ще</string>
     <string name="more_doodle_text">Малюнки на головний екран партнера</string>
     <string name="more_games_text">«Збіги» і колесо побачень</string>
-    <string name="more_month_text">Ваш місяць на відстані карткою для сторіс</string>
+    <string name="more_month_text">Підсумки місяця й року з вашими фото</string>
     <string name="more_settings_text">Імена, ласкаве ім’я, міста, дата зустрічі й мова</string>
     <string name="delete">Видалити</string>
 
@@ -681,4 +681,142 @@
         <item>Що тебе найбільше стресує?|%1$s: що найбільше стресує?|Запізнення|Натовп|Невизначеність|Недосипання</item>
         <item>Твоє ідеальне побачення?|%1$s: ідеальне побачення?|Затишний вечір удома|Вечеря в ресторані|Щось активне|Сюрприз</item>
     </string-array>
+    <!-- Разом чи на відстані, календар важливих дат -->
+    <string name="mode_question">Ви живете разом чи на відстані?</string>
+    <string name="mode_text">Покажемо те, що важливо вам: парі на відстані — скільки днів до зустрічі та скільки кілометрів між вами, парі, яка живе разом, — ваші важливі дати.</string>
+    <string name="mode_together">Разом</string>
+    <string name="mode_apart">На відстані</string>
+    <string name="settings_apart">Ми живемо на відстані</string>
+    <string name="calendar_title">Важливі дати</string>
+    <string name="calendar_upcoming">Незабаром</string>
+    <string name="calendar_empty">Дат поки немає. Додайте дні народження, річниці та плани.</string>
+    <string name="calendar_add">Додати дату</string>
+    <string name="calendar_add_first">Додайте ваші важливі дати</string>
+    <string name="calendar_all">Усі дати</string>
+    <string name="calendar_prev">Попередній місяць</string>
+    <string name="calendar_next">Наступний місяць</string>
+    <string name="calendar_anniversary">Наша річниця</string>
+    <string name="calendar_delete">Видалити цю дату?</string>
+    <string name="calendar_field_title">Що за дата? Наприклад, день народження мами</string>
+    <string name="calendar_yearly">Щороку</string>
+    <string name="calendar_once">Один раз</string>
+    <plurals name="years">
+        <item quantity="one">%d рік</item>
+        <item quantity="few">%d роки</item>
+        <item quantity="many">%d років</item>
+        <item quantity="other">%d року</item>
+    </plurals>
+    <string-array name="date_seeds">
+        <item>🎂|24|03-14|День народження Юлі</item>
+        <item>🎂|26|11-02|День народження Ігоря</item>
+        <item>🌹|3|06-21|Наше перше побачення</item>
+    </string-array>
+    <!-- Фото дня -->
+    <string name="tab_photos">Фото</string>
+    <string name="photos_title">Наші фото</string>
+    <string name="photos_subtitle_empty">По фото на день, і до кінця місяця у вас буде ціла історія.</string>
+    <plurals name="photos_count">
+        <item quantity="one">%d фото наших днів</item>
+        <item quantity="few">%d фото наших днів</item>
+        <item quantity="many">%d фото наших днів</item>
+        <item quantity="other">%d фото наших днів</item>
+    </plurals>
+    <string name="photos_all">Усі</string>
+    <string name="photos_today">Сьогодні</string>
+    <string name="photos_today_none">Сьогодні фото ще немає. Який вигляд має ваш день?</string>
+    <string name="photos_today_partner">%1$s: фото дня вже тут. Ваша черга!</string>
+    <string name="photos_today_mine">Сьогодні додано %1$d з %2$d</string>
+    <string name="photos_add">Додати фото</string>
+    <string name="photos_limit">До %1$d фото на день у кожного</string>
+    <string name="photos_no_gallery">Не знайшлося застосунку галереї</string>
+    <plurals name="photos_adding">
+        <item quantity="one">Додати %d фото</item>
+        <item quantity="few">Додати %d фото</item>
+        <item quantity="many">Додати %d фото</item>
+        <item quantity="other">Додати %d фото</item>
+    </plurals>
+    <string name="photos_caption">Кілька слів (необов’язково)</string>
+    <string name="photos_save">Додати до сьогодні</string>
+    <plurals name="photos_added">
+        <item quantity="one">Фото додано</item>
+        <item quantity="few">Додано %d фото</item>
+        <item quantity="many">Додано %d фото</item>
+        <item quantity="other">Додано %d фото</item>
+    </plurals>
+    <string name="photos_failed">Не вдалося відкрити фото</string>
+    <string name="photos_delete">Видалити це фото?</string>
+    <string name="photos_see_all">Усі фото</string>
+    <string name="photos_card_title">Фото дня</string>
+    <string name="us_calendar_text">Дні народження, річниці та плани</string>
+    <string name="us_map_text">Де зроблено фото з вашої галереї</string>
+    <string-array name="photo_seeds">
+        <item>☕|0|partner|Ранкова кава перед роботою</item>
+        <item>🌇|1|me|Захід сонця дорогою додому</item>
+        <item>🍝|1|partner|Приготував твою улюблену пасту</item>
+        <item>🍂|3|me|Осінь прийшла</item>
+        <item>🎬|5|partner|Вечір кіно</item>
+        <item>🐈|8|me|Дивись, хто прийшов у гості</item>
+        <item>🌊|12|partner|Нарешті море</item>
+        <item>🎡|16|me|Наша субота</item>
+        <item>🌻|21|partner|Це тобі</item>
+        <item>📚|26|me|Куточок для читання</item>
+    </string-array>
+    <!-- Підсумки місяця та року -->
+    <string name="month_title_apart">Наш місяць на відстані</string>
+    <string name="story_title_together">Наш %1$s</string>
+    <string name="report_year_title">Наш рік</string>
+    <string name="report_month">Місяць</string>
+    <string name="report_year">Рік</string>
+    <plurals name="report_photos">
+        <item quantity="one">%d фото</item>
+        <item quantity="few">%d фото</item>
+        <item quantity="many">%d фото</item>
+        <item quantity="other">%d фото</item>
+    </plurals>
+    <plurals name="report_days">
+        <item quantity="one">%d день</item>
+        <item quantity="few">%d дні</item>
+        <item quantity="many">%d днів</item>
+        <item quantity="other">%d дня</item>
+    </plurals>
+    <string name="report_no_photos">Фото тут поки немає. Додайте фото дня, і воно потрапить у підсумки.</string>
+    <string name="report_came_true">Збулося</string>
+    <string name="report_moments">Спогади</string>
+    <string name="report_ready">Підсумки місяця: %1$s</string>
+    <string name="report_ready_text">Фото, настрій і все, що ви зробили разом за місяць</string>
+    <string name="stat_photos">фото наших днів</string>
+    <string name="stat_questions">питання дня на двох</string>
+    <string name="stat_thanks">вечірні записки</string>
+    <string name="stat_dreams">мрії збулися</string>
+    <string name="stat_goals">цілі досягнуто</string>
+    <string name="stat_talks">чесні розмови</string>
+    <!-- Почуття після сварки -->
+    <string name="feelings_title">Поговорімо про почуття</string>
+    <string name="feelings_intro">Після сварки кожен записує, що відчуває. Нотатка партнера відкриється, коли ви напишете свою: так обоє спершу говорять, а потім слухають.</string>
+    <string name="feelings_write">Написати нотатку</string>
+    <string name="feelings_answer">Ваша сторона</string>
+    <string name="feelings_write_hint">%1$s прочитає її після того, як напише свою.</string>
+    <string name="feelings_field_title">Про що це? (необов’язково)</string>
+    <string name="feelings_what">Що сталося</string>
+    <string name="feelings_what_hint">Своїми словами, без звинувачень</string>
+    <string name="feelings_feel">Що я відчуваю</string>
+    <string name="feelings_feel_hint">Мені образливо, я втомлююся, мені тривожно…</string>
+    <string name="feelings_need">Що мені потрібно</string>
+    <string name="feelings_need_hint">Щоб мене почули, трохи часу, обійми…</string>
+    <string name="feelings_ask">Про що я прошу</string>
+    <string name="feelings_ask_hint">Маленьке конкретне прохання</string>
+    <string name="feelings_feel_required">Напишіть хоча б кілька слів про свої почуття</string>
+    <string name="feelings_save">Зберегти нотатку</string>
+    <string name="feelings_sent">Збережено. Дякуємо за щирість 💞</string>
+    <string name="feelings_untitled">Нотатка від %1$s</string>
+    <string name="feelings_both">Ви обоє написали. Натисніть, щоб прочитати</string>
+    <string name="feelings_partner_wrote">%1$s: нотатку вже написано. Напишіть свою, щоб прочитати її.</string>
+    <string name="feelings_waiting">Чекаємо на другу нотатку: %1$s</string>
+    <string name="feelings_after">А тепер обійміться й поговоріть 🤍</string>
+    <string name="feelings_empty">Нотаток поки немає. Сподіваємося, вони знадобляться рідко 🙂</string>
+    <string name="feelings_tips">Порада: пишіть «я відчуваю…», а не «ти завжди…». І це нормально — взяти паузу перед розмовою.</string>
+    <string name="feelings_today">%1$s: нова нотатка про почуття</string>
+    <string name="feelings_today_text">Напишіть свою, щоб прочитати</string>
+    <string name="us_feelings_text">Нотатки після сварки: відкриються, коли напишете обоє</string>
+    <string name="feelings_demo">Посперечалися через плани на вихідні|Трохи образливо, але найбільше я сумую за тобою|Знати, що мої плани для тебе теж важливі|Давай увечері разом сплануємо наступні вихідні?</string>
 </resources>

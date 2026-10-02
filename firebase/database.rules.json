@@ -334,6 +334,12 @@
             "since": {
               ".validate": "newData.isNumber() && newData.val() % 1 === 0"
             },
+            "apart": {
+              ".validate": "newData.isBoolean()"
+            },
+            "meeting": {
+              ".validate": "newData.isNumber() && newData.val() % 1 === 0"
+            },
             "$other": {
               ".validate": false
             }
@@ -373,6 +379,79 @@
                 },
                 "$other": {
                   ".validate": false
+                }
+              },
+              "$other": {
+                ".validate": false
+              }
+            }
+          },
+          "dates": {
+            "$d": {
+              ".write": "auth != null && (root.child('pairs').child($code).child('members/a').val() === auth.uid || root.child('pairs').child($code).child('members/b').val() === auth.uid)",
+              ".validate": "newData.hasChildren(['title', 'emoji', 'day', 'yearly', 'at'])",
+              "title": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+              },
+              "emoji": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 16"
+              },
+              "day": {
+                ".validate": "newData.isNumber() && newData.val() % 1 === 0"
+              },
+              "yearly": {
+                ".validate": "newData.isBoolean()"
+              },
+              "at": {
+                ".validate": "newData.isNumber()"
+              },
+              "$other": {
+                ".validate": false
+              }
+            }
+          },
+          "photos": {
+            "$day": {
+              "$p": {
+                ".write": "auth != null && $day.matches(/^[0-9]{5,6}$/) && root.child('pairs').child($code).child('members').child(data.exists() ? data.child('by').val() : newData.child('by').val()).val() === auth.uid",
+                ".validate": "newData.hasChildren(['by', 'at']) && (!data.exists() || newData.child('by').val() === data.child('by').val())",
+                "by": {
+                  ".validate": "newData.val() === 'a' || newData.val() === 'b'"
+                },
+                "at": {
+                  ".validate": "newData.isNumber()"
+                },
+                "caption": {
+                  ".validate": "newData.isString() && newData.val().length >= 0 && newData.val().length <= 200"
+                },
+                "w": {
+                  ".validate": "newData.isNumber()"
+                },
+                "h": {
+                  ".validate": "newData.isNumber()"
+                },
+                "$other": {
+                  ".validate": false
+                }
+              }
+            }
+          },
+          "feelings": {
+            "$t": {
+              ".write": "auth != null && (root.child('pairs').child($code).child('members/a').val() === auth.uid || root.child('pairs').child($code).child('members/b').val() === auth.uid)",
+              ".validate": "newData.hasChildren(['by', 'at'])",
+              "by": {
+                ".validate": "newData.val() === 'a' || newData.val() === 'b'"
+              },
+              "at": {
+                ".validate": "newData.isNumber()"
+              },
+              "title": {
+                ".validate": "newData.isString() && newData.val().length >= 0 && newData.val().length <= 80"
+              },
+              "wrote": {
+                "$role": {
+                  ".validate": "newData.isBoolean()"
                 }
               },
               "$other": {
@@ -445,6 +524,52 @@
               },
               "done": {
                 ".validate": "newData.isBoolean()"
+              },
+              "$other": {
+                ".validate": false
+              }
+            }
+          }
+        },
+        "photo_data": {
+          "$p": {
+            ".read": "auth != null && (root.child('pairs').child($code).child('members/a').val() === auth.uid || root.child('pairs').child($code).child('members/b').val() === auth.uid)",
+            ".write": "auth != null && (data.exists() ? !newData.exists() && root.child('pairs').child($code).child('members').child(data.exists() ? data.child('by').val() : newData.child('by').val()).val() === auth.uid : root.child('pairs').child($code).child('members').child(data.exists() ? data.child('by').val() : newData.child('by').val()).val() === auth.uid)",
+            ".validate": "newData.hasChildren(['by', 'thumb', 'full'])",
+            "by": {
+              ".validate": "newData.val() === 'a' || newData.val() === 'b'"
+            },
+            "thumb": {
+              ".validate": "newData.isString() && newData.val().length <= 80000 && newData.val().beginsWith('/9j/')"
+            },
+            "full": {
+              ".validate": "newData.isString() && newData.val().length <= 1000000 && newData.val().beginsWith('/9j/')"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+        "feelings": {
+          "$t": {
+            "$role": {
+              ".read": "auth != null && (root.child('pairs').child($code).child('members').child($role).val() === auth.uid || ($role === 'a' && root.child('pairs').child($code).child('members/b').val() === auth.uid && root.child('pairs').child($code).child('feelings').child($t).child('b').exists()) || ($role === 'b' && root.child('pairs').child($code).child('members/a').val() === auth.uid && root.child('pairs').child($code).child('feelings').child($t).child('a').exists()))",
+              ".write": "auth != null && root.child('pairs').child($code).child('members').child($role).val() === auth.uid",
+              ".validate": "newData.hasChildren(['feel', 'at'])",
+              "what": {
+                ".validate": "newData.isString() && newData.val().length >= 0 && newData.val().length <= 1000"
+              },
+              "feel": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 1000"
+              },
+              "need": {
+                ".validate": "newData.isString() && newData.val().length >= 0 && newData.val().length <= 1000"
+              },
+              "ask": {
+                ".validate": "newData.isString() && newData.val().length >= 0 && newData.val().length <= 1000"
+              },
+              "at": {
+                ".validate": "newData.isNumber()"
               },
               "$other": {
                 ".validate": false

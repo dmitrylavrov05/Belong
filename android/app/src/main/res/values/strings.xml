@@ -147,7 +147,7 @@
         <item>2|out|Trip|One night out of town</item>
     </string-array>
 
-    <string name="month_title">Our month apart</string>
+    <string name="month_title">Our month</string>
     <string name="month_in_progress">Month in progress</string>
     <string name="month_example">Example numbers until your partner joins</string>
     <string name="stat_km">km between you</string>
@@ -183,7 +183,7 @@
     <string name="more_title">More</string>
     <string name="more_doodle_text">Draw for your partner’s home screen</string>
     <string name="more_games_text">Date Match and the date wheel</string>
-    <string name="more_month_text">Your month apart as a story card</string>
+    <string name="more_month_text">Monthly and yearly reports with your photos</string>
     <string name="more_settings_text">Names, pet name, cities, meeting date and language</string>
     <string name="delete">Delete</string>
 
@@ -670,4 +670,130 @@
         <item>What stresses you most?|What stresses %1$s most?|Being late|Crowds|Uncertainty|Lack of sleep</item>
         <item>Your perfect date?|What’s %1$s’s perfect date?|A cosy night in|A fancy dinner|Something active|A surprise</item>
     </string-array>
+    <!-- Together or apart, and the calendar of important dates -->
+    <string name="mode_question">Do you live together or apart?</string>
+    <string name="mode_text">We’ll show what matters to you: for a couple apart, the countdown to your next meeting and the distance; for a couple together, your important dates.</string>
+    <string name="mode_together">Together</string>
+    <string name="mode_apart">Apart</string>
+    <string name="settings_apart">We live apart (long distance)</string>
+    <string name="calendar_title">Important dates</string>
+    <string name="calendar_upcoming">Coming up</string>
+    <string name="calendar_empty">No dates yet. Add birthdays, anniversaries and plans.</string>
+    <string name="calendar_add">Add a date</string>
+    <string name="calendar_add_first">Add your important dates</string>
+    <string name="calendar_all">All dates</string>
+    <string name="calendar_prev">Previous month</string>
+    <string name="calendar_next">Next month</string>
+    <string name="calendar_anniversary">Our anniversary</string>
+    <string name="calendar_delete">Delete this date?</string>
+    <string name="calendar_field_title">What’s the date? E.g. Mum’s birthday</string>
+    <string name="calendar_yearly">Every year</string>
+    <string name="calendar_once">Once</string>
+    <plurals name="years">
+        <item quantity="one">%d year</item>
+        <item quantity="other">%d years</item>
+    </plurals>
+    <string-array name="date_seeds">
+        <item>🎂|24|03-14|Yulia’s birthday</item>
+        <item>🎂|26|11-02|Igor’s birthday</item>
+        <item>🌹|3|06-21|Our first date</item>
+    </string-array>
+    <!-- Photos of the day -->
+    <string name="tab_photos">Photos</string>
+    <string name="photos_title">Our photos</string>
+    <string name="photos_subtitle_empty">A photo a day, and at the end of the month you’ll have a whole story.</string>
+    <plurals name="photos_count">
+        <item quantity="one">%d photo of our days</item>
+        <item quantity="other">%d photos of our days</item>
+    </plurals>
+    <string name="photos_all">All</string>
+    <string name="photos_today">Today</string>
+    <string name="photos_today_none">No photos today yet. What does your day look like?</string>
+    <string name="photos_today_partner">%1$s has shared today. Your turn!</string>
+    <string name="photos_today_mine">You added %1$d of %2$d today</string>
+    <string name="photos_add">Add a photo</string>
+    <string name="photos_limit">Up to %1$d photos a day each</string>
+    <string name="photos_no_gallery">No gallery app found</string>
+    <plurals name="photos_adding">
+        <item quantity="one">Add %d photo</item>
+        <item quantity="other">Add %d photos</item>
+    </plurals>
+    <string name="photos_caption">A few words (optional)</string>
+    <string name="photos_save">Add to today</string>
+    <plurals name="photos_added">
+        <item quantity="one">Photo added</item>
+        <item quantity="other">%d photos added</item>
+    </plurals>
+    <string name="photos_failed">Couldn’t read that photo</string>
+    <string name="photos_delete">Delete this photo?</string>
+    <string name="photos_see_all">All photos</string>
+    <string name="photos_card_title">Photo of the day</string>
+    <string name="us_calendar_text">Birthdays, anniversaries and plans</string>
+    <string name="us_map_text">Where your gallery photos were taken</string>
+    <string-array name="photo_seeds">
+        <item>☕|0|partner|Morning coffee before work</item>
+        <item>🌇|1|me|Sunset on the way home</item>
+        <item>🍝|1|partner|Cooked your favourite pasta</item>
+        <item>🍂|3|me|Autumn is here</item>
+        <item>🎬|5|partner|Movie night</item>
+        <item>🐈|8|me|Look who came to visit</item>
+        <item>🌊|12|partner|The sea, at last</item>
+        <item>🎡|16|me|Our Saturday</item>
+        <item>🌻|21|partner|For you</item>
+        <item>📚|26|me|Reading corner</item>
+    </string-array>
+    <!-- Month and year reports -->
+    <string name="month_title_apart">Our month apart</string>
+    <string name="story_title_together">Our %1$s</string>
+    <string name="report_year_title">Our year</string>
+    <string name="report_month">Month</string>
+    <string name="report_year">Year</string>
+    <plurals name="report_photos">
+        <item quantity="one">%d photo</item>
+        <item quantity="other">%d photos</item>
+    </plurals>
+    <plurals name="report_days">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
+    <string name="report_no_photos">No photos here yet. Add a photo of your day, and it’ll end up in the report.</string>
+    <string name="report_came_true">Came true</string>
+    <string name="report_moments">Memories</string>
+    <string name="report_ready">Your %1$s in review</string>
+    <string name="report_ready_text">Photos, moods and everything you did together this month</string>
+    <string name="stat_photos">photos of our days</string>
+    <string name="stat_questions">questions answered together</string>
+    <string name="stat_thanks">evening notes</string>
+    <string name="stat_dreams">dreams came true</string>
+    <string name="stat_goals">goals reached</string>
+    <string name="stat_talks">honest talks</string>
+    <!-- Feelings after a quarrel -->
+    <string name="feelings_title">Talking about feelings</string>
+    <string name="feelings_intro">After a quarrel, each of you writes down how you feel. Your partner’s note opens once you’ve written yours, so you both speak first and listen second.</string>
+    <string name="feelings_write">Write a note</string>
+    <string name="feelings_answer">Your side</string>
+    <string name="feelings_write_hint">%1$s will read it after writing their own side.</string>
+    <string name="feelings_field_title">What is it about? (optional)</string>
+    <string name="feelings_what">What happened</string>
+    <string name="feelings_what_hint">In your own words, without blame</string>
+    <string name="feelings_feel">What I feel</string>
+    <string name="feelings_feel_hint">I feel hurt, tired, worried…</string>
+    <string name="feelings_need">What I need</string>
+    <string name="feelings_need_hint">To be heard, some time alone, a hug…</string>
+    <string name="feelings_ask">What I’d ask for</string>
+    <string name="feelings_ask_hint">A small, concrete request</string>
+    <string name="feelings_feel_required">Write at least a few words about how you feel</string>
+    <string name="feelings_save">Save my note</string>
+    <string name="feelings_sent">Saved. Thank you for being honest 💞</string>
+    <string name="feelings_untitled">Note from %1$s</string>
+    <string name="feelings_both">You both wrote. Tap to read</string>
+    <string name="feelings_partner_wrote">%1$s has written their side. Write yours to read it.</string>
+    <string name="feelings_waiting">Waiting for %1$s’s note</string>
+    <string name="feelings_after">Now give each other a hug and talk it through 🤍</string>
+    <string name="feelings_empty">No notes yet. We hope you’ll rarely need them 🙂</string>
+    <string name="feelings_tips">Tip: try “I feel…” instead of “you always…”. It’s fine to take a pause before you talk.</string>
+    <string name="feelings_today">%1$s wrote about their feelings</string>
+    <string name="feelings_today_text">Write your side to read it</string>
+    <string name="us_feelings_text">Notes after a quarrel, private until you’ve both written</string>
+    <string name="feelings_demo">We argued about the weekend plans|A little hurt, but mostly I miss you|To know that my plans matter to you too|Let’s plan next weekend together tonight?</string>
 </resources>

@@ -11,6 +11,7 @@ import app.belong.couple.data.Account
 import app.belong.couple.data.CoupleStore
 import app.belong.couple.data.Counter
 import app.belong.couple.data.DataEvents
+import app.belong.couple.data.DayPhotos
 import app.belong.couple.data.SharedRepo
 import app.belong.couple.data.TaskRepo
 import app.belong.couple.data.WishRepo
@@ -220,6 +221,7 @@ object LiveSync {
                 sent(app, "${RESERVED}_dirty", key)
             }
             flushDreams(app, db, live, account)
+            DayPhotos.flush(app, db, seat.code, seat.role.key) { account.token() }
         } catch (e: CloudException) {
             if (e.reason == Reason.DENIED) PairAccess.check(app)
             // Otherwise offline: retried on the next connect or change.

@@ -4,12 +4,14 @@ Native Android app in Kotlin that uses only the Android framework (no AndroidX),
 
 ## What's inside
 
-Five tabs: Today, Dreams, Chat, Places, Us.
+Five tabs: Today, Dreams, Chat, Photos, Us.
 
 - **Today:**
   - greeting, the partner's mood and energy, and your own check-in;
   - **plan for the day**: mine, ours and the partner's tasks. Tap to tick off, long-press to delete. Unfinished tasks roll over to the next day;
-  - both cities' clocks, the distance between you and the countdown to your next meeting;
+  - **together or apart**: on first launch Today asks whether you live together or apart (also in Settings). Apart: both cities' clocks, the distance and the countdown to your next meeting. Together: the next important dates from the calendar instead;
+  - **photo of the day**: today's photos from both of you; a card announces last month's report in the first week of a month;
+  - when your partner has written about their feelings, a card invites you to write your side;
   - the “Thinking of you” and “I'm safe” buttons and buttons to place widgets.
 - **On Today** also:
   - **Shopping**: a shared list showing who added each item;
@@ -30,7 +32,11 @@ Five tabs: Today, Dreams, Chat, Places, Us.
 - **Wishlist:**
   - your list: add and edit gifts, trips and experiences with a price, a link and a note. Only http(s) links open;
   - your partner's list: mark “I'll give this” and they won't see that it's reserved.
-- **Places:**
+- **Photos:** each of you adds up to 5 photos a day (from the gallery, with an optional caption). They're grouped by day, filter by whose they are, open full screen, and your own can be deleted. Photos are compressed on the phone (1280 px, plus a 360 px thumbnail) and stored in the pair's database, which keeps them within the free Spark plan.
+- **Important dates** (Us → Important dates): a month calendar with dots, what's coming up (birthdays with the age, your anniversary, plans; yearly or once) and, for a couple apart, the meeting.
+- **Our month / Our year** (Us): a report for any month or year with a collage of your photos of the day, taps, doodles, mood, questions answered together, evening notes, dreams that came true, goals and memories. Distance, time zones and the meeting only for a couple apart. The story card shows up to three photos as polaroids.
+- **Talking about feelings** (Us): after a quarrel each of you writes what happened, what you feel, what you need and what you'd ask for. Your partner's note opens only once you've written yours (the database enforces it).
+- **Places** (Us → Places):
   - an offline world map (Natural Earth land outlines);
   - photos from the gallery appear where they were taken, read from the GPS data inside each photo;
   - pinch, double-tap or use the +/− buttons to zoom. Markers merge when they overlap and show the newest photo with a count;
@@ -40,7 +46,6 @@ Five tabs: Today, Dreams, Chat, Places, Us.
 - **More:**
   - **Doodle:** draw and send. The partner's latest doodle appears on the home-screen widget;
   - **Games:** Date Match on one phone and the date wheel;
-  - **Our month apart:** a story card you can share or save;
   - **Settings:** names, a **pet name for your partner** (Sunshine ☀️, Котик 🐱, … shown everywhere instead of the name), cities, the meeting date and the **app language** (phone’s language, English, Українська or Русский; on Android 13+ it is also in the system’s per-app language settings).
 - **Home-screen widgets:**
   - partner's mood with live local time;

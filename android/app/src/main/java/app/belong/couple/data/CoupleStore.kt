@@ -59,9 +59,19 @@ class CoupleStore private constructor(private val context: Context) {
     val myCity: City get() = Cities.byId(myCityId)
     val partnerCity: City get() = Cities.byId(partnerCityId)
 
-    var meetingDate: LocalDate
+    /** The meeting date kept on this phone before it became shared; only used to seed the demo. */
+    val localMeeting: LocalDate
         get() = LocalDate.ofEpochDay(prefs.getLong("meeting", LocalDate.now().plusDays(12).toEpochDay()))
-        set(value) = prefs.edit().putLong("meeting", value.toEpochDay()).apply()
+
+    /** Whether you live apart (shared by both phones); null until the couple has chosen. */
+    val apart: Boolean? get() = app.belong.couple.core.CalendarModel.apart(SharedRepo(context).root())
+
+    /** The next meeting for a couple living apart, shared by both phones. */
+    var meetingDate: LocalDate
+        get() = app.belong.couple.core.CalendarModel.meeting(SharedRepo(context).root())?.let { LocalDate.ofEpochDay(it) } ?: localMeeting
+        set(value) = SharedRepo(context).put("couple/meeting", value.toEpochDay())
+
+    fun setApart(apart: Boolean) = SharedRepo(context).put("couple/apart", apart)
 
     val myMood: Int get() = prefs.getInt("my_mood", 4)
     val myEnergy: Int get() = prefs.getInt("my_energy", 4)
@@ -150,8 +160,7 @@ class CoupleStore private constructor(private val context: Context) {
 
     // ---------- Monthly recap ----------
 
-    fun stats(today: LocalDate = LocalDate.now(), now: Instant = Instant.now()): MonthStats {
-        val month = TimeMath.recapMonth(today)
+    fun stats(today: LocalDate = LocalDate.now(), now: Instant = Instant.now(), month: YearMonth = TimeMath.recapMonth(today)): MonthStats {
         val days = TimeMath.daysUntil(today, meetingDate)
         return MonthStats(
             month = month,

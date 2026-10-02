@@ -30,6 +30,10 @@ Under `pairs/<code>`:
 - `live/shopping/<key>` `{title, by, done, at}`, `live/thanks/<day>/<seat>` (the evening note, written only by its author), `live/couple/since`, `live/moments/<key>` and `live/flags/question|quiz/<id>/<seat>` (who has answered, without the answer);
 - `answers/<day>/<seat>`: the question of the day. The partner may read your answer only once their own answer for that day exists;
 - `quiz/<round>/<seat>`: a week's quiz `{self, guess, done}`, readable by the partner only after they have finished theirs;
+- `live/couple/apart` and `live/couple/meeting`: whether you live apart, and the next meeting (epoch day);
+- `live/dates/<key>`: important dates `{title, emoji, day, yearly, at}`;
+- `live/photos/<day>/<key>` `{by, at, caption}` and `photo_data/<key>` `{by, thumb, full}`: photos of the day as base64 JPEGs (thumb ≤ 80 000 characters, full ≤ 1 000 000). Only the author writes or deletes them, and a picture can't be replaced;
+- `live/feelings/<key>` `{by, at, title, wrote/<seat>}` and `feelings/<key>/<seat>` `{what, feel, need, ask, at}`: notes after a quarrel. The partner may read your note only once their own exists;
 - `secret/<seat>/reserved/<key>`: gifts this seat will give. Only that seat can read or write it, which is why members get read access per section (`chat`, `live`) and not to the whole pair.
 
 Nobody receives mail at `pair.belong.app`: the address is just an account name. `database.rules.json` enforces all of the above. Members alone read the pair. Messages can't be forged, edited or deleted; the other partner can only add a ❤️.

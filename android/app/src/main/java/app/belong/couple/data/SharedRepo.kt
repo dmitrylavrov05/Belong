@@ -81,6 +81,40 @@ class SharedRepo(context: Context) {
     fun ensureSeeded() {
         seedDreams()
         seedEveryday()
+        seedCalendar()
+        seedPhotos()
+    }
+
+    /** A few photos of the day for the example couple, so the gallery and the month report aren't empty. */
+    private fun seedPhotos() {
+        if (prefs.getBoolean("seeded_photos", false)) return
+        prefs.edit().putBoolean("seeded_photos", true).apply()
+        if (me == null) DayPhotos.seedDemo(app, app.resources.getStringArray(R.array.photo_seeds).toList())
+    }
+
+    /** The example couple lives apart and has a few dates in the calendar. */
+    private fun seedCalendar() {
+        if (prefs.getBoolean("seeded_calendar", false)) return
+        if (me != null) {
+            prefs.edit().putBoolean("seeded_calendar", true).apply()
+            return
+        }
+        val now = System.currentTimeMillis()
+        val today = LocalDate.now(ZoneId.systemDefault())
+        val dates = JSONObject()
+        app.resources.getStringArray(R.array.date_seeds).forEachIndexed { i, line ->
+            val (emoji, yearsAgo, monthDay, title) = line.split('|', limit = 4)
+            val (m, d) = monthDay.split('-').map { it.toInt() }
+            val day = LocalDate.of(today.year - yearsAgo.toInt(), m, d).toEpochDay()
+            dates.put("demo-d$i", JSONObject().put("title", title).put("emoji", emoji).put("day", day).put("yearly", true).put("at", now))
+        }
+        synchronized(lock) {
+            val tree = JsonTree(base())
+            tree.set("dates", dates)
+            tree.set("couple/apart", true)
+            tree.set("couple/meeting", CoupleStore.get(app).localMeeting.toEpochDay())
+            prefs.edit().putBoolean("seeded_calendar", true).putString("base", tree.root.toString()).apply()
+        }
     }
 
     private fun seedDreams() {
@@ -144,7 +178,7 @@ class SharedRepo(context: Context) {
     }
 
     /** A real pair starts with an empty map; the server fills it in. */
-    fun startReal() = prefs.edit().putBoolean("seeded", true).putBoolean("seeded_everyday", true).remove("base").remove("ops").apply()
+    fun startReal() = prefs.edit().putBoolean("seeded", true).putBoolean("seeded_everyday", true).putBoolean("seeded_calendar", true).putBoolean("seeded_photos", true).remove("base").remove("ops").apply()
 
     private fun base(): JSONObject = try {
         JSONObject(prefs.getString("base", "{}")!!)
@@ -156,7 +190,7 @@ class SharedRepo(context: Context) {
         private const val PREFS = "belong_dreams"
 
         /** Parts of live/ kept here; the rest (check-ins, tasks, wishes…) have their own stores. */
-        val SECTIONS = listOf("dreams", "goals", "shopping", "thanks", "flags", "couple", "moments")
+        val SECTIONS = listOf("dreams", "goals", "shopping", "thanks", "flags", "couple", "moments", "dates", "photos", "feelings")
         private val lock = Any()
 
         fun apply(tree: JsonTree, op: JSONObject) {

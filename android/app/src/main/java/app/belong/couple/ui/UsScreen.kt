@@ -56,11 +56,14 @@ class UsScreen(private val activity: MainActivity) : Screen {
 
         body.addView(ctx.text(ctx.getString(R.string.more_title), 22f, 700).lp(top = 32))
         val menu = ctx.column(12)
+        menu.addView(entry(R.drawable.ic_calendar, R.string.calendar_title, R.string.us_calendar_text) { activity.select(MainActivity.TAB_CALENDAR) })
+        menu.addView(entry(R.drawable.ic_heart, R.string.feelings_title, R.string.us_feelings_text) { activity.select(MainActivity.TAB_FEELINGS) })
         menu.addView(entry(R.drawable.ic_tab_games, R.string.quiz_title, R.string.us_quiz_text) { QuizScreen.show(activity) })
         menu.addView(entry(R.drawable.ic_tab_gift, R.string.wish_title, R.string.more_wishlist_text) { activity.select(MainActivity.TAB_WISHLIST) })
         menu.addView(entry(R.drawable.ic_tab_doodle, R.string.tab_doodle, R.string.more_doodle_text) { activity.select(MainActivity.TAB_DOODLE) })
         menu.addView(entry(R.drawable.ic_tab_games, R.string.games_title, R.string.more_games_text) { activity.select(MainActivity.TAB_GAMES) })
         menu.addView(entry(R.drawable.ic_tab_month, R.string.month_title, R.string.more_month_text) { activity.select(MainActivity.TAB_MONTH) })
+        menu.addView(entry(R.drawable.ic_tab_map, R.string.map_title, R.string.us_map_text) { activity.select(MainActivity.TAB_MAP) })
         if (Account.get(ctx).available) menu.addView(entry(R.drawable.ic_heart, R.string.pair_title, R.string.more_pair_text) { PairDialog.show(activity) })
         menu.addView(entry(R.drawable.ic_settings, R.string.settings_title, R.string.more_settings_text) { SettingsDialog.show(activity) })
         body.addView(menu.lp(top = 12))
@@ -71,6 +74,8 @@ class UsScreen(private val activity: MainActivity) : Screen {
         gravity = Gravity.CENTER_HORIZONTAL
         addView(PairMark(ctx).apply {
             initials = store.myName.take(1).uppercase() to store.partnerDisplay.take(1).uppercase()
+            if (EasterEgg.isFor(store.myName)) setOnClickListener { v -> secretTap(v) }
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }, LinearLayout.LayoutParams(WRAP, ctx.dp(64)))
         addView(ctx.text(ctx.getString(R.string.couple_line, store.myName, store.partnerDisplay), 20f, 700).apply { gravity = Gravity.CENTER })
         val line = if (since != null) {
@@ -87,6 +92,24 @@ class UsScreen(private val activity: MainActivity) : Screen {
             setOnClickListener { pickSince(since) }
             if (since == null) setTextColor(ctx.col(R.color.us_end))
         })
+    }
+
+    private var taps = 0
+    private var lastTap = 0L
+
+    /** Seven quick taps on the two dots: a little heartbeat on each, and then the secret. */
+    private fun secretTap(v: View) {
+        val now = System.currentTimeMillis()
+        taps = if (now - lastTap < 1500) taps + 1 else 1
+        lastTap = now
+        if (taps >= 3) v.animate().scaleX(1.12f).scaleY(1.12f).setDuration(90).withEndAction {
+            v.animate().scaleX(1f).scaleY(1f).setDuration(120).start()
+        }.start()
+        if (taps >= EasterEgg.TAPS) {
+            taps = 0
+            haptic(v)
+            EasterEgg.show(activity)
+        }
     }
 
     private fun pickSince(current: Long?) {

@@ -90,6 +90,7 @@ object Widgets {
 
     fun countdown(context: Context): RemoteViews {
         val store = CoupleStore.get(context)
+        if (store.apart != true) return nextDate(context)
         val days = TimeMath.daysUntil(LocalDate.now(), store.meetingDate)
         val (number, label) = when {
             days > 0 -> days.toString() to context.resources.getQuantityString(R.plurals.days_until_label, days.toInt())
@@ -101,6 +102,26 @@ object Widgets {
             setTextViewText(R.id.widget_countdown_label, label)
             setTextViewText(R.id.widget_countdown_date, if (days >= 0) context.formatLongDate(store.meetingDate) else "")
             setOnClickPendingIntent(R.id.widget_root, open(context, MainActivity.TAB_TODAY))
+        }
+    }
+
+    /** For a couple living together: the next important date from the calendar. */
+    private fun nextDate(context: Context): RemoteViews {
+        val today = LocalDate.now().toEpochDay()
+        val next = app.belong.couple.core.CalendarModel.upcoming(
+            app.belong.couple.data.SharedRepo(context).root(), today, context.getString(R.string.calendar_anniversary), context.getString(R.string.countdown_title),
+        ).firstOrNull()
+        return RemoteViews(context.packageName, R.layout.widget_countdown).apply {
+            if (next == null) {
+                setTextViewText(R.id.widget_countdown_number, "📅")
+                setTextViewText(R.id.widget_countdown_label, context.getString(R.string.calendar_add_first))
+                setTextViewText(R.id.widget_countdown_date, "")
+            } else {
+                setTextViewText(R.id.widget_countdown_number, if (next.daysLeft == 0L) "❤" else next.daysLeft.toString())
+                setTextViewText(R.id.widget_countdown_label, "${next.emoji} ${next.title}")
+                setTextViewText(R.id.widget_countdown_date, context.formatLongDate(LocalDate.ofEpochDay(next.date)))
+            }
+            setOnClickPendingIntent(R.id.widget_root, open(context, MainActivity.TAB_CALENDAR))
         }
     }
 

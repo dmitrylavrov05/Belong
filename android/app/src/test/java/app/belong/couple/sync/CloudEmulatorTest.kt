@@ -288,6 +288,57 @@ class CloudEmulatorTest {
     }
 
     @Test
+    fun calendarPhotosAndFeelingsFollowTheirRules() {
+        val yulia = pairing.create("Yulia", "sunflower1")
+        val igor = pairing.join(yulia.code, "Igor", "maple-leaf")
+        val pair = "pairs/${yulia.code}"
+        val y = yulia.session.idToken
+        val i = igor.session.idToken
+
+        // Living together or apart, and important dates both can edit.
+        db.put("$pair/live/couple/apart", false, i)
+        expect(Reason.DENIED) { db.put("$pair/live/couple/apart", "yes", y) }
+        db.put("$pair/live/couple/meeting", 20740, y)
+        db.put("$pair/live/dates/d1", JSONObject().put("title", "Yulia’s birthday").put("emoji", "🎂").put("day", 11760).put("yearly", true).put("at", 1), i)
+        db.put("$pair/live/dates/d1/title", "Yulia’s birthday 🎉", y)
+        expect(Reason.DENIED) { db.put("$pair/live/dates/d2", JSONObject().put("title", "No day").put("at", 1), y) }
+
+        // Photos of the day: only the author writes or deletes them, and the picture can't be swapped.
+        val jpeg = "/9j/" + "A".repeat(100)
+        val meta = { by: String -> JSONObject().put("by", by).put("at", 1).put("caption", "Coffee") }
+        db.put("$pair/photo_data/p1", JSONObject().put("by", "a").put("thumb", jpeg).put("full", jpeg), y)
+        db.put("$pair/live/photos/20730/p1", meta("a"), y)
+        assertEquals(jpeg, db.get("$pair/photo_data/p1/thumb", i))
+        expect(Reason.DENIED) { db.put("$pair/photo_data/p2", JSONObject().put("by", "a").put("thumb", jpeg).put("full", jpeg), i) }
+        expect(Reason.DENIED) { db.put("$pair/photo_data/p3", JSONObject().put("by", "b").put("thumb", "not a jpeg").put("full", jpeg), i) }
+        expect(Reason.DENIED) { db.put("$pair/photo_data/p1", JSONObject().put("by", "a").put("thumb", jpeg).put("full", jpeg + "B"), y) }
+        expect(Reason.DENIED) { db.put("$pair/live/photos/20730/p1/caption", "Changed by Igor", i) }
+        expect(Reason.DENIED) { db.put("$pair/live/photos/20730/p1", meta("b"), y) }
+        expect(Reason.DENIED) { db.delete("$pair/live/photos/20730/p1", i) }
+        expect(Reason.DENIED) { db.delete("$pair/photo_data/p1", i) }
+        db.put("$pair/live/photos/20730/p1/caption", "Morning coffee", y)
+        db.delete("$pair/live/photos/20730/p1", y)
+        db.delete("$pair/photo_data/p1", y)
+
+        // Feelings: each note opens to the partner only after they've written their own.
+        val note = { feel: String -> JSONObject().put("what", "").put("feel", feel).put("need", "").put("ask", "").put("at", Db.serverTime()) }
+        db.put("$pair/feelings/f1/b", note("Hurt, but I love you"), i)
+        db.put("$pair/live/feelings/f1", JSONObject().put("by", "b").put("at", 1).put("title", "").put("wrote", JSONObject().put("b", true)), i)
+        expect(Reason.DENIED) { db.get("$pair/feelings/f1/b", y) }
+        expect(Reason.DENIED) { db.put("$pair/feelings/f1/b", note("Forged"), y) }
+        expect(Reason.DENIED) { db.put("$pair/feelings/f1/a", JSONObject().put("what", "No feelings").put("at", 1), y) }
+        db.put("$pair/feelings/f1/a", note("Sorry, I was tired"), y)
+        db.put("$pair/live/feelings/f1/wrote/a", true, y)
+        assertEquals("Hurt, but I love you", (db.get("$pair/feelings/f1/b", y) as JSONObject).getString("feel"))
+        assertEquals("Sorry, I was tired", (db.get("$pair/feelings/f1/a", i) as JSONObject).getString("feel"))
+
+        val live = JSONObject(db.get("$pair/live", y).toString())
+        assertEquals(false, app.belong.couple.core.CalendarModel.apart(live))
+        assertEquals("Yulia’s birthday 🎉", app.belong.couple.core.CalendarModel.dates(live).single().title)
+        assertEquals(true, app.belong.couple.core.FeelingsModel.notes(live, Role.A).single().partnerWritten)
+    }
+
+    @Test
     fun partnerHelpsResetAForgottenPassword() {
         val yulia = pairing.create("Yulia", "sunflower1")
         val igor = pairing.join(yulia.code, "Igor", "maple-leaf")

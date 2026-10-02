@@ -182,7 +182,8 @@ class ChatScreen(private val activity: MainActivity) : Screen {
     override fun refresh() {
         title.text = store.partnerDisplay
         val city = store.partnerCity
-        subtitle.text = "${city.name(ctx.language())} ${ctx.timeIn(city.zone)}"
+        subtitle.text = if (store.apart == true) "${city.name(ctx.language())} ${ctx.timeIn(city.zone)}" else ""
+        subtitle.visibility = if (subtitle.text.isEmpty()) View.GONE else View.VISIBLE
         avatarHolder.removeAllViews()
         avatarHolder.addView(ctx.avatar(store.partnerDisplay, ctx.col(R.color.him), 42))
 

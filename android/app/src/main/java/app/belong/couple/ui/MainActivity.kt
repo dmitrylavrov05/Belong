@@ -116,8 +116,14 @@ class MainActivity : Activity() {
         if (requestCode == REQUEST_PHOTOS) (screens[TAB_MAP] as? MapScreen)?.onPermissionsResult()
     }
 
+    @Deprecated("Activity results without AndroidX")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION") super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_DAY_PHOTOS && resultCode == RESULT_OK) PhotosScreen.picked(this, data)
+    }
+
     fun select(destination: Int) {
-        current = if (destination in 0..TAB_DREAMS) destination else TAB_TODAY
+        current = if (destination in 0..TAB_FEELINGS) destination else TAB_TODAY
         val screen = screens.getOrPut(current) { create(current) }
         val parent = PARENT[current]
         val view = if (parent != null) framed.getOrPut(current) { withBackBar(screen.view, parent) } else screen.view
@@ -144,6 +150,9 @@ class MainActivity : Activity() {
         TAB_GAMES -> GamesScreen(this)
         TAB_MONTH -> MonthScreen(this)
         TAB_DREAMS -> DreamsScreen(this)
+        TAB_CALENDAR -> CalendarScreen(this)
+        TAB_PHOTOS -> PhotosScreen(this)
+        TAB_FEELINGS -> FeelingsScreen(this)
         else -> TodayScreen(this)
     }
 
@@ -199,6 +208,7 @@ class MainActivity : Activity() {
         const val EXTRA_SHARED_TEXT = "app.belong.couple.SHARED_TEXT"
         private const val STATE_TAB = "tab"
         const val REQUEST_PHOTOS = 41
+        const val REQUEST_DAY_PHOTOS = 42
 
         const val TAB_TODAY = 0
         const val TAB_CHAT = 1
@@ -209,6 +219,9 @@ class MainActivity : Activity() {
         const val TAB_GAMES = 6
         const val TAB_MONTH = 7
         const val TAB_DREAMS = 8
+        const val TAB_CALENDAR = 9
+        const val TAB_PHOTOS = 10
+        const val TAB_FEELINGS = 11
 
         /** Screens reached from a tab, with a back button to it. */
         private val PARENT = mapOf(
@@ -216,13 +229,16 @@ class MainActivity : Activity() {
             TAB_DOODLE to TAB_MORE,
             TAB_GAMES to TAB_MORE,
             TAB_MONTH to TAB_MORE,
+            TAB_CALENDAR to TAB_MORE,
+            TAB_MAP to TAB_MORE,
+            TAB_FEELINGS to TAB_MORE,
         )
 
         private val TABS = listOf(
             Triple(TAB_TODAY, R.string.tab_today, R.drawable.ic_tab_today),
             Triple(TAB_DREAMS, R.string.tab_dreams, R.drawable.ic_tab_dreams),
             Triple(TAB_CHAT, R.string.tab_chat, R.drawable.ic_tab_chat),
-            Triple(TAB_MAP, R.string.tab_map, R.drawable.ic_tab_map),
+            Triple(TAB_PHOTOS, R.string.tab_photos, R.drawable.ic_tab_photos),
             Triple(TAB_MORE, R.string.tab_more, R.drawable.ic_tab_us),
         )
     }
