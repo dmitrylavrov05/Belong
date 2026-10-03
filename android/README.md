@@ -56,7 +56,7 @@ Five tabs: Today, Dreams, Chat, Photos, Us.
 - **More:**
   - **Doodle:** draw and send. The partner's latest doodle appears on the home-screen widget;
   - **Games:** Date Match on one phone and the date wheel;
-  - **Settings:** names, a **pet name for your partner** (Sunshine ☀️, Котик 🐱, … shown everywhere instead of the name), cities, the meeting date and the **app language** (phone’s language, English, Українська or Русский; on Android 13+ it is also in the system’s per-app language settings).
+  - **Settings** (Us → Settings, or tap your initials on Today): a full screen with both avatars on top — yours can be a photo or an emoji on a colour, and your partner sees it — then sections for you, your partner, the two of you (together or apart, together since, cities, the next meeting), the app (language, Customise Today, widgets), the pair and credits. Names, a **pet name for your partner** (Sunshine ☀️, Котик 🐱, … shown everywhere instead of the name), cities, the meeting date and the **app language** (phone’s language, English, Українська or Русский; on Android 13+ it is also in the system’s per-app language settings).
 - **Home-screen widgets:**
   - partner's mood with live local time;
   - countdown to your meeting;

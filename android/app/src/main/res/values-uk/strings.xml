@@ -1026,4 +1026,24 @@
     <string name="us_group_fun">Разом</string>
     <string name="us_group_story">Наша історія і плани</string>
     <string name="us_group_settings">Налаштування</string>
+    <!-- Екран налаштувань -->
+    <string name="settings_section_me">Про мене</string>
+    <string name="settings_section_partner">Партнер</string>
+    <string name="settings_section_us">Ми вдвох</string>
+    <string name="settings_section_app">Застосунок</string>
+    <string name="settings_section_pair">Пара</string>
+    <string name="settings_section_about">Про Belong</string>
+    <string name="settings_avatar">Аватарка</string>
+    <string name="settings_none">Не задано</string>
+    <string name="settings_since">Разом з</string>
+    <string name="settings_nickname_row">Пестливе ім’я</string>
+    <string name="settings_nickname_clear">Показувати звичайне ім’я</string>
+    <string name="settings_avatar_photo">Вибрати фото</string>
+    <string name="settings_avatar_emoji">Або емодзі на кольоровому тлі</string>
+    <string name="settings_avatar_color">Колір %1$d</string>
+    <string name="settings_avatar_use_emoji">Поставити цей емодзі</string>
+    <string name="settings_avatar_remove">Повернути літеру імені</string>
+    <string name="settings_version">Версія</string>
+    <string name="settings_licenses">Автори й ліцензії</string>
+    <string name="settings_licenses_text">Зроблено з любов’ю для двох.\n\nШрифт Manrope: The Manrope Project Authors, SIL Open Font License 1.1.\nЕмодзі Fluent: Microsoft, ліцензія MIT.\nМапа світу: Natural Earth, суспільне надбання.\nФото для мрій: Unsplash.\nДані про фільми та серіали: TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</string>
 </resources>

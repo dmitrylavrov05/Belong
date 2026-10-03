@@ -398,6 +398,10 @@ class CloudEmulatorTest {
         expect(Reason.DENIED) { db.put("$pair/live/note/a", JSONObject().put("text", "Forged").put("at", 1), i) }
         expect(Reason.DENIED) { db.put("$pair/live/note/b", JSONObject().put("text", "x".repeat(201)).put("at", 1), i) }
         db.put("$pair/live/couple/cover", "p1", i)
+        db.put("$pair/live/profile/a", JSONObject().put("emoji", "🌷").put("color", 2), y)
+        db.put("$pair/live/profile/b/photo", "p1", i)
+        expect(Reason.DENIED) { db.put("$pair/live/profile/a/emoji", "🐻", i) }
+        expect(Reason.DENIED) { db.put("$pair/live/profile/a/color", 99, y) }
         expect(Reason.DENIED) { db.put("$pair/live/couple/cover", "../secret", i) }
 
         val live = JSONObject(db.get("$pair/live", y).toString())

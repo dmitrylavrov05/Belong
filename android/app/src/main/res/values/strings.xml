@@ -995,4 +995,24 @@
     <string name="us_group_fun">Fun together</string>
     <string name="us_group_story">Our story and plans</string>
     <string name="us_group_settings">Settings</string>
+    <!-- Settings screen -->
+    <string name="settings_section_me">About me</string>
+    <string name="settings_section_partner">My partner</string>
+    <string name="settings_section_us">The two of us</string>
+    <string name="settings_section_app">App</string>
+    <string name="settings_section_pair">Pair</string>
+    <string name="settings_section_about">About Belong</string>
+    <string name="settings_avatar">Avatar</string>
+    <string name="settings_none">Not set</string>
+    <string name="settings_since">Together since</string>
+    <string name="settings_nickname_row">Pet name</string>
+    <string name="settings_nickname_clear">Use their name instead</string>
+    <string name="settings_avatar_photo">Choose a photo</string>
+    <string name="settings_avatar_emoji">Or an emoji on a colour</string>
+    <string name="settings_avatar_color">Colour %1$d</string>
+    <string name="settings_avatar_use_emoji">Use this emoji</string>
+    <string name="settings_avatar_remove">Back to my initial</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_licenses">Credits and licences</string>
+    <string name="settings_licenses_text">Made with love for two.\n\nManrope font: The Manrope Project Authors, SIL Open Font License 1.1.\nFluent Emoji: Microsoft, MIT License.\nWorld map: Natural Earth, public domain.\nPhotos for dreams: Unsplash.\nFilm and series data: TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</string>
 </resources>

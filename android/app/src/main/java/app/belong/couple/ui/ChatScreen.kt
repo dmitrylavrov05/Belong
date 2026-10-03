@@ -353,7 +353,7 @@ class ChatScreen(private val activity: MainActivity) : Screen {
         subtitle.text = if (store.apart == true) "${city.name(ctx.language())} ${ctx.timeIn(city.zone)}" else ""
         subtitle.visibility = if (subtitle.text.isEmpty()) View.GONE else View.VISIBLE
         avatarHolder.removeAllViews()
-        avatarHolder.addView(ctx.avatar(store.partnerDisplay, ctx.col(R.color.him), 42))
+        avatarHolder.addView(Avatars.view(ctx, app.belong.couple.core.Owner.PARTNER, 42))
 
         val all = repo.all()
         if (all.lastOrNull()?.fromMe == false) typing.visibility = View.GONE

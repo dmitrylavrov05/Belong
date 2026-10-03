@@ -87,6 +87,16 @@ class SharedRepo(context: Context) {
         seedPhotos()
         seedLetters()
         seedHome()
+        seedProfiles()
+    }
+
+    /** Emoji avatars for the example couple. */
+    private fun seedProfiles() {
+        if (prefs.getBoolean("seeded_profile", false)) return
+        prefs.edit().putBoolean("seeded_profile", true).apply()
+        if (me != null) return
+        put("profile/me", JSONObject().put("emoji", "🌷").put("color", 0))
+        put("profile/partner", JSONObject().put("emoji", "🐻").put("color", 1))
     }
 
     /** The example couple's cover photo and a note from the partner on Today. */
@@ -209,7 +219,7 @@ class SharedRepo(context: Context) {
     }
 
     /** A real pair starts with an empty map; the server fills it in. */
-    fun startReal() = prefs.edit().putBoolean("seeded", true).putBoolean("seeded_everyday", true).putBoolean("seeded_calendar", true).putBoolean("seeded_photos", true).putBoolean("seeded_letters", true).putBoolean("seeded_home", true).remove("base").remove("ops").apply()
+    fun startReal() = prefs.edit().putBoolean("seeded", true).putBoolean("seeded_everyday", true).putBoolean("seeded_calendar", true).putBoolean("seeded_photos", true).putBoolean("seeded_letters", true).putBoolean("seeded_home", true).putBoolean("seeded_profile", true).remove("base").remove("ops").apply()
 
     private fun base(): JSONObject = try {
         JSONObject(prefs.getString("base", "{}")!!)
@@ -224,7 +234,7 @@ class SharedRepo(context: Context) {
         private const val PREFS = "belong_dreams"
 
         /** Parts of live/ kept here; the rest (check-ins, tasks, wishes…) have their own stores. */
-        val SECTIONS = listOf("dreams", "goals", "thanks", "flags", "couple", "moments", "dates", "photos", "feelings", "letters", "movies", "note")
+        val SECTIONS = listOf("dreams", "goals", "thanks", "flags", "couple", "moments", "dates", "photos", "feelings", "letters", "movies", "note", "profile")
         private val lock = Any()
 
         fun apply(tree: JsonTree, op: JSONObject) {

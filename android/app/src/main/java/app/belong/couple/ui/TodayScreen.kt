@@ -181,7 +181,7 @@ class TodayScreen(private val activity: MainActivity) : Screen {
     })
 
     /** "Customise Today": each card with a switch and arrows to move it; saved on this phone. */
-    private fun customize() {
+    fun customize() {
         val dialog = android.app.Dialog(activity, R.style.Theme_Belong)
         val col = ctx.column(10).apply { setPadding(ctx.dp(20), ctx.dp(12), ctx.dp(20), ctx.dp(28)) }
         val list = ctx.column(8)
@@ -420,7 +420,7 @@ class TodayScreen(private val activity: MainActivity) : Screen {
         addView(PairMark(ctx).apply {
             initials = initial(store.myName) to initial(store.partnerDisplay)
             contentDescription = ctx.getString(R.string.settings)
-            setOnClickListener { SettingsDialog.show(activity) }
+            setOnClickListener { activity.select(MainActivity.TAB_SETTINGS) }
         }, LinearLayout.LayoutParams(WRAP, ctx.dp(44)))
     }
 
@@ -449,7 +449,7 @@ class TodayScreen(private val activity: MainActivity) : Screen {
 
     private fun partnerCard(): View = ctx.card(paddingDp = 16, spacingDp = 14).apply {
         val top = ctx.row(12).apply { gravity = Gravity.TOP }
-        top.addView(ctx.avatar(store.partnerDisplay, ctx.col(R.color.him), 44))
+        top.addView(Avatars.view(ctx, Owner.PARTNER, 44))
         val info = ctx.column(4)
         val name = store.partnerDisplay
         val line = SpannableStringBuilder()

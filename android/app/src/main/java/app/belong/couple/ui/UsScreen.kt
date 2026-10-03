@@ -67,8 +67,8 @@ class UsScreen(private val activity: MainActivity) : Screen {
         ))
         group(R.string.us_group_settings, listOfNotNull(
             if (Account.get(ctx).available) Tile("🔗", R.string.pair_title) { PairDialog.show(activity) } else null,
-            Tile("📱", R.string.widgets_title) { widgetsSheet() },
-            Tile("⚙️", R.string.us_group_settings) { SettingsDialog.show(activity) },
+            Tile("📱", R.string.widgets_title) { WidgetsSheet.show(activity) },
+            Tile("⚙️", R.string.settings_title) { activity.select(MainActivity.TAB_SETTINGS) },
         ))
 
         body.addView(ctx.text(ctx.getString(R.string.us_chronicle), 22f, 700).lp(top = 32))
@@ -216,23 +216,6 @@ class UsScreen(private val activity: MainActivity) : Screen {
         body.addView(box.lp(top = 10))
     }
 
-    /** Placing a home-screen widget: the four kinds, one tap each. */
-    private fun widgetsSheet() {
-        activity.bottomSheet { sheet, _ ->
-            sheet.addView(ctx.text(ctx.getString(R.string.widgets_title), 22f, 700))
-            sheet.addView(ctx.text(ctx.getString(R.string.widgets_text), 14f, 500, ctx.col(R.color.ink2)))
-            listOf(
-                R.string.add_widget_mood to app.belong.couple.widget.MoodWidget::class.java,
-                R.string.add_widget_countdown to app.belong.couple.widget.CountdownWidget::class.java,
-                R.string.add_widget_doodle to app.belong.couple.widget.DoodleWidget::class.java,
-                R.string.add_widget_tasks to app.belong.couple.widget.TasksWidget::class.java,
-            ).forEach { (label, cls) ->
-                sheet.addView(ctx.secondaryButton("+ " + ctx.getString(label), null) {
-                    if (!app.belong.couple.widget.Widgets.requestPin(ctx, cls)) Toaster.show(activity, ctx.getString(R.string.widget_pin_unsupported))
-                })
-            }
-        }
-    }
 }
 
 /** "Add a memory": a title, a few words, the date and optionally a photo. */

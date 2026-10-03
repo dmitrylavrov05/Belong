@@ -119,7 +119,10 @@ object DayPhotos {
     }
 
     /** Makes the picture at [uri] the couple's cover on Today, for both phones. [done] gets whether it worked. */
-    fun setCover(context: Context, uri: Uri, done: (Boolean) -> Unit) {
+    fun setCover(context: Context, uri: Uri, done: (Boolean) -> Unit) = setPhoto(context, uri, "couple/cover", done)
+
+    /** Compresses the picture at [uri], sends it for a pair, and stores its key at [path] in the shared data. */
+    fun setPhoto(context: Context, uri: Uri, path: String, done: (Boolean) -> Unit) {
         val app = context.applicationContext
         pool.execute {
             val key = prepare(app, uri)
@@ -129,7 +132,7 @@ object DayPhotos {
                     mark(app, "upload", key, true)
                     LiveSync.flushSoon(app)
                 }
-                repo.put("couple/cover", key)
+                repo.put(path, key)
             }
             main.post { done(key != null) }
         }

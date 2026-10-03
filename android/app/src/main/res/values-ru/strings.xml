@@ -1029,4 +1029,24 @@
     <string name="us_group_fun">Вместе</string>
     <string name="us_group_story">Наша история и планы</string>
     <string name="us_group_settings">Настройки</string>
+    <!-- Экран настроек -->
+    <string name="settings_section_me">Обо мне</string>
+    <string name="settings_section_partner">Партнёр</string>
+    <string name="settings_section_us">Мы вдвоём</string>
+    <string name="settings_section_app">Приложение</string>
+    <string name="settings_section_pair">Пара</string>
+    <string name="settings_section_about">О Belong</string>
+    <string name="settings_avatar">Аватарка</string>
+    <string name="settings_none">Не задано</string>
+    <string name="settings_since">Вместе с</string>
+    <string name="settings_nickname_row">Ласковое имя</string>
+    <string name="settings_nickname_clear">Показывать обычное имя</string>
+    <string name="settings_avatar_photo">Выбрать фото</string>
+    <string name="settings_avatar_emoji">Или эмодзи на цветном фоне</string>
+    <string name="settings_avatar_color">Цвет %1$d</string>
+    <string name="settings_avatar_use_emoji">Поставить этот эмодзи</string>
+    <string name="settings_avatar_remove">Вернуть букву имени</string>
+    <string name="settings_version">Версия</string>
+    <string name="settings_licenses">Авторы и лицензии</string>
+    <string name="settings_licenses_text">Сделано с любовью для двоих.\n\nШрифт Manrope: The Manrope Project Authors, SIL Open Font License 1.1.\nЭмодзи Fluent: Microsoft, лицензия MIT.\nКарта мира: Natural Earth, общественное достояние.\nФото к мечтам: Unsplash.\nДанные о фильмах и сериалах: TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</string>
 </resources>

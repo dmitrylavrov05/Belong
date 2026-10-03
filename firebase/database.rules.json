@@ -536,6 +536,23 @@
                 ".validate": false
               }
             }
+          },
+          "profile": {
+            "$role": {
+              ".write": "auth != null && root.child('pairs').child($code).child('members').child($role).val() === auth.uid",
+              "photo": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40 && newData.val().matches(/^[a-z0-9-]+$/)"
+              },
+              "emoji": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 16"
+              },
+              "color": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 15 && newData.val() % 1 === 0"
+              },
+              "$other": {
+                ".validate": false
+              }
+            }
           }
         },
         "secret": {

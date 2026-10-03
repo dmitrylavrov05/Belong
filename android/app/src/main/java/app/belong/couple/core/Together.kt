@@ -463,3 +463,19 @@ object TodayModel {
         return OnThisDay(years, photos.filter { it.first == years }.map { it.second }, moments.filter { it.first == years }.map { it.second })
     }
 }
+
+/** How a person appears: their photo (a photo_data key), or an emoji on one of the avatar colours. */
+data class Profile(val photo: String?, val emoji: String?, val color: Int)
+
+object ProfileModel {
+    const val COLORS = 8
+
+    fun profile(root: JSONObject, seat: String): Profile {
+        val o = root.optJSONObject("profile")?.optJSONObject(seat) ?: return Profile(null, null, 0)
+        return Profile(
+            o.optString("photo").ifEmpty { null },
+            o.optString("emoji").ifEmpty { null },
+            Math.floorMod(o.optInt("color"), COLORS),
+        )
+    }
+}
