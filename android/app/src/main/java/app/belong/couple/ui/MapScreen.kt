@@ -398,7 +398,7 @@ class MapScreen(private val activity: MainActivity) : Screen {
             val uri = "example:$i"
             if (Thumbs.cached(uri) == null) {
                 val (a, b) = tints[i % 2]
-                Thumbs.put(uri, Thumbs.example(p[2], 160, ctx.col(a), ctx.col(b)))
+                Thumbs.put(uri, Thumbs.example(ctx, p[2], 160, ctx.col(a), ctx.col(b)))
             }
             repeat(p[4].toInt()) { j ->
                 val photo = GeoPhoto(-(i * 1000L + j) - 1, uri, p[0].toDouble() + (j % 5) * 0.004, p[1].toDouble() + (j % 3) * 0.004, now - (i * 40L + j) * 86_400_000L)

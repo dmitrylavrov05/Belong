@@ -141,7 +141,7 @@ object StoryRenderer {
             if (top + 118f > HEIGHT - 170f) break
             canvas.drawRoundRect(RectF(90f, top, 990f, top + 118f), 40f, 40f, card)
             val baseline = top + 76f
-            canvas.drawText(row.emoji, 130f, baseline, emojiPaint)
+            Emoji.draw(canvas, context, row.emoji, 156f, top + 59f, 56f, emojiPaint)
             val valueWidth = valuePaint.measureText(row.value)
             val label = ellipsize(row.label, labelPaint, 950f - 220f - valueWidth - 30f)
             canvas.drawText(label, 220f, baseline - 4f, labelPaint)

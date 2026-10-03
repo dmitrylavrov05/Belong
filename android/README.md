@@ -126,4 +126,5 @@ The sandbox APK targets API 34, because the Ubuntu build of aapt2 cannot read th
 ## Third-party assets
 
 - Manrope by The Manrope Project Authors, SIL Open Font License 1.1 (`app/src/main/assets/licenses/OFL-Manrope.txt`).
+- Fluent Emoji (3D) by Microsoft, MIT License (`app/src/main/assets/licenses/MIT-FluentEmoji.txt`). `app/src/main/assets/emoji/` holds the 1,871 emoji without skin-tone variants, resized to 128 px WebP (about 4 MB); `ui/Emoji.kt` draws them in place of the phone's emoji in every text the app shows, so they look the same on every phone. The keyboard still shows the phone's own emoji while typing.
 - World map: Natural Earth land polygons, public domain. `tools/make_world_map.py` converts them into `app/src/main/assets/map/*.bin`.

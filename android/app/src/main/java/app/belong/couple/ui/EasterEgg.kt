@@ -137,7 +137,7 @@ object EasterEgg {
                 val x = width * h[0] + Math.sin((progress * 6 + h[3] * 6).toDouble()).toFloat() * context.dp(14)
                 paint.textSize = context.dp(16 + (h[3] * 18).toInt()).toFloat()
                 paint.alpha = (110 * (1f - progress)).toInt().coerceIn(0, 255)
-                canvas.drawText(glyphs[i % glyphs.size], x, y, paint)
+                Emoji.draw(canvas, context, glyphs[i % glyphs.size], x, y, paint.textSize * 1.2f, paint)
             }
         }
     }

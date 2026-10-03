@@ -22,6 +22,7 @@ import android.util.Size
 import app.belong.couple.core.GeoPhoto
 import app.belong.couple.core.Geo
 import app.belong.couple.core.PhotoClusters
+import app.belong.couple.ui.Emoji
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -178,16 +179,14 @@ object Thumbs {
     }
 
     /** A placeholder picture for the example places: a soft gradient with an emoji. */
-    fun example(emoji: String, size: Int, start: Int, end: Int): Bitmap {
+    fun example(context: Context, emoji: String, size: Int, start: Int, end: Int): Bitmap {
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         paint.shader = LinearGradient(0f, 0f, size.toFloat(), size.toFloat(), start, end, Shader.TileMode.CLAMP)
         canvas.drawRect(0f, 0f, size.toFloat(), size.toFloat(), paint)
         paint.shader = null
-        paint.textSize = size * 0.5f
-        paint.textAlign = Paint.Align.CENTER
-        canvas.drawText(emoji, size / 2f, size * 0.68f, paint)
+        Emoji.draw(canvas, context, emoji, size / 2f, size / 2f, size * 0.55f, paint)
         return bitmap
     }
 }

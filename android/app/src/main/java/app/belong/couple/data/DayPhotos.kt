@@ -21,6 +21,7 @@ import app.belong.couple.sync.CloudException
 import app.belong.couple.sync.Db
 import app.belong.couple.sync.LiveSync
 import app.belong.couple.sync.Reason
+import app.belong.couple.ui.Emoji
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -285,7 +286,7 @@ object DayPhotos {
             val (emoji, daysAgo, owner, caption) = line.split('|', limit = 4)
             val key = "demo-p${first + i}"
             val day = today - daysAgo.toLong()
-            val bmp = drawDemo(emoji, i)
+            val bmp = drawDemo(app, emoji, i)
             save(app, key, bmp)
             bmp.recycle()
             repo.put("photos/$day/$key", JSONObject().put("by", owner).put("at", System.currentTimeMillis() - daysAgo.toLong() * 86_400_000L + i).put("caption", caption))
@@ -300,17 +301,14 @@ object DayPhotos {
         0xFFD7C2FF.toInt() to 0xFFFFC2E2.toInt(),
     )
 
-    private fun drawDemo(emoji: String, i: Int): Bitmap {
+    private fun drawDemo(context: Context, emoji: String, i: Int): Bitmap {
         val w = 720
         val h = 880
         val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
         val (a, b) = DEMO_COLORS[i % DEMO_COLORS.size]
         c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), Paint().apply { shader = LinearGradient(0f, 0f, w.toFloat(), h.toFloat(), a, b, Shader.TileMode.CLAMP) })
-        c.drawText(emoji, w / 2f, h / 2f + 90f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            textSize = 260f
-            textAlign = Paint.Align.CENTER
-        })
+        Emoji.draw(c, context, emoji, w / 2f, h / 2f, 300f, Paint(Paint.ANTI_ALIAS_FLAG))
         return bmp
     }
 }

@@ -67,7 +67,7 @@ fun Context.text(
     size: Float = 16f,
     weight: Int = 400,
     color: Int = col(R.color.ink),
-): TextView = TextView(this).apply {
+): TextView = EmojiTextView(this).apply {
     text = value
     setTextSize(TypedValue.COMPLEX_UNIT_SP, size)
     typeface = Fonts.get(context, weight)
