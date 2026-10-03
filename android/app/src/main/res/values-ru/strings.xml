@@ -1020,4 +1020,15 @@
     <string name="note_sent">%1$s увидит вашу записку 💌</string>
     <string name="note_seed">Удачи сегодня на встрече, у тебя всё получится! 💪</string>
     <string name="photo_seed_year_ago">🏡|365|me|Наш первый вечер в новой квартире</string>
+    <!-- Уведомления -->
+    <string name="inbox_title">Уведомления</string>
+    <string name="inbox_empty">Всё прочитано. Хорошего вам дня вместе</string>
+    <string name="inbox_note">%1$s: новая записка</string>
+    <string name="inbox_photos">%1$s: фото дня уже здесь</string>
+    <plurals name="inbox_new">
+        <item quantity="one">Уведомления, новых: %d</item>
+        <item quantity="few">Уведомления, новых: %d</item>
+        <item quantity="many">Уведомления, новых: %d</item>
+        <item quantity="other">Уведомления, новых: %d</item>
+    </plurals>
 </resources>

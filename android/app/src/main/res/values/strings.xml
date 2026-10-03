@@ -988,4 +988,13 @@
     <string name="note_sent">%1$s will see your note 💌</string>
     <string name="note_seed">Good luck at the meeting today, you’ve got this! 💪</string>
     <string name="photo_seed_year_ago">🏡|365|me|Our first evening in the new flat</string>
+    <!-- Notifications -->
+    <string name="inbox_title">Notifications</string>
+    <string name="inbox_empty">All caught up. Have a lovely day together</string>
+    <string name="inbox_note">A new note from %1$s</string>
+    <string name="inbox_photos">%1$s shared photos today</string>
+    <plurals name="inbox_new">
+        <item quantity="one">Notifications, %d new</item>
+        <item quantity="other">Notifications, %d new</item>
+    </plurals>
 </resources>

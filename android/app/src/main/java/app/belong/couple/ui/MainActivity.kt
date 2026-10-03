@@ -126,7 +126,7 @@ class MainActivity : Activity() {
     }
 
     fun select(destination: Int) {
-        current = if (destination in 0..TAB_MOVIES) destination else TAB_TODAY
+        current = if (destination in 0..TAB_INBOX) destination else TAB_TODAY
         val screen = screens.getOrPut(current) { create(current) }
         val parent = PARENT[current]
         val view = if (parent != null) framed.getOrPut(current) { withBackBar(screen.view, parent) } else screen.view
@@ -158,6 +158,7 @@ class MainActivity : Activity() {
         TAB_FEELINGS -> FeelingsScreen(this)
         TAB_LETTERS -> LettersScreen(this)
         TAB_MOVIES -> MoviesScreen(this)
+        TAB_INBOX -> InboxScreen(this)
         else -> TodayScreen(this)
     }
 
@@ -171,7 +172,7 @@ class MainActivity : Activity() {
             background = ripple(rounded(col(R.color.bg), 24f), 24f)
             setOnClickListener { select(parent) }
         }, LinearLayout.LayoutParams(dp(48), dp(48)))
-        bar.addView(text(getString(if (parent == TAB_DREAMS) R.string.dreams_title else R.string.tab_more), 15f, 700, col(R.color.ink2)))
+        bar.addView(text(getString(when (parent) { TAB_DREAMS -> R.string.dreams_title; TAB_TODAY -> R.string.tab_today; else -> R.string.tab_more }), 15f, 700, col(R.color.ink2)))
         addView(bar)
         addView(child, LinearLayout.LayoutParams(MATCH, 0, 1f))
     }
@@ -232,6 +233,7 @@ class MainActivity : Activity() {
         const val TAB_FEELINGS = 11
         const val TAB_LETTERS = 12
         const val TAB_MOVIES = 13
+        const val TAB_INBOX = 14
 
         /** Screens reached from a tab, with a back button to it. */
         private val PARENT = mapOf(
@@ -244,6 +246,7 @@ class MainActivity : Activity() {
             TAB_FEELINGS to TAB_MORE,
             TAB_LETTERS to TAB_MORE,
             TAB_MOVIES to TAB_MORE,
+            TAB_INBOX to TAB_TODAY,
         )
 
         private val TABS = listOf(

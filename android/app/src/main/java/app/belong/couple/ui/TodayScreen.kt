@@ -19,11 +19,9 @@ import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import app.belong.couple.R
-import app.belong.couple.core.FeelingsModel
 import app.belong.couple.core.HomeLayout
 import app.belong.couple.core.LoveNote
 import app.belong.couple.core.Geo
-import app.belong.couple.core.LettersModel
 import app.belong.couple.core.Owner
 import app.belong.couple.core.PartOfDay
 import app.belong.couple.core.PhotosModel
@@ -130,11 +128,7 @@ class TodayScreen(private val activity: MainActivity) : Screen {
         body.removeAllViews()
         clockUpdaters.clear()
         body.addView(header())
-        // Notices first: they need an answer or have just become available.
-        if (store.apart == null) body.addView(modeCard().lp(top = 24))
-        feelingsCard()?.let { body.addView(it.lp(top = 24)) }
-        letterCard()?.let { body.addView(it.lp(top = 24)) }
-        reportCard()?.let { body.addView(it.lp(top = 24)) }
+        // Letters, feelings notes, the month report and the like wait behind the bell in the header.
         val off = hidden()
         for (id in layout()) {
             if (id in off) continue
@@ -421,6 +415,7 @@ class TodayScreen(private val activity: MainActivity) : Screen {
         texts.addView(ctx.text(ctx.getString(greeting, store.myName), 28f, 700).apply { letterSpacing = -0.01f })
         texts.addView(ctx.text(ctx.formatDayHeader(LocalDate.now()), 15f, 500, ctx.col(R.color.ink2)))
         addView(texts, LinearLayout.LayoutParams(0, WRAP, 1f))
+        addView(bell(), LinearLayout.LayoutParams(ctx.dp(44), ctx.dp(44)))
         addView(PairMark(ctx).apply {
             initials = initial(store.myName) to initial(store.partnerDisplay)
             contentDescription = ctx.getString(R.string.settings)
@@ -429,6 +424,25 @@ class TodayScreen(private val activity: MainActivity) : Screen {
     }
 
     private fun initial(name: String) = name.trim().take(1).uppercase(ctx.locale())
+
+    /** The bell: opens notifications, with a dot and the number of new ones. */
+    private fun bell(): View = FrameLayout(ctx).apply {
+        val count = InboxScreen.unseen(activity)
+        addView(android.widget.ImageView(ctx).apply {
+            setImageDrawable(ctx.icon(R.drawable.ic_bell, ctx.col(R.color.ink), 22))
+            scaleType = android.widget.ImageView.ScaleType.CENTER
+            background = ctx.ripple(ctx.rounded(ctx.col(R.color.surface), 22f), 22f)
+        }, FrameLayout.LayoutParams(MATCH, MATCH))
+        if (count > 0) addView(ctx.text(if (count > 9) "9+" else count.toString(), 10f, 800, ctx.col(R.color.white)).apply {
+            gravity = Gravity.CENTER
+            background = ctx.gradient(999f, ctx.col(R.color.us_start), ctx.col(R.color.us_end))
+            setPadding(ctx.dp(4), 0, ctx.dp(4), 0)
+            minWidth = ctx.dp(18)
+        }, FrameLayout.LayoutParams(WRAP, ctx.dp(18), Gravity.TOP or Gravity.END))
+        contentDescription = if (count > 0) ctx.resources.getQuantityString(R.plurals.inbox_new, count, count) else ctx.getString(R.string.inbox_title)
+        isClickable = true
+        setOnClickListener { activity.select(MainActivity.TAB_INBOX) }
+    }
 
     // ---------- Partner and check-in ----------
 
@@ -619,52 +633,6 @@ class TodayScreen(private val activity: MainActivity) : Screen {
         row.addView(clock)
     }
 
-    /** Asked once for a new pair: everything about distance and meetings depends on the answer. */
-    /** A dated letter from the partner has opened today. */
-    private fun letterCard(): View? {
-        val repo = SharedRepo(ctx)
-        val letter = LettersModel.ready(LettersModel.letters(repo.root(), repo.me), System.currentTimeMillis()) ?: return null
-        return ctx.card(paddingDp = 18, spacingDp = 6, background = ctx.gradient(24f, ctx.col(R.color.her_tint), ctx.col(R.color.him_tint))).apply {
-            addView(ctx.text("💌 " + ctx.getString(R.string.letters_today, store.partnerDisplay), 17f, 700, ctx.col(R.color.on_tint)))
-            addView(ctx.text(letter.title, 14f, 500, ctx.col(R.color.on_tint)))
-            isClickable = true
-            foreground = ctx.ripple(android.graphics.drawable.ColorDrawable(0), 24f)
-            setOnClickListener { LettersScreen.read(activity, letter) }
-        }
-    }
-
-    /** The partner wrote about their feelings and waits for my side. */
-    private fun feelingsCard(): View? {
-        val repo = SharedRepo(ctx)
-        val note = FeelingsModel.waitingForMe(repo.root(), repo.me) ?: return null
-        return ctx.card(paddingDp = 18, spacingDp = 6, background = ctx.rounded(ctx.col(R.color.her_tint), 24f)).apply {
-            addView(ctx.text("💌 " + ctx.getString(R.string.feelings_today, store.partnerDisplay), 17f, 700, ctx.col(R.color.on_tint)))
-            addView(ctx.text(ctx.getString(R.string.feelings_today_text), 14f, 500, ctx.col(R.color.on_tint)))
-            isClickable = true
-            foreground = ctx.ripple(android.graphics.drawable.ColorDrawable(0), 24f)
-            setOnClickListener { FeelingsScreen.write(activity, note) }
-        }
-    }
-
-    /** In the first week of a month: last month's report is ready, until it's opened. */
-    private fun reportCard(): View? {
-        val today = java.time.LocalDate.now()
-        val month = TimeMath.recapMonth(today)
-        if (month == java.time.YearMonth.from(today)) return null
-        val prefs = ctx.getSharedPreferences("belong_reports", android.content.Context.MODE_PRIVATE)
-        if (prefs.getBoolean("seen_$month", false)) return null
-        return ctx.card(paddingDp = 18, spacingDp = 6, background = ctx.gradient(24f, ctx.col(R.color.her_tint), ctx.col(R.color.him_tint))).apply {
-            addView(ctx.text("✨ " + ctx.getString(R.string.report_ready, StoryRenderer.monthName(ctx, month)), 18f, 700, ctx.col(R.color.on_tint)))
-            addView(ctx.text(ctx.getString(R.string.report_ready_text), 14f, 500, ctx.col(R.color.on_tint)))
-            isClickable = true
-            foreground = ctx.ripple(android.graphics.drawable.ColorDrawable(0), 24f)
-            setOnClickListener {
-                prefs.edit().putBoolean("seen_$month", true).apply()
-                activity.select(MainActivity.TAB_MONTH)
-            }
-        }
-    }
-
     /** Today's photos from both of you, or an invitation to add one. */
     private fun photoCard(): View = ctx.card(paddingDp = 16, spacingDp = 12).apply {
         val today = DayPhotos.today()
@@ -681,15 +649,6 @@ class TodayScreen(private val activity: MainActivity) : Screen {
         if (photos.count { it.by == Owner.ME } < PhotosModel.PER_DAY) {
             addView(ctx.secondaryButton(ctx.getString(R.string.photos_add), R.drawable.ic_plus) { PhotosScreen.pick(activity) })
         }
-    }
-
-    private fun modeCard(): View = ctx.card(paddingDp = 16, spacingDp = 10).apply {
-        addView(ctx.text(ctx.getString(R.string.mode_question), 18f, 700))
-        addView(ctx.text(ctx.getString(R.string.mode_text), 14f, 500, ctx.col(R.color.ink2)))
-        val buttons = ctx.row(10)
-        buttons.addView(ctx.secondaryButton(ctx.getString(R.string.mode_together)) { store.setApart(false) }, LinearLayout.LayoutParams(0, WRAP, 1f))
-        buttons.addView(ctx.secondaryButton(ctx.getString(R.string.mode_apart)) { store.setApart(true) }, LinearLayout.LayoutParams(0, WRAP, 1f))
-        addView(buttons)
     }
 
     private fun miniCard(iconRes: Int, title: String, big: String, unit: String, caption: String, background: android.graphics.drawable.Drawable?): LinearLayout =
