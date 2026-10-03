@@ -31,7 +31,54 @@ class EverydayCards(private val activity: MainActivity, private val refresh: () 
     private val repo = SharedRepo(ctx)
     private val today: Long get() = LocalDate.now(ZoneId.systemDefault()).toEpochDay()
 
+    private var shoppingOpen = false
+    private var questionOpen = false
+
     // ---------- Shopping ----------
+
+    /** One line with what's left to buy; tap to see and tick off the whole list. */
+    fun shoppingCompact(): View {
+        if (shoppingOpen) return ctx.column().apply {
+            addView(shoppingHeader())
+            addView(shoppingCard().lp(top = 8))
+            addView(ctx.textButton(ctx.getString(R.string.home_less)) {
+                shoppingOpen = false
+                refresh()
+            })
+        }
+        val open = TogetherModel.shopping(repo.root(), repo.me).filter { !it.done }
+        return ctx.card(paddingDp = 16, spacingDp = 0).apply {
+            val r = ctx.row(12)
+            r.addView(ctx.text("🛒", 22f))
+            val t = ctx.column(2)
+            t.addView(ctx.text(
+                if (open.isEmpty()) ctx.getString(R.string.shopping_title) else ctx.getString(R.string.home_shopping_left, ctx.getString(R.string.shopping_title), open.size),
+                16f, 700,
+            ))
+            t.addView(ctx.text(
+                if (open.isEmpty()) ctx.getString(R.string.shopping_empty) else open.joinToString(" · ") { it.title },
+                13f, 500, ctx.col(R.color.ink2),
+            ).apply {
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            })
+            r.addView(t, LinearLayout.LayoutParams(0, WRAP, 1f))
+            r.addView(ImageView(ctx).apply {
+                setImageDrawable(ctx.icon(R.drawable.ic_plus, ctx.col(R.color.ink), 20))
+                scaleType = ImageView.ScaleType.CENTER
+                contentDescription = ctx.getString(R.string.shopping_add)
+                background = ctx.ripple(ctx.rounded(ctx.col(R.color.bg), 22f), 22f)
+                setOnClickListener { addShopping() }
+            }, LinearLayout.LayoutParams(ctx.dp(44), ctx.dp(44)))
+            addView(r)
+            isClickable = true
+            background = ctx.ripple(background, 24f)
+            setOnClickListener {
+                shoppingOpen = true
+                refresh()
+            }
+        }
+    }
 
     fun shoppingHeader(): View = ctx.row(8).apply {
         addView(ctx.text(ctx.getString(R.string.shopping_title), 22f, 700), LinearLayout.LayoutParams(0, WRAP, 1f))
@@ -105,6 +152,29 @@ class EverydayCards(private val activity: MainActivity, private val refresh: () 
     }
 
     // ---------- Question of the day ----------
+
+    /** The full card until you've both answered; then one line to open your answers again. */
+    fun questionCompact(): View {
+        val day = today
+        val bothAnswered = DayQuestion.mine(ctx, day) != null && DayQuestion.cachedPartner(ctx, day) != null
+        if (!bothAnswered || questionOpen) return questionCard()
+        return ctx.card(paddingDp = 16, spacingDp = 0).apply {
+            val r = ctx.row(12)
+            r.addView(ctx.text("💬", 22f))
+            val t = ctx.column(2)
+            t.addView(ctx.text(ctx.getString(R.string.question_title), 16f, 700))
+            t.addView(ctx.text(ctx.getString(R.string.home_question_done), 13f, 500, ctx.col(R.color.ok_ink)))
+            r.addView(t, LinearLayout.LayoutParams(0, WRAP, 1f))
+            r.addView(ctx.text(ctx.getString(R.string.home_show), 14f, 700, ctx.col(R.color.him)))
+            addView(r)
+            isClickable = true
+            background = ctx.ripple(background, 24f)
+            setOnClickListener {
+                questionOpen = true
+                refresh()
+            }
+        }
+    }
 
     fun questionCard(): View = ctx.card(paddingDp = 16, spacingDp = 12).apply {
         val day = today

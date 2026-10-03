@@ -11,7 +11,7 @@ Five tabs: Today, Dreams, Chat, Photos, Us.
   - **our photo**: a cover photo of the two of you with “Together for N days”, shared by both phones (tap to change or remove);
   - **notes for each other**: a short note each of you leaves for the other, shown until it's replaced;
   - **on this day**: photos of the day and memories from this date a year or more ago;
-  - “Thinking of you”, “I'm safe” and “Send support” now sit in the partner's card; after you check in, your mood folds into one line (tap to change); the widgets card hides once a widget is on the home screen;
+  - kept short: the partner's card has one big “Thinking of you” (“Send support” and “I'm safe” behind ⋯ or a long press); after you check in, your mood folds into one line; the plan shows three tasks and “N more”; shopping is one line until opened; the question of the day folds once you've both answered; the widgets card is off by default (Us → Widgets);
   - greeting, the partner's mood and energy, and your own check-in;
   - **plan for the day**: mine, ours and the partner's tasks. Tap to tick off, long-press to delete. Unfinished tasks roll over to the next day;
   - **together or apart**: on first launch Today asks whether you live together or apart (also in Settings). Apart: both cities' clocks, the distance and the countdown to your next meeting. Together: the next important dates from the calendar instead;
@@ -22,7 +22,7 @@ Five tabs: Today, Dreams, Chat, Photos, Us.
   - **Shopping**: a shared list showing who added each item;
   - **Question of the day**: the same question on both phones; your partner's answer stays blurred (and the server won't send it) until you answer too;
   - **End of the day**: in the evening, a short “thank you” for your partner, with suggestion chips; they see it the next morning.
-- **Us** (replaces More): how long you've been together, the **chronicle** (dreams that came true, goals reached, your own memories with an optional photo, “On this day”), the weekly quiz **“How well do you know me?”** (guess your partner's answers, give your own, compare once both have played) and everything that was under More.
+- **Us** (replaces More): tiles in groups — For each other, Fun together, Our story and plans, Settings — above the chronicle; how long you've been together, the **chronicle** (dreams that came true, goals reached, your own memories with an optional photo, “On this day”), the weekly quiz **“How well do you know me?”** (guess your partner's answers, give your own, compare once both have played) and everything that was under More.
 - **Dreams** (from the design handoff):
   - the **wish map**: dreams with a picture, a category and whose they are (mine, ours, the partner's); filter by category; “Me too 💞” turns the partner's dream into a shared one;
   - **goals**: “Make it a goal” turns a dream into a goal with a progress ring, a **savings jar** (each partner's share in their colour, and when you'll get there at the current pace) and **steps** with who does them and by when; a step can go to today's plan; “We did it” marks the dream as come true;

@@ -48,27 +48,34 @@ class UsScreen(private val activity: MainActivity) : Screen {
         body.removeAllViews()
         val root = repo.root()
         body.addView(header(TogetherModel.since(root)))
-        body.addView(ctx.text(ctx.getString(R.string.us_chronicle), 22f, 700).lp(top = 28))
+        // Everything you can do together, in groups of tiles; the chronicle follows below.
+        group(R.string.us_group_each_other, listOf(
+            Tile("💌", R.string.letters_title) { activity.select(MainActivity.TAB_LETTERS) },
+            Tile("🤍", R.string.feelings_title) { activity.select(MainActivity.TAB_FEELINGS) },
+            Tile("🎁", R.string.wish_title) { activity.select(MainActivity.TAB_WISHLIST) },
+            Tile("✏️", R.string.tab_doodle) { activity.select(MainActivity.TAB_DOODLE) },
+        ))
+        group(R.string.us_group_fun, listOf(
+            Tile("🎬", R.string.movies_title) { activity.select(MainActivity.TAB_MOVIES) },
+            Tile("🧠", R.string.quiz_title) { QuizScreen.show(activity) },
+            Tile("🎲", R.string.games_title) { activity.select(MainActivity.TAB_GAMES) },
+        ))
+        group(R.string.us_group_story, listOf(
+            Tile("✨", R.string.month_title) { activity.select(MainActivity.TAB_MONTH) },
+            Tile("📅", R.string.calendar_title) { activity.select(MainActivity.TAB_CALENDAR) },
+            Tile("🗺", R.string.map_title) { activity.select(MainActivity.TAB_MAP) },
+        ))
+        group(R.string.us_group_settings, listOfNotNull(
+            if (Account.get(ctx).available) Tile("🔗", R.string.pair_title) { PairDialog.show(activity) } else null,
+            Tile("📱", R.string.widgets_title) { widgetsSheet() },
+            Tile("⚙️", R.string.us_group_settings) { SettingsDialog.show(activity) },
+        ))
+
+        body.addView(ctx.text(ctx.getString(R.string.us_chronicle), 22f, 700).lp(top = 32))
         val items = TogetherModel.chronicle(root, repo.me, today)
         if (items.isEmpty()) body.addView(ctx.text(ctx.getString(R.string.us_chronicle_empty), 15f, 500, ctx.col(R.color.ink2)).lp(top = 8))
         items.forEachIndexed { i, item -> body.addView(timelineRow(item, last = i == items.lastIndex).lp(top = if (i == 0) 12 else 0)) }
         body.addView(ctx.secondaryButton(ctx.getString(R.string.us_add_moment), R.drawable.ic_plus) { MomentSheet.show(activity) }.lp(top = 12))
-
-        body.addView(ctx.text(ctx.getString(R.string.more_title), 22f, 700).lp(top = 32))
-        val menu = ctx.column(12)
-        menu.addView(entry(R.drawable.ic_mail, R.string.letters_title, R.string.us_letters_text) { activity.select(MainActivity.TAB_LETTERS) })
-        menu.addView(entry(R.drawable.ic_film, R.string.movies_title, R.string.us_movies_text) { activity.select(MainActivity.TAB_MOVIES) })
-        menu.addView(entry(R.drawable.ic_calendar, R.string.calendar_title, R.string.us_calendar_text) { activity.select(MainActivity.TAB_CALENDAR) })
-        menu.addView(entry(R.drawable.ic_heart, R.string.feelings_title, R.string.us_feelings_text) { activity.select(MainActivity.TAB_FEELINGS) })
-        menu.addView(entry(R.drawable.ic_tab_games, R.string.quiz_title, R.string.us_quiz_text) { QuizScreen.show(activity) })
-        menu.addView(entry(R.drawable.ic_tab_gift, R.string.wish_title, R.string.more_wishlist_text) { activity.select(MainActivity.TAB_WISHLIST) })
-        menu.addView(entry(R.drawable.ic_tab_doodle, R.string.tab_doodle, R.string.more_doodle_text) { activity.select(MainActivity.TAB_DOODLE) })
-        menu.addView(entry(R.drawable.ic_tab_games, R.string.games_title, R.string.more_games_text) { activity.select(MainActivity.TAB_GAMES) })
-        menu.addView(entry(R.drawable.ic_tab_month, R.string.month_title, R.string.more_month_text) { activity.select(MainActivity.TAB_MONTH) })
-        menu.addView(entry(R.drawable.ic_tab_map, R.string.map_title, R.string.us_map_text) { activity.select(MainActivity.TAB_MAP) })
-        if (Account.get(ctx).available) menu.addView(entry(R.drawable.ic_heart, R.string.pair_title, R.string.more_pair_text) { PairDialog.show(activity) })
-        menu.addView(entry(R.drawable.ic_settings, R.string.settings_title, R.string.more_settings_text) { SettingsDialog.show(activity) })
-        body.addView(menu.lp(top = 12))
         scroll.post { scroll.scrollTo(0, y) }
     }
 
@@ -183,26 +190,48 @@ class UsScreen(private val activity: MainActivity) : Screen {
         }
     }
 
-    private fun entry(iconRes: Int, title: Int, text: Int, onClick: () -> Unit): View = ctx.card(paddingDp = 16).apply {
-        val row = ctx.row(14)
-        row.addView(ImageView(ctx).apply {
-            setImageDrawable(ctx.icon(iconRes, ctx.col(R.color.on_tint), 22))
-            scaleType = ImageView.ScaleType.CENTER
-            background = ctx.gradient(16f, ctx.col(R.color.her_tint), ctx.col(R.color.him_tint))
-            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-        }, LinearLayout.LayoutParams(ctx.dp(48), ctx.dp(48)))
-        val texts = ctx.column(2)
-        texts.addView(ctx.text(ctx.getString(title), 17f, 700))
-        texts.addView(ctx.text(ctx.getString(text), 14f, 400, ctx.col(R.color.ink2)))
-        row.addView(texts, LinearLayout.LayoutParams(0, WRAP, 1f))
-        row.addView(ImageView(ctx).apply {
-            setImageDrawable(ctx.icon(R.drawable.ic_chevron, ctx.col(R.color.ink2), 20))
-            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-        })
-        addView(row)
-        isClickable = true
-        background = ctx.ripple(background, 24f)
-        setOnClickListener { onClick() }
+    private class Tile(val emoji: String, val title: Int, val onClick: () -> Unit)
+
+    /** A titled group of tiles, two to a row. */
+    private fun group(title: Int, tiles: List<Tile>) {
+        body.addView(ctx.text(ctx.getString(title), 13f, 700, ctx.col(R.color.ink2)).apply { isAllCaps = true; letterSpacing = 0.06f }.lp(top = 24))
+        val box = ctx.column(10)
+        tiles.chunked(2).forEach { pair ->
+            val row = ctx.row(10)
+            pair.forEach { t ->
+                row.addView(ctx.card(paddingDp = 14, spacingDp = 8).apply {
+                    addView(ctx.text(t.emoji, 24f).apply {
+                        gravity = Gravity.CENTER
+                        background = ctx.gradient(14f, ctx.col(R.color.her_tint), ctx.col(R.color.him_tint))
+                    }, LinearLayout.LayoutParams(ctx.dp(44), ctx.dp(44)))
+                    addView(ctx.text(ctx.getString(t.title), 15f, 700).apply { maxLines = 2 })
+                    isClickable = true
+                    background = ctx.ripple(background, 24f)
+                    setOnClickListener { t.onClick() }
+                }, LinearLayout.LayoutParams(0, if (pair.size == 2) MATCH else WRAP, 1f))
+            }
+            if (pair.size == 1) row.addView(View(ctx), LinearLayout.LayoutParams(0, 1, 1f))
+            box.addView(row)
+        }
+        body.addView(box.lp(top = 10))
+    }
+
+    /** Placing a home-screen widget: the four kinds, one tap each. */
+    private fun widgetsSheet() {
+        activity.bottomSheet { sheet, _ ->
+            sheet.addView(ctx.text(ctx.getString(R.string.widgets_title), 22f, 700))
+            sheet.addView(ctx.text(ctx.getString(R.string.widgets_text), 14f, 500, ctx.col(R.color.ink2)))
+            listOf(
+                R.string.add_widget_mood to app.belong.couple.widget.MoodWidget::class.java,
+                R.string.add_widget_countdown to app.belong.couple.widget.CountdownWidget::class.java,
+                R.string.add_widget_doodle to app.belong.couple.widget.DoodleWidget::class.java,
+                R.string.add_widget_tasks to app.belong.couple.widget.TasksWidget::class.java,
+            ).forEach { (label, cls) ->
+                sheet.addView(ctx.secondaryButton("+ " + ctx.getString(label), null) {
+                    if (!app.belong.couple.widget.Widgets.requestPin(ctx, cls)) Toaster.show(activity, ctx.getString(R.string.widget_pin_unsupported))
+                })
+            }
+        }
     }
 }
 

@@ -1031,4 +1031,17 @@
         <item quantity="many">Уведомления, новых: %d</item>
         <item quantity="other">Уведомления, новых: %d</item>
     </plurals>
+    <!-- Спокойная главная и группы в «Мы» -->
+    <string name="home_less">Свернуть</string>
+    <string name="home_more">Ещё %1$d</string>
+    <string name="home_more_taps">Отправить другое</string>
+    <string name="home_support_text">Если у партнёра непростой день</string>
+    <string name="home_safe_text">Дать знать, что вы добрались</string>
+    <string name="home_shopping_left">%1$s · осталось %2$d</string>
+    <string name="home_question_done">Вы оба ответили ✓</string>
+    <string name="home_show">Показать</string>
+    <string name="us_group_each_other">Друг для друга</string>
+    <string name="us_group_fun">Вместе</string>
+    <string name="us_group_story">Наша история и планы</string>
+    <string name="us_group_settings">Настройки</string>
 </resources>

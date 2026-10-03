@@ -428,6 +428,9 @@ object HomeLayout {
 
     val DEFAULT = listOf(COVER, PARTNER, CHECKIN, NOTE, DATES, ON_THIS_DAY, PHOTO, PLAN, EVENING, SHOPPING, QUESTION, WIDGETS)
 
+    /** Off until switched on in "Customise Today". */
+    val HIDDEN_BY_DEFAULT = setOf(WIDGETS)
+
     /** The saved order with unknown ids dropped and cards added in a later version put where they belong by default. */
     fun order(saved: List<String>): List<String> {
         val known = saved.filter { it in DEFAULT }.distinct()

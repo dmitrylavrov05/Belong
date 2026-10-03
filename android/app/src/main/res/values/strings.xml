@@ -997,4 +997,17 @@
         <item quantity="one">Notifications, %d new</item>
         <item quantity="other">Notifications, %d new</item>
     </plurals>
+    <!-- Calmer Today and grouped Us -->
+    <string name="home_less">Show less</string>
+    <string name="home_more">%1$d more</string>
+    <string name="home_more_taps">Send something else</string>
+    <string name="home_support_text">For when %1$s is having a hard day</string>
+    <string name="home_safe_text">Let %1$s know you got there safely</string>
+    <string name="home_shopping_left">%1$s · %2$d left</string>
+    <string name="home_question_done">You both answered ✓</string>
+    <string name="home_show">Show</string>
+    <string name="us_group_each_other">For each other</string>
+    <string name="us_group_fun">Fun together</string>
+    <string name="us_group_story">Our story and plans</string>
+    <string name="us_group_settings">Settings</string>
 </resources>

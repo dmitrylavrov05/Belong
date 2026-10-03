@@ -126,7 +126,7 @@ class InboxScreen(private val activity: MainActivity) : Screen {
                 buttons = listOf(a.getString(R.string.mode_together) to { store.setApart(false) }, a.getString(R.string.mode_apart) to { store.setApart(true) }),
             )
             FeelingsModel.waitingForMe(root, me)?.let { n ->
-                list += Item("feel-${n.key}", "🫶", a.getString(R.string.feelings_today, partner), a.getString(R.string.feelings_today_text), open = { FeelingsScreen.write(a, n) })
+                list += Item("feel-${n.key}", "🤍", a.getString(R.string.feelings_today, partner), a.getString(R.string.feelings_today_text), open = { FeelingsScreen.write(a, n) })
             }
             LettersModel.letters(root, me).filter { it.by == Owner.PARTNER && it.canOpen(now) && !it.opened && it.kind == app.belong.couple.core.Letter.Kind.DATE }.forEach { l ->
                 list += Item("letter-${l.key}", "💌", a.getString(R.string.letters_today, partner), l.title, open = { LettersScreen.read(a, l) })

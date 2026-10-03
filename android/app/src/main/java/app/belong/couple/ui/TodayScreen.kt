@@ -119,9 +119,11 @@ class TodayScreen(private val activity: MainActivity) : Screen {
     /** The card order and hidden cards on this phone (see [HomeLayout]). */
     private val home = ctx.getSharedPreferences("belong_home", android.content.Context.MODE_PRIVATE)
     private var checkInOpen = false
+    private var planOpen = false
 
     private fun layout(): List<String> = HomeLayout.order(home.getString("order", "").orEmpty().split(',').filter { it.isNotEmpty() })
-    private fun hidden(): Set<String> = home.getStringSet("hidden", emptySet())!!
+    /** Hidden cards; until the person changes anything, the widgets card is off (it's in Us → Widgets too). */
+    private fun hidden(): Set<String> = home.getStringSet("hidden", null) ?: HomeLayout.HIDDEN_BY_DEFAULT
 
     override fun refresh() {
         val scrollY = scroll.scrollY
@@ -159,11 +161,8 @@ class TodayScreen(private val activity: MainActivity) : Screen {
             addView(planCard().lp(top = 12))
         }
         HomeLayout.EVENING -> everyday.eveningCard()
-        HomeLayout.SHOPPING -> ctx.column().apply {
-            addView(everyday.shoppingHeader())
-            addView(everyday.shoppingCard().lp(top = 8))
-        }
-        HomeLayout.QUESTION -> everyday.questionCard()
+        HomeLayout.SHOPPING -> everyday.shoppingCompact()
+        HomeLayout.QUESTION -> everyday.questionCompact()
         HomeLayout.WIDGETS -> if (Widgets.anyPlaced(ctx)) null else widgetsCard()
         else -> null
     }
@@ -412,7 +411,11 @@ class TodayScreen(private val activity: MainActivity) : Screen {
             PartOfDay.NIGHT -> R.string.greeting_night_name
         }
         val texts = ctx.column(2)
-        texts.addView(ctx.text(ctx.getString(greeting, store.myName), 28f, 700).apply { letterSpacing = -0.01f })
+        texts.addView(ctx.text(ctx.getString(greeting, store.myName), 26f, 700).apply {
+            letterSpacing = -0.01f
+            maxLines = 1
+            setAutoSizeTextTypeUniformWithConfiguration(18, 26, 1, android.util.TypedValue.COMPLEX_UNIT_SP)
+        }, LinearLayout.LayoutParams(MATCH, ctx.dp(36)))
         texts.addView(ctx.text(ctx.formatDayHeader(LocalDate.now()), 15f, 500, ctx.col(R.color.ink2)))
         addView(texts, LinearLayout.LayoutParams(0, WRAP, 1f))
         addView(bell(), LinearLayout.LayoutParams(ctx.dp(44), ctx.dp(44)))
@@ -484,10 +487,6 @@ class TodayScreen(private val activity: MainActivity) : Screen {
         addView(top)
         // Everything you can send lives here, next to the person it goes to.
         addView(actions())
-        addView(ctx.tintButton(ctx.getString(R.string.support), R.drawable.ic_heart, ctx.col(R.color.him_tint), ctx.col(R.color.ink)) { v ->
-            haptic(v)
-            tap(LiveModel.SUPPORT, ctx.getString(R.string.support_sent, store.partnerDisplay), null)
-        }.apply { minHeight = ctx.dp(44) })
     }
 
     private fun checkInCard(): View {
@@ -700,12 +699,20 @@ class TodayScreen(private val activity: MainActivity) : Screen {
                 setPadding(0, ctx.dp(6), 0, ctx.dp(6))
             })
         }
-        tasks.forEachIndexed { i, task ->
+        // Open tasks come first; past three, the rest wait behind "N more".
+        val shown = if (planOpen) tasks else tasks.take(PLAN_PREVIEW)
+        shown.forEachIndexed { i, task ->
             if (i > 0) addView(View(ctx).apply { setBackgroundColor(ctx.col(R.color.sunk)) }, LinearLayout.LayoutParams(MATCH, ctx.dp(1)).apply {
                 marginStart = ctx.dp(40)
             })
             addView(taskRow(repo, task))
         }
+        if (tasks.size > PLAN_PREVIEW) addView(ctx.textButton(
+            if (planOpen) ctx.getString(R.string.home_less) else ctx.getString(R.string.home_more, tasks.size - PLAN_PREVIEW),
+        ) {
+            planOpen = !planOpen
+            refresh()
+        })
     }
 
     private fun ownerColor(owner: Owner): Int? = when (owner) {
@@ -803,16 +810,50 @@ class TodayScreen(private val activity: MainActivity) : Screen {
 
     // ---------- Taps ----------
 
-    private fun actions(): View = ctx.row(12).apply {
+    /** One big "Thinking of you", and the other taps behind the ⋯ button (or a long press). */
+    private fun actions(): View = ctx.row(10).apply {
         addView(ctx.primaryButton(ctx.getString(R.string.think), R.drawable.ic_heart) { v ->
             haptic(v)
             tap(LiveModel.THINK, ctx.getString(R.string.think_sent, store.partnerDisplay), Counter.TAPS_SENT)
             if (!paired) DemoPartner.onThinkingSent(ctx)
-        }.oneLine(), LinearLayout.LayoutParams(0, WRAP, 1f))
-        addView(ctx.tintButton(ctx.getString(R.string.safe), R.drawable.ic_shield, ctx.col(R.color.ok_tint), ctx.col(R.color.ok_ink)) { v ->
-            haptic(v)
-            tap(LiveModel.SAFE, ctx.getString(R.string.safe_sent, store.partnerDisplay), Counter.SAFE)
-        }.oneLine(), LinearLayout.LayoutParams(0, WRAP, 1f))
+        }.oneLine().apply {
+            setOnLongClickListener {
+                moreTaps()
+                true
+            }
+        }, LinearLayout.LayoutParams(0, WRAP, 1f))
+        addView(ctx.tintButton("⋯", null, ctx.col(R.color.him_tint), ctx.col(R.color.ink)) { moreTaps() }.apply {
+            contentDescription = ctx.getString(R.string.home_more_taps)
+            setPadding(0, 0, 0, 0)
+        }, LinearLayout.LayoutParams(ctx.dp(56), WRAP))
+    }
+
+    private fun moreTaps() {
+        activity.bottomSheet { sheet, dialog ->
+            sheet.addView(ctx.text(ctx.getString(R.string.home_more_taps), 20f, 700))
+            fun option(emoji: String, title: String, text: String, onClick: () -> Unit) = ctx.card(paddingDp = 14, spacingDp = 2).apply {
+                val r = ctx.row(12)
+                r.addView(ctx.text(emoji, 24f))
+                val t = ctx.column(2)
+                t.addView(ctx.text(title, 16f, 700))
+                t.addView(ctx.text(text, 13f, 500, ctx.col(R.color.ink2)))
+                r.addView(t, LinearLayout.LayoutParams(0, WRAP, 1f))
+                addView(r)
+                isClickable = true
+                background = ctx.ripple(background, 24f)
+                setOnClickListener { v ->
+                    haptic(v)
+                    dialog.dismiss()
+                    onClick()
+                }
+            }
+            sheet.addView(option("🤗", ctx.getString(R.string.support), ctx.getString(R.string.home_support_text, store.partnerDisplay)) {
+                tap(LiveModel.SUPPORT, ctx.getString(R.string.support_sent, store.partnerDisplay), null)
+            })
+            sheet.addView(option("🛡", ctx.getString(R.string.safe), ctx.getString(R.string.home_safe_text, store.partnerDisplay)) {
+                tap(LiveModel.SAFE, ctx.getString(R.string.safe_sent, store.partnerDisplay), Counter.SAFE)
+            })
+        }
     }
 
     /** Keeps a half-width button's label on one line, shrinking it a little if a translation is long. */
@@ -852,5 +893,9 @@ class TodayScreen(private val activity: MainActivity) : Screen {
             }
             addView(line)
         }
+    }
+
+    companion object {
+        private const val PLAN_PREVIEW = 3
     }
 }

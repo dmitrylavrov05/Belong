@@ -1028,4 +1028,17 @@
         <item quantity="many">Сповіщення, нових: %d</item>
         <item quantity="other">Сповіщення, нових: %d</item>
     </plurals>
+    <!-- Спокійна головна і групи в «Ми» -->
+    <string name="home_less">Згорнути</string>
+    <string name="home_more">Ще %1$d</string>
+    <string name="home_more_taps">Надіслати інше</string>
+    <string name="home_support_text">Якщо в партнера непростий день</string>
+    <string name="home_safe_text">Дати знати, що ви дісталися</string>
+    <string name="home_shopping_left">%1$s · залишилося %2$d</string>
+    <string name="home_question_done">Ви обоє відповіли ✓</string>
+    <string name="home_show">Показати</string>
+    <string name="us_group_each_other">Одне для одного</string>
+    <string name="us_group_fun">Разом</string>
+    <string name="us_group_story">Наша історія і плани</string>
+    <string name="us_group_settings">Налаштування</string>
 </resources>
