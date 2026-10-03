@@ -166,7 +166,7 @@
     <string name="story_title">Наш %1$s на відстані</string>
     <string name="story_footer">Зроблено в Belong</string>
 
-    <string name="settings_title">Ваша пара</string>
+    <string name="settings_title">Налаштування</string>
     <string name="settings_my_name">Твоє ім’я</string>
     <string name="settings_partner_name">Ім’я партнера</string>
     <string name="settings_my_city">Твоє місто</string>
@@ -311,7 +311,7 @@
         <item>Серденько ❤️</item>
     </string-array>
     <!-- Pairing and sync -->
-    <string name="pair_title">Наша пара</string>
+    <string name="pair_title">Код пари і вхід</string>
     <string name="more_pair_text">Код пари, допомога партнеру з входом, вихід</string>
     <string name="pair_intro">Спільний простір для вас двох. Один із вас створює пару й передає код іншому.</string>
     <string name="pair_create">Створити простір пари</string>

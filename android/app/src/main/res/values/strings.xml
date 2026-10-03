@@ -164,7 +164,7 @@
     <string name="story_title">Our %1$s apart</string>
     <string name="story_footer">Made with Belong</string>
 
-    <string name="settings_title">Your couple</string>
+    <string name="settings_title">Settings</string>
     <string name="settings_my_name">Your name</string>
     <string name="settings_partner_name">Partner’s name</string>
     <string name="settings_my_city">Your city</string>
@@ -306,7 +306,7 @@
         <item>Kitten 🐱</item>
     </string-array>
     <!-- Pairing and sync -->
-    <string name="pair_title">Our pair</string>
+    <string name="pair_title">Pair code and sign-in</string>
     <string name="more_pair_text">Pair code, help your partner sign in, sign out</string>
     <string name="pair_intro">A shared space for the two of you. One of you creates a pair and passes the code to the other.</string>
     <string name="pair_create">Create a pair space</string>
