@@ -137,6 +137,15 @@ class InboxScreen(private val activity: MainActivity) : Screen {
             val theirPhotos = PhotosModel.photos(root, me).count { it.day == today && it.by == Owner.PARTNER }
             if (theirPhotos > 0) list += Item("photos-$today-$theirPhotos", "📸", a.getString(R.string.inbox_photos, partner),
                 a.resources.getQuantityString(R.plurals.report_photos, theirPhotos, theirPhotos), open = { a.select(MainActivity.TAB_PHOTOS) })
+            app.belong.couple.core.TogetherModel.since(root)?.let { since ->
+                app.belong.couple.core.Milestones.recent(since, today)?.let { m ->
+                    val title = if (m.years != null) a.resources.getQuantityString(R.plurals.milestone_years, m.years, m.years)
+                    else a.resources.getQuantityString(R.plurals.milestone_days, m.days, m.days)
+                    list += Item("milestone-${m.day}", "🎉", a.getString(R.string.inbox_milestone, title), a.getString(R.string.inbox_milestone_text), open = { MilestoneCard.show(a, m) })
+                }
+            }
+            if (LocalDate.now().monthValue == 12) list += Item("wrapped-${LocalDate.now().year}", "🎁",
+                a.getString(R.string.inbox_wrapped, LocalDate.now().year), a.getString(R.string.wrapped_cover_text), open = { Wrapped.show(a) })
             val month = TimeMath.recapMonth(LocalDate.now())
             if (month != YearMonth.from(LocalDate.now())) list += Item("report-$month", "✨",
                 a.getString(R.string.report_ready, StoryRenderer.monthName(a, month)), a.getString(R.string.report_ready_text), open = { a.select(MainActivity.TAB_MONTH) })

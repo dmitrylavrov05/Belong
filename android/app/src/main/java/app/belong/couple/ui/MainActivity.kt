@@ -121,13 +121,14 @@ class MainActivity : Activity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         @Suppress("DEPRECATION") super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_DAY_PHOTOS && resultCode == RESULT_OK) PhotosScreen.picked(this, data)
+        if (requestCode == REQUEST_SCRATCH_PHOTO && resultCode == RESULT_OK) (screens[TAB_SCRATCH] as? ScratchScreen)?.onPhotoPicked(data)
         if (requestCode == REQUEST_AVATAR && resultCode == RESULT_OK) (screens[TAB_SETTINGS] as? SettingsScreen)?.onAvatarPicked(data)
         if (requestCode == REQUEST_COVER && resultCode == RESULT_OK) (screens[TAB_TODAY] as? TodayScreen)?.onCoverPicked(data)
         if (requestCode == REQUEST_CHAT_PHOTO && resultCode == RESULT_OK) (screens[TAB_CHAT] as? ChatScreen)?.onPhotoPicked(data)
     }
 
     fun select(destination: Int) {
-        current = if (destination in 0..TAB_SETTINGS) destination else TAB_TODAY
+        current = if (destination in 0..TAB_SCRATCH) destination else TAB_TODAY
         val screen = screens.getOrPut(current) { create(current) }
         val parent = PARENT[current]
         val view = if (parent != null) framed.getOrPut(current) { withBackBar(screen.view, parent) } else screen.view
@@ -167,6 +168,7 @@ class MainActivity : Activity() {
         TAB_MOVIES -> MoviesScreen(this)
         TAB_INBOX -> InboxScreen(this)
         TAB_SETTINGS -> SettingsScreen(this)
+        TAB_SCRATCH -> ScratchScreen(this)
         else -> TodayScreen(this)
     }
 
@@ -227,6 +229,7 @@ class MainActivity : Activity() {
         const val REQUEST_MIC = 44
         const val REQUEST_COVER = 45
         const val REQUEST_AVATAR = 46
+        const val REQUEST_SCRATCH_PHOTO = 47
 
         const val TAB_TODAY = 0
         const val TAB_CHAT = 1
@@ -244,6 +247,7 @@ class MainActivity : Activity() {
         const val TAB_MOVIES = 13
         const val TAB_INBOX = 14
         const val TAB_SETTINGS = 15
+        const val TAB_SCRATCH = 16
 
         /** Screens reached from a tab, with a back button to it. */
         private val PARENT = mapOf(
@@ -258,6 +262,7 @@ class MainActivity : Activity() {
             TAB_MOVIES to TAB_MORE,
             TAB_INBOX to TAB_TODAY,
             TAB_SETTINGS to TAB_MORE,
+            TAB_SCRATCH to TAB_MORE,
         )
 
         private val TABS = listOf(

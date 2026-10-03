@@ -212,3 +212,27 @@ class HomeLayoutTest {
         assertEquals("p1", TodayModel.cover(root))
     }
 }
+
+class MilestonesAndScratchTest {
+    @Test
+    fun roundDaysAndAnniversariesInOrder() {
+        val since = LocalDate.of(2024, 2, 16).toEpochDay()
+        val until = since + 1000
+        val all = Milestones.all(since, until)
+        assertEquals(listOf(100, 200, 300, 366, 500, 731, 777, 1000), all.map { it.days })
+        assertEquals(listOf(null, null, null, 1, null, 2, null, null), all.map { it.years })
+        assertEquals(1000, Milestones.recent(since, since + 1001)?.days)
+        assertNull(Milestones.recent(since, since + 1003))
+        assertEquals(1, Milestones.recent(since, LocalDate.of(2025, 2, 16).toEpochDay())?.years)
+    }
+
+    @Test
+    fun scratchedSquaresWithOwnerAndPhoto() {
+        val root = JSONObject("""{"scratch": {"0": {"at": 5, "by": "a"}, "42": {"at": 6, "by": "b", "photo": "p1"}, "200": {"at": 1, "by": "a"}, "x": {"at": 1, "by": "a"}}}""")
+        val done = ScratchModel.done(root, Role.A)
+        assertEquals(setOf(0, 42), done.keys)
+        assertEquals(Owner.ME, done[0]?.by)
+        assertEquals(Owner.PARTNER, done[42]?.by)
+        assertEquals("p1", done[42]?.photo)
+    }
+}

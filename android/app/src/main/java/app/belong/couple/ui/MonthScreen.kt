@@ -330,6 +330,7 @@ class MonthScreen(private val activity: MainActivity) : Screen {
         val months = (1..12).map { YearMonth.of(y, it) }.filter { it <= now }
         val stats = months.map { store.stats(month = it) }
 
+        body.addView(ctx.primaryButton("🎁 " + ctx.getString(R.string.us_wrapped), null) { Wrapped.show(activity, y) })
         body.addView(photoBlock(all, h))
         // Twelve months, each with its cover photo.
         val cells = months.map { m ->

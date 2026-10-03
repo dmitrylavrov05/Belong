@@ -398,6 +398,10 @@ class CloudEmulatorTest {
         expect(Reason.DENIED) { db.put("$pair/live/note/a", JSONObject().put("text", "Forged").put("at", 1), i) }
         expect(Reason.DENIED) { db.put("$pair/live/note/b", JSONObject().put("text", "x".repeat(201)).put("at", 1), i) }
         db.put("$pair/live/couple/cover", "p1", i)
+        db.put("$pair/live/scratch/7", JSONObject().put("at", 1).put("by", "a"), y)
+        db.put("$pair/live/scratch/7/photo", "p1", i)
+        expect(Reason.DENIED) { db.put("$pair/live/scratch/100", JSONObject().put("at", 1).put("by", "a"), y) }
+        expect(Reason.DENIED) { db.put("$pair/live/scratch/8", JSONObject().put("at", 1), y) }
         db.put("$pair/live/profile/a", JSONObject().put("emoji", "🌷").put("color", 2), y)
         db.put("$pair/live/profile/b/photo", "p1", i)
         expect(Reason.DENIED) { db.put("$pair/live/profile/a/emoji", "🐻", i) }

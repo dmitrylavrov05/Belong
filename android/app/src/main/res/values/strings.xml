@@ -1015,4 +1015,162 @@
     <string name="settings_version">Version</string>
     <string name="settings_licenses">Credits and licences</string>
     <string name="settings_licenses_text">Made with love for two.\n\nManrope font: The Manrope Project Authors, SIL Open Font License 1.1.\nFluent Emoji: Microsoft, MIT License.\nWorld map: Natural Earth, public domain.\nPhotos for dreams: Unsplash.\nFilm and series data: TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</string>
+    <string-array name="scratch_ideas">
+        <item>🌅|Watch the sunrise together</item>
+        <item>🌇|Watch the sunset from a rooftop</item>
+        <item>🧺|Have a picnic in the park</item>
+        <item>🍝|Cook a three-course dinner</item>
+        <item>🍣|Make sushi at home</item>
+        <item>🍕|Bake pizza from scratch</item>
+        <item>🥞|Breakfast in bed</item>
+        <item>🎬|Movie marathon with blankets</item>
+        <item>🍿|Sit in the back row at the cinema</item>
+        <item>⭐|Stargazing far from the city</item>
+        <item>⛺|Go camping for a night</item>
+        <item>🚲|Ride bikes together</item>
+        <item>🛼|Go roller skating</item>
+        <item>⛸|Go ice skating</item>
+        <item>🎳|Bowling night</item>
+        <item>🎤|Sing karaoke</item>
+        <item>💃|Take a dance class</item>
+        <item>🎨|Paint each other\'s portraits</item>
+        <item>🏺|Try a pottery class</item>
+        <item>📸|Photo walk around the city</item>
+        <item>🗺|Explore a new neighbourhood</item>
+        <item>🚆|Day trip by train</item>
+        <item>🏖|A day at the beach</item>
+        <item>🏔|Climb a hill or mountain</item>
+        <item>🌊|Swim in the sea at night</item>
+        <item>🛶|Go kayaking</item>
+        <item>🎡|Ride a Ferris wheel</item>
+        <item>🎢|Go to an amusement park</item>
+        <item>🦁|Visit the zoo</item>
+        <item>🐠|Visit an aquarium</item>
+        <item>🏛|Spend an afternoon in a museum</item>
+        <item>🖼|Go to an art gallery</item>
+        <item>🎭|See a play at the theatre</item>
+        <item>🎶|Go to a live concert</item>
+        <item>🎻|Listen to an orchestra</item>
+        <item>😂|Go to a stand-up show</item>
+        <item>🧩|Build a 1000-piece puzzle</item>
+        <item>🎲|Board game night</item>
+        <item>🔐|Escape room</item>
+        <item>🎮|Play a co-op video game</item>
+        <item>📚|Read the same book</item>
+        <item>📖|Read aloud to each other</item>
+        <item>✉️|Write each other letters</item>
+        <item>💌|Make a time capsule</item>
+        <item>🕯|Candlelit dinner at home</item>
+        <item>🍷|Wine or tea tasting</item>
+        <item>☕|Find the best coffee in town</item>
+        <item>🥐|Visit a new bakery</item>
+        <item>🍦|Ice cream tour</item>
+        <item>🍜|Try a cuisine you\'ve never had</item>
+        <item>🛍|Thrift shopping challenge</item>
+        <item>🎁|Swap surprise gifts under 10</item>
+        <item>🌱|Plant something together</item>
+        <item>🌸|Visit a botanical garden</item>
+        <item>🍓|Pick berries or fruit</item>
+        <item>🍂|Autumn walk in the woods</item>
+        <item>⛄|Build a snowman</item>
+        <item>☔|Walk in the rain</item>
+        <item>🌌|Watch a meteor shower</item>
+        <item>🔭|Visit a planetarium</item>
+        <item>🧖|Spa day at home</item>
+        <item>💆|Give each other massages</item>
+        <item>🧘|Try yoga together</item>
+        <item>🏃|Run a 5k together</item>
+        <item>🏊|Go to the pool</item>
+        <item>🧗|Try climbing</item>
+        <item>🎯|Try archery or darts</item>
+        <item>🏓|Play ping-pong</item>
+        <item>🎣|Go fishing</item>
+        <item>🐴|Go horse riding</item>
+        <item>🎈|Fly a kite</item>
+        <item>🎆|Watch fireworks</item>
+        <item>🏮|Go to a night market or fair</item>
+        <item>🎪|Go to a festival</item>
+        <item>🛳|Take a boat trip</item>
+        <item>🚗|Road trip with a playlist</item>
+        <item>🏨|Staycation in a hotel</item>
+        <item>✈️|Plan a trip abroad</item>
+        <item>🗼|Visit a city you\'ve never seen</item>
+        <item>🎧|Make a playlist for each other</item>
+        <item>🎹|Learn a song together</item>
+        <item>🗣|Learn 20 words of a new language</item>
+        <item>🧑‍🍳|Take a cooking class</item>
+        <item>🍰|Bake a cake together</item>
+        <item>🍫|Make chocolate or candy</item>
+        <item>📽|Recreate your first date</item>
+        <item>💍|Renew your promises</item>
+        <item>🫶|Volunteer together</item>
+        <item>🐶|Walk dogs at a shelter</item>
+        <item>🧁|Surprise friends with a dinner</item>
+        <item>🕺|Throw a party for two</item>
+        <item>👘|Dress up for no reason</item>
+        <item>📷|Do a photoshoot together</item>
+        <item>🎥|Film a mini-movie about you</item>
+        <item>🗒|Write a bucket list for 10 years</item>
+        <item>🌍|Pin all your trips on a map</item>
+        <item>🛌|A whole day with no phones</item>
+        <item>🌙|Talk all night until sunrise</item>
+        <item>💐|Bring flowers for no reason</item>
+        <item>❤️|Say what you love most about each other</item>
+    </string-array>
+    <!-- Stories, Wrapped, milestones, 100 dates -->
+    <string name="stories_share_all">Share all to stories</string>
+    <string name="stories_share_this">Just this one</string>
+    <string name="stories_card">Card %1$d of %2$d</string>
+    <string name="us_wrapped">Our year · Wrapped</string>
+    <string name="us_share_days">Days together card</string>
+    <string name="wrapped_making">Putting your year together…</string>
+    <string name="wrapped_kicker">Belong Wrapped</string>
+    <string name="wrapped_title">Our %1$d</string>
+    <string name="wrapped_cover_text">Everything you shared this year, card by card</string>
+    <string name="wrapped_taps_title">You thought of each other</string>
+    <string name="wrapped_taps_text">“thinking of you” taps</string>
+    <string name="wrapped_photos_title">Photos of our days</string>
+    <plurals name="wrapped_photo_days">
+        <item quantity="one">on %d day of the year</item>
+        <item quantity="other">on %d days of the year</item>
+    </plurals>
+    <string name="wrapped_mood_title">Our happiest month</string>
+    <string name="wrapped_mood_text">by the moods you both checked in</string>
+    <string name="wrapped_movies_title">Films and series watched together</string>
+    <string name="wrapped_movie_of_year">Film of the year</string>
+    <string name="wrapped_dreams_title">Dreams and goals that came true</string>
+    <string name="wrapped_words_title">Words for each other</string>
+    <string name="wrapped_together_title">We’ve been together</string>
+    <string name="wrapped_outro">Thank you for %1$d 💞</string>
+    <plurals name="milestone_days">
+        <item quantity="one">%d day together</item>
+        <item quantity="other">%d days together</item>
+    </plurals>
+    <plurals name="milestone_years">
+        <item quantity="one">%d year together</item>
+        <item quantity="other">%d years together</item>
+    </plurals>
+    <string name="milestone_since">since %1$s</string>
+    <string name="inbox_milestone">Today: %1$s 🎉</string>
+    <string name="inbox_milestone_text">A card for your stories is ready</string>
+    <string name="inbox_wrapped">Your %1$d Wrapped is ready</string>
+    <string name="scratch_title">100 dates</string>
+    <string name="scratch_intro">A scratch-off poster for two: go on a date, then rub off its square together.</string>
+    <string name="scratch_progress">%1$d of %2$d scratched</string>
+    <string name="scratch_done">done</string>
+    <string name="scratch_done_on">Done on %1$s 💞</string>
+    <string name="scratch_add_photo">Add a photo of this date</string>
+    <string name="scratch_hint">Been on this date? Rub off the foil</string>
+    <string name="scratch_rub">Rub me ✨</string>
+    <string name="scratch_poster_line">We’ve done %1$d of %2$d dates</string>
+    <string name="scratch_poster_cta">What’s next? 💞</string>
+    <plurals name="milestone_days_label">
+        <item quantity="one">day together</item>
+        <item quantity="other">days together</item>
+    </plurals>
+    <plurals name="milestone_years_label">
+        <item quantity="one">year together</item>
+        <item quantity="other">years together</item>
+    </plurals>
+    <string name="wrapped_letters">“Open when…” letters</string>
 </resources>

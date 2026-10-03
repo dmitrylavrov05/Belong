@@ -1046,4 +1046,172 @@
     <string name="settings_version">Версія</string>
     <string name="settings_licenses">Автори й ліцензії</string>
     <string name="settings_licenses_text">Зроблено з любов’ю для двох.\n\nШрифт Manrope: The Manrope Project Authors, SIL Open Font License 1.1.\nЕмодзі Fluent: Microsoft, ліцензія MIT.\nМапа світу: Natural Earth, суспільне надбання.\nФото для мрій: Unsplash.\nДані про фільми та серіали: TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</string>
+    <string-array name="scratch_ideas">
+        <item>🌅|Зустріти світанок разом</item>
+        <item>🌇|Подивитися захід сонця з даху</item>
+        <item>🧺|Влаштувати пікнік у парку</item>
+        <item>🍝|Приготувати вечерю з трьох страв</item>
+        <item>🍣|Зробити суші вдома</item>
+        <item>🍕|Спекти піцу з нуля</item>
+        <item>🥞|Сніданок у ліжко</item>
+        <item>🎬|Кіномарафон під пледом</item>
+        <item>🍿|Сходити в кіно на останній ряд</item>
+        <item>⭐|Дивитися на зорі за містом</item>
+        <item>⛺|Ніч у наметі</item>
+        <item>🚲|Покататися на велосипедах</item>
+        <item>🛼|Покататися на роликах</item>
+        <item>⛸|Сходити на ковзанку</item>
+        <item>🎳|Вечір боулінгу</item>
+        <item>🎤|Заспівати в караоке</item>
+        <item>💃|Сходити на урок танців</item>
+        <item>🎨|Намалювати портрети одне одного</item>
+        <item>🏺|Спробувати гончарний майстер-клас</item>
+        <item>📸|Фотопрогулянка містом</item>
+        <item>🗺|Дослідити новий район</item>
+        <item>🚆|Поїхати на день потягом</item>
+        <item>🏖|День на пляжі</item>
+        <item>🏔|Піднятися на гору</item>
+        <item>🌊|Скупатися вночі</item>
+        <item>🛶|Поплавати на байдарці</item>
+        <item>🎡|Покататися на оглядовому колесі</item>
+        <item>🎢|Сходити в парк атракціонів</item>
+        <item>🦁|Сходити в зоопарк</item>
+        <item>🐠|Сходити в океанаріум</item>
+        <item>🏛|Провести день у музеї</item>
+        <item>🖼|Сходити на виставку</item>
+        <item>🎭|Сходити в театр</item>
+        <item>🎶|Сходити на концерт</item>
+        <item>🎻|Послухати оркестр</item>
+        <item>😂|Сходити на стендап</item>
+        <item>🧩|Скласти пазл на 1000 деталей</item>
+        <item>🎲|Вечір настільних ігор</item>
+        <item>🔐|Пройти квест-кімнату</item>
+        <item>🎮|Пройти кооперативну гру</item>
+        <item>📚|Прочитати одну книгу</item>
+        <item>📖|Читати одне одному вголос</item>
+        <item>✉️|Написати одне одному листи</item>
+        <item>💌|Зробити капсулу часу</item>
+        <item>🕯|Вечеря при свічках удома</item>
+        <item>🍷|Дегустація вина чи чаю</item>
+        <item>☕|Знайти найкращу каву в місті</item>
+        <item>🥐|Відкрити нову пекарню</item>
+        <item>🍦|Тур кав\'ярнями з морозивом</item>
+        <item>🍜|Спробувати нову кухню</item>
+        <item>🛍|Челендж у секонд-хенді</item>
+        <item>🎁|Обмінятися сюрпризами до 200 ₴</item>
+        <item>🌱|Посадити рослину разом</item>
+        <item>🌸|Сходити в ботанічний сад</item>
+        <item>🍓|Збирати ягоди</item>
+        <item>🍂|Осіння прогулянка лісом</item>
+        <item>⛄|Зліпити сніговика</item>
+        <item>☔|Погуляти під дощем</item>
+        <item>🌌|Подивитися зорепад</item>
+        <item>🔭|Сходити в планетарій</item>
+        <item>🧖|Спа-день удома</item>
+        <item>💆|Зробити одне одному масаж</item>
+        <item>🧘|Спробувати йогу разом</item>
+        <item>🏃|Пробігти 5 км разом</item>
+        <item>🏊|Сходити в басейн</item>
+        <item>🧗|Спробувати скеледром</item>
+        <item>🎯|Постріляти з лука чи в дартс</item>
+        <item>🏓|Зіграти в пінг-понг</item>
+        <item>🎣|Сходити на риболовлю</item>
+        <item>🐴|Покататися на конях</item>
+        <item>🎈|Запустити повітряного змія</item>
+        <item>🎆|Подивитися салют</item>
+        <item>🏮|Сходити на ярмарок</item>
+        <item>🎪|Сходити на фестиваль</item>
+        <item>🛳|Покататися на теплоході</item>
+        <item>🚗|Подорож із плейлистом</item>
+        <item>🏨|Ніч у готелі у своєму місті</item>
+        <item>✈️|Спланувати подорож за кордон</item>
+        <item>🗼|Поїхати в нове місто</item>
+        <item>🎧|Зробити плейлисти одне одному</item>
+        <item>🎹|Вивчити пісню разом</item>
+        <item>🗣|Вивчити 20 слів новою мовою</item>
+        <item>🧑‍🍳|Сходити на кулінарний майстер-клас</item>
+        <item>🍰|Спекти торт разом</item>
+        <item>🍫|Зробити шоколад чи цукерки</item>
+        <item>📽|Повторити перше побачення</item>
+        <item>💍|Пообіцяти одне одному щось важливе</item>
+        <item>🫶|Стати волонтерами на день</item>
+        <item>🐶|Погуляти з собаками з притулку</item>
+        <item>🧁|Влаштувати вечерю для друзів</item>
+        <item>🕺|Вечірка на двох</item>
+        <item>👘|Причепуритися без приводу</item>
+        <item>📷|Влаштувати фотосесію</item>
+        <item>🎥|Зняти мініфільм про вас</item>
+        <item>🗒|Скласти план мрій на 10 років</item>
+        <item>🌍|Позначити всі подорожі на мапі</item>
+        <item>🛌|Цілий день без телефонів</item>
+        <item>🌙|Проговорити всю ніч</item>
+        <item>💐|Подарувати квіти без приводу</item>
+        <item>❤️|Сказати, що найбільше любиш в іншому</item>
+    </string-array>
+    <!-- Сторіс, Wrapped, ювілеї, 100 побачень -->
+    <string name="stories_share_all">Усі картки в сторіс</string>
+    <string name="stories_share_this">Лише цю</string>
+    <string name="stories_card">Картка %1$d з %2$d</string>
+    <string name="us_wrapped">Наш рік · Wrapped</string>
+    <string name="us_share_days">Картка «Ми разом»</string>
+    <string name="wrapped_making">Збираємо ваш рік…</string>
+    <string name="wrapped_kicker">Belong Wrapped</string>
+    <string name="wrapped_title">Наш %1$d</string>
+    <string name="wrapped_cover_text">Усе, чим ви ділилися цього року, картка за карткою</string>
+    <string name="wrapped_taps_title">Ви думали одне про одного</string>
+    <string name="wrapped_taps_text">разів натиснули «думаю про тебе»</string>
+    <string name="wrapped_photos_title">Фото наших днів</string>
+    <plurals name="wrapped_photo_days">
+        <item quantity="one">за %d день року</item>
+        <item quantity="few">за %d дні року</item>
+        <item quantity="many">за %d днів року</item>
+        <item quantity="other">за %d дня року</item>
+    </plurals>
+    <string name="wrapped_mood_title">Найщасливіший місяць</string>
+    <string name="wrapped_mood_text">за настроєм, який ви відзначали</string>
+    <string name="wrapped_movies_title">Фільмів і серіалів подивилися разом</string>
+    <string name="wrapped_movie_of_year">Фільм року</string>
+    <string name="wrapped_dreams_title">Мрії й цілі, які збулися</string>
+    <string name="wrapped_words_title">Слова одне для одного</string>
+    <string name="wrapped_together_title">Ми разом уже</string>
+    <string name="wrapped_outro">Дякуємо за %1$d 💞</string>
+    <plurals name="milestone_days">
+        <item quantity="one">%d день разом</item>
+        <item quantity="few">%d дні разом</item>
+        <item quantity="many">%d днів разом</item>
+        <item quantity="other">%d дня разом</item>
+    </plurals>
+    <plurals name="milestone_years">
+        <item quantity="one">%d рік разом</item>
+        <item quantity="few">%d роки разом</item>
+        <item quantity="many">%d років разом</item>
+        <item quantity="other">%d року разом</item>
+    </plurals>
+    <string name="milestone_since">з %1$s</string>
+    <string name="inbox_milestone">Сьогодні: %1$s 🎉</string>
+    <string name="inbox_milestone_text">Картка для сторіс уже готова</string>
+    <string name="inbox_wrapped">Ваш %1$d Wrapped готовий</string>
+    <string name="scratch_title">100 побачень</string>
+    <string name="scratch_intro">Скретч-постер на двох: сходіть на побачення і зітріть його квадратик разом.</string>
+    <string name="scratch_progress">Відкрито %1$d з %2$d</string>
+    <string name="scratch_done">зроблено</string>
+    <string name="scratch_done_on">Зроблено %1$s 💞</string>
+    <string name="scratch_add_photo">Додати фото з цього побачення</string>
+    <string name="scratch_hint">Уже були на цьому побаченні? Зітріть шар</string>
+    <string name="scratch_rub">Зітри мене ✨</string>
+    <string name="scratch_poster_line">Ми відкрили %1$d з %2$d побачень</string>
+    <string name="scratch_poster_cta">Що далі? 💞</string>
+    <plurals name="milestone_days_label">
+        <item quantity="one">день разом</item>
+        <item quantity="few">дні разом</item>
+        <item quantity="many">днів разом</item>
+        <item quantity="other">дня разом</item>
+    </plurals>
+    <plurals name="milestone_years_label">
+        <item quantity="one">рік разом</item>
+        <item quantity="few">роки разом</item>
+        <item quantity="many">років разом</item>
+        <item quantity="other">року разом</item>
+    </plurals>
+    <string name="wrapped_letters">листи «Відкрий, коли…»</string>
 </resources>

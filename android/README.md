@@ -45,6 +45,10 @@ Five tabs: Today, Dreams, Chat, Photos, Us.
   - **TMDB catalog** (the “Discover ✨” tab): search, popular this week, best films and series, genres; posters, years and descriptions in the app's language. Adding a title searches TMDB as you type.
   - **For the two of you:** suggestions from both partners' stars. Each rating moves its genres up or down for whoever gave it; titles come from TMDB's “more like this” for what either of you rated 4–5 stars and from genres you both like. A title scores by how well it suits the one of you it suits least, so the top is what you'd both enjoy, with a reason (“You both liked …”). “Not for us” hides a title on this phone.
   - The TMDB API key is in `res/values/cloud.xml` (`tmdb_api_key`). The app credits TMDB as its terms require.
+- **Share-worthy cards** (Us → Our story and plans): story cards 1080×1920 in the app's style, shown as tap-through stories with “Share all to stories”, “Just this one” and “Save to gallery”:
+  - **Our year · Wrapped**: the year as up to eight cards — “thinking of you” taps, photos of the day, the happiest month, films and the film of the year, dreams that came true, words for each other and days together. Cards with nothing to show are skipped. Also in the year report and in notifications in December;
+  - **Days together card** on your cover photo; on round numbers (100, 200, 300, 500, 777, 1000…) and anniversaries it appears in notifications for three days.
+- **100 dates** (Us → Fun together): a scratch-off poster of 100 date ideas. Each square hides a picture under silver foil; after a date you rub it off with a finger (both phones see it), add a photo, and share the poster with your progress.
 - **Talking about feelings** (Us): after a quarrel each of you writes what happened, what you feel, what you need and what you'd ask for. Your partner's note opens only once you've written yours (the database enforces it).
 - **Places** (Us → Places):
   - an offline world map (Natural Earth land outlines);

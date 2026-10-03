@@ -553,6 +553,24 @@
                 ".validate": false
               }
             }
+          },
+          "scratch": {
+            "$i": {
+              ".write": "auth != null && $i.matches(/^[0-9]{1,2}$/) && (root.child('pairs').child($code).child('members/a').val() === auth.uid || root.child('pairs').child($code).child('members/b').val() === auth.uid)",
+              ".validate": "newData.hasChildren(['at', 'by'])",
+              "at": {
+                ".validate": "newData.isNumber()"
+              },
+              "by": {
+                ".validate": "newData.val() === 'a' || newData.val() === 'b'"
+              },
+              "photo": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40 && newData.val().matches(/^[a-z0-9-]+$/)"
+              },
+              "$other": {
+                ".validate": false
+              }
+            }
           }
         },
         "secret": {

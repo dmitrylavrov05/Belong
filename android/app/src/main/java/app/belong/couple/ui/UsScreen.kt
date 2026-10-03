@@ -57,10 +57,13 @@ class UsScreen(private val activity: MainActivity) : Screen {
         ))
         group(R.string.us_group_fun, listOf(
             Tile("🎬", R.string.movies_title) { activity.select(MainActivity.TAB_MOVIES) },
+            Tile("🎟", R.string.scratch_title) { activity.select(MainActivity.TAB_SCRATCH) },
             Tile("🧠", R.string.quiz_title) { QuizScreen.show(activity) },
             Tile("🎲", R.string.games_title) { activity.select(MainActivity.TAB_GAMES) },
         ))
         group(R.string.us_group_story, listOf(
+            Tile("🎁", R.string.us_wrapped) { Wrapped.show(activity) },
+            Tile("💞", R.string.us_share_days) { MilestoneCard.show(activity) },
             Tile("✨", R.string.month_title) { activity.select(MainActivity.TAB_MONTH) },
             Tile("📅", R.string.calendar_title) { activity.select(MainActivity.TAB_CALENDAR) },
             Tile("🗺", R.string.map_title) { activity.select(MainActivity.TAB_MAP) },

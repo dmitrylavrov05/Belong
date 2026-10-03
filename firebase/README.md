@@ -33,6 +33,7 @@ Under `pairs/<code>`:
 - `quiz/<round>/<seat>`: a week's quiz `{self, guess, done}`, readable by the partner only after they have finished theirs;
 - `live/couple/apart`, `live/couple/meeting` and `live/couple/cover`: whether you live apart, the next meeting (epoch day) and the cover photo on Today (a `photo_data` key);
 - `live/profile/<seat>` `{photo?, emoji?, color?}`: each person's avatar (a `photo_data` key, or an emoji on one of eight colours); only its owner writes it;
+- `live/scratch/<0–99>` `{at, by, photo?}`: squares of the “100 dates” poster you've scratched;
 - `live/note/<seat>` `{text, at}`: the note each partner leaves for the other on Today; only its author writes it;
 - `live/dates/<key>`: important dates `{title, emoji, day, yearly, at}`;
 - `live/photos/<day>/<key>` `{by, at, caption}` and `photo_data/<key>` `{by, thumb, full}`: photos of the day as base64 JPEGs (thumb ≤ 80 000 characters, full ≤ 1 000 000). Only the author writes or deletes them, and a picture can't be replaced;

@@ -479,3 +479,52 @@ object ProfileModel {
         )
     }
 }
+
+/** A round number of days together, or an anniversary in years. */
+data class Milestone(val days: Int, val years: Int?, val day: Long)
+
+object Milestones {
+    private val ROUND = listOf(100, 200, 300, 500, 777, 1000, 1500, 2000, 2500, 3000)
+
+    /** Milestones of a couple together since [since], in order. */
+    fun all(since: Long, until: Long): List<Milestone> {
+        val out = mutableListOf<Milestone>()
+        val start = java.time.LocalDate.ofEpochDay(since)
+        ROUND.forEach { d -> if (since + d <= until) out += Milestone(d, null, since + d) }
+        var n = 4000
+        while (since + n <= until) {
+            out += Milestone(n, null, since + n)
+            n += 1000
+        }
+        var y = 1
+        while (true) {
+            val day = start.plusYears(y.toLong()).toEpochDay()
+            if (day > until) break
+            out += Milestone((day - since).toInt(), y, day)
+            y++
+        }
+        return out.sortedBy { it.day }
+    }
+
+    /** The milestone reached today or in the last [graceDays] days, if any: worth a card. */
+    fun recent(since: Long, today: Long, graceDays: Int = 2): Milestone? =
+        all(since, today).lastOrNull { today - it.day in 0..graceDays.toLong() }
+}
+
+/** One opened square of the "100 dates" poster: when, by whom, and an optional photo. */
+data class ScratchDone(val index: Int, val at: Long, val by: Owner, val photo: String?)
+
+/** The scratch-off poster of 100 date ideas (live/scratch/{index}); a square is scratched once you've done it. */
+object ScratchModel {
+    const val SIZE = 100
+
+    fun done(root: JSONObject, me: Role?): Map<Int, ScratchDone> {
+        val all = root.optJSONObject("scratch") ?: return emptyMap()
+        val mine = seatKey(me, mine = true)
+        return all.keys().asSequence().mapNotNull { k ->
+            val i = k.toIntOrNull()?.takeIf { it in 0 until SIZE } ?: return@mapNotNull null
+            val o = all.optJSONObject(k) ?: return@mapNotNull null
+            i to ScratchDone(i, o.optLong("at"), if (o.optString("by") == mine) Owner.ME else Owner.PARTNER, o.optString("photo").ifEmpty { null })
+        }.toMap()
+    }
+}
