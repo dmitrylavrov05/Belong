@@ -161,7 +161,6 @@ class TodayScreen(private val activity: MainActivity) : Screen {
             addView(planCard().lp(top = 12))
         }
         HomeLayout.EVENING -> everyday.eveningCard()
-        HomeLayout.SHOPPING -> everyday.shoppingCompact()
         HomeLayout.QUESTION -> everyday.questionCompact()
         HomeLayout.WIDGETS -> if (Widgets.anyPlaced(ctx)) null else widgetsCard()
         else -> null
@@ -177,7 +176,6 @@ class TodayScreen(private val activity: MainActivity) : Screen {
         HomeLayout.PHOTO -> R.string.photos_card_title
         HomeLayout.PLAN -> R.string.tasks_title
         HomeLayout.EVENING -> R.string.home_card_evening
-        HomeLayout.SHOPPING -> R.string.home_card_shopping
         HomeLayout.QUESTION -> R.string.home_card_question
         else -> R.string.widgets_title
     })

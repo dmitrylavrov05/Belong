@@ -14,7 +14,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 /**
- * The pair's shared things that both can edit: dreams, goals, the shopping list, evening notes,
+ * The pair's shared things that both can edit: dreams, goals, evening notess,
  * memories and the date you got together. For a pair: the server's copy plus changes not sent yet
  * (an ordered queue of put / delete / add operations, so offline edits and money added on both
  * phones all count). In demo mode the changes go straight into the example couple's copy here.
@@ -26,7 +26,7 @@ class SharedRepo(context: Context) {
     /** This phone's seat, or null for the demo couple (whose data says me / ours / partner). */
     val me: Role? get() = Account.get(app).takeIf { it.paired }?.seat?.role
 
-    /** Everything as this phone should show it: { dreams: {...}, goals: {...}, shopping: {...}, ... }. */
+    /** Everything as this phone should show it: { dreams: {...}, goals: {...}, thanks: {...}, ... }. */
     fun root(): JSONObject = synchronized(lock) {
         val tree = JsonTree(base())
         ops().forEach { apply(tree, it) }
@@ -182,7 +182,7 @@ class SharedRepo(context: Context) {
         prefs.edit().putBoolean("seeded", true).putString("base", root.toString()).apply()
     }
 
-    /** The example couple's shopping list, evening note, memories and anniversary. */
+    /** The example couple's evening note, memories and anniversary. */
     private fun seedEveryday() {
         if (prefs.getBoolean("seeded_everyday", false)) return
         if (me != null) {
@@ -191,16 +191,10 @@ class SharedRepo(context: Context) {
         }
         val now = System.currentTimeMillis()
         val today = LocalDate.now(ZoneId.systemDefault()).toEpochDay()
-        val shopping = JSONObject()
-        app.resources.getStringArray(R.array.shopping_seeds).forEachIndexed { i, line ->
-            val (who, done, title) = line.split('|', limit = 3)
-            shopping.put("demo-s$i", JSONObject().put("title", title).put("by", who).put("done", done == "1").put("at", now - (10 - i) * 60_000L))
-        }
         val (title, text) = app.getString(R.string.moment_seed).split('|', limit = 2)
         val moments = JSONObject().put("demo-m0", JSONObject().put("title", title).put("text", text).put("day", today - 365).put("at", now))
         synchronized(lock) {
             val tree = JsonTree(base())
-            tree.set("shopping", shopping)
             tree.set("moments", moments)
             tree.set("couple/since", today - 960)
             tree.set("thanks/${today - 1}/partner", JSONObject().put("text", app.getString(R.string.thanks_seed)).put("at", now - 12 * 3600_000L))
@@ -230,7 +224,7 @@ class SharedRepo(context: Context) {
         private const val PREFS = "belong_dreams"
 
         /** Parts of live/ kept here; the rest (check-ins, tasks, wishes…) have their own stores. */
-        val SECTIONS = listOf("dreams", "goals", "shopping", "thanks", "flags", "couple", "moments", "dates", "photos", "feelings", "letters", "movies", "note")
+        val SECTIONS = listOf("dreams", "goals", "thanks", "flags", "couple", "moments", "dates", "photos", "feelings", "letters", "movies", "note")
         private val lock = Any()
 
         fun apply(tree: JsonTree, op: JSONObject) {

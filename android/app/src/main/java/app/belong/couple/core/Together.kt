@@ -9,8 +9,6 @@ fun seatKey(me: Role?, mine: Boolean): String = when {
     else -> me.other.key
 }
 
-data class ShoppingItem(val key: String, val title: String, val by: Owner, val done: Boolean, val at: Long)
-
 data class Moment(val key: String, val title: String, val text: String, val day: Long, val photo: Picture?)
 
 /** One entry in the couple's chronicle ("Us"). */
@@ -29,24 +27,10 @@ data class ChronicleItem(
 }
 
 /**
- * Everyday shared things stored under live/: shopping/{key}, thanks/{day}/{seat},
+ * Everyday shared things stored under live/: thanks/{day}/{seat},
  * flags/{question|quiz}/{id}/{seat}, couple/since and moments/{key}.
  */
 object TogetherModel {
-
-    fun shopping(root: JSONObject, me: Role?): List<ShoppingItem> {
-        val all = root.optJSONObject("shopping") ?: return emptyList()
-        return all.keys().asSequence().mapNotNull { key ->
-            val o = all.optJSONObject(key) ?: return@mapNotNull null
-            val title = o.optString("title")
-            if (title.isEmpty()) return@mapNotNull null
-            val by = if (o.optString("by") == seatKey(me, mine = true)) Owner.ME else Owner.PARTNER
-            ShoppingItem(key, title, by, o.optBoolean("done"), o.optLong("at"))
-        }.sortedWith(compareBy<ShoppingItem>({ it.done }, { it.at })).toList()
-    }
-
-    fun shoppingJson(title: String, me: Role?, at: Long): JSONObject =
-        JSONObject().put("title", title).put("by", seatKey(me, mine = true)).put("done", false).put("at", at)
 
     /** The evening note one partner left for the other on [day]. */
     fun thanks(root: JSONObject, day: Long, seat: String): String? =
@@ -422,11 +406,10 @@ object HomeLayout {
     const val PHOTO = "photo"
     const val PLAN = "plan"
     const val EVENING = "evening"
-    const val SHOPPING = "shopping"
     const val QUESTION = "question"
     const val WIDGETS = "widgets"
 
-    val DEFAULT = listOf(COVER, PARTNER, CHECKIN, NOTE, DATES, ON_THIS_DAY, PHOTO, PLAN, EVENING, SHOPPING, QUESTION, WIDGETS)
+    val DEFAULT = listOf(COVER, PARTNER, CHECKIN, NOTE, DATES, ON_THIS_DAY, PHOTO, PLAN, EVENING, QUESTION, WIDGETS)
 
     /** Off until switched on in "Customise Today". */
     val HIDDEN_BY_DEFAULT = setOf(WIDGETS)

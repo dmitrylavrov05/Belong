@@ -567,19 +567,6 @@
     <string name="share_label">Зберегти як мрію</string>
     <string name="share_loading">Відкриваємо посилання…</string>
     <string name="photo_hint">Напишіть, про що мрієте, і тут з’являться ідеї фото.</string>
-    <!-- Покупки -->
-    <string name="shopping_title">Покупки</string>
-    <string name="shopping_add">+ Додати</string>
-    <string name="shopping_empty">Список порожній. Додайте, що треба купити.</string>
-    <string name="shopping_hint">Молоко, хліб…</string>
-    <string name="shopping_hint_more">Додавайте скільки завгодно; утримуйте пункт, щоб прибрати його.</string>
-    <string name="shopping_removed">Прибрано: %1$s</string>
-    <string-array name="shopping_seeds">
-        <item>partner|0|Молоко</item>
-        <item>me|1|Авокадо</item>
-        <item>partner|0|Корм для кота</item>
-    </string-array>
-
     <!-- Питання дня -->
     <string name="question_title">Питання дня</string>
     <string name="question_hint">Ваша відповідь</string>
@@ -990,7 +977,6 @@
     <string name="home_card_dates">Дати й відлік</string>
     <string name="home_card_onthisday">У цей день</string>
     <string name="home_card_evening">Підсумок дня</string>
-    <string name="home_card_shopping">Покупки</string>
     <string name="home_card_question">Питання дня</string>
     <string name="home_together">Разом %1$s</string>
     <string name="home_cover_add">Натисніть, щоб додати ваше спільне фото</string>
@@ -1034,7 +1020,6 @@
     <string name="home_more_taps">Надіслати інше</string>
     <string name="home_support_text">Якщо в партнера непростий день</string>
     <string name="home_safe_text">Дати знати, що ви дісталися</string>
-    <string name="home_shopping_left">%1$s · залишилося %2$d</string>
     <string name="home_question_done">Ви обоє відповіли ✓</string>
     <string name="home_show">Показати</string>
     <string name="us_group_each_other">Одне для одного</string>

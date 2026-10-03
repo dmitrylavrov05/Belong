@@ -28,7 +28,7 @@ Under `pairs/<code>`:
 - `live/dreams/<key>`: the wish map `{title, emoji, cat, owner: a|b|both, at, goal?, done?, photo?}`; `photo` is a link only (`{url, thumb, by, link, src: unsplash|web}`, https), the image stays on Unsplash or Pinterest;
 - `live/goals/<key>`: goals `{title, emoji, at, target?, unit?, dream?, done?}` with `saved/<seat>` (each partner adds only to their own amount, which can only grow) and `steps/<key>` `{title, who, done, at, due?}`;
 - `votes/<seat>/<idea>`: a "yes" in Matches. The partner may read it only for an idea they said yes to themselves, so they learn about mutual yeses and nothing else; `secret/<seat>/decided/<idea>` keeps "no" and "maybe" private;
-- `live/shopping/<key>` `{title, by, done, at}`, `live/thanks/<day>/<seat>` (the evening note, written only by its author), `live/couple/since`, `live/moments/<key>` and `live/flags/question|quiz/<id>/<seat>` (who has answered, without the answer);
+- `live/thanks/<day>/<seat>` (the evening note, written only by its author), `live/couple/since`, `live/moments/<key>` and `live/flags/question|quiz/<id>/<seat>` (who has answered, without the answer);
 - `answers/<day>/<seat>`: the question of the day. The partner may read your answer only once their own answer for that day exists;
 - `quiz/<round>/<seat>`: a week's quiz `{self, guess, done}`, readable by the partner only after they have finished theirs;
 - `live/couple/apart`, `live/couple/meeting` and `live/couple/cover`: whether you live apart, the next meeting (epoch day) and the cover photo on Today (a `photo_data` key);

@@ -290,27 +290,6 @@
               }
             }
           },
-          "shopping": {
-            "$item": {
-              ".write": "auth != null && (root.child('pairs').child($code).child('members/a').val() === auth.uid || root.child('pairs').child($code).child('members/b').val() === auth.uid)",
-              ".validate": "newData.hasChildren(['title', 'by', 'done', 'at'])",
-              "title": {
-                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
-              },
-              "by": {
-                ".validate": "newData.val() === 'a' || newData.val() === 'b'"
-              },
-              "done": {
-                ".validate": "newData.isBoolean()"
-              },
-              "at": {
-                ".validate": "newData.isNumber()"
-              },
-              "$other": {
-                ".validate": false
-              }
-            }
-          },
           "thanks": {
             "$day": {
               "$role": {

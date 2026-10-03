@@ -310,17 +310,6 @@ class TogetherModelTest {
     private fun root(json: String) = org.json.JSONObject(json)
 
     @Test
-    fun shoppingShowsWhoAddedItAndOpenItemsFirst() {
-        val r = root("""{"shopping":{"s1":{"title":"Milk","by":"b","done":false,"at":2},"s2":{"title":"Bread","by":"a","done":true,"at":1},"s3":{"title":"Tea","by":"a","done":false,"at":3}}}""")
-        val items = app.belong.couple.core.TogetherModel.shopping(r, Role.A)
-        assertEquals(listOf("Milk", "Tea", "Bread"), items.map { it.title })
-        assertEquals(app.belong.couple.core.Owner.PARTNER, items[0].by)
-        assertEquals(app.belong.couple.core.Owner.ME, items[1].by)
-        assertEquals("b", app.belong.couple.core.TogetherModel.shoppingJson("Eggs", Role.B, 5).getString("by"))
-        assertEquals("me", app.belong.couple.core.TogetherModel.shoppingJson("Eggs", null, 5).getString("by"))
-    }
-
-    @Test
     fun chronicleCollectsMilestonesNewestFirstWithOnThisDayOnTop() {
         val today = java.time.LocalDate.of(2026, 10, 2).toEpochDay()
         val day = 86_400_000L

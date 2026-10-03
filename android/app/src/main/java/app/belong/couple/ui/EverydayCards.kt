@@ -24,132 +24,14 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 
-/** The everyday cards on Today: the shopping list, the question of the day and the evening "thank you". */
+/** The everyday cards on Today: the question of the day and the evening "thank you". */
 class EverydayCards(private val activity: MainActivity, private val refresh: () -> Unit) {
     private val ctx = activity
     private val store = CoupleStore.get(ctx)
     private val repo = SharedRepo(ctx)
     private val today: Long get() = LocalDate.now(ZoneId.systemDefault()).toEpochDay()
 
-    private var shoppingOpen = false
     private var questionOpen = false
-
-    // ---------- Shopping ----------
-
-    /** One line with what's left to buy; tap to see and tick off the whole list. */
-    fun shoppingCompact(): View {
-        if (shoppingOpen) return ctx.column().apply {
-            addView(shoppingHeader())
-            addView(shoppingCard().lp(top = 8))
-            addView(ctx.textButton(ctx.getString(R.string.home_less)) {
-                shoppingOpen = false
-                refresh()
-            })
-        }
-        val open = TogetherModel.shopping(repo.root(), repo.me).filter { !it.done }
-        return ctx.card(paddingDp = 16, spacingDp = 0).apply {
-            val r = ctx.row(12)
-            r.addView(ctx.text("🛒", 22f))
-            val t = ctx.column(2)
-            t.addView(ctx.text(
-                if (open.isEmpty()) ctx.getString(R.string.shopping_title) else ctx.getString(R.string.home_shopping_left, ctx.getString(R.string.shopping_title), open.size),
-                16f, 700,
-            ))
-            t.addView(ctx.text(
-                if (open.isEmpty()) ctx.getString(R.string.shopping_empty) else open.joinToString(" · ") { it.title },
-                13f, 500, ctx.col(R.color.ink2),
-            ).apply {
-                maxLines = 1
-                ellipsize = android.text.TextUtils.TruncateAt.END
-            })
-            r.addView(t, LinearLayout.LayoutParams(0, WRAP, 1f))
-            r.addView(ImageView(ctx).apply {
-                setImageDrawable(ctx.icon(R.drawable.ic_plus, ctx.col(R.color.ink), 20))
-                scaleType = ImageView.ScaleType.CENTER
-                contentDescription = ctx.getString(R.string.shopping_add)
-                background = ctx.ripple(ctx.rounded(ctx.col(R.color.bg), 22f), 22f)
-                setOnClickListener { addShopping() }
-            }, LinearLayout.LayoutParams(ctx.dp(44), ctx.dp(44)))
-            addView(r)
-            isClickable = true
-            background = ctx.ripple(background, 24f)
-            setOnClickListener {
-                shoppingOpen = true
-                refresh()
-            }
-        }
-    }
-
-    fun shoppingHeader(): View = ctx.row(8).apply {
-        addView(ctx.text(ctx.getString(R.string.shopping_title), 22f, 700), LinearLayout.LayoutParams(0, WRAP, 1f))
-        addView(ctx.text(ctx.getString(R.string.shopping_add), 14f, 700).apply {
-            minHeight = ctx.dp(44)
-            gravity = Gravity.CENTER
-            setPadding(ctx.dp(8), 0, ctx.dp(4), 0)
-            background = ctx.ripple(ctx.rounded(ctx.col(R.color.bg), 12f), 12f)
-            setOnClickListener { addShopping() }
-        })
-    }
-
-    fun shoppingCard(): View = ctx.card(paddingDp = 16, spacingDp = 0).apply {
-        val items = TogetherModel.shopping(repo.root(), repo.me)
-        if (items.isEmpty()) addView(ctx.text(ctx.getString(R.string.shopping_empty), 15f, 500, ctx.col(R.color.ink2)))
-        items.forEachIndexed { i, item ->
-            if (i > 0) addView(View(ctx).apply { setBackgroundColor(ctx.col(R.color.sunk)) }, LinearLayout.LayoutParams(MATCH, ctx.dp(1)).apply { marginStart = ctx.dp(36) })
-            addView(ctx.row(14).apply {
-                minimumHeight = ctx.dp(52)
-                addView(checkbox(item.done), LinearLayout.LayoutParams(ctx.dp(22), ctx.dp(22)))
-                addView(ctx.text(item.title, 16f, 400, ctx.col(if (item.done) R.color.ink2 else R.color.ink)).apply {
-                    if (item.done) paintFlags = paintFlags or Paint.STRIKE_THRU_TEXT_FLAG
-                }, LinearLayout.LayoutParams(0, WRAP, 1f))
-                val who = if (item.by == Owner.ME) store.myName else store.partnerDisplay
-                addView(ctx.avatar(who, ctx.col(if (item.by == Owner.ME) R.color.her else R.color.him), 24))
-                contentDescription = ctx.getString(if (item.done) R.string.task_done_cd else R.string.task_open_cd, item.title)
-                background = ctx.ripple(ctx.rounded(ctx.col(R.color.surface), 12f), 12f)
-                setOnClickListener { v ->
-                    haptic(v)
-                    repo.put("shopping/${item.key}/done", !item.done)
-                }
-                setOnLongClickListener {
-                    repo.delete("shopping/${item.key}")
-                    Toaster.show(activity, ctx.getString(R.string.shopping_removed, item.title))
-                    true
-                }
-            })
-        }
-    }
-
-    /** A 22 dp square checkbox with 7 dp corners; green with a tick when done. */
-    private fun checkbox(done: Boolean): View = ImageView(ctx).apply {
-        background = if (done) ctx.rounded(ctx.col(R.color.ok), 7f) else ctx.rounded(ctx.col(R.color.surface), 7f, ctx.col(R.color.checkbox), 2f)
-        if (done) setImageDrawable(ctx.icon(R.drawable.ic_check, ctx.col(R.color.white), 14))
-        scaleType = ImageView.ScaleType.CENTER
-        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-    }
-
-    private fun addShopping() = activity.bottomSheet { sheet, dialog ->
-        sheet.addView(ctx.text(ctx.getString(R.string.shopping_title), 22f, 700))
-        val input = input(ctx.getString(R.string.shopping_hint), 60)
-        input.imeOptions = EditorInfo.IME_ACTION_DONE
-        sheet.addView(input)
-        sheet.addView(ctx.text(ctx.getString(R.string.shopping_hint_more), 13f, 500, ctx.col(R.color.ink2)))
-        val add = {
-            val title = input.text.toString().trim()
-            if (title.isNotEmpty()) {
-                repo.put("shopping/${DreamsScreen.newKey()}", TogetherModel.shoppingJson(title, repo.me, System.currentTimeMillis()))
-                input.setText("") // stay open for the next item
-            }
-        }
-        input.setOnEditorActionListener { _, action, _ ->
-            if (action == EditorInfo.IME_ACTION_DONE) {
-                add()
-                true
-            } else false
-        }
-        sheet.addView(ctx.primaryButton(ctx.getString(R.string.task_add)) { add() }.lp(top = 8))
-        sheet.addView(ctx.textButton(ctx.getString(R.string.pair_close)) { dialog.dismiss() })
-        input.requestFocus()
-    }
 
     // ---------- Question of the day ----------
 
