@@ -28,8 +28,8 @@ Set these environment variables for `npm run build`:
 
 ## What is on the page
 
-- Hero with a live recreation of the app's Today screen.
-- **Inside the app**: a swipeable gallery of 10 real screens of the Android app (Today, photos, chat, letters, films, 100 dates, month report, Us, settings, dreams) in phone frames, in the page's language.
+- Hero with the real Today screen of the app.
+- **Inside the app**: a swipeable gallery of 9 more real screens of the Android app (photos, chat, letters, films, 100 dates, month report, Us, settings, dreams) in phone frames, in the page's language.
 - How it works: wish → goal → plan → memory.
 - A day with Belong: interactive mood check-in, “thinking of you”, the plan switcher, evening gratitude and the weekly talk.
 - **Date Match**: a two-player game that works without the app. One partner swipes 10 date ideas, then passes the phone or sends a link. The partner's results can be sent back with a reply link. The result screen exports a 1080×1920 story card. Answers travel in the link's `#` fragment, so nothing is stored on a server.

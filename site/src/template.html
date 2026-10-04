@@ -106,48 +106,8 @@
     </div>
 
     <div class="hero__stage">
-      <div class="phone" role="img" aria-label="{{a11y.phoneAlt|attr}}">
-        <div class="phone__inner" aria-hidden="true">
-          <div class="phone__status"><span>9:41</span><span class="phone__bat"><i></i></span></div>
-          <div class="phone__screen">
-            <div class="ph-head">
-              <div><p class="ph-h1">{{phone.greeting}}</p><p class="ph-sub">{{phone.date}}</p></div>
-              <svg class="ph-pair" viewBox="0 0 48 32"><use href="#pair"/></svg>
-            </div>
-            <div class="ph-card">
-              <div class="ph-partner">
-                <span class="av av--him">{{phone.him}}</span>
-                <div class="ph-partner__body">
-                  <p>{{phone.partner}}</p>
-                  <div class="meter meter--him" style="--v:2"><i></i><i></i><i></i><i></i><i></i></div>
-                </div>
-              </div>
-              <span class="ph-pill ph-pill--him"><svg class="ic"><use href="#i-heart"/></svg>{{phone.support}}</span>
-            </div>
-            <div class="ph-card">
-              <div class="ph-row"><b>{{phone.howAreYou}}</b><span class="ph-meta">{{phone.partnerSees}}</span></div>
-              <div class="ph-moods"><span>😔</span><span>😕</span><span>🙂</span><span class="is-on">😊</span><span>🤩</span></div>
-              <div class="ph-energy"><span class="ph-meta">{{phone.energy}}</span><div class="meter meter--her meter--battery" style="--v:4"><i></i><i></i><i></i><i></i><i></i></div><b>4/5</b></div>
-            </div>
-            <div class="ph-cds">
-              <div class="ph-cd ph-cd--us"><span class="ph-meta">{{phone.cd1Label}}</span><span class="ph-cd__num">{{phone.cd1Num}} <small>{{phone.days}}</small></span><span class="ph-meta">{{phone.cd1Date}}</span></div>
-              <div class="ph-cd"><span class="ph-meta">{{phone.cd2Label}}</span><span class="ph-cd__num">{{phone.cd2Num}} <small>{{phone.days}}</small></span><span class="ph-meta">{{phone.cd2Date}}</span></div>
-            </div>
-            <div class="ph-row ph-row--sec"><b>{{phone.plan}}</b><span class="ph-meta">{{phone.planCount}}</span></div>
-            <div class="ph-card ph-tasks">
-              <div class="task task--her"><span class="task__ring"></span><span class="task__body"><span>{{phone.t1}}</span><span class="task__meta"><span class="tag">{{phone.t1Tag}}</span>{{phone.t1Due}}</span></span><i class="dot dot--her"></i></div>
-              <div class="task task--her"><span class="task__ring"></span><span class="task__body"><span>{{phone.t2}}</span><span class="task__meta">{{phone.t2Meta}}</span></span><i class="dot dot--her"></i></div>
-            </div>
-          </div>
-          <span class="ph-fab"><svg class="ic"><use href="#i-plus"/></svg></span>
-          <div class="ph-tabs">
-            <span class="is-on"><svg class="ic"><use href="#i-sun"/></svg>{{phone.tabToday}}</span>
-            <span><svg class="ic"><use href="#i-star"/></svg>{{phone.tabDreams}}</span>
-            <span><svg class="ic"><use href="#i-chat"/></svg>{{phone.tabChat}}</span>
-            <span><svg class="ic"><use href="#i-dice"/></svg>{{phone.tabGames}}</span>
-            <span><svg class="ic"><use href="#i-circles"/></svg>{{phone.tabUs}}</span>
-          </div>
-        </div>
+      <div class="phone phone--real">
+        <img src="{{@root}}assets/shots/{{@lang}}-today.webp" width="520" height="1125" fetchpriority="high" decoding="async" alt="{{a11y.phoneAlt|attr}}">
       </div>
       <div class="float float--toast" aria-hidden="true">
         <span class="float__icon"><svg class="ic"><use href="#i-heart"/></svg></span>{{hero.float1}}
@@ -168,10 +128,6 @@
       <p class="section__lead">{{inside.lead}}</p>
     </div>
     <div class="shots" tabindex="0" role="region" aria-label="{{inside.title|attr}}">
-      <figure class="shot">
-        <div class="shot__phone"><img src="{{@root}}assets/shots/{{@lang}}-today.webp" width="520" height="1125" loading="lazy" decoding="async" alt="{{inside.today.alt|attr}}"></div>
-        <figcaption><b>{{inside.today.t}}</b><span>{{inside.today.d}}</span></figcaption>
-      </figure>
       <figure class="shot">
         <div class="shot__phone"><img src="{{@root}}assets/shots/{{@lang}}-photos.webp" width="520" height="1125" loading="lazy" decoding="async" alt="{{inside.photos.alt|attr}}"></div>
         <figcaption><b>{{inside.photos.t}}</b><span>{{inside.photos.d}}</span></figcaption>
@@ -346,12 +302,6 @@
               <li class="task task--us" data-owner="ours" hidden><span class="task__ring"></span><span class="task__body"><span>{{day.ours2}}</span><span class="task__meta">{{day.ours2Meta}}</span></span><i class="dot dot--us"></i></li>
               <li class="task task--him" data-owner="his" hidden><span class="task__ring"></span><span class="task__body"><span>{{day.his1}}</span><span class="task__meta">{{day.his1Meta}}</span></span><i class="dot dot--him"></i></li>
               <li class="task task--him" data-owner="his" hidden><span class="task__ring"></span><span class="task__body"><span>{{day.his2}}</span><span class="task__meta">{{day.his2Meta}}</span></span><i class="dot dot--him"></i></li>
-            </ul>
-            <p class="card__label">{{day.groceries}}</p>
-            <ul class="checks">
-              <li><input type="checkbox" id="g1"><label for="g1">{{day.g1}}</label><span class="av av--him av--xs" aria-hidden="true">{{phone.him}}</span></li>
-              <li><input type="checkbox" id="g2" checked><label for="g2">{{day.g2}}</label><span class="av av--her av--xs" aria-hidden="true">{{phone.her}}</span></li>
-              <li><input type="checkbox" id="g3"><label for="g3">{{day.g3}}</label><span class="av av--him av--xs" aria-hidden="true">{{phone.him}}</span></li>
             </ul>
           </div>
         </div>

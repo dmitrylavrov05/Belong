@@ -235,44 +235,10 @@ a.lang__item:hover { color: var(--ink); }
 
 /* ---------- Phone mock ---------- */
 .phone {
-  width: min(340px, 100%); border-radius: 46px; background: var(--bg);
-  box-shadow: var(--shadow-lg), 0 0 0 1px var(--line); overflow: hidden; position: relative;
-  font-size: 13px; line-height: 1.35;
+  width: min(330px, 100%); padding: 10px; border-radius: 52px; background: #1F1A24;
+  box-shadow: var(--shadow-lg), inset 0 0 0 1.5px rgba(255, 255, 255, 0.08); position: relative;
 }
-.phone__inner { position: relative; height: 640px; display: flex; flex-direction: column; }
-.phone__status { display: flex; justify-content: space-between; align-items: center; padding: 16px 28px 8px 36px; font-weight: 700; font-size: 14px; }
-.phone__bat { width: 24px; height: 12px; border: 1.5px solid var(--ink); border-radius: 4px; padding: 1.5px; }
-.phone__bat i { display: block; width: 80%; height: 100%; background: var(--ink); border-radius: 1.5px; }
-.phone__screen { flex: 1; padding: 6px 16px 0; display: grid; gap: 10px; align-content: start; overflow: hidden; -webkit-mask-image: linear-gradient(#000 82%, transparent); mask-image: linear-gradient(#000 82%, transparent); }
-.ph-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 2px 2px 4px; }
-.ph-h1 { font-size: 21px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.15; }
-.ph-sub, .ph-meta { color: var(--ink-2); font-size: 11.5px; }
-.ph-pair { width: 44px; height: 30px; flex: none; }
-.ph-card { background: var(--surface); border-radius: 20px; box-shadow: var(--shadow); padding: 12px; display: grid; gap: 10px; }
-.ph-partner { display: flex; gap: 10px; align-items: flex-start; }
-.ph-partner__body { display: grid; gap: 6px; }
-.ph-pill { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; border-radius: 12px; font-weight: 700; font-size: 12px; }
-.ph-pill--him { background: var(--him-tint); color: var(--on-tint); }
-.ph-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.ph-row--sec { padding: 4px 2px 0; font-size: 15px; }
-.ph-moods { display: flex; justify-content: space-between; }
-.ph-moods span { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-size: 20px; background: var(--sunk); }
-.ph-moods .is-on { background: var(--her-tint); box-shadow: inset 0 0 0 2px var(--her); }
-.ph-energy { display: flex; align-items: center; gap: 10px; }
-.ph-energy .meter { flex: 1; }
-.ph-cds { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.ph-cd { border-radius: 18px; padding: 10px 12px; background: var(--surface); box-shadow: var(--shadow); display: grid; gap: 2px; }
-.ph-cd--us { background: var(--us-tint); box-shadow: none; }
-.ph-cd--us .ph-meta { color: var(--on-tint); }
-.ph-cd__num { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
-.ph-cd__num small { font-size: 12px; font-weight: 700; letter-spacing: 0; }
-.ph-tasks { gap: 0; padding-block: 4px; }
-.ph-fab { position: absolute; right: 16px; bottom: 84px; width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: var(--us); color: #FFFFFF; box-shadow: 0 10px 24px rgba(92, 157, 242, 0.4); }
-.ph-fab .ic { width: 22px; height: 22px; }
-.ph-tabs { display: grid; grid-template-columns: repeat(5, 1fr); padding: 10px 6px 22px; background: var(--surface); border-top: 1px solid var(--line); }
-.ph-tabs span { display: grid; justify-items: center; gap: 3px; font-size: 10px; font-weight: 600; color: var(--ink-2); }
-.ph-tabs .is-on { color: var(--ink); font-weight: 700; }
-.ph-tabs .is-on .ic { stroke: var(--him); }
+.phone img { display: block; width: 100%; height: auto; aspect-ratio: 520 / 1125; border-radius: 42px; background: var(--sunk); }
 
 .av { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; flex: none; font-weight: 800; font-size: 14px; color: #FFFFFF; }
 .av--him { background: #3B7DD8; }
@@ -392,14 +358,6 @@ a.lang__item:hover { color: var(--ink); }
 #plan-seg { display: flex; }
 #plan-seg button { flex: 1; }
 .tasks .task { font-size: 15px; }
-.checks { display: grid; }
-.checks li { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
-.checks li:last-child { border-bottom: 0; }
-.checks input { appearance: none; -webkit-appearance: none; width: 22px; height: 22px; margin: 0; flex: none; border-radius: 7px; box-shadow: inset 0 0 0 2px #B9AEB8; background: var(--surface); display: grid; place-items: center; cursor: pointer; }
-.checks input:checked { background: var(--ok); box-shadow: none; }
-.checks input:checked::after { content: ""; width: 10px; height: 6px; border: solid #FFFFFF; border-width: 0 0 2.5px 2.5px; transform: translateY(-1px) rotate(-45deg); }
-.checks label { flex: 1; cursor: pointer; font-weight: 600; }
-.checks input:checked + label { color: var(--ink-2); text-decoration: line-through; }
 
 .card--night { background: var(--night-card); color: var(--night-ink); box-shadow: var(--shadow-lg); }
 .card--night .card__label, .card--night .card__note { color: var(--night-ink-2); }
@@ -747,7 +705,6 @@ select:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--him), 0 
   .clock__time { font-size: 1.5rem; }
   .moods { gap: 2px; }
   .mood { width: 46px; height: 46px; font-size: 1.4rem; }
-  .phone__inner { height: 600px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -757,7 +714,7 @@ select:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--him), 0 
 .handoff__label { font-size: var(--fs-small); }
 .game__text { font-size: var(--fs-small); }
 
-.mood, .ph-moods span, .dcard__art, .float__emoji, .mini__photo, .result__list span[aria-hidden] { font-family: var(--emoji); }
+.mood, .dcard__art, .float__emoji, .mini__photo, .result__list span[aria-hidden] { font-family: var(--emoji); }
 
 /* ---------- Inside the app: real screenshots in phone frames ---------- */
 .shots {

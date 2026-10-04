@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Belong for Couples",
-    "description": "Belong is a shared space for two: a wishlist, shared goals, a plan for the day, chat, a map of your places and games for couples. Join the waitlist.",
+    "description": "Belong is a shared space for two: a plan for the day, photos of the day, chat with voice notes, letters for later, a film list, dreams and games for couples. Join the waitlist.",
     "ogTitle": "Belong: your life together, in one place",
     "ogLocale": "en_US",
     "ogImage": "og-en.png"
@@ -12,7 +12,7 @@
     "mainNav": "Main",
     "language": "Language",
     "otherLangLabel": "Українська",
-    "phoneAlt": "Belong app, Today screen: Igor’s mood, Yulia’s check-in, countdowns and the plan for the day"
+    "phoneAlt": "Belong app, Today screen: the couple's photo, Igor's mood, a note and the plan for the day"
   },
   "nav": {
     "how": "How it works",
@@ -28,7 +28,7 @@
   "hero": {
     "eyebrow": "For couples · Coming to iOS and Android",
     "title": "Your life together, in one place",
-    "lead": "Belong is a shared space for two. Keep a wishlist, turn wishes into goals, plan the day and keep your memories on a map. Everything connects.",
+    "lead": "Belong is a shared space for two. Plan the day, share a photo of it, write letters for later, pick tonight's film and turn wishes into goals. Everything connects.",
     "ctaPrimary": "Get early access",
     "ctaSecondary": "Play Date Match",
     "note": "Free to start. One subscription covers you both.",
@@ -37,45 +37,17 @@
     "float2": "Night in a tent by a lake"
   },
   "phone": {
-    "greeting": "Good morning, Yulia",
-    "date": "Thursday, October 1",
-    "him": "I",
-    "her": "Y",
-    "partner": "<b>Igor today</b> 😴 · energy 2 of 5, a tough day",
-    "support": "Send support",
-    "howAreYou": "How are you, Yulia?",
-    "partnerSees": "Igor will see",
-    "energy": "Energy",
-    "cd1Label": "Until Japan",
-    "cd1Num": "187",
-    "days": "days",
-    "cd1Date": "April 6, 2027",
-    "cd2Label": "Until our anniversary",
-    "cd2Num": "136",
-    "cd2Date": "Feb 14 · 3 years",
-    "plan": "Plan for today",
-    "planCount": "3 tasks",
     "t1": "Buy tickets to Tokyo",
     "t1Tag": "★ Japan",
     "t1Due": "by Oct 15",
     "t2": "Pick up a parcel",
-    "t2Meta": "Post office · by 8 pm",
-    "tabToday": "Today",
-    "tabDreams": "Dreams",
-    "tabChat": "Chat",
-    "tabGames": "Games",
-    "tabUs": "Us"
+    "t2Meta": "Post office · by 8 pm"
   },
   "inside": {
     "eyebrow": "Inside the app",
     "title": "Real screens, made for two",
     "lead": "Every picture here is the app itself, with the example couple Yulia and Igor.",
     "hint": "Swipe to see more →",
-    "today": {
-      "t": "Today",
-      "d": "Your photo together, each other's mood, a note, dates and the plan.",
-      "alt": "Today screen: the couple's photo, the partner's mood, a note and the plan"
-    },
     "photos": {
       "t": "Photos of the day",
       "d": "Up to five each, every day. They come back in your monthly and yearly story.",
@@ -174,7 +146,7 @@
     "thinkBtn": "Thinking of you",
     "eTime": "18:30",
     "eTitle": "One plan, three views",
-    "eText": "Switch between your tasks, shared ones and your partner’s. Groceries sync instantly, with a dot for who added what.",
+    "eText": "Switch between your tasks, shared ones and your partner’s. A dot shows whose task it is.",
     "segLabel": "Whose tasks",
     "segMine": "Mine",
     "segOurs": "Ours",
@@ -191,10 +163,6 @@
     "his1Meta": "by Friday",
     "his2": "Book a car service",
     "his2Meta": "Saturday morning",
-    "groceries": "Groceries",
-    "g1": "Milk",
-    "g2": "Avocado",
-    "g3": "Cat food",
     "nTime": "22:40",
     "nTitle": "Evening gratitude",
     "nText": "Before bed, write one thing you’re thankful for. Igor reads it with your “good morning”.",
@@ -279,9 +247,9 @@
     "theirsText": "What your partner keeps to themselves stays theirs.",
     "ours": "Ours",
     "oursText": "Plans, goals and the timeline you both see.",
-    "l1": "No location tracking. It stays off unless you both turn it on.",
+    "l1": "No location tracking. Belong never asks where you are.",
     "l2": "Secret swipes are revealed only when you both say yes.",
-    "l3": "Chat is end-to-end encrypted.",
+    "l3": "Only the two of you can read your shared space.",
     "l4": "If you break up, each of you exports your own data, and the shared space is archived instead of quietly deleted.",
     "l5": "No guilt streaks. Missing a day costs you nothing."
   },
