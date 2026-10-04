@@ -72,8 +72,6 @@ export const PLACES = [
     district: 'Печерський',
     phone: '+380 44 000 00 01',
     hours: [8, 22],
-    rating: 4.8,
-    reviews: 312,
     boxes: 4,
     tags: ['Кава в зоні очікування', 'Генератор: працює під час відключень'],
     services: pick(WASH, ['express', 'complex', 'inside', 'wax', 'engine', 'dry']),
@@ -88,8 +86,6 @@ export const PLACES = [
     district: 'Оболонський',
     phone: '+380 44 000 00 02',
     hours: null,
-    rating: 4.5,
-    reviews: 189,
     boxes: 6,
     tags: ['Цілодобово', 'Самообслуговування'],
     services: pick(WASH, ['express', 'complex', 'inside', 'engine'], 0.9),
@@ -104,8 +100,6 @@ export const PLACES = [
     district: 'Дарницький',
     phone: '+380 44 000 00 03',
     hours: [9, 21],
-    rating: 4.7,
-    reviews: 421,
     boxes: 3,
     tags: ['Зберігання шин', 'Шини в наявності'],
     services: pick(TIRES, ['change', 'balance', 'repair', 'storage', 'rolling']),
@@ -120,8 +114,6 @@ export const PLACES = [
     district: 'Святошинський',
     phone: '+380 44 000 00 04',
     hours: [8, 20],
-    rating: 4.4,
-    reviews: 97,
     boxes: 2,
     tags: ['Вантажні шини', 'Розвал-сходження 3D'],
     services: [...pick(TIRES, ['change', 'balance', 'repair'], 0.9), ...pick(SERVICE, ['align', 'suspension'])],
@@ -136,8 +128,6 @@ export const PLACES = [
     district: 'Подільський',
     phone: '+380 44 000 00 05',
     hours: [9, 19],
-    rating: 4.9,
-    reviews: 256,
     boxes: 5,
     tags: ['Гарантія 1 рік', 'Можна свої запчастини'],
     services: pick(SERVICE, ['diag', 'oil', 'brakes', 'align', 'ac', 'suspension', 'battery']),
@@ -152,8 +142,6 @@ export const PLACES = [
     district: 'Солом’янський',
     phone: '+380 44 000 00 06',
     hours: [8, 21],
-    rating: 4.6,
-    reviews: 143,
     boxes: 3,
     tags: ['Евакуатор', 'Генератор: працює під час відключень'],
     services: [...pick(SERVICE, ['diag', 'oil', 'brakes', 'battery'], 1.1), ...pick(TIRES, ['change', 'balance'], 1.05)],
@@ -168,8 +156,6 @@ export const PLACES = [
     district: 'Деснянський',
     phone: '+380 44 000 00 07',
     hours: [7, 23],
-    rating: 4.3,
-    reviews: 74,
     boxes: 3,
     tags: ['Мийка + перевзування за раз', 'Wi‑Fi'],
     services: [...pick(WASH, ['express', 'complex', 'inside'], 0.85), ...pick(TIRES, ['change', 'balance', 'repair'], 0.95)],
@@ -184,8 +170,6 @@ export const PLACES = [
     district: 'Голосіївський',
     phone: '+380 44 000 00 08',
     hours: [9, 20],
-    rating: 4.9,
-    reviews: 118,
     boxes: 2,
     tags: ['Тепла камера', 'Гарантія на кераміку 2 роки'],
     services: pick(DETAILING, ['polish', 'ceramic', 'ppf', 'deepclean', 'headlights']),
@@ -200,19 +184,18 @@ export const PLACES = [
     district: 'Дніпровський',
     phone: '+380 44 000 00 09',
     hours: [8, 21],
-    rating: 4.6,
-    reviews: 65,
     boxes: 3,
     tags: ['Детейлінг-мийка', 'Генератор: працює під час відключень'],
     services: [...pick(WASH, ['complex', 'wax'], 1.2), ...pick(DETAILING, ['polish', 'ceramic', 'headlights'], 0.9)],
   },
 ];
 
-// Правила оплати («як на FunPay»): клієнт не платить комісію, гроші утримуються
-// до виконання роботи, а комісія з точки утримується під час виведення коштів.
+// Правила оплати («як на FunPay»): клієнт не платить комісію, гроші утримуються до виконання
+// роботи й ще freezeHours після підтвердження, а комісія з точки — під час виведення коштів.
 export const PAYMENT = {
   commission: 0.07, // частка, яку платформа утримує з точки під час виведення
-  autoReleaseHours: 24, // якщо клієнт мовчить після «Виконано», гроші йдуть точці
+  autoReleaseHours: 24, // якщо клієнт мовчить після «Машина готова», замовлення підтверджується саме
+  freezeHours: 48, // скільки годин гроші за підтверджене замовлення заморожені, перш ніж їх можна вивести
   freeCancelHours: 2, // безкоштовне скасування не пізніше ніж за N годин
   lateCancelShare: 0.5, // частка точці при пізньому скасуванні
   noShowShare: 0.5, // частка точці, якщо клієнт не приїхав

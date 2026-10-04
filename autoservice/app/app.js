@@ -25,8 +25,10 @@ const store = {
 let cars = store.get('cars', []);
 let bookings = store.get('bookings', []).map((b) =>
   // Записи з версії без оплати: вважаємо їх оплаченими або скасованими з поверненням.
-  b.state ? b : { ...b, paid: b.total, code: String(1000 + Math.floor(Math.random() * 9000)), state: b.status === 'cancelled' ? 'cancelled' : 'paid' });
+  b.state ? b : { ...b, paid: b.total, state: b.status === 'cancelled' ? 'cancelled' : 'paid' });
 let payouts = store.get('payouts', []);
+// Відгуки клієнтів: лише по завершених замовленнях, один на замовлення.
+let reviews = store.get('reviews', []);
 let favs = new Set(store.get('favs', []));
 
 const ui = { cat: 'all', q: '', sort: 'rating', openNow: false, favOnly: false, cls: store.get('cls', 0), partner: store.get('partner', null) };
@@ -130,6 +132,28 @@ const DETAIL_IDS = ['polish', 'ceramic', 'ppf', 'deepclean', 'headlights'];
 const serviceCat = (s) =>
   WASH_IDS.includes(s.id) ? 'wash' : TIRE_IDS.includes(s.id) ? 'tires' : DETAIL_IDS.includes(s.id) ? 'detailing' : 'service';
 const catById = (id) => CATEGORIES.find((c) => c.id === id);
+
+// ---------- рейтинг з відгуків ----------
+
+function ratingOf(placeId) {
+  const list = reviews.filter((r) => r.placeId === placeId);
+  const dist = [1, 2, 3, 4, 5].map((n) => list.filter((r) => r.stars === n).length);
+  const avg = list.length ? list.reduce((a, r) => a + r.stars, 0) / list.length : 0;
+  return { avg, count: list.length, dist };
+}
+
+const reviewsWord = (n) => plural(n, 'відгук', 'відгуки', 'відгуків');
+
+// Рядок із пʼяти зірок; aria-label озвучує оцінку цілим реченням.
+const stars = (n, size = 14) => `<span class="stars" role="img" aria-label="Оцінка ${rating(n)} з 5">${[1, 2, 3, 4, 5]
+  .map((i) => `<span class="${i <= Math.round(n) ? 'on' : ''}">${icon('star', size)}</span>`).join('')}</span>`;
+
+function ratingBadge(placeId) {
+  const r = ratingOf(placeId);
+  return r.count
+    ? `<span class="rating">${icon('star', 14)}${rating(r.avg)}</span><span>${r.count} ${reviewsWord(r.count)}</span>`
+    : '<span>Ще немає відгуків</span>';
+}
 
 // ---------- відстань ----------
 
@@ -242,10 +266,10 @@ function filteredPlaces() {
     return true;
   });
   const by = {
-    rating: (a, b) => b.rating - a.rating,
+    rating: (a, b) => ratingOf(b.id).avg - ratingOf(a.id).avg || ratingOf(b.id).count - ratingOf(a.id).count,
     price: (a, b) => minPrice(a, ui.cat, ui.cls) - minPrice(b, ui.cat, ui.cls),
-    reviews: (a, b) => b.reviews - a.reviews,
-    near: (a, b) => (ui.pos ? distTo(a) - distTo(b) : b.rating - a.rating),
+    reviews: (a, b) => ratingOf(b.id).count - ratingOf(a.id).count,
+    near: (a, b) => (ui.pos ? distTo(a) - distTo(b) : ratingOf(b.id).avg - ratingOf(a.id).avg),
   }[ui.sort];
   return list.sort(by);
 }
@@ -263,8 +287,7 @@ function placeCard(p) {
     </div>
     <a class="place stack" href="#/place/${p.id}" tabindex="-1">
       <div class="meta">
-        <span class="rating">${icon('star', 14)}${rating(p.rating)}</span>
-        <span>${p.reviews} ${plural(p.reviews, 'відгук', 'відгуки', 'відгуків')}</span>
+        ${ratingBadge(p.id)}
         <span>${esc(p.district)}, ${esc(p.address)}</span>
       </div>
       <div class="badges">
@@ -314,7 +337,35 @@ function viewCatalog() {
     <p class="note">Демо-дані: назви, номери будинків і телефони вигадані. Список місць задається у файлі data.js.</p>`;
 }
 
-// ---------- картка точки ----------
+// ---------- сторінка бізнесу ----------
+
+function reviewItem(r) {
+  return `<article class="review">
+    <div class="head">${stars(r.stars)}<span class="small muted">${fmtDate(r.date)}</span></div>
+    ${r.text ? `<p>${esc(r.text)}</p>` : ''}
+    <div class="small muted">${icon('checkCircle', 14)}Підтверджений візит · ${esc(r.services)}</div>
+  </article>`;
+}
+
+function ratingSummary(placeId) {
+  const r = ratingOf(placeId);
+  if (!r.count) {
+    return `<div class="rating-box empty-rating">
+      <div class="rating-num">—</div>
+      <p>Ще немає відгуків. Рейтинг зʼявиться після першого завершеного замовлення.</p>
+    </div>`;
+  }
+  return `<div class="rating-box">
+    <div class="rating-main">
+      <div class="rating-num">${rating(r.avg)}</div>
+      ${stars(r.avg, 16)}
+      <div class="small muted">${r.count} ${reviewsWord(r.count)}</div>
+    </div>
+    <ol class="bars" aria-label="Розподіл оцінок">
+      ${[5, 4, 3, 2, 1].map((n) => `<li><span>${n}</span><span class="bar"><span style="width:${(r.dist[n - 1] / r.count) * 100}%"></span></span><span class="n">${r.dist[n - 1]}</span></li>`).join('')}
+    </ol>
+  </div>`;
+}
 
 function viewPlace(id) {
   const p = placeById(id);
@@ -322,11 +373,13 @@ function viewPlace(id) {
   const open = isOpenNow(p);
   const maps = `${CITY.mapsSearch}${encodeURIComponent(`${CITY.name}, ${p.address}`)}`;
   const groups = CATEGORIES.map((c) => [c, p.services.filter((s) => serviceCat(s) === c.id)]).filter(([, s]) => s.length);
+  const list = reviews.filter((r) => r.placeId === p.id).sort((a, b) => b.at - a.at);
+  const cats = p.cats.map(catById);
   return `<div class="topbar">${back('#/', 'Усі місця')}${favButton(p, false)}</div>
     <h1>${esc(p.name)}</h1>
-    <div class="meta lg">
-      <span class="rating">${icon('star', 16)}${rating(p.rating)}</span>
-      <span>${p.reviews} ${plural(p.reviews, 'відгук', 'відгуки', 'відгуків')}</span>
+    <div class="pc-cat" style="margin-top:-6px">${icon(cats[0].icon, 14)}${cats.map((c) => c.name).join(' · ')}</div>
+    <div class="meta lg" style="margin-top:8px">
+      ${ratingBadge(p.id)}
       <span>${p.boxes} ${plural(p.boxes, 'бокс', 'бокси', 'боксів')}</span>
       ${ui.pos ? `<span>${fmtDist(distTo(p))} від ${ui.posFallback ? 'центру' : 'вас'}</span>` : ''}
     </div>
@@ -341,16 +394,21 @@ function viewPlace(id) {
         <a class="btn" href="${maps}" target="_blank" rel="noopener">${icon('route', 18)}Маршрут</a>
       </div>
     </div>
-    <h2 class="big">Послуги та ціни</h2>
+    <nav class="jump" aria-label="Розділи сторінки"><a href="#/place/${p.id}" data-jump="services">Послуги та ціни</a><a href="#/place/${p.id}" data-jump="reviews">Відгуки${list.length ? ` (${list.length})` : ''}</a></nav>
+    <h2 class="big" id="services">Послуги та ціни</h2>
     <p class="small muted" style="margin:-6px 0 0">Ціни для класу «${CAR_CLASSES[ui.cls]}». Остаточну вартість майстер підтвердить на місці.</p>
-    ${groups.map(([c, list]) => `
+    ${groups.map(([c, items]) => `
       <h3 class="cat-label">${icon(c.icon, 15)}${c.name}</h3>
       <div class="list">
-        ${list.map((s) => `<div class="item">
+        ${items.map((s) => `<div class="item">
           <span class="name">${esc(s.name)}<small>${duration(s.min)}</small></span>
           <span class="price">${uah(s.price[ui.cls])}</span>
         </div>`).join('')}
       </div>`).join('')}
+    <h2 class="big" id="reviews">Рейтинг і відгуки</h2>
+    ${ratingSummary(p.id)}
+    <p class="small muted">Залишити відгук можна лише після завершеного замовлення через CARCAR, тому кожен відгук — від реального клієнта.</p>
+    <div class="stack">${list.map(reviewItem).join('')}</div>
     <div class="dock-space"></div>
     <div class="dock"><a class="btn primary block" href="#/book/${p.id}">Записатися онлайн</a></div>`;
 }
@@ -461,7 +519,6 @@ function confirmBooking() {
     car: car ? carLabel(car) : CAR_CLASSES[cls],
     carId: car?.id ?? null,
     state: 'paid',
-    code: newCode(),
     createdAt: Date.now(),
   };
   bookings.push(b);
@@ -475,19 +532,25 @@ function confirmBooking() {
 
 const ACTIVE = ['paid', 'done', 'dispute'];
 const HOUR = 3600000;
-const newCode = () => String(1000 + Math.floor(Math.random() * 9000));
 
 function save() {
-  return store.set('bookings', bookings) && store.set('payouts', payouts);
+  return store.set('bookings', bookings) && store.set('payouts', payouts) && store.set('reviews', reviews);
 }
+
+// Клієнт підтвердив (або мовчав після «Машина готова»): замовлення завершене,
+// гроші точці заморожені ще на freezeHours, щоб клієнт встиг відкрити спір.
+function complete(b, at = Date.now()) {
+  Object.assign(b, { state: 'completed', completedAt: at, unfreezeAt: at + PAYMENT.freezeHours * HOUR });
+}
+
+const isFrozen = (b) => b.state === 'completed' && Date.now() < (b.unfreezeAt ?? 0);
 
 // Автоматично передаємо гроші точці, якщо клієнт не відповів за autoReleaseHours.
 function settle() {
   let changed = false;
   for (const b of bookings) {
     if (b.state === 'done' && Date.now() - b.doneAt >= PAYMENT.autoReleaseHours * HOUR) {
-      b.state = 'completed';
-      b.releasedAt = b.doneAt + PAYMENT.autoReleaseHours * HOUR;
+      complete(b, b.doneAt + PAYMENT.autoReleaseHours * HOUR);
       changed = true;
     }
   }
@@ -501,12 +564,14 @@ function placeShare(b) {
   return 0;
 }
 
+// available — можна вивести; frozen — замовлення в роботі плюс підтверджені, що ще не розморозились.
 function balanceOf(placeId) {
   const own = bookings.filter((b) => b.placeId === placeId);
-  const earned = own.reduce((a, b) => a + placeShare(b), 0);
+  const earned = own.filter((b) => !isFrozen(b)).reduce((a, b) => a + placeShare(b), 0);
   const withdrawn = payouts.filter((x) => x.placeId === placeId).reduce((a, x) => a + x.gross, 0);
-  const held = own.filter((b) => ACTIVE.includes(b.state)).reduce((a, b) => a + b.paid, 0);
-  return { available: earned - withdrawn, held };
+  const frozen = own.filter((b) => ACTIVE.includes(b.state) || isFrozen(b)).reduce((a, b) => a + b.paid, 0);
+  const next = own.filter(isFrozen).sort((a, b) => a.unfreezeAt - b.unfreezeAt)[0];
+  return { available: earned - withdrawn, frozen, next };
 }
 
 function cancelTerms(b) {
@@ -518,7 +583,7 @@ function cancelTerms(b) {
 const fmtTime = (ms) => new Date(ms).toLocaleString('uk-UA', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
 
 function steps(b) {
-  const at = { paid: 0, done: 1, dispute: 1, completed: 2 }[b.state];
+  const at = b.state === 'completed' && isFrozen(b) ? 1 : { paid: 0, done: 1, dispute: 1, completed: 2 }[b.state];
   if (at === undefined) return '';
   return `<ol class="steps" aria-label="Статус оплати">${['Оплачено', 'Виконано', 'Гроші точці']
     .map((s, i) => `<li class="${i <= at ? 'on' : ''}" ${i === at ? 'aria-current="step"' : ''}>${s}</li>`).join('')}</ol>`;
@@ -536,7 +601,7 @@ const STATE_LABEL = {
 };
 
 const cardHead = (b, title, sm) => {
-  const [cls, label] = STATE_LABEL[b.state];
+  const [cls, label] = isFrozen(b) ? ['go', 'Виконано · гроші заморожені'] : STATE_LABEL[b.state];
   return `<div class="head">
       <div><div class="bk-status ${cls}">${label}</div><h3 class="bk-title${sm ? ' sm' : ''}">${title}</h3></div>
       <div class="bk-price">${uah(b.paid)}</div>
@@ -553,6 +618,23 @@ function result(b) {
     </div>` : ''}`;
 }
 
+// Відгук після завершеного замовлення: форма з оцінкою або вже залишений відгук.
+function reviewBlock(b) {
+  const mine = reviews.find((r) => r.bookingId === b.id);
+  if (mine) {
+    return `<div class="my-review"><div class="head"><b>Ваш відгук</b>${stars(mine.stars)}</div>${mine.text ? `<p>${esc(mine.text)}</p>` : ''}</div>`;
+  }
+  return `<form class="review-form" data-id="${b.id}">
+    <fieldset class="star-input">
+      <legend>Оцініть візит</legend>
+      ${[1, 2, 3, 4, 5].map((n) => `<label><input class="sr-only" type="radio" name="stars" value="${n}" required>
+        <span aria-hidden="true">${icon('star', 30)}</span><span class="sr-only">${n} з 5</span></label>`).join('')}
+    </fieldset>
+    <label class="field"><span>Відгук (необовʼязково)</span><textarea name="text" rows="3" maxlength="600" placeholder="Що сподобалось, що варто покращити"></textarea></label>
+    <button class="btn primary block" type="submit">Надіслати відгук</button>
+  </form>`;
+}
+
 function bookingCard(b, highlight) {
   const p = placeById(b.placeId);
   const when = `${dayLabel(b.date)}, ${b.time}–${hhmm(toMin(b.time) + b.minutes)}`;
@@ -563,6 +645,11 @@ function bookingCard(b, highlight) {
       <div class="svc">${b.services.map(esc).join(', ')}</div>
     </div>`;
   let body = lines;
+  const started = bookingStart(b) <= new Date();
+  const confirmBtns = (label) => `<div class="grid2">
+      <button class="btn primary" data-action="client-ok" data-id="${b.id}">${icon('check', 18)}${label}</button>
+      <button class="btn line-danger" data-action="dispute" data-id="${b.id}">Відкрити спір</button>
+    </div>`;
   if (b.state === 'paid') {
     const t = cancelTerms(b);
     body += `${b.extra ? `<div class="notice">
@@ -571,8 +658,11 @@ function bookingCard(b, highlight) {
           <button class="btn primary" data-action="extra-ok" data-id="${b.id}">Погодитися й доплатити</button>
           <button class="btn" data-action="extra-no" data-id="${b.id}">Відхилити</button>
         </div></div>` : ''}
-      <div class="code-box"><p>Код для майстра — назвіть його лише після виконання роботи</p>
-        <div class="code" aria-label="Код ${b.code}">${[...b.code].map((d) => `<span>${d}</span>`).join('')}</div></div>
+      ${started ? `<div class="notice">Коли заберете авто, підтвердьте виконання — точка отримає підтвердження автоматично.
+        Гроші будуть заморожені ще ${PAYMENT.freezeHours} год, і весь цей час можна відкрити спір.</div>
+        ${confirmBtns('Підтвердити виконання')}
+        ${p ? `<a class="btn" href="${tel(p)}">${icon('phone', 18)}Зателефонувати</a>` : ''}`
+      : `<div class="notice ic-row">${icon('shield', 18)}Гроші утримуються, доки ви не підтвердите виконання. Після візиту тут зʼявиться кнопка «Підтвердити виконання».</div>
       <div class="grid2">
         <button class="btn" data-action="ics" data-id="${b.id}">${icon('calendar', 18)}У календар</button>
         ${p ? `<a class="btn" href="${tel(p)}">${icon('phone', 18)}Зателефонувати</a>` : ''}
@@ -580,23 +670,25 @@ function bookingCard(b, highlight) {
       </div>
       <p class="terms">${t.free
         ? `Безкоштовне скасування до ${fmtTime(bookingStart(b) - PAYMENT.freeCancelHours * HOUR)}.`
-        : `Пізнє скасування: повернемо ${uah(t.refund)}, ${uah(t.placeAmount)} отримає точка.`}</p>`;
+        : `Пізнє скасування: повернемо ${uah(t.refund)}, ${uah(t.placeAmount)} отримає точка.`}</p>`}`;
   } else if (b.state === 'done') {
     body = `<div class="lines tight">
         <div class="il strong">${when}</div>
         <div>${esc(b.car)} · ${b.services.map(esc).join(', ')}</div>
       </div>
       <div class="notice ok">${icon('checkCircle', 22)}<div><b>Машина готова!</b>Перевірте результат і підтвердіть або відкрийте спір до
-        ${fmtTime(b.doneAt + PAYMENT.autoReleaseHours * HOUR)}, інакше гроші автоматично перейдуть точці.</div></div>
+        ${fmtTime(b.doneAt + PAYMENT.autoReleaseHours * HOUR)}, інакше замовлення підтвердиться автоматично.</div></div>
       ${result(b)}
-      <div class="grid2">
-        <button class="btn primary" data-action="client-ok" data-id="${b.id}">${icon('check', 18)}Усе добре</button>
-        <button class="btn line-danger" data-action="dispute" data-id="${b.id}">Відкрити спір</button>
-      </div>`;
+      ${confirmBtns('Усе добре')}`;
   } else if (b.state === 'dispute') {
     body += `<div class="notice warn"><div class="label">Ваша скарга</div>«${esc(b.disputeReason)}». Модератор перевірить і вирішить, кому передати гроші.</div>${result(b)}`;
   } else if (b.state === 'completed') {
     body += result(b);
+    if (isFrozen(b)) {
+      body += `<div class="notice">Гроші точці заморожені до ${fmtTime(b.unfreezeAt)}. Якщо щось не так — ще можна відкрити спір.</div>
+        <button class="btn line-danger" data-action="dispute" data-id="${b.id}">Відкрити спір</button>`;
+    }
+    body += reviewBlock(b);
   } else {
     body += `<p class="small muted" style="margin:0">Повернено ${uah(b.refund ?? b.paid)} на картку${b.placeAmount ? `, ${uah(b.placeAmount)} отримала точка` : ''}.</p>`;
   }
@@ -624,12 +716,12 @@ function viewBookings(highlightId) {
 // ---------- кабінет точки ----------
 
 function partnerRow(b) {
-  const [cls, label] = STATE_LABEL[b.state];
+  const [cls, label] = isFrozen(b) ? ['go', 'Підтверджено · гроші заморожені'] : STATE_LABEL[b.state];
   return `<a class="card prow" href="#/partner/${b.id}">
     <div><div class="bk-status ${cls}">${label}</div>
       <h3>${dayLabel(b.date, { day: 'numeric', month: 'short' })}, ${b.time} · ${esc(b.car)}</h3>
       <div class="small muted" style="margin-top:2px">${b.services.map(esc).join(', ')}</div></div>
-    <span class="price">${uah(ACTIVE.includes(b.state) ? b.paid : placeShare(b))}</span>
+    <span class="price">${uah(ACTIVE.includes(b.state) || isFrozen(b) ? b.paid : placeShare(b))}</span>
   </a>`;
 }
 
@@ -650,13 +742,15 @@ function viewPartner() {
     <section class="card balance-card" aria-label="Баланс" style="margin-top:12px">
       <div class="tiles">
         <div class="tile ok"><span>Доступно до виведення</span><b>${uah(bal.available)}</b></div>
-        <div class="tile"><span>Утримується до виконання</span><b>${uah(bal.held)}</b></div>
+        <div class="tile"><span>Заморожено</span><b>${uah(bal.frozen)}</b></div>
       </div>
       <button class="btn primary block" data-action="payout" ${bal.available > 0 ? '' : 'disabled'}>
         ${icon('card', 20)}${bal.available > 0 ? `Вивести ${uah(bal.available - fee)} на картку` : 'Немає коштів для виведення'}
       </button>
-      <p class="fine">Комісія сервісу ${Math.round(PAYMENT.commission * 100)}% утримується лише під час виведення${bal.available > 0 ? `: ${uah(fee)}` : ''}. Для клієнтів комісії немає.</p>
+      <p class="fine">Гроші за замовлення заморожені, доки клієнт не підтвердить виконання, і ще ${PAYMENT.freezeHours} год після цього.${bal.next ? ` Найближче розморожування: ${uah(bal.next.paid)} — ${fmtTime(bal.next.unfreezeAt)}.` : ''}
+        Комісія сервісу ${Math.round(PAYMENT.commission * 100)}% утримується лише під час виведення${bal.available > 0 ? `: ${uah(fee)}` : ''}. Для клієнтів комісії немає.</p>
     </section>
+    <a class="card link-card" href="#/place/${p.id}" style="margin-top:12px">${icon('star', 22)}<span>Сторінка точки й відгуки<small class="small muted" style="display:block;font-weight:400">${ratingOf(p.id).count ? `Рейтинг ${rating(ratingOf(p.id).avg)} · ${ratingOf(p.id).count} ${reviewsWord(ratingOf(p.id).count)}` : 'Ще немає відгуків'}</small></span>${icon('chevR', 18)}</a>
     <h2>Активні записи</h2>
     <div class="stack">${active.length ? active.map(partnerRow).join('') : '<p class="muted">Активних записів немає.</p>'}</div>
     ${rest.length ? `<h2>Завершені</h2><div class="stack">${rest.map(partnerRow).join('')}</div>` : ''}
@@ -679,15 +773,10 @@ function viewPartnerJob(id) {
         <label class="dropzone">${icon('camera', 24)}Додати фото результату (до 3)
           <span class="photo-count" aria-live="polite"></span>
           <input class="sr-only" name="photos" type="file" accept="image/*" capture="environment" multiple></label>
-        <div class="grid2">
-          <label class="field"><span>Пробіг, км</span><input name="km" type="number" inputmode="numeric" min="0" autocomplete="off"></label>
-          <label class="field"><span>Код клієнта</span><input class="code-input" name="code" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="0000"></label>
-        </div>
+        <label class="field"><span>Пробіг, км</span><input name="km" type="number" inputmode="numeric" min="0" autocomplete="off"></label>
         <label class="field"><span>Коментар для клієнта</span><input name="note" autocomplete="off" placeholder="Наприклад, старі колодки в багажнику"></label>
-        <div class="grid2">
-          <button class="btn primary" type="submit" name="mode" value="code">Підтвердити кодом</button>
-          <button class="btn" type="submit" name="mode" value="ready" style="min-height:52px;border-radius:14px">Машина готова</button>
-        </div>
+        <button class="btn primary block" type="submit">Машина готова</button>
+        <p class="fine">Клієнт отримає сповіщення й підтвердить виконання у своєму застосунку — тоді замовлення підтвердиться тут автоматично.</p>
       </form>
       ${b.extra ? `<p class="small muted" style="margin:0">Запит на доплату +${uah(b.extra.amount)} чекає відповіді клієнта.</p>` : ''}
       ${b.extraDeclined ? '<p class="small muted" style="margin:0">Клієнт відхилив доплату.</p>' : ''}
@@ -696,7 +785,9 @@ function viewPartnerJob(id) {
         ${started ? `<button class="btn text-danger" data-action="noshow" data-id="${b.id}">Клієнт не приїхав</button>` : ''}
       </div>`;
   } else if (b.state === 'done') {
-    body = `<p class="small muted" style="margin:0">Чекаємо підтвердження клієнта. Гроші надійдуть автоматично ${fmtTime(b.doneAt + PAYMENT.autoReleaseHours * HOUR)}.</p>${result(b)}`;
+    body = `<p class="small muted" style="margin:0">Чекаємо підтвердження клієнта. Якщо він не відповість, замовлення підтвердиться автоматично ${fmtTime(b.doneAt + PAYMENT.autoReleaseHours * HOUR)}.</p>${result(b)}`;
+  } else if (isFrozen(b)) {
+    body = `<div class="notice ok">${icon('checkCircle', 22)}<div><b>Клієнт підтвердив виконання</b>${uah(b.paid)} заморожено до ${fmtTime(b.unfreezeAt)}, потім їх можна вивести.</div></div>${result(b)}`;
   } else if (b.state === 'dispute') {
     body = `<div class="notice warn"><div class="label">Скарга клієнта</div>«${esc(b.disputeReason)}»</div>`;
   } else {
@@ -891,22 +982,18 @@ async function shrinkPhoto(file) {
   }
 }
 
-// «Машина готова»: точка додає фото, пробіг і коментар, а потім або вводить код клієнта
-// (гроші одразу точці), або чекає підтвердження клієнта. Після цього повертаємось у кабінет.
-async function finishJob(form, mode) {
+// «Машина готова»: точка додає фото, пробіг і коментар, а клієнт отримує сповіщення
+// й підтверджує виконання. Після цього повертаємось у кабінет.
+async function finishJob(form) {
   const b = bookings.find((x) => x.id === form.dataset.id);
   const f = new FormData(form);
-  if (mode === 'code' && f.get('code').trim() !== b.code) { toast('Невірний код'); return; }
   const files = f.getAll('photos').filter((x) => x.size).slice(0, 3);
   const photos = (await Promise.all(files.map(shrinkPhoto))).filter(Boolean);
-  Object.assign(b, { photos, note: f.get('note').trim() || null, km: Number(f.get('km')) || null });
-  if (mode === 'code') Object.assign(b, { state: 'completed', releasedAt: Date.now() });
-  else Object.assign(b, { state: 'done', doneAt: Date.now() });
+  Object.assign(b, { photos, note: f.get('note').trim() || null, km: Number(f.get('km')) || null, state: 'done', doneAt: Date.now() });
   const dropped = !save() && photos.length > 0;
   if (dropped) { b.photos = []; save(); }
   location.hash = '#/partner';
-  if (dropped) toast('Фото не вмістилися в памʼять пристрою, запис збережено без них');
-  else toast(mode === 'code' ? `Код вірний: ${uah(b.paid)} зараховано на баланс` : 'Клієнт отримав сповіщення «Машина готова»');
+  toast(dropped ? 'Фото не вмістилися в памʼять пристрою, запис збережено без них' : 'Клієнт отримав сповіщення «Машина готова»');
 }
 
 // Дії із записом з боку клієнта, точки й модератора. Повертають false, якщо нічого не змінилося.
@@ -929,9 +1016,8 @@ const bookingActions = {
     b.extraDeclined = true;
   },
   'client-ok'(b) {
-    b.state = 'completed';
-    b.releasedAt = Date.now();
-    toast('Дякуємо! Гроші передано точці');
+    complete(b);
+    toast('Дякуємо! Виконання підтверджено');
   },
   dispute(b) {
     const reason = prompt('Що пішло не так?')?.trim();
@@ -959,7 +1045,9 @@ const bookingActions = {
     toast('Гроші повернено клієнту');
   },
   'resolve-place'(b) {
-    Object.assign(b, { state: 'completed', releasedAt: Date.now() });
+    // Модератор уже перевірив замовлення, тож гроші доступні точці одразу.
+    complete(b);
+    b.unfreezeAt = Date.now();
     toast('Гроші передано точці');
   },
 };
@@ -994,6 +1082,13 @@ function route() {
 }
 
 document.addEventListener('click', (e) => {
+  // Переходи всередині сторінки бізнесу: хеш зайнятий роутером, тож прокручуємо самі.
+  const jump = e.target.closest('[data-jump]');
+  if (jump) {
+    e.preventDefault();
+    document.getElementById(jump.dataset.jump)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
   const el = e.target.closest('[data-action]');
   if (!el) return;
   const { action, id } = el.dataset;
@@ -1093,7 +1188,20 @@ document.addEventListener('input', (e) => {
 document.addEventListener('submit', (e) => {
   if (e.target.matches('.ready-form')) {
     e.preventDefault();
-    finishJob(e.target, e.submitter?.value ?? 'ready');
+    finishJob(e.target);
+    return;
+  }
+  if (e.target.matches('.review-form')) {
+    e.preventDefault();
+    const b = bookings.find((x) => x.id === e.target.dataset.id);
+    const f = new FormData(e.target);
+    reviews.push({
+      id: uid(), placeId: b.placeId, bookingId: b.id, stars: Number(f.get('stars')),
+      text: f.get('text').trim(), services: b.services.join(', '), date: isoDate(new Date()), at: Date.now(),
+    });
+    save();
+    route();
+    toast('Дякуємо за відгук!');
     return;
   }
   if (e.target.id === 'kmform' || e.target.id === 'logform') {

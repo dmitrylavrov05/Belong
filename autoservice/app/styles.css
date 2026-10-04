@@ -162,6 +162,7 @@ h2.big { font-size: 20px; }
 
 .field { display: block; }
 .field > span { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+.field textarea { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); font: inherit; font-size: 15px; resize: vertical; }
 .field input, .field select, .select {
   width: 100%; height: 48px; padding: 0 14px; border-radius: 12px;
   border: 1px solid var(--line); background: var(--bg); font-size: 15px;
@@ -173,7 +174,6 @@ h2.big { font-size: 20px; }
 }
 .form-box { background: var(--soft); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
 .form-box input, .form-box select { background-color: var(--bg); }
-.code-input { font-size: 18px !important; font-weight: 600; letter-spacing: 6px; }
 
 /* ---------- каталог ---------- */
 
@@ -291,6 +291,42 @@ label.item { cursor: pointer; padding: 10px 14px; }
 .perk-ic.ok { background: var(--ok-soft); color: var(--ok); }
 .sheet .demo { font-size: 13px; color: var(--muted); text-align: center; margin: 0; }
 
+/* ---------- рейтинг і відгуки ---------- */
+
+.stars { display: inline-flex; gap: 1px; color: var(--line); vertical-align: middle; }
+.stars .on { color: var(--accent); }
+.jump { display: flex; gap: 8px; margin-top: 16px; }
+.jump a { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 40px; border-radius: 10px; background: var(--soft); color: var(--navy); font-size: 14px; font-weight: 600; }
+.jump a:hover { color: var(--navy); background: var(--line); }
+
+.rating-box { display: flex; gap: 20px; align-items: center; border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+.rating-main { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: none; min-width: 96px; }
+.rating-num { font-size: 40px; font-weight: 800; line-height: 1; }
+.empty-rating p { margin: 0; color: var(--muted); font-size: 14px; }
+.empty-rating .rating-num { color: var(--box); }
+.bars { list-style: none; margin: 0; padding: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.bars li { display: grid; grid-template-columns: 10px 1fr 20px; gap: 8px; align-items: center; }
+.bars .bar { height: 6px; border-radius: 3px; background: var(--soft); overflow: hidden; }
+.bars .bar span { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.bars .n { text-align: right; }
+
+.review { border-top: 1px solid var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.review p { margin: 0; font-size: 15px; }
+.review .small { display: flex; align-items: center; gap: 5px; }
+.review .small .ic { color: var(--ok); }
+.my-review { background: var(--soft); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.my-review p { margin: 0; font-size: 14px; }
+
+.review-form { display: flex; flex-direction: column; gap: 12px; border-top: 1px solid var(--line); padding-top: 14px; }
+.star-input { border: 0; margin: 0; padding: 0; display: flex; gap: 4px; }
+.star-input legend { font-size: 17px; font-weight: 700; padding: 0; margin-bottom: 8px; }
+.star-input label { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: var(--line); cursor: pointer; border-radius: 10px; }
+.star-input:has(input:checked) label { color: var(--accent); }
+.star-input label:has(input:checked) ~ label { color: var(--line); }
+.star-input:hover label { color: var(--accent); }
+.star-input label:hover ~ label { color: var(--line); }
+.star-input label:focus-within { outline: 3px solid var(--accent); outline-offset: 1px; }
+
 /* ---------- мої записи ---------- */
 
 .bk { border: 1px solid var(--line); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
@@ -313,13 +349,6 @@ label.item { cursor: pointer; padding: 10px 14px; }
 .lines .svc { padding-left: 28px; }
 .lines.tight { gap: 4px; }
 
-.code-box { background: var(--soft); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
-.code-box p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.4; }
-.code { display: flex; gap: 8px; }
-.code span {
-  width: 52px; height: 60px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line);
-  display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: 800; font-variant-numeric: tabular-nums;
-}
 .terms { font-size: 13px; color: var(--muted); text-align: center; margin: -6px 0 0; }
 
 .notice { background: var(--soft); border-radius: 14px; padding: 12px 14px; font-size: 14px; line-height: 1.45; }
@@ -329,6 +358,8 @@ label.item { cursor: pointer; padding: 10px 14px; }
 .notice .label { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
 .notice.ok { background: var(--ok-soft); display: flex; gap: 10px; }
 .notice.ok > .ic { color: var(--ok); }
+.notice.ic-row { display: flex; gap: 10px; align-items: flex-start; }
+.notice.ic-row > .ic { color: var(--ok); margin-top: 2px; }
 .notice.ok b { font-size: 16px; }
 
 .photos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
@@ -397,6 +428,7 @@ label.item { cursor: pointer; padding: 10px 14px; }
 .link-card { flex-direction: row; align-items: center; gap: 12px; color: inherit; }
 .link-card:hover { color: inherit; border-color: var(--box); }
 .link-card > span { flex: 1; font-weight: 600; }
+.link-card > .ic:first-child { color: var(--accent); }
 .link-card .count { flex: none; min-width: 24px; height: 24px; padding: 0 7px; border-radius: 999px; background: var(--warn-soft); color: var(--warn); font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 
 /* ---------- повідомлення ---------- */

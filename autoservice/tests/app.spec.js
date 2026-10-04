@@ -62,7 +62,8 @@ test('запис від вибору послуги до скасування', 
   await expect(page).toHaveURL(/#\/bookings\//);
   const card = page.locator('article', { hasText: 'Шиномонтаж «Колесо»' });
   await expect(card).toContainText('Оплачено · гроші утримуються');
-  await expect(card.locator('.code')).toHaveText(/^\d{4}$/);
+  await expect(card).toContainText('Після візиту тут зʼявиться кнопка «Підтвердити виконання»');
+  await expect(card.getByRole('button', { name: 'Підтвердити виконання' })).toHaveCount(0);
   await expect(card).toContainText(time.trim());
 
   // Зайнятий мною час більше не пропонується.
@@ -95,7 +96,7 @@ test('авто з гаража задає ціни під час запису', 
   await expect(page.locator('.summary')).toContainText('350 ₴');
 });
 
-// Записує на завтра в «Колесо» на перевзування (900 ₴) і повертає код для майстра.
+// Записує на завтра в «Колесо» на перевзування (900 ₴) і оплачує.
 async function bookTomorrow(page) {
   await page.goto('/#/book/koleso');
   await page.getByLabel(/Сезонне перевзування/).check();
@@ -103,7 +104,14 @@ async function bookTomorrow(page) {
   await page.locator('.slot:not([disabled])').first().click();
   await page.locator('[data-action="confirm"]').click();
   await page.getByRole('button', { name: 'Оплатити 900 ₴' }).click();
-  return (await page.locator('.code').first().textContent()).trim();
+}
+
+// Переводить годинник на вечір дня візиту (після закриття точки) і підтверджує виконання як клієнт.
+async function confirmAfterVisit(page, day = 5) {
+  await page.clock.setFixedTime(new Date(2026, 9, day, 21, 30));
+  await page.goto('/#/bookings');
+  await page.getByRole('button', { name: 'Підтвердити виконання' }).click();
+  await expect(page.locator('#toast')).toHaveText('Дякуємо! Виконання підтверджено');
 }
 
 async function openPartner(page, name) {
@@ -118,20 +126,31 @@ async function openJob(page, name) {
   await expect(page.getByRole('heading', { name: 'Запис клієнта' })).toBeVisible();
 }
 
-test('гроші утримуються до коду, а комісія береться під час виведення', async ({ page }) => {
-  const code = await bookTomorrow(page);
+test('клієнт підтверджує кнопкою, гроші заморожені 48 годин, комісія під час виведення', async ({ page }) => {
+  await bookTomorrow(page);
   await openPartner(page, 'Шиномонтаж «Колесо»');
   const balance = page.getByRole('region', { name: 'Баланс' });
-  await expect(balance).toContainText('Утримується до виконання900 ₴');
-
+  await expect(balance).toContainText('Доступно до виведення0 ₴');
+  await expect(balance).toContainText('Заморожено900 ₴');
   await page.locator('a.prow').first().click();
-  await page.getByLabel('Код клієнта').fill('0000' === code ? '1111' : '0000');
-  await page.getByRole('button', { name: 'Підтвердити кодом' }).click();
-  await expect(page.locator('#toast')).toHaveText('Невірний код');
+  await expect(page.getByLabel('Код клієнта')).toHaveCount(0);
 
-  await page.getByLabel('Код клієнта').fill(code);
-  await page.getByRole('button', { name: 'Підтвердити кодом' }).click();
+  await confirmAfterVisit(page);
+  const card = page.locator('article').first();
+  await expect(card).toContainText('Виконано · гроші заморожені');
+  await expect(card).toContainText('Гроші точці заморожені до 7 жовтня о 21:30');
+
+  // У точки замовлення підтвердилось автоматично, але гроші ще заморожені.
+  await openPartner(page, 'Шиномонтаж «Колесо»');
+  await expect(balance).toContainText('Доступно до виведення0 ₴');
+  await expect(balance).toContainText('Заморожено900 ₴');
+  await expect(balance).toContainText('Найближче розморожування: 900 ₴ — 7 жовтня о 21:30');
+  await expect(page.locator('a.prow').first()).toContainText('Підтверджено · гроші заморожені');
+
+  await page.clock.setFixedTime(new Date(2026, 9, 7, 21, 31));
+  await page.reload();
   await expect(balance).toContainText('Доступно до виведення900 ₴');
+  await expect(balance).toContainText('Заморожено0 ₴');
 
   // 7% від 900 ₴ = 63 ₴, на картку 837 ₴.
   page.once('dialog', (d) => { expect(d.message()).toContain('Комісія 63 ₴'); d.accept(); });
@@ -141,7 +160,23 @@ test('гроші утримуються до коду, а комісія бер�
   await expect(page.getByRole('button', { name: 'Немає коштів для виведення' })).toBeDisabled();
 
   await page.goto('/#/bookings');
-  await expect(page.locator('article').first()).toContainText('Виконано');
+  await expect(card).toContainText('Виконано');
+  await expect(card.getByRole('button', { name: 'Відкрити спір' })).toHaveCount(0);
+});
+
+test('протягом 48 годин після підтвердження можна відкрити спір', async ({ page }) => {
+  await bookTomorrow(page);
+  await confirmAfterVisit(page);
+  page.once('dialog', (d) => d.accept('Залишились подряпини на диску'));
+  await page.getByRole('button', { name: 'Відкрити спір' }).click();
+  await expect(page.locator('article').first()).toContainText('Спір розглядається');
+
+  await openPartner(page, 'Шиномонтаж «Колесо»');
+  await page.getByRole('link', { name: /Модерація спорів/ }).click();
+  await page.getByRole('button', { name: 'Передати точці' }).click();
+  await page.getByRole('link', { name: 'Кабінет точки' }).click();
+  // Рішення модератора остаточне: гроші доступні одразу.
+  await expect(page.getByRole('region', { name: 'Баланс' })).toContainText('Доступно до виведення900 ₴');
 });
 
 test('доплата на місці, спір і рішення модератора', async ({ page }) => {
@@ -171,12 +206,13 @@ test('доплата на місці, спір і рішення модерат�
   await expect(page.getByText('Відкритих спорів немає.')).toBeVisible();
   await page.getByRole('link', { name: 'Кабінет точки' }).click();
   await expect(page.getByRole('region', { name: 'Баланс' })).toContainText('Доступно до виведення0 ₴');
+  await expect(page.getByRole('region', { name: 'Баланс' })).toContainText('Заморожено0 ₴');
 
   await page.goto('/#/bookings');
   await expect(page.locator('article').first()).toContainText('Повернено 1 050 ₴');
 });
 
-test('якщо клієнт мовчить, гроші переходять точці через 24 години', async ({ page }) => {
+test('якщо клієнт мовчить, замовлення підтверджується через 24 години, а гроші — ще через 48', async ({ page }) => {
   await bookTomorrow(page);
   await openJob(page, 'Шиномонтаж «Колесо»');
   await page.getByRole('button', { name: 'Машина готова' }).click();
@@ -185,9 +221,54 @@ test('якщо клієнт мовчить, гроші переходять то
 
   await page.clock.setFixedTime(new Date(2026, 9, 5, 10, 1));
   await page.reload();
-  await expect(page.locator('article').first()).toContainText('Виконано');
+  await expect(page.locator('article').first()).toContainText('Виконано · гроші заморожені');
   await openPartner(page, 'Шиномонтаж «Колесо»');
+  await expect(page.getByRole('region', { name: 'Баланс' })).toContainText('Заморожено900 ₴');
+
+  await page.clock.setFixedTime(new Date(2026, 9, 7, 10, 1));
+  await page.reload();
   await expect(page.getByRole('region', { name: 'Баланс' })).toContainText('Доступно до виведення900 ₴');
+});
+
+test('рейтинг точки складається з відгуків після завершених замовлень', async ({ page }) => {
+  await page.goto('/#/place/koleso');
+  await expect(page.getByText('Ще немає відгуків. Рейтинг зʼявиться після першого завершеного замовлення.')).toBeVisible();
+
+  await bookTomorrow(page);
+  await expect(page.locator('.review-form')).toHaveCount(0);
+  await confirmAfterVisit(page);
+  const card = page.locator('article').first();
+  await card.locator('.star-input label').nth(3).click();
+  await card.getByLabel('Відгук (необовʼязково)').fill('Швидко й акуратно');
+  await card.getByRole('button', { name: 'Надіслати відгук' }).click();
+  await expect(page.locator('#toast')).toHaveText('Дякуємо за відгук!');
+  await expect(card).toContainText('Ваш відгук');
+  await expect(card.getByRole('img', { name: 'Оцінка 4,0 з 5' })).toBeVisible();
+  await expect(card.locator('.review-form')).toHaveCount(0);
+
+  await bookTomorrow(page);
+  await confirmAfterVisit(page, 6);
+  await page.locator('article').first().locator('.star-input label').nth(4).click();
+  await page.locator('article').first().getByRole('button', { name: 'Надіслати відгук' }).click();
+
+  await page.goto('/#/place/koleso');
+  const box = page.locator('.rating-box');
+  await expect(box).toContainText('4,5');
+  await expect(box).toContainText('2 відгуки');
+  await expect(page.locator('.review')).toHaveCount(2);
+  await expect(page.locator('.review').last()).toContainText('Швидко й акуратно');
+  await expect(page.locator('.review').first()).toContainText('Підтверджений візит · Сезонне перевзування (4 колеса)');
+  const { violations } = await new AxeBuilder({ page }).analyze();
+  expect(violations.map((v) => v.id)).toEqual([]);
+
+  await page.goto('/');
+  const first = page.locator('#list article').first();
+  await expect(first).toContainText('Шиномонтаж «Колесо»');
+  await expect(first).toContainText('4,5');
+  await expect(page.locator('#list article').nth(1)).toContainText('Ще немає відгуків');
+
+  await openPartner(page, 'Шиномонтаж «Колесо»');
+  await expect(page.getByRole('link', { name: /Сторінка точки й відгуки/ })).toContainText('Рейтинг 4,5 · 2 відгуки');
 });
 
 test('пізнє скасування й неявка: частина грошей іде точці', async ({ page }) => {
@@ -272,7 +353,7 @@ test('«Машина готова» з фото потрапляє клієнт�
   await expect(card.getByRole('img', { name: 'Фото результату 1' })).toBeVisible();
   await expect(card).toContainText('Літні шини здали на зберігання');
   await card.getByRole('button', { name: 'Усе добре' }).click();
-  await expect(card).toContainText('Виконано');
+  await expect(card).toContainText('Виконано · гроші заморожені');
   await expect(page.locator('.tabs a[data-tab="bookings"]')).not.toHaveAttribute('data-badge');
 
   await page.goto('/#/garage');
