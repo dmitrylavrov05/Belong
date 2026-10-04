@@ -10,11 +10,12 @@ export const CITY = {
   center: { lat: 50.4501, lng: 30.5234 },
 };
 
+// icon — назва лінійної іконки з ICONS в app.js.
 export const CATEGORIES = [
-  { id: 'wash', name: 'Мийка', icon: '🫧' },
-  { id: 'tires', name: 'Шиномонтаж', icon: '🛞' },
-  { id: 'service', name: 'СТО', icon: '🔧' },
-  { id: 'detailing', name: 'Детейлінг', icon: '✨' },
+  { id: 'wash', name: 'Мийка', icon: 'drop' },
+  { id: 'tires', name: 'Шиномонтаж', icon: 'wheel' },
+  { id: 'service', name: 'СТО', icon: 'wrench' },
+  { id: 'detailing', name: 'Детейлінг', icon: 'sparkle' },
 ];
 
 // Ціна залежить від класу авто: [легкове, кросовер, позашляховик/мінівен], у гривнях.

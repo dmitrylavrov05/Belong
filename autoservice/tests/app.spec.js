@@ -11,6 +11,7 @@ test.beforeEach(async ({ page }) => {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
+  page.on('requestfailed', (r) => errors.push(`failed: ${r.url()}`));
   page.errors = errors;
 });
 
@@ -24,7 +25,7 @@ test('каталог фільтрується за категорією, пош�
   await expect(page.getByText('Час на зимову гуму')).toBeVisible();
   await expect(page.locator('#list article')).toHaveCount(9);
 
-  await page.getByRole('button', { name: '🛞 Шиномонтаж' }).click();
+  await page.getByRole('button', { name: 'Шиномонтаж', exact: true }).click();
   await expect(page.locator('#list article')).toHaveCount(4);
 
   await page.getByRole('button', { name: 'Усі', exact: true }).click();
@@ -34,7 +35,7 @@ test('каталог фільтрується за категорією, пош�
 
   await page.getByRole('button', { name: 'В обране: СТО «Мотор»' }).click();
   await page.getByLabel('Пошук').fill('');
-  await page.getByRole('button', { name: '❤️ Обране' }).click();
+  await page.getByRole('button', { name: 'Обране', exact: true }).click();
   await expect(page.locator('#list article')).toHaveCount(1);
 });
 
@@ -110,12 +111,20 @@ async function openPartner(page, name) {
   await page.getByLabel('Точка').selectOption({ label: name });
 }
 
+// Відкриває перший активний запис точки (екран «Запис клієнта»).
+async function openJob(page, name) {
+  await openPartner(page, name);
+  await page.locator('a.prow').first().click();
+  await expect(page.getByRole('heading', { name: 'Запис клієнта' })).toBeVisible();
+}
+
 test('гроші утримуються до коду, а комісія береться під час виведення', async ({ page }) => {
   const code = await bookTomorrow(page);
   await openPartner(page, 'Шиномонтаж «Колесо»');
   const balance = page.getByRole('region', { name: 'Баланс' });
   await expect(balance).toContainText('Утримується до виконання900 ₴');
 
+  await page.locator('a.prow').first().click();
   await page.getByLabel('Код клієнта').fill('0000' === code ? '1111' : '0000');
   await page.getByRole('button', { name: 'Підтвердити кодом' }).click();
   await expect(page.locator('#toast')).toHaveText('Невірний код');
@@ -137,17 +146,17 @@ test('гроші утримуються до коду, а комісія бер�
 
 test('доплата на місці, спір і рішення модератора', async ({ page }) => {
   await bookTomorrow(page);
-  await openPartner(page, 'Шиномонтаж «Колесо»');
+  await openJob(page, 'Шиномонтаж «Колесо»');
   const answers = ['150', 'Шиповані шини R17'];
   page.on('dialog', (d) => d.accept(answers.shift()));
-  await page.getByRole('button', { name: '＋ Доплата' }).click();
+  await page.getByRole('button', { name: 'Доплата', exact: true }).click();
   await expect(page.getByText('Запит на доплату +150 ₴')).toBeVisible();
 
   await page.goto('/#/bookings');
   await page.getByRole('button', { name: 'Погодитися й доплатити' }).click();
   await expect(page.locator('article').first()).toContainText('1 050 ₴');
 
-  await openPartner(page, 'Шиномонтаж «Колесо»');
+  await openJob(page, 'Шиномонтаж «Колесо»');
   await page.getByRole('button', { name: 'Машина готова' }).click();
 
   await page.goto('/#/bookings');
@@ -156,8 +165,11 @@ test('доплата на місці, спір і рішення модерат�
   await expect(page.locator('article').first()).toContainText('Спір розглядається');
 
   await openPartner(page, 'Шиномонтаж «Колесо»');
-  await expect(page.getByText('«Не відбалансували колеса»').first()).toBeVisible();
+  await page.getByRole('link', { name: /Модерація спорів/ }).click();
+  await expect(page.getByText('«Не відбалансували колеса»')).toBeVisible();
   await page.getByRole('button', { name: 'Повернути клієнту' }).click();
+  await expect(page.getByText('Відкритих спорів немає.')).toBeVisible();
+  await page.getByRole('link', { name: 'Кабінет точки' }).click();
   await expect(page.getByRole('region', { name: 'Баланс' })).toContainText('Доступно до виведення0 ₴');
 
   await page.goto('/#/bookings');
@@ -166,7 +178,7 @@ test('доплата на місці, спір і рішення модерат�
 
 test('якщо клієнт мовчить, гроші переходять точці через 24 години', async ({ page }) => {
   await bookTomorrow(page);
-  await openPartner(page, 'Шиномонтаж «Колесо»');
+  await openJob(page, 'Шиномонтаж «Колесо»');
   await page.getByRole('button', { name: 'Машина готова' }).click();
   await page.goto('/#/bookings');
   await expect(page.locator('article').first()).toContainText('Чекає вашого підтвердження');
@@ -192,7 +204,7 @@ test('пізнє скасування й неявка: частина гроше
 
   await bookTomorrow(page);
   await page.clock.setFixedTime(new Date(2026, 9, 5, 22, 0));
-  await openPartner(page, 'Шиномонтаж «Колесо»');
+  await openJob(page, 'Шиномонтаж «Колесо»');
   page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Клієнт не приїхав' }).click();
   await expect(page.getByRole('region', { name: 'Баланс' })).toContainText('Доступно до виведення900 ₴');
@@ -204,14 +216,14 @@ test.describe('поруч зі мною', () => {
 
   test('найближчі точки зверху, з відстанню', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('button', { name: '📍 Поруч' }).click();
-    await expect(page.locator('#count')).toContainText('відстань від вас');
+    await page.getByRole('button', { name: 'Поруч', exact: true }).click();
+    await expect(page.locator('#count')).toContainText('від вас');
     const first = page.locator('#list article').first();
     await expect(first).toContainText('Чисто і швидко');
-    await expect(first.locator('.badge.dist')).toHaveText(/📍 \d+ м/);
+    await expect(first.locator('.badge.dist')).toHaveText(/^\d+ м$/);
     await expect(page.getByLabel('Сортування')).toHaveValue('near');
 
-    await page.getByRole('button', { name: '✨ Детейлінг' }).click();
+    await page.getByRole('button', { name: 'Детейлінг', exact: true }).click();
     await expect(page.locator('#list article')).toHaveCount(2);
     await expect(page.locator('#list article').first()).toContainText('Кераміка Про');
 
@@ -228,7 +240,7 @@ test('без геолокації відстань рахується від ц�
   await page.goto('/');
   await page.getByLabel('Сортування').selectOption('near');
   await expect(page.locator('#toast')).toContainText('від центру Києва');
-  await expect(page.locator('#count')).toContainText('відстань від центру Києва');
+  await expect(page.locator('#count')).toContainText('від центру Києва');
   await expect(page.locator('#list article').first()).toContainText('Автомийка «Блиск»');
 });
 
@@ -245,7 +257,7 @@ async function addCar(page, extra = async () => {}) {
 test('«Машина готова» з фото потрапляє клієнту й у сервісну книжку', async ({ page }) => {
   await addCar(page);
   await bookTomorrow(page);
-  await openPartner(page, 'Шиномонтаж «Колесо»');
+  await openJob(page, 'Шиномонтаж «Колесо»');
   await page.getByLabel(/Додати фото результату/).setInputFiles({ name: 'wheel.png', mimeType: 'image/png', buffer: PIXEL });
   await expect(page.getByText('Обрано фото: 1')).toBeVisible();
   await page.getByLabel('Пробіг, км').fill('84200');
@@ -259,7 +271,7 @@ test('«Машина готова» з фото потрапляє клієнт�
   await expect(card).toContainText('Машина готова!');
   await expect(card.getByRole('img', { name: 'Фото результату 1' })).toBeVisible();
   await expect(card).toContainText('Літні шини здали на зберігання');
-  await card.getByRole('button', { name: '✅ Усе добре' }).click();
+  await card.getByRole('button', { name: 'Усе добре' }).click();
   await expect(card).toContainText('Виконано');
   await expect(page.locator('.tabs a[data-tab="bookings"]')).not.toHaveAttribute('data-badge');
 
@@ -293,11 +305,11 @@ test('сервісна книжка нагадує про шини, оливу �
   expect(violations.map((v) => v.id)).toEqual([]);
 
   await page.locator('.reminder', { hasText: 'Час перевзутися' }).getByRole('link', { name: 'Записатися' }).click();
-  await expect(page.getByRole('button', { name: '🛞 Шиномонтаж' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Шиномонтаж', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#list article')).toHaveCount(4);
 });
 
-for (const path of ['/', '/#/place/motor', '/#/book/blysk', '/#/bookings', '/#/garage', '/#/partner']) {
+for (const path of ['/', '/#/place/motor', '/#/book/blysk', '/#/bookings', '/#/garage', '/#/partner', '/#/disputes']) {
   test(`доступність і верстка: ${path}`, async ({ page }) => {
     await page.goto(path);
     await page.locator('main *').first().waitFor();
