@@ -1,7 +1,7 @@
 import { CITY, CATEGORIES, CAR_CLASSES, PLACES, PAYMENT, MAINTENANCE, REFERRAL } from './data.js';
 import {
   store, icon, esc, uah, pad, hhmm, toMin, isoDate, parseDate, uid, placeById, plural, duration, dayLabel, rating, tel,
-  openRange, isOpenNow, hoursText, bookingStart, fmtTime, fmtDate, km, serviceCat, catById, shrinkPhoto,
+  hoursFor, scheduleOf, inBreak, rangeText, WEEKDAY_NAMES, weekdayOf, phoneKey, offersOf, offerAsService, isOpenNow, hoursText, bookingStart, fmtTime, fmtDate, km, serviceCat, catById, shrinkPhoto,
   applyOverrides, ACTIVE, BLOCKING, HOUR, isCarcar, price, complete, isFrozen, placeShare, balanceFor, settleAll, ratingFor,
 } from './core.js';
 
@@ -25,6 +25,8 @@ function newRefCode() {
   return `CAR${Array.from({ length: 5 }, () => abc[Math.floor(Math.random() * abc.length)]).join('')}`;
 }
 let favs = new Set(store.get('favs', []));
+// Профіль клієнта: імʼя й телефон бачить точка; за телефоном вона показує персональні ціни.
+let profile = store.get('profile', { name: '', phone: '' });
 
 // Записи цього клієнта — те, що він бачить у «Мої записи».
 const mine = () => bookings.filter((b) => !b.source);
@@ -98,10 +100,14 @@ function setSort(value) {
   renderList();
 }
 
-// Вільні вікна: крок 30 хвилин. Вікно зайняте, якщо в клієнта тут уже є свій запис
+// Вільні вікна за графіком точки, крок 30 хвилин. Вікно зайняте, якщо до нього менше
+// мінімального часу запису, воно потрапляє на перерву, у клієнта тут уже є свій запис
 // або на цей час не лишилося вільних боксів за журналом точки (записи CARCAR і з CRM).
 function slotsFor(place, date, minutes) {
-  const [open, close] = openRange(place);
+  const hours = hoursFor(place, date);
+  if (!hours) return [];
+  const [open, close] = hours;
+  const { lead } = scheduleOf(place);
   const now = new Date();
   const today = date === isoDate(now);
   const nowMin = now.getHours() * 60 + now.getMinutes();
@@ -113,7 +119,8 @@ function slotsFor(place, date, minutes) {
   for (let t = open; t + minutes <= close; t += 30) {
     const overlaps = (list) => list.filter(([s, e]) => t < e && t + minutes > s).length;
     const busy =
-      (today && t < nowMin + 30) ||
+      (today && t < nowMin + lead) ||
+      inBreak(place, t, minutes) ||
       overlaps(own) > 0 ||
       overlaps(all) >= place.boxes;
     slots.push({ time: hhmm(t), busy });
@@ -125,6 +132,16 @@ function nextDays(n = 7) {
   const d = new Date();
   return Array.from({ length: n }, (_, i) => isoDate(new Date(d.getFullYear(), d.getMonth(), d.getDate() + i)));
 }
+
+// Дні, на які можна записатися, — на стільки вперед, скільки дозволяє точка.
+const bookingDays = (p) => nextDays(scheduleOf(p).horizon);
+const firstOpenDay = (p) => bookingDays(p).find((d) => hoursFor(p, d)) ?? bookingDays(p)[0];
+
+// Ключі, за якими точка знає цього клієнта: телефон із профілю й авто з гаража.
+const myKeys = () => [phoneKey(profile.phone), ...cars.map((c) => `car:${carLabel(c)}`)].filter(Boolean);
+const personalFor = (p) => offersOf(p.id).filter((o) => myKeys().includes(o.clientKey)).map(offerAsService);
+// Усе, що клієнт може замовити в точці: спершу персональні послуги, далі прайс.
+const bookable = (p) => [...personalFor(p), ...p.services];
 
 function toast(text) {
   const el = $('#toast');
@@ -349,6 +366,18 @@ function ratingSummary(placeId) {
   </div>`;
 }
 
+// Графік точки на тиждень, перерва й найближчі особливі дні — щоб клієнт бачив актуальні години.
+function scheduleBlock(p) {
+  const s = scheduleOf(p);
+  const today = weekdayOf(isoDate(new Date()));
+  const special = Object.entries(s.special).filter(([d]) => bookingDays(p).includes(d)).sort();
+  return `<div class="list hours-list">${s.week.map((h, i) => `<div class="item${i === today ? ' today' : ''}">
+      <span class="name">${WEEKDAY_NAMES[i]}${i === today ? ' <small style="display:inline">· сьогодні</small>' : ''}</span><span>${rangeText(h)}</span></div>`).join('')}</div>
+    ${s.brk ? `<p class="small muted">Перерва щодня ${rangeText(s.brk)}.</p>` : ''}
+    ${special.length ? `<p class="small muted">${special.map(([d, h]) => `${dayLabel(d, { day: 'numeric', month: 'long' })} — ${h ? rangeText(h) : 'не працюємо'}`).join('; ')}.</p>` : ''}
+    <p class="small muted">Записатися можна на ${s.horizon} ${plural(s.horizon, 'день', 'дні', 'днів')} уперед${s.lead ? `, не пізніше ніж за ${duration(s.lead)} до початку` : ''}.</p>`;
+}
+
 function viewPlace(id) {
   const p = placeById(id);
   if (!p) return viewNotFound();
@@ -376,7 +405,12 @@ function viewPlace(id) {
         <a class="btn" href="${maps}" target="_blank" rel="noopener">${icon('route', 18)}Маршрут</a>
       </div>
     </div>
-    <nav class="jump" aria-label="Розділи сторінки"><a href="#/place/${p.id}" data-jump="services">Послуги та ціни</a><a href="#/place/${p.id}" data-jump="reviews">Відгуки${list.length ? ` (${list.length})` : ''}</a></nav>
+    <nav class="jump" aria-label="Розділи сторінки"><a href="#/place/${p.id}" data-jump="services">Послуги</a><a href="#/place/${p.id}" data-jump="hours">Графік</a><a href="#/place/${p.id}" data-jump="reviews">Відгуки${list.length ? ` (${list.length})` : ''}</a></nav>
+    ${personalFor(p).length ? `<h2 class="big">Тільки для вас</h2>
+      <p class="small muted" style="margin:-6px 0 0">Персональні послуги й ціни, які точка підготувала саме для вас.</p>
+      <div class="list personal-list" style="margin-top:10px">${personalFor(p).map((s) => `<div class="item">
+        <span class="name"><span class="badge personal">Для вас</span> ${esc(s.name)}<small>${duration(s.min)}${s.note ? ` · ${esc(s.note)}` : ''}</small></span>
+        <span class="price">${uah(s.price[0])}</span></div>`).join('')}</div>` : ''}
     <h2 class="big" id="services">Послуги та ціни</h2>
     <p class="small muted" style="margin:-6px 0 0">Ціни для класу «${CAR_CLASSES[ui.cls]}». Остаточну вартість майстер підтвердить на місці.</p>
     ${groups.map(([c, items]) => `
@@ -387,6 +421,8 @@ function viewPlace(id) {
           <span class="price">${uah(s.price[ui.cls])}</span>
         </div>`).join('')}
       </div>`).join('')}
+    <h2 class="big" id="hours">Графік роботи</h2>
+    ${scheduleBlock(p)}
     <h2 class="big" id="reviews">Рейтинг і відгуки</h2>
     ${ratingSummary(p.id)}
     <p class="small muted">Залишити відгук можна лише після завершеного замовлення через CARCAR, тому кожен відгук — від реального клієнта.</p>
@@ -406,7 +442,7 @@ function viewBook(id) {
   const p = placeById(id);
   if (!p) return viewNotFound();
   if (!draft || draft.placeId !== id) {
-    draft = { placeId: id, services: new Set(), date: nextDays()[0], time: null, carId: cars[0]?.id ?? null };
+    draft = { placeId: id, services: new Set(), date: firstOpenDay(p), time: null, carId: cars[0]?.id ?? null };
   }
   return `${back(`#/place/${p.id}`, p.name)}
     <h1>Запис</h1>
@@ -416,7 +452,8 @@ function viewBook(id) {
 function renderBook() {
   const p = placeById(draft.placeId);
   const cls = draftClass();
-  const chosen = p.services.filter((s) => draft.services.has(s.id));
+  const list = bookable(p);
+  const chosen = list.filter((s) => draft.services.has(s.id));
   const minutes = chosen.reduce((a, s) => a + s.min, 0);
   const total = chosen.reduce((a, s) => a + s.price[cls], 0);
   const bonus = draft.useBonus !== false ? bonusFor(total) : 0;
@@ -437,23 +474,25 @@ function renderBook() {
 
     <h2>2. Послуги</h2>
     <div class="list">
-      ${p.services.map((s) => `<label class="item">
+      ${list.map((s) => `<label class="item">
         <input class="check" type="checkbox" data-action="svc" value="${s.id}" ${draft.services.has(s.id) ? 'checked' : ''}>
-        <span class="name">${esc(s.name)}<small>${duration(s.min)}</small></span>
+        <span class="name">${s.personal ? '<span class="badge personal">Для вас</span> ' : ''}${esc(s.name)}<small>${duration(s.min)}${s.note ? ` · ${esc(s.note)}` : ''}</small></span>
         <span class="price">${uah(s.price[cls])}</span>
       </label>`).join('')}
     </div>
 
     <h2>3. День і час</h2>
     <div class="days" role="group" aria-label="День">
-      ${nextDays().map((d, i) => {
+      ${bookingDays(p).map((d, i) => {
         const date = parseDate(d);
         const wd = i === 0 ? 'Сьогодні' : i === 1 ? 'Завтра' : date.toLocaleDateString('uk-UA', { weekday: 'short' });
-        return `<button class="day" data-action="day" data-date="${d}" aria-pressed="${d === draft.date}">
-          <span>${wd}</span><b>${date.getDate()}</b><span>${date.toLocaleDateString('uk-UA', { month: 'short' })}</span>
+        const closed = !hoursFor(p, d);
+        return `<button class="day${closed ? ' closed' : ''}" data-action="day" data-date="${d}" aria-pressed="${d === draft.date}" ${closed ? `disabled aria-label="${wd}, ${date.getDate()}, вихідний"` : ''}>
+          <span>${wd}</span><b>${date.getDate()}</b><span>${closed ? 'вихідний' : date.toLocaleDateString('uk-UA', { month: 'short' })}</span>
         </button>`;
       }).join('')}
     </div>
+    ${hoursFor(p, draft.date) ? `<p class="small muted" style="margin:8px 0 0">Працюємо ${rangeText(hoursFor(p, draft.date))}${scheduleOf(p).brk ? `, перерва ${rangeText(scheduleOf(p).brk)}` : ''}</p>` : ''}
     ${!minutes
       ? '<p class="muted">Оберіть послуги, щоб побачити вільний час.</p>'
       : free.length
@@ -479,7 +518,11 @@ function renderBook() {
         <button class="btn primary block" data-action="pay">${icon('card', 20)}Оплатити ${uah(total - bonus)}</button>
         <button class="btn block" data-action="unpay">Назад</button>
       </div>
-      <p class="demo">Демо-оплата: гроші не списуються.</p>
+      <div class="grid2 pf">
+        <label class="field"><span>Ваше імʼя</span><input id="pf-name" autocomplete="name" value="${esc(draft.pfName ?? profile.name)}"></label>
+        <label class="field"><span>Телефон</span><input id="pf-phone" type="tel" autocomplete="tel" placeholder="+380" value="${esc(draft.pfPhone ?? profile.phone)}"></label>
+      </div>
+      <p class="demo">Імʼя й телефон бачить лише точка — щоб звʼязатися й показувати вам персональні ціни. Демо-оплата: гроші не списуються.</p>
     </div>` : `<div class="dock summary">
       <div class="total"><span>${chosen.length ? `${chosen.length} ${plural(chosen.length, 'послуга', 'послуги', 'послуг')} · ${duration(minutes)}` : 'Нічого не обрано'}</span><span>${uah(total)}</span></div>
       <button class="btn primary block" data-action="confirm" ${chosen.length && draft.time ? '' : 'disabled'}>
@@ -491,8 +534,11 @@ function renderBook() {
 function confirmBooking() {
   const p = placeById(draft.placeId);
   const cls = draftClass();
-  const chosen = p.services.filter((s) => draft.services.has(s.id));
+  const chosen = bookable(p).filter((s) => draft.services.has(s.id));
   const car = cars.find((c) => c.id === draft.carId);
+  // Імʼя й телефон з форми оплати зберігаємо в профіль, щоб наступного разу не вводити.
+  profile = { name: (draft.pfName ?? profile.name).trim(), phone: (draft.pfPhone ?? profile.phone).trim() };
+  store.set('profile', profile);
   const total = chosen.reduce((a, s) => a + s.price[cls], 0);
   const bonus = draft.useBonus !== false ? bonusFor(total) : 0;
   const b = {
@@ -507,6 +553,11 @@ function confirmBooking() {
     time: draft.time,
     car: car ? carLabel(car) : CAR_CLASSES[cls],
     carId: car?.id ?? null,
+    plate: car?.plate ?? '',
+    cls,
+    clientName: profile.name,
+    clientPhone: profile.phone,
+    personal: chosen.filter((x) => x.personal).map((x) => x.id),
     state: 'paid',
     createdAt: Date.now(),
   };
@@ -634,6 +685,7 @@ function bookingCard(b, highlight) {
       </div>
       <div class="notice ok">${icon('checkCircle', 22)}<div><b>Машина готова!</b>Перевірте результат і підтвердіть або відкрийте спір до
         ${fmtTime(b.doneAt + PAYMENT.autoReleaseHours * HOUR)}, інакше замовлення підтвердиться автоматично.</div></div>
+      ${b.remindedAt ? `<p class="small muted" style="margin:0">Точка нагадала ${fmtTime(b.remindedAt)}: підтвердьте виконання, щоб вона отримала оплату.</p>` : ''}
       ${result(b)}
       ${confirmBtns('Усе добре')}`;
   } else if (b.state === 'dispute') {
@@ -841,7 +893,16 @@ function carForm(id, fields, submit) {
 
 function viewGarage() {
   return `<h1>Гараж</h1>
-    <p class="lead">Сервісна книжка кожного авто: історія обслуговування, пробіг і нагадування.</p>
+    <form class="card profile-card" id="profileform">
+      <h2 class="car-name">Ваш профіль</h2>
+      <p class="small muted" style="margin:0">Імʼя й телефон бачить точка, до якої ви записуєтесь. За телефоном вона може підготувати для вас персональні послуги й ціни.</p>
+      <div class="grid2">
+        <label class="field"><span>Імʼя</span><input name="name" autocomplete="name" value="${esc(profile.name)}"></label>
+        <label class="field"><span>Телефон</span><input name="phone" type="tel" autocomplete="tel" placeholder="+380" value="${esc(profile.phone)}"></label>
+      </div>
+      <button class="btn" type="submit">Зберегти профіль</button>
+    </form>
+    <p class="lead" style="margin-top:16px">Сервісна книжка кожного авто: історія обслуговування, пробіг і нагадування.</p>
     <div class="stack">
       ${cars.map((c) => {
         const due = reminders(c).filter((r) => r.level === 'due');
@@ -1112,8 +1173,8 @@ document.addEventListener('click', (e) => {
     const p = placeById(b.placeId);
     draft = {
       placeId: p.id,
-      services: new Set(p.services.filter((s) => b.services.includes(s.name)).map((s) => s.id)),
-      date: nextDays()[0], time: null, carId: cars[0]?.id ?? null,
+      services: new Set(bookable(p).filter((s) => b.services.includes(s.name)).map((s) => s.id)),
+      date: firstOpenDay(p), time: null, carId: cars[0]?.id ?? null,
     };
   } else if (action === 'delcar') {
     if (!confirm('Видалити авто разом із сервісною книжкою?')) return;
@@ -1154,6 +1215,8 @@ document.addEventListener('change', (e) => {
 
 document.addEventListener('input', (e) => {
   if (e.target.id === 'q') { ui.q = e.target.value; renderList(); }
+  if (e.target.id === 'pf-name') draft.pfName = e.target.value;
+  if (e.target.id === 'pf-phone') draft.pfPhone = e.target.value;
 });
 
 document.addEventListener('submit', (e) => {
@@ -1173,6 +1236,14 @@ document.addEventListener('submit', (e) => {
     save();
     route();
     toast('Дякуємо за відгук!');
+    return;
+  }
+  if (e.target.id === 'profileform') {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    profile = { name: f.get('name').trim(), phone: f.get('phone').trim() };
+    store.set('profile', profile);
+    toast('Профіль збережено');
     return;
   }
   if (e.target.id === 'kmform' || e.target.id === 'logform') {

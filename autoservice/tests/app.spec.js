@@ -84,7 +84,7 @@ test('авто з гаража задає ціни під час запису', 
   await page.getByLabel('Марка').fill('Toyota');
   await page.getByLabel('Модель').fill('Land Cruiser');
   await page.getByLabel('Клас').selectOption('2');
-  await page.getByRole('button', { name: 'Зберегти' }).click();
+  await page.getByRole('button', { name: 'Зберегти', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Toyota Land Cruiser' })).toBeVisible();
 
   await page.reload();
@@ -422,7 +422,7 @@ async function addCar(page, extra = async () => {}) {
   await page.getByLabel('Марка').fill('Skoda');
   await page.getByLabel('Модель').fill('Octavia');
   await extra();
-  await page.getByRole('button', { name: 'Зберегти' }).click();
+  await page.getByRole('button', { name: 'Зберегти', exact: true }).click();
 }
 
 test('«Машина готова» з фото потрапляє клієнту й у сервісну книжку', async ({ page }) => {

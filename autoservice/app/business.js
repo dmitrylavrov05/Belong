@@ -4,19 +4,23 @@
 import { CATEGORIES, CAR_CLASSES, PLACES, PAYMENT } from './data.js';
 import {
   store, icon, esc, uah, pad, hhmm, toMin, isoDate, parseDate, uid, placeById, plural, duration, dayLabel, rating,
-  fmtTime, fmtDate, hash, openRange, bookingStart, serviceCat, catById, shrinkPhoto, applyOverrides, saveOverride,
+  fmtTime, fmtDate, hash, bookingStart, hoursFor, scheduleOf, widestRange, inBreak, rangeText, WEEKDAYS, WEEKDAY_NAMES,
+  weekdayOf, phoneKey, offersOf, offerAsService, EXPENSE_CATS, PAY_METHODS, expensesIn, serviceCat, catById, shrinkPhoto, applyOverrides, saveOverride,
   ACTIVE, BLOCKING, HOUR, isCarcar, price, isFrozen, balanceFor, settleAll, ratingFor,
 } from './core.js';
 
 // ---------- дані ----------
 
-let bookings, payouts, reviews, crm;
+let bookings, payouts, reviews, crm, offers, expenses;
 
 function load() {
   bookings = store.get('bookings', []);
   payouts = store.get('payouts', []);
   reviews = store.get('reviews', []);
-  crm = store.get('biz.clients', {}); // нотатки й мітки клієнтів: { placeId: { clientKey: { note, tags } } }
+  // Картки клієнтів: { placeId: { clientKey: { name, phone, cars, email, note, tags } } }
+  crm = store.get('biz.clients', {});
+  offers = store.get('biz.offers', []); // персональні послуги й ціни
+  expenses = store.get('biz.expenses', []); // витрати: разові й щомісячні
   applyOverrides();
   if (settleAll(bookings)) save();
 }
@@ -26,11 +30,13 @@ function save() {
   store.set('payouts', payouts);
   store.set('reviews', reviews);
   store.set('biz.clients', crm);
+  store.set('biz.offers', offers);
+  store.set('biz.expenses', expenses);
 }
 
 load();
 
-const ui = { place: store.get('partner', null), period: 30, clients: 'all', q: '', sort: 'last', svcDraft: null };
+const ui = { place: store.get('partner', null), period: 30, finPeriod: 30, expPeriod: 30, clients: 'all', q: '', sort: 'last', svcDraft: null, imp: { type: 'clients', text: '', rows: null, map: {}, result: null } };
 if (!placeById(ui.place)) ui.place = PLACES[0].id;
 
 const place = () => placeById(ui.place);
@@ -61,7 +67,7 @@ function revenue(b) {
   return 0;
 }
 
-const CHANNEL = { carcar: 'CARCAR', phone: 'Телефон', walkin: 'З вулиці' };
+const CHANNEL = { carcar: 'CARCAR', phone: 'Телефон', walkin: 'З вулиці', other: 'Інше / імпорт' };
 const channelOf = (b) => b.channel ?? 'carcar';
 const channelPill = (b) => `<span class="pill ${isCarcar(b) ? 'carcar' : 'cash'}"><i></i>${CHANNEL[channelOf(b)]}</span>`;
 
@@ -79,12 +85,15 @@ const statusPill = (b) => `<span class="pill ${STATUS[b.state][1]}">${STATUS[b.s
 
 // Клієнт: за телефоном (CRM), за авто з гаража (CARCAR) або окремий анонімний запис.
 function clientKey(b) {
-  if (b.clientPhone) return `tel:${b.clientPhone.replace(/\D/g, '')}`;
+  if (b.clientPhone) return phoneKey(b.clientPhone);
   if (b.carId) return `car:${b.car}`;
   return `anon:${b.id}`;
 }
 const clientName = (b) => b.clientName || 'Клієнт CARCAR';
-const clientMeta = (key) => crm[ui.place]?.[key] ?? { note: '', tags: [] };
+const clientMeta = (key) => ({ note: '', tags: [], ...crm[ui.place]?.[key] });
+function setMeta(key, patch) {
+  crm[ui.place] = { ...crm[ui.place], [key]: { ...clientMeta(key), ...patch } };
+}
 
 // ---------- аналітика ----------
 
@@ -94,6 +103,17 @@ function rangeOf(n, back = 0) {
 }
 const inRange = (b, [s, e]) => b.date >= s && b.date <= e;
 
+// Скільки хвилин боксів було доступно за проміжок за графіком: робочі години мінус перерва.
+function capacity(p, [from, to]) {
+  const brk = scheduleOf(p).brk;
+  let total = 0;
+  for (let d = from; d <= to; d = addDays(d, 1)) {
+    const h = hoursFor(p, d);
+    if (h) total += (h[1] - h[0] - (brk ? Math.max(0, Math.min(h[1], brk[1]) - Math.max(h[0], brk[0])) : 0)) * p.boxes;
+  }
+  return total;
+}
+
 function statsFor(range) {
   const p = place();
   const list = own().filter((b) => inRange(b, range) && happened(b));
@@ -101,8 +121,6 @@ function statsFor(range) {
   const rev = list.reduce((a, b) => a + revenue(b), 0);
   const viaCarcar = list.filter(isCarcar).reduce((a, b) => a + revenue(b), 0);
   const lost = list.filter((b) => b.state === 'cancelled' || b.state === 'noshow').length;
-  const [o, c] = openRange(p);
-  const days = Math.round((parseDate(range[1]) - parseDate(range[0])) / 864e5) + 1;
   const busy = list.filter((b) => b.state !== 'cancelled' && b.state !== 'refunded').reduce((a, b) => a + b.minutes, 0);
   const first = new Map();
   for (const b of own()) {
@@ -116,7 +134,7 @@ function statsFor(range) {
     rev, viaCarcar, cash: rev - viaCarcar, count: done.length,
     avg: done.length ? done.reduce((a, b) => a + revenue(b), 0) / done.length : 0,
     lostPct: list.length ? (lost / list.length) * 100 : 0,
-    load: ((busy / ((c - o) * p.boxes * days)) * 100) || 0,
+    load: ((busy / capacity(p, range)) * 100) || 0,
     clients: keys.size, fresh, returning: keys.size - fresh,
   };
 }
@@ -154,9 +172,9 @@ function drawColumns(el, spec) {
   const L = 52, R = 6, T = 10, B = 26;
   const n = spec.cats.length;
   const sums = spec.cats.map((c) => c.values.reduce((a, v) => a + v, 0));
-  const max = niceMax(Math.max(...sums, 0));
+  const max = niceMax(Math.max(...(spec.grouped ? spec.cats.flatMap((c) => c.values) : sums), 0));
   const band = (W - L - R) / n;
-  const bw = Math.max(2, Math.min(24, band * 0.66));
+  const bw = Math.max(2, Math.min(spec.grouped ? 40 : 24, band * (spec.grouped ? 0.76 : 0.66)));
   const y = (v) => T + (H - T - B) * (1 - v / max);
   const every = Math.ceil(n / Math.max(1, Math.floor((W - L) / 56)));
   let g = '<g class="grid">';
@@ -170,7 +188,15 @@ function drawColumns(el, spec) {
   spec.cats.forEach((c, i) => {
     const x = L + band * i + (band - bw) / 2;
     let base = H - B;
-    c.values.forEach((v, s) => {
+    // Згруповані стовпчики стоять поруч із проміжком 2 px; складені — один над одним.
+    if (spec.grouped) {
+      const k = c.values.length;
+      const w = Math.max(1, (bw - 2 * (k - 1)) / k);
+      c.values.forEach((v, s) => {
+        const h = (H - T - B) * (v / max);
+        if (h > 0) marks += `<path class="s${s + 1}" d="${topRound(x + s * (w + 2), H - B - h, w, h)}"/>`;
+      });
+    } else c.values.forEach((v, s) => {
       if (v <= 0) return;
       const h = (H - T - B) * (v / max) - (base < H - B ? 2 : 0);
       if (h <= 0) return;
@@ -183,7 +209,8 @@ function drawColumns(el, spec) {
     });
     if (i % every === 0) marks += `<text class="axis" x="${x + bw / 2}" y="${H - 8}" text-anchor="middle">${esc(c.short ?? c.label)}</text>`;
     const tip = { t: c.label, r: spec.series.map((s, k) => [`s${k + 1}`, spec.fmt(c.values[k]), s]) };
-    if (spec.series.length > 1) tip.r.push(['', spec.fmt(sums[i]), 'Разом']);
+    if (spec.grouped) tip.r.push(['', spec.fmt(c.values[0] - c.values[1]), 'Різниця']);
+    else if (spec.series.length > 1) tip.r.push(['', spec.fmt(sums[i]), 'Разом']);
     const aria = `${c.label}: ${spec.series.map((s, k) => `${s} ${spec.fmt(c.values[k])}`).join(', ')}`;
     hits += `<rect class="hit" role="img" tabindex="0" aria-label="${esc(aria)}" data-tip="${esc(JSON.stringify(tip))}" x="${L + band * i}" y="${T}" width="${band}" height="${H - T - B}"/>`;
   });
@@ -292,7 +319,7 @@ function viewOverview() {
 
   // Записи за годинами початку (виконані за період).
   const doneInRange = own().filter((b) => inRange(b, [from, to]) && b.state === 'completed');
-  const [o, c] = openRange(p);
+  const [o, c] = widestRange(p);
   const hours = [];
   for (let h = Math.floor(o / 60); h < Math.ceil(c / 60); h++) hours.push(h);
   const byHour = hours.map((h) => ({ label: `${pad(h)}:00–${pad(h + 1)}:00`, short: `${h}`, values: [doneInRange.filter((b) => Math.floor(toMin(b.time) / 60) === h).length] }));
@@ -407,7 +434,9 @@ function layoutDay(list, boxes) {
 
 function viewSchedule(day = today()) {
   const p = place();
-  const [o, c] = openRange(p);
+  const hours = hoursFor(p, day);
+  const [o, c] = hours ?? widestRange(p);
+  const brk = scheduleOf(p).brk;
   const list = own().filter((b) => b.date === day && b.state !== 'cancelled' && b.state !== 'refunded');
   const { placed, overflow } = layoutDay(list, p.boxes);
   const cols = p.boxes + (overflow.length ? 1 : 0);
@@ -439,9 +468,11 @@ function viewSchedule(day = today()) {
     </div>
     <div class="day-stats">
       <span>Записів: <b>${list.length}</b></span>
-      <span>Завантаженість: <b>${pct((busy / ((c - o) * p.boxes)) * 100)}</b></span>
+      <span>Графік: <b>${rangeText(hours)}</b>${brk && hours ? `, перерва ${rangeText(brk)}` : ''}</span>
+      ${hours ? `<span>Завантаженість: <b>${pct((busy / capacity(p, [day, day])) * 100)}</b></span>` : ''}
       <span>Через CARCAR: <b>${list.filter(isCarcar).length}</b></span>
     </div>
+    ${hours ? '' : `<p class="notice warn">За графіком це вихідний день — клієнти не можуть записатися. Змінити графік можна в <a href="#/settings">профілі точки</a>.</p>`}
     <div class="sched" tabindex="0" role="region" aria-label="Журнал по боксах">
       <div class="sched-grid" style="grid-template-columns:64px repeat(${cols}, minmax(150px, 1fr))">
         <div class="sched-col-head"></div>
@@ -449,6 +480,7 @@ function viewSchedule(day = today()) {
         ${overflow.length ? '<div class="sched-col-head">Понад місткість</div>' : ''}
         <div class="sched-times" style="height:${height}px">${times.join('')}</div>
         ${Array.from({ length: p.boxes }, (_, i) => `<div class="sched-col" style="height:${height}px;${colBg}">
+          ${brk && hours ? `<div class="break-block" style="top:${((brk[0] - o) / 30) * ROW}px;height:${((brk[1] - brk[0]) / 30) * ROW}px">Перерва</div>` : ''}
           ${day === today() && nowMin >= o && nowMin <= c ? `<div class="now-line" style="top:${((nowMin - o) / 30) * ROW}px"></div>` : ''}
           ${placed.filter(([, k]) => k === i).map(([b]) => block(b)).join('')}</div>`).join('')}
         ${overflow.length ? `<div class="sched-col" style="height:${height}px;${colBg}">${overflow.map(block).join('')}</div>` : ''}
@@ -477,7 +509,17 @@ function clientsList() {
     if (BLOCKING.includes(b.state) && !isPast(b)) c.upcoming++;
     map.set(k, c);
   }
-  return [...map.values()].map((c) => ({ ...c, meta: clientMeta(c.key), main: Object.entries(c.channels).sort((a, b) => b[1] - a[1])[0][0] }));
+  // Клієнти, додані вручну чи імпортовані, — навіть без жодного запису.
+  for (const [k, m] of Object.entries(crm[ui.place] ?? {})) {
+    if (!map.has(k) && (m.name || m.phone)) map.set(k, { key: k, name: m.name || m.phone, phone: m.phone ?? '', cars: new Set(), visits: 0, spent: 0, last: '', first: '', upcoming: 0, channels: {}, list: [] });
+  }
+  return [...map.values()].map((c) => {
+    const meta = clientMeta(c.key);
+    for (const car of meta.cars ?? []) c.cars.add(car);
+    // Імпортована історія без суми: враховуємо витрачене з картки клієнта.
+    if (!c.visits && meta.visits) Object.assign(c, { visits: meta.visits, spent: meta.spent ?? 0, last: meta.last ?? '' });
+    return { ...c, name: meta.name || c.name, phone: c.phone || meta.phone || '', meta, main: Object.entries(c.channels).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'other' };
+  });
 }
 
 const daysSince = (iso) => Math.round((parseDate(today()) - parseDate(iso)) / 864e5);
@@ -507,7 +549,7 @@ function clientRows() {
   const list = filteredClients();
   if (!list.length) return '<tr><td colspan="7" class="muted">Нікого не знайдено.</td></tr>';
   return list.map((c) => `<tr class="link-row" data-href="#/clients/${encodeURIComponent(c.key)}">
-    <td><a class="row-link" href="#/clients/${encodeURIComponent(c.key)}">${esc(c.name)}</a><small>${esc(c.phone || 'через CARCAR')}</small></td>
+    <td><a class="row-link" href="#/clients/${encodeURIComponent(c.key)}">${esc(c.name)}</a><small>${esc(c.phone || (c.key.startsWith('car:') ? 'через CARCAR' : '—'))}</small></td>
     <td>${esc([...c.cars].join(', ') || '—')}</td>
     <td class="num">${c.visits}</td>
     <td class="num">${uah(c.spent)}</td>
@@ -529,6 +571,8 @@ function viewClients() {
         <option value="name" ${ui.sort === 'name' ? 'selected' : ''}>За імʼям</option>
       </select>
       <button class="btn" data-action="export-clients">${icon('download', 18)}Експорт CSV</button>
+      <a class="btn" href="#/import">${icon('upload', 18)}Імпорт</a>
+      <button class="btn primary" data-action="client-new">${icon('plus', 18)}Новий клієнт</button>
     </div>
     <div class="filters">
       <div class="seg" role="group" aria-label="Сегмент">
@@ -545,9 +589,11 @@ function viewClient(key) {
   const c = clientsList().find((x) => x.key === key);
   if (!c) return `<a class="back" href="#/clients">${icon('chevL', 22)}Клієнти</a><p>Клієнта не знайдено.</p>`;
   const hist = [...c.list].sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+  const telLink = c.phone ? `<a href="tel:${esc(c.phone.replace(/[^+\d]/g, ''))}">${esc(c.phone)}</a>` : '';
   return `<a class="back" href="#/clients">${icon('chevL', 22)}Клієнти</a>
-    <h1>${esc(c.name)}</h1>
-    <p class="page-sub">${c.phone ? `<a href="tel:${esc(c.phone.replace(/[^+\d]/g, ''))}">${esc(c.phone)}</a> · ` : 'Клієнт CARCAR · '}${esc([...c.cars].join(', ') || 'авто не вказано')}</p>
+    <div class="title-row"><h1>${esc(c.name)}</h1>
+      <button class="btn" data-action="client-edit" data-key="${esc(key)}">Редагувати</button></div>
+    <p class="page-sub">${telLink ? `${telLink} · ` : c.list.some(isCarcar) ? 'Клієнт CARCAR · ' : ''}${esc([...c.cars].join(', ') || 'авто не вказано')}${c.meta.email ? ` · ${esc(c.meta.email)}` : ''}</p>
     <section class="kpis" aria-label="Показники клієнта">
       <div class="kpi"><span class="label">Візитів</span><span class="value">${c.visits}</span></div>
       <div class="kpi"><span class="label">Витрачено</span><span class="value">${uah(c.spent)}</span></div>
@@ -572,12 +618,72 @@ function viewClient(key) {
         </div>
       </section>
     </div>
+    ${offersPanel(c)}
     <h2 class="biz-h2">Історія візитів</h2>
-    <div class="table-wrap" tabindex="0" role="region" aria-label="Історія візитів"><table class="t">
+    ${hist.length ? `<div class="table-wrap" tabindex="0" role="region" aria-label="Історія візитів"><table class="t">
       <thead><tr><th>Дата</th><th>Послуги</th><th>Канал</th><th>Статус</th><th class="num">Сума</th></tr></thead>
       <tbody>${hist.map((b) => `<tr class="link-row" data-action="open-booking" data-id="${b.id}"><td>${dayLabel(b.date, { day: 'numeric', month: 'short', year: 'numeric' })}, ${b.time}</td>
         <td>${esc(b.services.join(', '))}</td><td>${channelPill(b)}</td><td>${statusPill(b)}</td><td class="num">${uah(isCarcar(b) ? price(b) : b.paid)}</td></tr>`).join('')}</tbody>
-    </table></div>`;
+    </table></div>` : '<p class="muted">Записів ще не було.</p>'}`;
+}
+
+// Персональні послуги клієнта: окрема ціна або послуга, якої немає в загальному прайсі.
+function offersPanel(c) {
+  const list = offers.filter((o) => o.placeId === ui.place && o.clientKey === c.key);
+  const canSee = c.key.startsWith('tel:')
+    ? 'Клієнт побачить їх у застосунку CARCAR на сторінці точки, якщо в його профілі вказано цей телефон. Ви також можете записати його на них самі.'
+    : c.key.startsWith('car:')
+      ? 'Клієнт побачить їх у застосунку CARCAR на сторінці точки — вони привʼязані до його авто з гаража.'
+      : 'Додайте клієнту телефон (кнопка «Редагувати»), щоб він бачив персональні послуги в застосунку.';
+  return `<section class="panel" aria-labelledby="h-offers" style="margin-top:16px">
+    <div class="head"><h2 id="h-offers">Персональні послуги й ціни</h2>
+      <button class="btn" data-action="offer-add" data-key="${esc(c.key)}">${icon('plus', 18)}Додати персональну послугу</button></div>
+    <p class="sub">${canSee}</p>
+    ${list.length ? `<ul class="offer-list">${list.map((o) => `<li class="${o.active === false ? 'off' : ''}">
+      <span class="name"><b>${esc(o.name)}</b><small>${duration(o.min)} · ${esc(catById(o.cat)?.name ?? '')}${o.base ? ` · у прайсі ${uah(o.base)}` : ''}${o.note ? ` · ${esc(o.note)}` : ''}</small></span>
+      <b class="price">${uah(o.price)}</b>
+      <label class="row small" style="gap:6px"><input class="check" type="checkbox" data-action="offer-toggle" data-id="${o.id}" ${o.active === false ? '' : 'checked'} aria-label="Активна: ${esc(o.name)}">Активна</label>
+      <button class="icon-btn" data-action="offer-del" data-id="${o.id}" aria-label="Видалити: ${esc(o.name)}">${icon('x', 18)}</button>
+    </li>`).join('')}</ul>` : '<p class="muted" style="margin:0">Персональних послуг ще немає. Наприклад, знижка постійному клієнту на комплекс або окрема ціна за нестандартне авто.</p>'}
+  </section>`;
+}
+
+function offerDrawer(key) {
+  const p = place();
+  openDrawer('Персональна послуга', `<form class="stack" id="offer-form" data-key="${esc(key)}" style="gap:14px">
+    <label class="field"><span>Основа</span><select name="base">
+      <option value="">Своя послуга</option>
+      ${p.services.map((s) => `<option value="${s.id}">${esc(s.name)} — ${uah(s.price[0])}</option>`).join('')}</select></label>
+    <label class="field"><span>Назва послуги</span><input name="name" required maxlength="80" autocomplete="off"></label>
+    <div class="form-grid">
+      <label class="field"><span>Ціна для клієнта, ₴</span><input name="price" type="number" min="1" step="1" required></label>
+      <label class="field"><span>Тривалість, хв</span><input name="min" type="number" min="5" step="5" value="30" required></label>
+      <label class="field full"><span>Категорія</span><select name="cat">${CATEGORIES.map((c) => `<option value="${c.id}" ${c.id === p.cats[0] ? 'selected' : ''}>${c.name}</option>`).join('')}</select></label>
+    </div>
+    <label class="field"><span>Примітка для клієнта</span><input name="note" maxlength="120" placeholder="Наприклад, ціна для постійного клієнта" autocomplete="off"></label>
+    <button class="btn primary" type="submit">Зберегти послугу</button>
+  </form>`);
+}
+
+function clientDrawer(key) {
+  const c = key ? clientsList().find((x) => x.key === key) : null;
+  const m = key ? clientMeta(key) : {};
+  // Телефон — це ключ клієнта; міняти його можна, лише поки за ним немає записів.
+  const lockPhone = c && (c.list.length || !c.key.startsWith('tel:'));
+  const car = (m.cars ?? [...(c?.cars ?? [])])[0] ?? '';
+  const [carName = '', plate = ''] = car.split(' · ');
+  openDrawer(c ? 'Редагувати клієнта' : 'Новий клієнт', `<form class="stack" id="client-form" data-key="${esc(key ?? '')}" style="gap:14px">
+    <label class="field"><span>Імʼя клієнта</span><input name="name" required maxlength="80" value="${esc(c?.name === 'Клієнт CARCAR' ? '' : c?.name ?? '')}" autocomplete="off"></label>
+    <label class="field"><span>Телефон клієнта</span><input name="phone" inputmode="tel" placeholder="+380" value="${esc(c?.phone ?? '')}" ${lockPhone ? 'readonly aria-describedby="phone-hint"' : c ? '' : 'required'} autocomplete="off"></label>
+    ${lockPhone ? `<p class="fine" id="phone-hint">${c.key.startsWith('tel:') ? 'Телефон привʼязаний до історії записів, тому його не можна змінити.' : 'Клієнт записується через CARCAR — телефон бачите лише ви.'}</p>` : ''}
+    <div class="form-grid">
+      <label class="field"><span>Авто</span><input name="carName" value="${esc(carName)}" placeholder="Наприклад, Skoda Octavia" autocomplete="off"></label>
+      <label class="field"><span>Держномер</span><input name="plate" value="${esc(plate)}" placeholder="AA1234BB" autocomplete="off"></label>
+    </div>
+    <label class="field"><span>Email</span><input name="email" type="email" value="${esc(m.email ?? '')}" autocomplete="off"></label>
+    <label class="field"><span>Нотатка</span><textarea name="note" rows="3">${esc(m.note ?? '')}</textarea></label>
+    <button class="btn primary" type="submit">${c ? 'Зберегти зміни' : 'Додати клієнта'}</button>
+  </form>`);
 }
 
 // ---------- послуги й ціни ----------
@@ -629,7 +735,10 @@ function viewFinance() {
   const [from, to] = rangeOf(30);
   const cashList = own().filter((b) => !isCarcar(b) && b.state === 'completed' && inRange(b, [from, to]));
   const cashBy = (m) => cashList.filter((b) => b.payment === m).reduce((a, b) => a + b.paid, 0);
-  return `<h1>Фінанси</h1><p class="page-sub">Гроші за замовлення через CARCAR: утримання, заморожування на ${PAYMENT.freezeHours} год і виплати</p>
+  return `<h1>Фінанси</h1><p class="page-sub">Повний облік точки: доходи з CARCAR і на місці, витрати, прибуток і виплати</p>
+    ${viewReport()}
+    <h2 class="biz-h2">Гроші через CARCAR</h2>
+    <p class="small muted" style="margin-top:-4px">Оплата утримується до підтвердження клієнтом, потім заморожується на ${PAYMENT.freezeHours} год і стає доступною до виведення.</p>
     <section class="kpis" aria-label="Баланс">
       <div class="kpi hero"><span class="label">Доступно до виведення</span><span class="value">${uah(bal.available)}</span>
         <span class="kpi-note">комісія ${Math.round(PAYMENT.commission * 100)}% під час виведення${bal.available > 0 ? `: ${uah(fee)}` : ''}</span></div>
@@ -643,7 +752,7 @@ function viewFinance() {
       <button class="btn" data-action="export-ledger">${icon('download', 18)}Експорт CSV</button>
     </div>
     <p class="small muted">Оплати на місці за 30 днів: готівка ${uah(cashBy('cash'))}, картка ${uah(cashBy('card'))}. Вони не проходять через CARCAR і комісією не обкладаються.</p>
-    <h2 class="biz-h2">Замовлення через CARCAR</h2>
+    <h3 class="biz-h3">Замовлення через CARCAR</h3>
     <div class="table-wrap" tabindex="0" role="region" aria-label="Замовлення через CARCAR"><table class="t">
       <thead><tr><th>Дата</th><th>Клієнт</th><th>Послуги</th><th>Статус грошей</th><th class="num">Сума точці</th></tr></thead>
       <tbody>${ledger.length ? ledger.slice(0, 150).map((b) => {
@@ -653,11 +762,470 @@ function viewFinance() {
           <td><span class="pill ${cls}">${esc(label)}</span></td><td class="num">${uah(shareOf(b))}${b.bonus ? `<small>з них бонус ${uah(b.bonus)}</small>` : ''}</td></tr>`;
       }).join('') : '<tr><td colspan="5" class="muted">Замовлень через CARCAR ще не було.</td></tr>'}</tbody>
     </table></div>
-    <h2 class="biz-h2">Виплати</h2>
+    <h3 class="biz-h3">Виплати</h3>
     <div class="table-wrap" tabindex="0" role="region" aria-label="Виплати"><table class="t">
       <thead><tr><th>Дата</th><th class="num">Сума</th><th class="num">Комісія</th><th class="num">На картку</th></tr></thead>
       <tbody>${mine.length ? mine.map((x) => `<tr><td>${fmtTime(x.at)}</td><td class="num">${uah(x.gross)}</td><td class="num">${uah(x.fee)}</td><td class="num">${uah(x.net)}</td></tr>`).join('') : '<tr><td colspan="4" class="muted">Виплат ще не було.</td></tr>'}</tbody>
     </table></div>`;
+}
+
+// ---------- витрати ----------
+
+const periodSeg = (action, n) => `<div class="seg" role="group" aria-label="Період">
+  ${[7, 30, 90].map((d) => `<button data-action="${action}" data-n="${d}" aria-pressed="${d === n}">${d} ${daysWord(d)}</button>`).join('')}</div>`;
+
+function byCategory(list) {
+  const m = new Map();
+  for (const e of list) m.set(e.cat, (m.get(e.cat) ?? 0) + e.amount);
+  return [...m].sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name, value }));
+}
+
+function viewExpenses() {
+  const n = ui.expPeriod;
+  const [from, to] = rangeOf(n);
+  const list = expensesIn(ui.place, from, to);
+  const total = list.reduce((a, e) => a + e.amount, 0);
+  const prevTotal = expensesIn(ui.place, ...rangeOf(n, 1)).reduce((a, e) => a + e.amount, 0);
+  const monthly = expenses.filter((e) => e.placeId === ui.place && e.recurring && (!e.until || e.until >= today()));
+  const cats = byCategory(list);
+  return `<h1>Витрати</h1><p class="page-sub">Хімія, зарплата, оренда й інші витрати точки — для обліку прибутку у «Фінансах»</p>
+    <div class="filters">
+      ${periodSeg('exp-period', n)}
+      <span class="small muted">${fmtDate(from)} — ${fmtDate(to)}</span>
+      <span class="spacer"></span>
+      <button class="btn" data-action="export-expenses">${icon('download', 18)}Експорт витрат</button>
+      <button class="btn primary" data-action="expense-add">${icon('plus', 18)}Додати витрату</button>
+    </div>
+    <section class="kpis" aria-label="Витрати за період">
+      <div class="kpi hero"><span class="label">Витрати</span><span class="value">${uah(total)}</span>${delta(total, prevTotal, false)}
+        <span class="kpi-note">${list.length} ${plural(list.length, 'операція', 'операції', 'операцій')}</span></div>
+      <div class="kpi"><span class="label">Щомісячні платежі</span><span class="value">${uah(monthly.reduce((a, e) => a + e.amount, 0))}</span><span class="kpi-note">${monthly.length} ${plural(monthly.length, 'платіж', 'платежі', 'платежів')} на місяць</span></div>
+      <div class="kpi"><span class="label">Найбільша стаття</span><span class="value small-value">${cats[0] ? esc(cats[0].name) : '—'}</span>${cats[0] ? `<span class="kpi-note">${uah(cats[0].value)} · ${pct((cats[0].value / total) * 100)}</span>` : ''}</div>
+    </section>
+    <div class="grid-2" style="margin-top:16px">
+      <section class="panel" aria-labelledby="h-ecat">
+        <h2 id="h-ecat">За категоріями</h2><p class="sub">Сума за період</p>
+        ${cats.length ? hbars(cats, uah) : '<p class="muted" style="margin:0">Витрат за період немає.</p>'}
+      </section>
+      <section class="panel" aria-labelledby="h-rec">
+        <h2 id="h-rec">Щомісячні платежі</h2><p class="sub">Додаються самі щомісяця в той самий день</p>
+        ${monthly.length ? `<ul class="special-list">${monthly.map((e) => `<li><span><b>${esc(e.cat)} · ${uah(e.amount)}</b><small>з ${fmtDate(e.date)}${e.note ? ` · ${esc(e.note)}` : ''}</small></span>
+          <button class="btn" data-action="exp-stop" data-id="${e.id}">Зупинити</button></li>`).join('')}</ul>` : '<p class="muted" style="margin:0">Наприклад, оренда чи зарплата адміністратора. Позначте «Повторювати щомісяця» під час додавання.</p>'}
+      </section>
+    </div>
+    <h2 class="biz-h2">Операції</h2>
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Витрати"><table class="t">
+      <thead><tr><th>Дата</th><th>Категорія</th><th>Спосіб</th><th>Нотатка</th><th class="num">Сума</th><th><span class="sr-only">Дії</span></th></tr></thead>
+      <tbody>${list.length ? list.map((e) => `<tr><td>${dayLabel(e.date, { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+        <td>${esc(e.cat)}${e.template ? ' <span class="pill">щомісяця</span>' : ''}</td><td>${PAY_METHODS[e.method] ?? '—'}</td><td>${esc(e.note ?? '')}</td>
+        <td class="num">${uah(e.amount)}</td>
+        <td>${e.template ? '' : `<button class="icon-btn" data-action="exp-del" data-id="${e.id}" aria-label="Видалити витрату ${esc(e.cat)}, ${uah(e.amount)}">${icon('x', 18)}</button>`}</td></tr>`).join('')
+        : '<tr><td colspan="6" class="muted">Витрат за період немає.</td></tr>'}</tbody>
+    </table></div>`;
+}
+
+function expenseDrawer() {
+  openDrawer('Нова витрата', `<form class="stack" id="expense-form" style="gap:14px">
+    <div class="form-grid">
+      <label class="field"><span>Сума, ₴</span><input name="amount" type="number" min="1" step="1" required></label>
+      <label class="field"><span>Дата</span><input name="date" type="date" required value="${today()}" max="${addDays(today(), 31)}"></label>
+      <label class="field full"><span>Категорія</span><select name="cat">${EXPENSE_CATS.map((c) => `<option>${c}</option>`).join('')}</select></label>
+    </div>
+    <fieldset class="radio-row"><legend>Як оплачено</legend>
+      ${Object.entries(PAY_METHODS).map(([k, v], i) => `<label><input type="radio" name="method" value="${k}" ${i === 0 ? 'checked' : ''}> ${v}</label>`).join('')}</fieldset>
+    <label class="field"><span>Нотатка</span><input name="note" maxlength="120" placeholder="Наприклад, шампунь 20 л" autocomplete="off"></label>
+    <label class="row"><input class="check" type="checkbox" name="recurring">Повторювати щомісяця</label>
+    <button class="btn primary" type="submit">Додати витрату</button>
+  </form>`);
+}
+
+// ---------- фінансовий звіт ----------
+
+// Доходи й витрати за проміжок: те, що потрапляє у звіт про прибутки.
+function pnl([from, to]) {
+  const list = own().filter((b) => inRange(b, [from, to]) && happened(b));
+  const sum = (fn) => list.filter(fn).reduce((a, b) => a + revenue(b), 0);
+  const inc = {
+    carcar: sum(isCarcar),
+    cash: sum((b) => !isCarcar(b) && b.payment === 'cash'),
+    card: sum((b) => !isCarcar(b) && b.payment === 'card'),
+    other: sum((b) => !isCarcar(b) && b.payment !== 'cash' && b.payment !== 'card'),
+  };
+  const income = inc.carcar + inc.cash + inc.card + inc.other;
+  const fee = Math.round(inc.carcar * PAYMENT.commission);
+  const exp = expensesIn(ui.place, from, to);
+  const expTotal = exp.reduce((a, e) => a + e.amount, 0);
+  const profit = income - fee - expTotal;
+  return { inc, income, fee, exp, expTotal, cats: byCategory(exp), profit, margin: income ? (profit / income) * 100 : 0 };
+}
+
+function pnlRows(r) {
+  const rows = [
+    ['Доходи', null, 'h'],
+    ['Через CARCAR', r.inc.carcar],
+    ['На місці: готівка', r.inc.cash],
+    ['На місці: картка', r.inc.card],
+    ...(r.inc.other ? [['На місці: спосіб не вказано', r.inc.other]] : []),
+    ['Разом доходи', r.income, 't'],
+    ['Витрати', null, 'h'],
+    [`Комісія CARCAR, ${Math.round(PAYMENT.commission * 100)}%`, r.fee],
+    ...r.cats.map((c) => [c.name, c.value]),
+    ['Разом витрати', r.fee + r.expTotal, 't'],
+  ];
+  return rows;
+}
+
+function viewReport() {
+  const n = ui.finPeriod;
+  const range = rangeOf(n);
+  const r = pnl(range);
+  const prev = pnl(rangeOf(n, 1));
+  // Групуємо по днях (7 і 30) або по тижнях (90), щоб стовпчики лишалися читабельними.
+  const step = n === 90 ? 7 : 1;
+  const cats = [];
+  for (let d = range[0]; d <= range[1]; d = addDays(d, step)) {
+    const end = step === 1 ? d : [addDays(d, step - 1), range[1]].sort()[0];
+    const x = pnl([d, end]);
+    const s = parseDate(d);
+    cats.push({
+      label: step === 1 ? dayLabel(d) : `${dayLabel(d, { day: 'numeric', month: 'short' })} — ${dayLabel(end, { day: 'numeric', month: 'short' })}`,
+      short: `${s.getDate()}.${pad(s.getMonth() + 1)}`, values: [x.income, x.fee + x.expTotal],
+    });
+  }
+  charts['ch-pnl'] = { title: `Доходи й витрати ${step === 1 ? 'по днях' : 'по тижнях'}`, cats, series: ['Доходи', 'Витрати'], fmt: uah, grouped: true };
+  return `<section class="report" aria-labelledby="h-pnl">
+    <h2 class="biz-h2" id="h-pnl">Прибутки й збитки</h2>
+    <div class="filters">
+      ${periodSeg('fin-period', n)}
+      <span class="small muted">${fmtDate(range[0])} — ${fmtDate(range[1])}</span>
+      <span class="spacer"></span>
+      <a class="btn" href="#/expenses">${icon('cash', 18)}Витрати</a>
+      <button class="btn" data-action="export-pnl">${icon('download', 18)}Експорт звіту</button>
+    </div>
+    <section class="kpis" aria-label="Прибуток за період">
+      <div class="kpi hero"><span class="label">Прибуток</span><span class="value ${r.profit < 0 ? 'neg' : ''}">${r.profit < 0 ? '−' : ''}${uah(Math.abs(r.profit))}</span>${delta(r.profit, prev.profit)}
+        <span class="kpi-note">маржа ${pct(r.margin)}</span></div>
+      <div class="kpi"><span class="label">Доходи</span><span class="value">${uah(r.income)}</span>${delta(r.income, prev.income)}</div>
+      <div class="kpi"><span class="label">Витрати</span><span class="value">${uah(r.fee + r.expTotal)}</span>${delta(r.fee + r.expTotal, prev.fee + prev.expTotal, false)}
+        <span class="kpi-note">з них комісія CARCAR ${uah(r.fee)}</span></div>
+    </section>
+    <div class="grid-3" style="margin-top:16px">
+      <section class="panel" aria-labelledby="h-pnl-ch">
+        <h3 id="h-pnl-ch">Доходи й витрати</h3>
+        ${legend(['Доходи', 'Витрати'])}
+        <div class="chart" id="ch-pnl"></div>
+        ${tableView(['Період', 'Доходи', 'Витрати', 'Різниця'], cats.map((c) => [c.label, uah(c.values[0]), uah(c.values[1]), uah(c.values[0] - c.values[1])]))}
+      </section>
+      <section class="panel" aria-labelledby="h-pnl-t">
+        <h3 id="h-pnl-t">Звіт</h3>
+        <table class="t pnl"><tbody>
+          ${pnlRows(r).map(([name, v, kind]) => kind === 'h'
+            ? `<tr class="h"><td colspan="2">${esc(name)}</td></tr>`
+            : `<tr class="${kind ?? ''}"><td>${esc(name)}</td><td class="num">${uah(v)}</td></tr>`).join('')}
+        </tbody><tfoot>
+          <tr class="t"><td>Прибуток</td><td class="num">${r.profit < 0 ? '−' : ''}${uah(Math.abs(r.profit))}</td></tr>
+          <tr><td>Маржа</td><td class="num">${pct(r.margin)}</td></tr>
+        </tfoot></table>
+      </section>
+    </div>
+    ${cashFlow(range)}
+  </section>`;
+}
+
+// Рух грошей: що пройшло через касу, через картку чи рахунок і що лежить у CARCAR.
+function cashFlow([from, to]) {
+  const list = own().filter((b) => inRange(b, [from, to]) && b.state === 'completed' && !isCarcar(b));
+  const exp = expensesIn(ui.place, from, to);
+  const cashIn = list.filter((b) => b.payment === 'cash').reduce((a, b) => a + b.paid, 0);
+  const cashOut = exp.filter((e) => e.method === 'cash').reduce((a, e) => a + e.amount, 0);
+  const startMs = parseDate(from).getTime();
+  const endMs = parseDate(addDays(to, 1)).getTime();
+  const payIn = payouts.filter((x) => x.placeId === ui.place && x.at >= startMs && x.at < endMs).reduce((a, x) => a + x.net, 0);
+  const cardIn = list.filter((b) => b.payment === 'card').reduce((a, b) => a + b.paid, 0) + payIn;
+  const cardOut = exp.filter((e) => e.method !== 'cash').reduce((a, e) => a + e.amount, 0);
+  const bal = balanceFor(ui.place, bookings, payouts);
+  const sign = (v) => `${v < 0 ? '−' : v > 0 ? '+' : ''}${uah(Math.abs(v))}`;
+  return `<h3 class="biz-h3">Рух грошей за період</h3>
+    <section class="kpis" aria-label="Рух грошей">
+      <div class="kpi"><span class="label">Каса (готівка)</span><span class="value">${sign(cashIn - cashOut)}</span><span class="kpi-note">надійшло ${uah(cashIn)} · витрачено ${uah(cashOut)}</span></div>
+      <div class="kpi"><span class="label">Картка й рахунок</span><span class="value">${sign(cardIn - cardOut)}</span><span class="kpi-note">надійшло ${uah(cardIn)}, з них виплати CARCAR ${uah(payIn)} · витрачено ${uah(cardOut)}</span></div>
+      <div class="kpi"><span class="label">На балансі CARCAR</span><span class="value">${uah(bal.available + bal.frozen)}</span><span class="kpi-note">доступно ${uah(bal.available)} · заморожено ${uah(bal.frozen)}</span></div>
+    </section>`;
+}
+
+// ---------- імпорт з інших CRM і таблиць ----------
+
+// Поля для кожного типу імпорту й назви стовпців, за якими їх упізнаємо (укр., рос., англ.).
+// Порядок важливий: специфічніші поля перевіряємо першими, кожен стовпець дістається одному полю.
+const IMPORT = {
+  clients: {
+    label: 'Клієнти', note: 'імʼя, телефон, авто, держномер, email, нотатка',
+    fields: [
+      ['plate', 'Держномер', ['держномер', 'госномер', 'номер авто', 'номерний знак', 'гос. номер', 'plate']],
+      ['phone', 'Телефон', ['телефон', 'phone', 'тел', 'моб', 'mobile']],
+      ['name', 'Імʼя', ['імʼя', "ім'я", 'имя', 'піб', 'фио', 'клієнт', 'клиент', 'name', 'client', 'customer']],
+      ['car', 'Авто', ['авто', 'машина', 'автомобіль', 'автомобиль', 'марка', 'car', 'vehicle']],
+      ['email', 'Email', ['email', 'e-mail', 'пошта', 'почта', 'mail']],
+      ['visits', 'Візитів', ['візит', 'визит', 'visits']],
+      ['spent', 'Витрачено, ₴', ['витрачено', 'потрачено', 'сума покупок', 'сумма', 'spent', 'revenue']],
+      ['last', 'Останній візит', ['останній', 'последн', 'last']],
+      ['note', 'Нотатка', ['нотатка', 'примітка', 'коментар', 'комментарий', 'примечание', 'note', 'comment']],
+    ],
+    required: ['name|phone'],
+  },
+  services: {
+    label: 'Послуги й ціни', note: 'назва, ціна (для легкового, кросовера, позашляховика), тривалість, категорія',
+    fields: [
+      ['price2', `Ціна: ${CAR_CLASSES[1]}`, ['кросовер', 'кроссовер', 'crossover', 'suv']],
+      ['price3', `Ціна: ${CAR_CLASSES[2]}`, ['позашлях', 'внедорож', 'мінівен', 'минивэн', 'бус', 'van']],
+      ['price', `Ціна: ${CAR_CLASSES[0]}`, ['легков', 'седан', 'ціна', 'цена', 'вартість', 'стоимость', 'price']],
+      ['min', 'Тривалість, хв', ['тривалість', 'длительность', 'хв', 'мин', 'duration', 'minutes', 'час']],
+      ['cat', 'Категорія', ['категор', 'category', 'тип', 'вид']],
+      ['name', 'Назва послуги', ['послуга', 'услуга', 'назва', 'название', 'наименование', 'service', 'name']],
+    ],
+    required: ['name', 'price'],
+  },
+  bookings: {
+    label: 'Записи й історія', note: 'дата, час, клієнт, телефон, послуги, сума, статус, оплата',
+    fields: [
+      ['date', 'Дата', ['дата', 'date', 'день']],
+      ['time', 'Час', ['час', 'время', 'time', 'початок', 'начало', 'start']],
+      ['plate', 'Держномер', ['держномер', 'госномер', 'номер авто', 'гос. номер', 'plate']],
+      ['phone', 'Телефон', ['телефон', 'phone', 'тел', 'моб']],
+      ['name', 'Клієнт', ['клієнт', 'клиент', 'імʼя', "ім'я", 'имя', 'піб', 'фио', 'client', 'customer', 'name']],
+      ['services', 'Послуги', ['послуг', 'услуг', 'service', 'роботи', 'работы']],
+      ['total', 'Сума, ₴', ['сума', 'сумма', 'вартість', 'стоимость', 'ціна', 'цена', 'total', 'amount', 'price', 'оплачено']],
+      ['payment', 'Спосіб оплати', ['спосіб оплати', 'способ оплаты', 'тип оплати', 'оплата', 'payment']],
+      ['minutes', 'Тривалість, хв', ['тривалість', 'длительность', 'duration', 'minutes', 'хв', 'мин']],
+      ['status', 'Статус', ['статус', 'status', 'стан']],
+      ['car', 'Авто', ['авто', 'машина', 'автомобіль', 'автомобиль', 'car', 'vehicle']],
+      ['note', 'Коментар', ['коментар', 'комментарий', 'примітка', 'примечание', 'нотатка', 'note', 'comment']],
+    ],
+    required: ['date', 'services'],
+  },
+};
+
+const IMPORT_TEMPLATES = {
+  clients: [['Імʼя', 'Телефон', 'Авто', 'Держномер', 'Email', 'Нотатка'], ['Іван Приклад', '+380 67 000 00 00', 'Skoda Octavia', 'AA0000AA', '', 'Шини зберігаємо в нас']],
+  services: [['Назва послуги', `Ціна: ${CAR_CLASSES[0]}`, `Ціна: ${CAR_CLASSES[1]}`, `Ціна: ${CAR_CLASSES[2]}`, 'Тривалість, хв', 'Категорія'], ['Комплекс: кузов + салон', '550', '650', '750', '60', 'Мийка']],
+  bookings: [['Дата', 'Час', 'Клієнт', 'Телефон', 'Авто', 'Держномер', 'Послуги', 'Сума', 'Оплата', 'Статус'], ['01.09.2026', '10:30', 'Іван Приклад', '+380 67 000 00 00', 'Skoda Octavia', 'AA0000AA', 'Комплекс: кузов + салон', '550', 'Готівка', 'Виконано']],
+};
+
+// CSV із будь-якої CRM чи таблиці: роздільник ; , або табуляція, лапки, BOM, переноси в лапках.
+function parseCsv(text) {
+  text = text.replace(/^\uFEFF/, '');
+  const first = text.split(/\r?\n/, 1)[0];
+  const delim = [';', '\t', ','].map((d) => [d, first.split(d).length]).sort((a, b) => b[1] - a[1])[0][0];
+  const rows = [];
+  let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) {
+      if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (ch === '"') q = false; else cell += ch;
+    } else if (ch === '"' && !cell) q = true;
+    else if (ch === delim) { row.push(cell.trim()); cell = ''; }
+    else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && text[i + 1] === '\n') i++;
+      row.push(cell.trim()); rows.push(row); row = []; cell = '';
+    } else cell += ch;
+  }
+  if (cell || row.length) { row.push(cell.trim()); rows.push(row); }
+  return rows.filter((r) => r.some((c) => c));
+}
+
+// Файли з Excel часто в кодуванні Windows-1251: пробуємо UTF-8, інакше — його.
+async function readFileText(file) {
+  const buf = await file.arrayBuffer();
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch { return new TextDecoder('windows-1251').decode(buf); }
+}
+
+function autoMap(type, head) {
+  const used = new Set();
+  const map = {};
+  const h = head.map((x) => x.toLowerCase().replace(/[’`]/g, 'ʼ'));
+  for (const [f, , words] of IMPORT[type].fields) {
+    const i = h.findIndex((x, k) => !used.has(k) && words.some((w) => x.includes(w)));
+    if (i >= 0) { map[f] = i; used.add(i); }
+  }
+  return map;
+}
+
+const num = (v) => { const n = parseFloat(String(v ?? '').replace(/[\s ₴]|грн\.?|uah/gi, '').replace(',', '.')); return Number.isFinite(n) ? n : null; };
+
+// Дата й час: 25.09.2026, 25/09/2026, 2026-09-25, 25.09.26, разом із часом в одній клітинці чи окремо.
+function parseWhen(dateCell, timeCell) {
+  const s = String(dateCell ?? '');
+  let date = null;
+  let m = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) date = `${m[1]}-${pad(+m[2])}-${pad(+m[3])}`;
+  else if ((m = s.match(/(\d{1,2})[./](\d{1,2})[./](\d{2,4})/))) date = `${m[3].length === 2 ? `20${m[3]}` : m[3]}-${pad(+m[2])}-${pad(+m[1])}`;
+  if (date && Number.isNaN(parseDate(date).getTime())) date = null;
+  const t = String(timeCell ?? '').match(/(\d{1,2}):(\d{2})/) ?? s.replace(m?.[0] ?? '', '').match(/(\d{1,2}):(\d{2})/);
+  return { date, time: t ? `${pad(Math.min(23, +t[1]))}:${t[2]}` : null };
+}
+
+function parseStatus(v, future) {
+  const s = String(v ?? '').toLowerCase();
+  if (/скас|отмен|cancel/.test(s)) return 'cancelled';
+  if (/неяв|не прий|не приш|не приех|no.?show/.test(s)) return 'noshow';
+  return future ? 'booked' : 'completed';
+}
+
+const parsePayment = (v) => {
+  const s = String(v ?? '').toLowerCase();
+  return /готів|налич|cash|кеш/.test(s) ? 'cash' : /карт|card|безгот|безнал|термін|термин|рахун|счет|счёт|iban/.test(s) ? 'card' : null;
+};
+
+const matchCat = (v, p) => {
+  const s = String(v ?? '').toLowerCase();
+  const byWord = { wash: /мий|мой|wash/, tires: /шин|tire|tyre/, service: /сто|ремонт|service|сервіс/, detailing: /детейл|детейл|detail|полір|полир|кераміка|керамика/ };
+  return CATEGORIES.find((c) => s && (s.includes(c.name.toLowerCase()) || byWord[c.id].test(s)))?.id ?? p.cats[0] ?? 'wash';
+};
+
+function importRows() {
+  const { type, rows, map } = ui.imp;
+  const pick = (r, f) => (map[f] === undefined || map[f] === '' ? '' : String(r[map[f]] ?? '').trim());
+  return rows.slice(1).map((r) => Object.fromEntries(IMPORT[type].fields.map(([f]) => [f, pick(r, f)])));
+}
+
+function runImport() {
+  const { type } = ui.imp;
+  const p = place();
+  const res = { added: 0, updated: 0, skipped: 0 };
+  const data = importRows();
+  if (type === 'clients') {
+    const known = new Set(clientsList().map((c) => c.key));
+    for (const r of data) {
+      if (!r.name && !r.phone) { res.skipped++; continue; }
+      const key = phoneKey(r.phone) ?? `name:${r.name.toLowerCase()}`;
+      const m = clientMeta(key);
+      const car = [r.car, r.plate.toUpperCase()].filter(Boolean).join(' · ');
+      const last = parseWhen(r.last).date;
+      setMeta(key, {
+        // Наявні дані не перезаписуємо — лише доповнюємо порожні поля.
+        name: m.name || r.name, phone: m.phone || r.phone, email: m.email || r.email, note: [m.note, r.note].filter(Boolean).join('\n'),
+        cars: car && !(m.cars ?? []).includes(car) ? [...(m.cars ?? []), car] : m.cars,
+        visits: num(r.visits) ?? m.visits, spent: num(r.spent) ?? m.spent, last: last ?? m.last,
+        source: m.source ?? 'import',
+      });
+      if (known.has(key)) res.updated++; else { res.added++; known.add(key); }
+    }
+  } else if (type === 'services') {
+    const list = p.allServices.map((s) => ({ ...s, cat: serviceCat(s), price: [...s.price] }));
+    for (const r of data) {
+      const price = num(r.price);
+      if (!r.name || !price) { res.skipped++; continue; }
+      const prices = [price, num(r.price2) ?? price, num(r.price3) ?? num(r.price2) ?? price].map(Math.round);
+      const found = list.find((s) => s.name.toLowerCase() === r.name.toLowerCase());
+      const min = Math.round(num(r.min) ?? found?.min ?? 30);
+      if (found) { Object.assign(found, { price: prices, min, off: false, ...(r.cat ? { cat: matchCat(r.cat, p) } : {}) }); res.updated++; }
+      else { list.push({ id: `c_${uid()}`, name: r.name, cat: matchCat(r.cat, p), min, price: prices }); res.added++; }
+    }
+    saveOverride(ui.place, { services: list });
+  } else {
+    for (const r of data) {
+      const { date, time } = parseWhen(r.date, r.time);
+      const names = r.services.split(/\s*[;,+\n]\s*/).filter(Boolean);
+      if (!date || !names.length) { res.skipped++; continue; }
+      const t = time ?? '10:00';
+      const svc = names.map((n) => p.allServices.find((s) => s.name.toLowerCase() === n.toLowerCase()));
+      const cls = 0;
+      const total = Math.round(num(r.total) ?? svc.reduce((a, s) => a + (s?.price[cls] ?? 0), 0));
+      const minutes = Math.round(num(r.minutes) ?? (svc.reduce((a, s) => a + (s?.min ?? 0), 0) || 60));
+      const dup = bookings.some((b) => b.placeId === p.id && b.date === date && b.time === t && (b.clientPhone ?? '') === r.phone && b.services.join(', ') === names.join(', '));
+      if (dup) { res.skipped++; continue; }
+      const future = bookingStart({ date, time: t }).getTime() > Date.now();
+      const state = parseStatus(r.status, future);
+      const plate = r.plate.toUpperCase();
+      bookings.push({
+        id: uid(), source: 'import', channel: 'other', placeId: p.id, services: names, total, paid: total, bonus: 0,
+        minutes, date, time: t, car: [r.car, plate].filter(Boolean).join(' · ') || CAR_CLASSES[cls], plate, cls,
+        clientName: r.name, clientPhone: r.phone, note: r.note, state, createdAt: Date.now(),
+        ...(state === 'completed' ? { payment: parsePayment(r.payment), completedAt: bookingStart({ date, time: t }).getTime() + minutes * 60000 } : {}),
+      });
+      res.added++;
+    }
+  }
+  save();
+  ui.imp.result = { ...res, type };
+  ui.imp.rows = null;
+  ui.imp.text = '';
+  rerenderKeepScroll();
+  toast(`Імпорт завершено: додано ${res.added}, оновлено ${res.updated}, пропущено ${res.skipped}`);
+}
+
+// Порядок полів на екрані — звичний для людини, а не порядок розпізнавання.
+const FIELD_ORDER = ['date', 'time', 'name', 'phone', 'car', 'plate', 'email', 'services', 'price', 'price2', 'price3', 'min', 'minutes', 'total', 'payment', 'status', 'cat', 'visits', 'spent', 'last', 'note'];
+
+function viewImport() {
+  const { type, rows, map, result } = ui.imp;
+  const cfg = IMPORT[type];
+  const shown = [...cfg.fields].sort((a, b) => FIELD_ORDER.indexOf(a[0]) - FIELD_ORDER.indexOf(b[0]));
+  const head = rows?.[0] ?? [];
+  const preview = rows ? importRows().slice(0, 5) : [];
+  const missing = rows ? cfg.required.filter((req) => !req.split('|').some((f) => map[f] !== undefined && map[f] !== '')) : [];
+  const fieldName = (f) => cfg.fields.find((x) => x[0] === f)[1];
+  return `<h1>Імпорт даних</h1>
+    <p class="page-sub">Перенесіть клієнтів, прайс та історію записів із вашої CRM чи таблиці — і працюйте далі в CARCAR</p>
+    ${result ? `<p class="notice ok" role="status">${icon('checkCircle', 22)}<span><b>Імпорт завершено</b>Додано ${result.added}, оновлено ${result.updated}, пропущено ${result.skipped}.
+      ${result.type === 'clients' ? '<a href="#/clients">Відкрити клієнтів</a>' : result.type === 'services' ? '<a href="#/services">Відкрити прайс</a>' : '<a href="#/schedule">Відкрити розклад</a>'}</span></p>` : ''}
+    <div class="grid-2 import-grid">
+      <section class="panel stack" aria-labelledby="h-imp1" style="gap:14px">
+        <h2 id="h-imp1">1. Що переносимо</h2>
+        <div class="seg" role="group" aria-label="Тип даних">
+          ${Object.entries(IMPORT).map(([k, v]) => `<button data-action="imp-type" data-t="${k}" aria-pressed="${k === type}">${v.label}</button>`).join('')}
+        </div>
+        <p class="small muted" style="margin:0">Стовпці: ${cfg.note}. Назви стовпців можуть бути українською, російською чи англійською — ми їх упізнаємо, а відповідність можна змінити.</p>
+        <button class="btn" data-action="imp-template" style="align-self:flex-start">${icon('download', 18)}Завантажити шаблон CSV</button>
+      </section>
+      <section class="panel stack" aria-labelledby="h-imp2" style="gap:14px">
+        <h2 id="h-imp2">2. Файл або дані</h2>
+        <label class="dropzone">${icon('upload', 24)}Обрати CSV-файл<input class="sr-only" id="imp-file" type="file" accept=".csv,.txt,text/csv,text/plain"></label>
+        <form id="imp-paste" class="stack" style="gap:8px">
+          <label class="field"><span>Або вставте рядки з таблиці (разом із заголовками)</span><textarea name="text" rows="4" placeholder="Імʼя;Телефон;Авто">${esc(ui.imp.text)}</textarea></label>
+          <button class="btn" type="submit" style="align-self:flex-start">Розібрати</button>
+        </form>
+      </section>
+    </div>
+    <details class="panel howto"><summary>Як вивантажити дані з інших систем</summary>
+      <ul>
+        <li><b>YCLIENTS / Altegio:</b> «Клієнти» → «Клієнтська база» → «Експорт в Excel»; записи — у звіті «Записи» → «Завантажити».</li>
+        <li><b>EasyWeek:</b> «Клієнти» → «Експорт»; записи — «Звіти» → «Записи» → «Експорт».</li>
+        <li><b>RO App:</b> «Клієнти» → меню «⋯» → «Експорт»; замовлення — «Замовлення» → «Експорт».</li>
+        <li><b>Excel, Google Таблиці, Numbers:</b> «Файл» → «Зберегти як» / «Завантажити» → <b>CSV</b>.</li>
+      </ul>
+      <p class="small muted">Файл .xlsx спершу відкрийте в Excel чи Google Таблицях і збережіть як CSV. Назви пунктів меню в інших системах можуть відрізнятися.</p>
+    </details>
+    ${rows ? `<section class="panel" aria-labelledby="h-imp3" style="margin-top:16px">
+      <h2 id="h-imp3">3. Відповідність стовпців</h2>
+      <p class="sub">Знайдено рядків: ${rows.length - 1}. Перевірте, з якого стовпця брати кожне поле.</p>
+      <div class="map-grid">${shown.map(([f, label]) => `<label class="field"><span>${esc(label)}</span><select class="select" data-map="${f}">
+        <option value="">— не імпортувати —</option>
+        ${head.map((h, i) => `<option value="${i}" ${map[f] === i ? 'selected' : ''}>${esc(h || `Стовпець ${i + 1}`)}</option>`).join('')}</select></label>`).join('')}</div>
+      <h3 class="biz-h3">Попередній перегляд</h3>
+      <div class="table-wrap" tabindex="0" role="region" aria-label="Попередній перегляд імпорту"><table class="t">
+        <thead><tr>${shown.filter(([f]) => map[f] !== undefined && map[f] !== '').map(([, l]) => `<th>${esc(l)}</th>`).join('')}</tr></thead>
+        <tbody>${preview.map((r) => `<tr>${shown.filter(([f]) => map[f] !== undefined && map[f] !== '').map(([f]) => `<td>${esc(r[f])}</td>`).join('')}</tr>`).join('')}</tbody>
+      </table></div>
+      ${missing.length ? `<p class="notice warn" style="margin-top:12px">Оберіть стовпець для поля: ${missing.map((m) => m.split('|').map(fieldName).join(' або ')).join(', ')}.</p>` : ''}
+      <div class="row" style="margin-top:12px">
+        <button class="btn primary" data-action="imp-run" ${missing.length ? 'disabled' : ''}>Імпортувати ${rows.length - 1} ${plural(rows.length - 1, 'рядок', 'рядки', 'рядків')}</button>
+        <button class="btn" data-action="imp-cancel">Скасувати</button>
+      </div>
+      ${type === 'bookings' ? '<p class="fine" style="margin-top:8px">Майбутні записи займуть бокси в застосунку клієнта. Записи без часу ставимо на 10:00, повтори пропускаємо.</p>' : ''}
+      ${type === 'services' ? '<p class="fine" style="margin-top:8px">Послуги з такою самою назвою оновимо, нові — додамо до прайсу. Клієнти побачать зміни одразу.</p>' : ''}
+      ${type === 'clients' ? '<p class="fine" style="margin-top:8px">Клієнтів з однаковим телефоном обʼєднуємо, навіть якщо номер записаний по-різному.</p>' : ''}
+    </section>` : ''}`;
+}
+
+function loadImportText(text) {
+  const rows = parseCsv(text);
+  if (rows.length < 2) { toast('Потрібні заголовки й хоча б один рядок даних'); return; }
+  const width = Math.max(...rows.map((r) => r.length));
+  rows[0] = Array.from({ length: width }, (_, i) => rows[0][i] ?? '');
+  Object.assign(ui.imp, { rows, map: autoMap(ui.imp.type, rows[0]), result: null });
+  rerenderKeepScroll();
+  document.getElementById('h-imp3')?.scrollIntoView({ block: 'start' });
 }
 
 // ---------- відгуки ----------
@@ -690,25 +1258,70 @@ function viewReviews() {
 
 // ---------- профіль точки ----------
 
+// Варіанти часу з кроком 30 хвилин; 24:00 — опівночі наступного дня.
+const timeOpts = (sel, from = 0, to = 1440) => {
+  let out = '';
+  for (let t = from; t <= to; t += 30) out += `<option value="${t}" ${t === sel ? 'selected' : ''}>${hhmm(t)}</option>`;
+  return out;
+};
+
 function viewSettings() {
   const p = place();
-  const hourOpts = (sel, from, to) => Array.from({ length: to - from + 1 }, (_, i) => from + i)
-    .map((h) => `<option value="${h}" ${h === sel ? 'selected' : ''}>${pad(h)}:00</option>`).join('');
-  return `<h1>Профіль точки</h1><p class="page-sub">Ці дані бачать клієнти на сторінці точки, а години й бокси визначають вільний час для запису.</p>
-    <form id="settings-form" class="panel stack" style="max-width:560px;gap:14px">
-      <label class="field"><span>Телефон</span><input name="phone" required value="${esc(p.phone)}" autocomplete="off"></label>
-      <label class="row" style="gap:10px"><input class="check" type="checkbox" name="allday" ${p.hours ? '' : 'checked'}> Працюємо цілодобово</label>
+  const s = scheduleOf(p);
+  const special = Object.entries(s.special).sort(([a], [b]) => a.localeCompare(b));
+  const dayRow = (h, i) => `<div class="week-row">
+      <label class="row"><input class="check" type="checkbox" name="on-${i}" ${h ? 'checked' : ''}>${WEEKDAY_NAMES[i]}</label>
+      <select class="select" name="o-${i}" aria-label="Відкриття, ${WEEKDAY_NAMES[i]}" ${h ? '' : 'disabled'}>${timeOpts(h?.[0] ?? 480, 0, 1410)}</select>
+      <span aria-hidden="true">–</span>
+      <select class="select" name="c-${i}" aria-label="Закриття, ${WEEKDAY_NAMES[i]}" ${h ? '' : 'disabled'}>${timeOpts(h?.[1] ?? 1200, 30, 1440)}</select>
+    </div>`;
+  return `<h1>Профіль точки</h1><p class="page-sub">Графік, перерва й бокси визначають, на який час клієнти можуть записатися в застосунку. Зміни видно одразу.</p>
+    <div class="grid-2 settings-grid">
+    <form id="settings-form" class="panel stack" style="gap:14px">
+      <h2>Контакти й бокси</h2>
       <div class="form-grid">
-        <label class="field"><span>Відкриття</span><select name="open">${hourOpts(p.hours?.[0] ?? 8, 0, 23)}</select></label>
-        <label class="field"><span>Закриття</span><select name="close">${hourOpts(p.hours?.[1] ?? 20, 1, 24)}</select></label>
+        <label class="field"><span>Телефон</span><input name="phone" required value="${esc(p.phone)}" autocomplete="off"></label>
+        <label class="field"><span>Кількість боксів</span><input name="boxes" type="number" min="1" max="20" value="${p.boxes}"></label>
       </div>
-      <label class="field"><span>Кількість боксів</span><input name="boxes" type="number" min="1" max="20" value="${p.boxes}"></label>
+      <fieldset class="week"><legend>Графік роботи</legend>
+        ${s.week.map(dayRow).join('')}
+        <button class="btn small-btn" type="button" data-action="copy-monday">Як у понеділок — на всі робочі дні</button>
+      </fieldset>
+      <fieldset class="week"><legend>Перерва</legend>
+        <div class="week-row">
+          <label class="row"><input class="check" type="checkbox" name="brk-on" ${s.brk ? 'checked' : ''}>Щодня</label>
+          <select class="select" name="brk-o" aria-label="Початок перерви" ${s.brk ? '' : 'disabled'}>${timeOpts(s.brk?.[0] ?? 780, 0, 1410)}</select>
+          <span aria-hidden="true">–</span>
+          <select class="select" name="brk-c" aria-label="Кінець перерви" ${s.brk ? '' : 'disabled'}>${timeOpts(s.brk?.[1] ?? 840, 30, 1440)}</select>
+        </div>
+      </fieldset>
+      <div class="form-grid">
+        <label class="field"><span>Запис наперед</span><select name="horizon">${[7, 14, 30, 60].map((n) => `<option value="${n}" ${n === s.horizon ? 'selected' : ''}>на ${n} ${daysWord(n)}</option>`).join('')}</select></label>
+        <label class="field"><span>Не пізніше ніж за</span><select name="lead">${[[0, 'будь-коли'], [30, '30 хв до початку'], [60, '1 год до початку'], [120, '2 год до початку']].map(([v, t]) => `<option value="${v}" ${v === s.lead ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      </div>
       <div class="row">
         <button class="btn primary" type="submit">Зберегти</button>
         <button class="btn" type="button" data-action="settings-reset">Повернути як було</button>
         <a class="btn" href="index.html#/place/${p.id}" target="_blank" rel="noopener">Сторінка точки для клієнтів</a>
       </div>
-    </form>`;
+    </form>
+    <section class="panel stack" aria-labelledby="h-special" style="gap:14px">
+      <h2 id="h-special">Особливі дати</h2>
+      <p class="sub" style="margin:0">Свята, санітарні дні чи скорочений день. Ці дати мають пріоритет над тижневим графіком.</p>
+      ${special.length ? `<ul class="special-list">${special.map(([d, h]) => `<li><span><b>${dayLabel(d, { weekday: 'short', day: 'numeric', month: 'long' })}</b><small>${rangeText(h)}</small></span>
+        <button class="icon-btn" data-action="special-del" data-date="${d}" aria-label="Прибрати особливу дату ${fmtDate(d)}">${icon('x', 18)}</button></li>`).join('')}</ul>` : '<p class="muted" style="margin:0">Особливих дат немає.</p>'}
+      <form id="special-form" class="stack" style="gap:10px">
+        <label class="field"><span>Дата</span><input name="date" type="date" required min="${today()}"></label>
+        <label class="row"><input class="check" type="checkbox" name="closed" checked>Не працюємо</label>
+        <div class="week-row" style="grid-template-columns:1fr auto 1fr">
+          <select class="select" name="o" aria-label="Відкриття в особливу дату" disabled>${timeOpts(600, 0, 1410)}</select>
+          <span aria-hidden="true">–</span>
+          <select class="select" name="c" aria-label="Закриття в особливу дату" disabled>${timeOpts(1080, 30, 1440)}</select>
+        </div>
+        <button class="btn" type="submit">Додати дату</button>
+      </form>
+    </section>
+    </div>`;
 }
 
 // ---------- бічна панель: запис ----------
@@ -749,7 +1362,8 @@ function bookingDrawer(id) {
         <button class="btn text-danger" data-action="crm-cancel" data-id="${b.id}">Скасувати запис</button>
       </div>`;
   } else if (b.state === 'paid') {
-    actions = `<form class="stack ready-form" id="ready-form" data-id="${b.id}">
+    actions = `${isPast(b) ? '<p class="notice warn">Час візиту минув. Позначте «Машина готова» — клієнт підтвердить виконання, і гроші надійдуть на ваш баланс.</p>' : ''}
+      <form class="stack ready-form" id="ready-form" data-id="${b.id}">
         <label class="dropzone">${icon('camera', 24)}Додати фото результату (до 3)
           <span class="photo-count" aria-live="polite"></span>
           <input class="sr-only" name="photos" type="file" accept="image/*" multiple></label>
@@ -762,7 +1376,9 @@ function bookingDrawer(id) {
       </form>
       ${started ? `<button class="btn text-danger" data-action="carcar-noshow" data-id="${b.id}">Клієнт не приїхав</button>` : ''}`;
   } else if (b.state === 'done') {
-    actions = `<p class="notice">Чекаємо підтвердження клієнта. Якщо він не відповість, замовлення підтвердиться автоматично ${fmtTime(b.doneAt + PAYMENT.autoReleaseHours * HOUR)}.</p>`;
+    actions = `<p class="notice">Чекаємо підтвердження клієнта. Якщо він не відповість, замовлення підтвердиться автоматично ${fmtTime(b.doneAt + PAYMENT.autoReleaseHours * HOUR)}.</p>
+      <button class="btn" data-action="remind" data-id="${b.id}">${icon('chat', 18)}Нагадати клієнту</button>
+      ${b.remindedAt ? `<p class="small muted" style="margin:0">Останнє нагадування: ${fmtTime(b.remindedAt)}</p>` : ''}`;
   } else if (b.state === 'completed' && isCarcar(b)) {
     actions = `<p class="notice">${isFrozen(b) ? `Гроші заморожені до ${fmtTime(b.unfreezeAt)}.` : 'Гроші доступні до виведення у «Фінансах».'}</p>`;
   }
@@ -787,19 +1403,28 @@ function bookingDrawer(id) {
 // Вільні початки для нового запису: бокс вільний, якщо записів, що перетинаються, менше, ніж боксів.
 function freeStarts(date, minutes) {
   const p = place();
-  const [o, c] = openRange(p);
+  const h = hoursFor(p, date);
+  if (!h) return [];
+  const [o, c] = h;
   const now = new Date();
   const nowMin = date === today() ? now.getHours() * 60 + now.getMinutes() : -1;
   const spans = own().filter((b) => b.date === date && BLOCKING.includes(b.state)).map((b) => [toMin(b.time), toMin(b.time) + b.minutes]);
   const out = [];
   for (let t = o; t + minutes <= c; t += 30) {
-    if (t <= nowMin) continue;
+    if (t <= nowMin || inBreak(p, t, minutes)) continue;
     if (spans.filter(([s, e]) => t < e && t + minutes > s).length < p.boxes) out.push(hhmm(t));
   }
   return out;
 }
 
 let nb = null; // чернетка нового запису
+
+// Послуги для нового запису: спершу персональні послуги клієнта (за телефоном або карткою), потім прайс.
+function nbServices() {
+  const keys = [phoneKey(nb.clientPhone), nb.clientKey].filter(Boolean);
+  const mine = offers.filter((o) => o.placeId === ui.place && o.active !== false && keys.includes(o.clientKey)).map(offerAsService);
+  return [...mine, ...place().services];
+}
 
 function newBookingDrawer(prefill = {}) {
   nb = { cls: 0, services: new Set(), date: today(), time: '', channel: 'phone', ...prefill };
@@ -808,8 +1433,8 @@ function newBookingDrawer(prefill = {}) {
 }
 
 function renderNewBooking() {
-  const p = place();
-  const chosen = p.services.filter((s) => nb.services.has(s.id));
+  const all = nbServices();
+  const chosen = all.filter((s) => nb.services.has(s.id));
   const minutes = chosen.reduce((a, s) => a + s.min, 0) || 30;
   const total = chosen.reduce((a, s) => a + s.price[nb.cls], 0);
   const starts = freeStarts(nb.date, minutes);
@@ -823,8 +1448,8 @@ function renderNewBooking() {
       <label class="field full"><span>Клас авто</span><select name="cls">${CAR_CLASSES.map((c, i) => `<option value="${i}" ${i === nb.cls ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
     </div>
     <div><div class="small muted" style="margin-bottom:6px">Послуги</div>
-      <div class="list svc-pick">${p.services.map((s) => `<label class="item"><input class="check" type="checkbox" name="svc" value="${s.id}" ${nb.services.has(s.id) ? 'checked' : ''}>
-        <span class="name">${esc(s.name)}<small>${duration(s.min)}</small></span><span class="price">${uah(s.price[nb.cls])}</span></label>`).join('')}</div></div>
+      <div class="list svc-pick">${all.map((s) => `<label class="item"><input class="check" type="checkbox" name="svc" value="${s.id}" ${nb.services.has(s.id) ? 'checked' : ''}>
+        <span class="name">${esc(s.name)}${s.personal ? ' <span class="badge personal">Для клієнта</span>' : ''}<small>${duration(s.min)}</small></span><span class="price">${uah(s.price[nb.cls])}</span></label>`).join('')}</div></div>
     <div class="form-grid">
       <label class="field"><span>Дата</span><input name="date" type="date" required value="${nb.date}" min="${today()}"></label>
       <label class="field"><span>Час</span><select name="time" ${starts.length ? '' : 'disabled'}>${starts.length ? starts.map((t) => `<option ${t === nb.time ? 'selected' : ''}>${t}</option>`).join('') : '<option>Немає вільних боксів</option>'}</select></label>
@@ -866,10 +1491,12 @@ function demoFill() {
     plate: `AA${1000 + ((i * 137) % 9000)}XX`,
     cls: i % 5 === 0 ? 2 : i % 3 === 0 ? 1 : 0,
   }));
-  const [o, c] = openRange(p);
   const out = [];
   for (let d = -90; d <= 3; d++) {
     const date = addDays(today(), d);
+    const hours = hoursFor(p, date);
+    if (!hours) continue;
+    const [o, c] = hours;
     const wd = parseDate(date).getDay();
     const n = Math.round(p.boxes * ((wd === 0 || wd === 6) ? 2.6 : 1.8) * (0.7 + r() * 0.6));
     const spans = [];
@@ -887,6 +1514,7 @@ function demoFill() {
       let t = -1;
       for (let k = 0; k < 8 && t < 0; k++) {
         const cand = o + 30 * Math.floor(r() * ((c - o - minutes) / 30 + 1));
+        if (inBreak(p, cand, minutes)) continue;
         if (spans.filter(([s, e]) => cand < e && cand + minutes > s).length < p.boxes) t = cand;
       }
       if (t < 0) continue;
@@ -932,6 +1560,18 @@ function demoFill() {
     payouts.push({ id: uid(), placeId: p.id, gross, fee, net: gross - fee, at, demo: true });
     withdrawn += gross;
   }
+  // Витрати точки: щомісячні (оренда, зарплата, комунальні) і разові закупівлі хімії, реклама.
+  const k = p.boxes;
+  const month0 = addDays(today(), -100).slice(0, 8);
+  const demoExp = (o) => expenses.push({ id: uid(), placeId: p.id, source: 'demo', method: 'account', note: '', ...o });
+  demoExp({ date: `${month0}05`, cat: 'Оренда', amount: 9000 * k, recurring: true, note: 'Приміщення' });
+  demoExp({ date: `${month0}10`, cat: 'Зарплата', amount: 16000 * k, recurring: true, method: 'card', note: 'Майстри' });
+  demoExp({ date: `${month0}15`, cat: 'Комунальні послуги', amount: 2500 * k, recurring: true, note: 'Вода, світло' });
+  demoExp({ date: `${month0}20`, cat: 'Податки', amount: 6500, recurring: true, note: 'Єдиний податок і ЄСВ' });
+  for (let d = -90; d <= 0; d += 7) {
+    demoExp({ date: addDays(today(), d), cat: p.cats.includes('wash') ? 'Хімія й витратні матеріали' : 'Запчастини', amount: Math.round((900 + r() * 1400) * k / 10) * 10, method: r() < 0.5 ? 'cash' : 'card' });
+    if (r() < 0.35) demoExp({ date: addDays(today(), d - 2), cat: 'Реклама', amount: Math.round((500 + r() * 1500) / 10) * 10, method: 'card', note: 'Таргетована реклама' });
+  }
   save();
   route();
   toast(`Додано ${out.length} демо-записів за 90 днів`);
@@ -940,6 +1580,7 @@ function demoFill() {
 function demoClear(silent) {
   bookings = bookings.filter((b) => !(b.source === 'demo' && b.placeId === ui.place));
   payouts = payouts.filter((x) => !(x.demo && x.placeId === ui.place));
+  expenses = expenses.filter((x) => !(x.source === 'demo' && x.placeId === ui.place));
   save();
   if (!silent) { route(); toast('Демо-дані очищено'); }
 }
@@ -964,8 +1605,10 @@ const NAV = [
   ['clients', 'Клієнти', 'users'],
   ['services', 'Послуги й ціни', 'list'],
   ['finance', 'Фінанси', 'card'],
+  ['expenses', 'Витрати', 'cash'],
   ['reviews', 'Відгуки', 'star'],
   ['settings', 'Профіль точки', 'settings'],
+  ['import', 'Імпорт даних', 'upload'],
 ];
 
 function renderChrome(page) {
@@ -987,6 +1630,8 @@ function route() {
   else if (page === 'clients') view.innerHTML = arg ? viewClient(decodeURIComponent(arg)) : viewClients();
   else if (page === 'services') view.innerHTML = viewServices();
   else if (page === 'finance') view.innerHTML = viewFinance();
+  else if (page === 'expenses') view.innerHTML = viewExpenses();
+  else if (page === 'import') view.innerHTML = viewImport();
   else if (page === 'reviews') view.innerHTML = viewReviews();
   else if (page === 'settings') view.innerHTML = viewSettings();
   else view.innerHTML = '<p>Сторінку не знайдено.</p>';
@@ -1016,7 +1661,7 @@ document.addEventListener('click', (e) => {
   else if (action === 'new-booking') {
     const c = el.dataset.client ? clientsList().find((x) => x.key === el.dataset.client) : null;
     const last = c?.list.find((b) => b.clientName) ?? c?.list[0];
-    newBookingDrawer(c ? { clientName: c.name === 'Клієнт CARCAR' ? '' : c.name, clientPhone: c.phone, carName: last?.car?.split(' · ')[0] ?? '', plate: last?.plate ?? '', cls: last?.cls ?? 0 } : {});
+    newBookingDrawer(c ? { clientKey: c.key, clientName: c.name === 'Клієнт CARCAR' ? '' : c.name, clientPhone: c.phone, carName: last?.car?.split(' · ')[0] ?? '', plate: last?.plate ?? '', cls: last?.cls ?? 0 } : {});
   } else if (action === 'open-booking') bookingDrawer(id);
   else if (action === 'close-drawer') closeDrawer();
   else if (action === 'close-drawer-nav') $('#drawer-root').innerHTML = '';
@@ -1071,9 +1716,71 @@ document.addEventListener('click', (e) => {
     ui.svcDraft = null;
     rerenderKeepScroll();
     toast('Прайс повернуто');
-  } else if (action === 'settings-reset') {
+  } else if (action === 'fin-period') { ui.finPeriod = Number(el.dataset.n); rerenderKeepScroll(); }
+  else if (action === 'exp-period') { ui.expPeriod = Number(el.dataset.n); rerenderKeepScroll(); }
+  else if (action === 'expense-add') expenseDrawer();
+  else if (action === 'exp-del' || action === 'exp-stop') {
+    const e = expenses.find((x) => x.id === id);
+    if (action === 'exp-del') {
+      if (!confirm(`Видалити витрату ${e.cat} на ${uah(e.amount)}?`)) return;
+      expenses = expenses.filter((x) => x !== e);
+    } else {
+      if (!confirm(`Зупинити щомісячний платіж «${e.cat}»? Уже нараховані місяці залишаться в обліку.`)) return;
+      e.until = today();
+    }
+    save();
+    rerenderKeepScroll();
+    toast(action === 'exp-del' ? 'Витрату видалено' : 'Щомісячний платіж зупинено');
+  } else if (action === 'export-expenses') {
+    const [from, to] = rangeOf(ui.expPeriod);
+    downloadCsv(`carcar-expenses-${ui.place}.csv`, [['Дата', 'Категорія', 'Сума, ₴', 'Спосіб оплати', 'Щомісяця', 'Нотатка'],
+      ...expensesIn(ui.place, from, to).map((e) => [e.date, e.cat, e.amount, PAY_METHODS[e.method] ?? '', e.template ? 'так' : '', e.note ?? ''])]);
+  } else if (action === 'export-pnl') {
+    const range = rangeOf(ui.finPeriod);
+    const r = pnl(range);
+    downloadCsv(`carcar-pnl-${ui.place}-${range[0]}-${range[1]}.csv`, [['Стаття', 'Сума, ₴'], ...pnlRows(r).map(([n, v]) => [n, v ?? '']),
+      ['Прибуток', r.profit], ['Маржа, %', Math.round(r.margin)]]);
+  } else if (action === 'remind') {
+    const b = bookings.find((x) => x.id === id);
+    b.remindedAt = Date.now();
+    save();
+    bookingDrawer(id);
+    toast('Клієнт отримав нагадування підтвердити виконання');
+  } else if (action === 'client-new') clientDrawer(null);
+  else if (action === 'client-edit') clientDrawer(el.dataset.key);
+  else if (action === 'offer-add') offerDrawer(el.dataset.key);
+  else if (action === 'offer-del') {
+    const o = offers.find((x) => x.id === id);
+    if (!confirm(`Видалити персональну послугу «${o.name}»?`)) return;
+    offers = offers.filter((x) => x !== o);
+    save();
+    rerenderKeepScroll();
+    toast('Персональну послугу видалено');
+  } else if (action === 'copy-monday') {
+    const f = $('#settings-form');
+    for (let i = 1; i < 7; i++) {
+      if (!f[`on-${i}`].checked) continue;
+      f[`o-${i}`].value = f['o-0'].value;
+      f[`c-${i}`].value = f['c-0'].value;
+    }
+    toast('Години понеділка скопійовано на робочі дні — не забудьте зберегти');
+  } else if (action === 'special-del') {
+    const s = scheduleOf(place());
+    delete s.special[el.dataset.date];
+    saveOverride(ui.place, { schedule: s });
+    rerenderKeepScroll();
+    toast('Особливу дату прибрано');
+  } else if (action === 'imp-type') {
+    Object.assign(ui.imp, { type: el.dataset.t, result: null });
+    if (ui.imp.rows) ui.imp.map = autoMap(ui.imp.type, ui.imp.rows[0]);
+    rerenderKeepScroll();
+  } else if (action === 'imp-template') {
+    downloadCsv(`carcar-import-${ui.imp.type}.csv`, IMPORT_TEMPLATES[ui.imp.type]);
+  } else if (action === 'imp-cancel') { Object.assign(ui.imp, { rows: null, text: '' }); rerenderKeepScroll(); }
+  else if (action === 'imp-run') runImport();
+  else if (action === 'settings-reset') {
     const all = store.get('biz.places', {});
-    if (all[ui.place]) { delete all[ui.place].phone; delete all[ui.place].hours; delete all[ui.place].boxes; }
+    if (all[ui.place]) { delete all[ui.place].phone; delete all[ui.place].hours; delete all[ui.place].boxes; delete all[ui.place].schedule; }
     store.set('biz.places', all);
     applyOverrides();
     rerenderKeepScroll();
@@ -1103,8 +1810,39 @@ document.addEventListener('input', (e) => {
   }
 });
 
-document.addEventListener('change', (e) => {
+document.addEventListener('change', async (e) => {
   const t = e.target;
+  // Вимкнений день, перерва чи особлива дата — години не потрібні.
+  const toggles = { 'brk-on': ['brk-o', 'brk-c'], closed: ['o', 'c'] };
+  if (/^on-\d$/.test(t.name)) toggles[t.name] = [`o-${t.name.slice(3)}`, `c-${t.name.slice(3)}`];
+  if (toggles[t.name] && t.form) {
+    for (const n of toggles[t.name]) t.form[n].disabled = t.name === 'closed' ? t.checked : !t.checked;
+    return;
+  }
+  if (t.dataset.action === 'offer-toggle') {
+    offers.find((o) => o.id === t.dataset.id).active = t.checked;
+    save();
+    t.closest('li').classList.toggle('off', !t.checked);
+    toast(t.checked ? 'Послуга знову доступна клієнту' : 'Клієнт більше не бачить цю послугу');
+    return;
+  }
+  if (t.name === 'base' && t.form?.id === 'offer-form') {
+    const s = place().services.find((x) => x.id === t.value);
+    const el = t.form.elements;
+    if (s) { el.name.value = s.name; el.price.value = s.price[0]; el.min.value = s.min; el.cat.value = serviceCat(s); }
+    return;
+  }
+  if (t.dataset.map) {
+    ui.imp.map[t.dataset.map] = t.value === '' ? undefined : Number(t.value);
+    rerenderKeepScroll();
+    $(`[data-map="${t.dataset.map}"]`)?.focus();
+    return;
+  }
+  if (t.id === 'imp-file' && t.files[0]) {
+    ui.imp.text = '';
+    loadImportText(await readFileText(t.files[0]));
+    return;
+  }
   if (t.id === 'place') {
     ui.place = t.value;
     store.set('partner', ui.place);
@@ -1121,7 +1859,11 @@ document.addEventListener('change', (e) => {
       cls: Number(f.get('cls')), date: f.get('date') || nb.date, time: f.get('time') ?? nb.time, channel: f.get('channel'), note: f.get('note'),
       services: new Set(f.getAll('svc')),
     });
-    if (t.name !== 'clientName' && t.name !== 'clientPhone' && t.name !== 'carName' && t.name !== 'plate' && t.name !== 'note') {
+    // Новий телефон може відкрити персональні послуги клієнта — тоді оновлюємо список.
+    if (t.name === 'clientPhone') {
+      const ids = (x) => x.filter((s) => s.personal).map((s) => s.id).join();
+      if (ids(nbServices()) !== ids([...$('#nb-form').querySelectorAll('[name="svc"]')].map((i) => ({ id: i.value, personal: i.value.startsWith('offer:') })))) renderNewBooking();
+    } else if (t.name !== 'clientName' && t.name !== 'carName' && t.name !== 'plate' && t.name !== 'note') {
       renderNewBooking();
       $(`#nb-form [name="${t.name}"]${t.type === 'checkbox' || t.type === 'radio' ? `[value="${t.value}"]` : ''}`)?.focus();
     }
@@ -1137,7 +1879,7 @@ document.addEventListener('submit', async (e) => {
   if (f.id === 'nb-form') {
     const d = new FormData(f);
     const p = place();
-    const chosen = p.services.filter((s) => nb.services.has(s.id));
+    const chosen = nbServices().filter((s) => nb.services.has(s.id));
     const total = chosen.reduce((a, s) => a + s.price[nb.cls], 0);
     const plate = d.get('plate').trim().toUpperCase();
     const carName = d.get('carName').trim();
@@ -1191,12 +1933,72 @@ document.addEventListener('submit', async (e) => {
     toast('Прайс збережено — клієнти вже бачать нові ціни');
   } else if (f.id === 'settings-form') {
     const d = new FormData(f);
-    const open = Number(d.get('open'));
-    const close = Number(d.get('close'));
-    if (!d.get('allday') && close <= open) { toast('Час закриття має бути пізніше за відкриття'); return; }
-    saveOverride(ui.place, { phone: d.get('phone').trim(), hours: d.get('allday') ? null : [open, close], boxes: Math.max(1, Number(d.get('boxes')) || 1) });
+    const week = WEEKDAYS.map((_, i) => (d.get(`on-${i}`) ? [Number(d.get(`o-${i}`)), Number(d.get(`c-${i}`))] : null));
+    const bad = week.findIndex((h) => h && h[1] <= h[0]);
+    if (bad >= 0) { toast(`${WEEKDAY_NAMES[bad]}: час закриття має бути пізніше за відкриття`); return; }
+    if (!week.some(Boolean)) { toast('Позначте хоча б один робочий день'); return; }
+    const brk = d.get('brk-on') ? [Number(d.get('brk-o')), Number(d.get('brk-c'))] : null;
+    if (brk && brk[1] <= brk[0]) { toast('Кінець перерви має бути пізніше за початок'); return; }
+    const s = scheduleOf(place());
+    saveOverride(ui.place, {
+      phone: d.get('phone').trim(), boxes: Math.max(1, Number(d.get('boxes')) || 1),
+      schedule: { week, brk, special: s.special, horizon: Number(d.get('horizon')), lead: Number(d.get('lead')) },
+    });
     rerenderKeepScroll();
     toast('Профіль збережено');
+  } else if (f.id === 'special-form') {
+    const d = new FormData(f);
+    const h = d.get('closed') ? null : [Number(d.get('o')), Number(d.get('c'))];
+    if (h && h[1] <= h[0]) { toast('Час закриття має бути пізніше за відкриття'); return; }
+    const s = scheduleOf(place());
+    s.special[d.get('date')] = h;
+    saveOverride(ui.place, { schedule: s });
+    rerenderKeepScroll();
+    toast(`${fmtDate(d.get('date'))}: ${rangeText(h).toLowerCase()}`);
+  } else if (f.id === 'client-form') {
+    const d = new FormData(f);
+    const old = f.dataset.key;
+    const phone = d.get('phone').trim();
+    const name = d.get('name').trim();
+    const key = old && (f.elements.phone.readOnly || phoneKey(phone) === old) ? old : phoneKey(phone) ?? `name:${name.toLowerCase()}`;
+    if (key !== old && clientsList().some((c) => c.key === key)) { toast('Клієнт із таким телефоном уже є'); return; }
+    const car = [d.get('carName').trim(), d.get('plate').trim().toUpperCase()].filter(Boolean).join(' · ');
+    const prev = old ? clientMeta(old) : { tags: [], note: '' };
+    if (old && key !== old) {
+      // Телефон змінили в клієнта без записів: переносимо картку й персональні послуги на новий ключ.
+      delete crm[ui.place][old];
+      for (const o of offers) if (o.placeId === ui.place && o.clientKey === old) o.clientKey = key;
+    }
+    setMeta(key, { ...prev, name, phone, email: d.get('email').trim(), note: d.get('note').trim(), cars: car ? [car, ...(prev.cars ?? []).slice(1)] : (prev.cars ?? []).slice(1), source: prev.source ?? 'crm' });
+    save();
+    closeDrawer();
+    location.hash = `#/clients/${encodeURIComponent(key)}`;
+    rerenderKeepScroll();
+    toast(old ? 'Дані клієнта збережено' : `Клієнта додано: ${name}`);
+  } else if (f.id === 'offer-form') {
+    const d = new FormData(f);
+    const base = place().services.find((x) => x.id === d.get('base'));
+    offers.push({
+      id: uid(), placeId: ui.place, clientKey: f.dataset.key, name: d.get('name').trim(), price: Math.round(Number(d.get('price'))),
+      min: Math.round(Number(d.get('min'))), cat: d.get('cat'), note: d.get('note').trim(), base: base?.price[0] ?? null, active: true, createdAt: Date.now(),
+    });
+    save();
+    closeDrawer();
+    rerenderKeepScroll();
+    toast('Персональну послугу збережено — клієнт побачить її в застосунку');
+  } else if (f.id === 'expense-form') {
+    const d = new FormData(f);
+    expenses.push({
+      id: uid(), placeId: ui.place, date: d.get('date'), cat: d.get('cat'), amount: Math.round(Number(d.get('amount'))),
+      method: d.get('method'), note: d.get('note').trim(), recurring: !!d.get('recurring'), createdAt: Date.now(),
+    });
+    save();
+    closeDrawer();
+    rerenderKeepScroll();
+    toast(d.get('recurring') ? 'Щомісячну витрату додано' : 'Витрату додано');
+  } else if (f.id === 'imp-paste') {
+    ui.imp.text = new FormData(f).get('text');
+    loadImportText(ui.imp.text);
   } else if (f.matches('.reply-form')) {
     const r = reviews.find((x) => x.id === f.dataset.id);
     r.reply = { text: new FormData(f).get('reply').trim(), at: Date.now() };

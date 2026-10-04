@@ -65,6 +65,7 @@ export const ICONS = {
   users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>',
   list: '<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>',
   settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M2.5 12h3M18.5 12h3M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1"/>',
+  upload: '<path d="M12 20V9M7 14l5-5 5 5M5 4h14"/>',
   download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
   x: '<path d="M6 6l12 12M18 6 6 18"/>',
   scale: '<path d="M12 4v16M8 20h8M5 7h14"/><path d="M5 7 2.5 13a3 3 0 0 0 5 0zM19 7l-2.5 6a3 3 0 0 0 5 0z"/>',
@@ -100,23 +101,72 @@ export function hash(str) {
   for (const ch of str) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
   return h >>> 0;
 }
-export function openRange(place) {
-  return place.hours ? [place.hours[0] * 60, place.hours[1] * 60] : [0, 24 * 60];
+
+// ---------- графік роботи ----------
+
+export const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
+export const WEEKDAY_NAMES = ['Понеділок', 'Вівторок', 'Середа', 'Четвер', 'Пʼятниця', 'Субота', 'Неділя'];
+export const weekdayOf = (iso) => (parseDate(iso).getDay() + 6) % 7; // 0 — понеділок
+
+// Графік точки (усе в хвилинах від півночі): години на кожен день тижня або null — вихідний,
+// перерва, особливі дати (свята, санітарні дні) і правила запису: на скільки днів уперед
+// можна записатися (horizon) і за скільки хвилин до початку (lead).
+export function scheduleOf(place) {
+  const s = place.schedule ?? {};
+  const base = place.hours ? [place.hours[0] * 60, place.hours[1] * 60] : [0, 24 * 60];
+  return {
+    week: s.week ?? Array(7).fill(base),
+    brk: s.brk ?? null,
+    special: s.special ?? {},
+    horizon: s.horizon ?? 14,
+    lead: s.lead ?? 30,
+  };
 }
+
+// Години роботи на конкретну дату або null, якщо точка не працює.
+export function hoursFor(place, iso) {
+  const s = scheduleOf(place);
+  return iso in s.special ? s.special[iso] : s.week[weekdayOf(iso)];
+}
+
+// Найширший робочий проміжок тижня — для осі годин у журналі й аналітиці.
+export function widestRange(place) {
+  const days = scheduleOf(place).week.filter(Boolean);
+  return days.length ? [Math.min(...days.map((d) => d[0])), Math.max(...days.map((d) => d[1]))] : [8 * 60, 20 * 60];
+}
+
+// Чи перетинає проміжок [t, t + minutes) перерву точки.
+export function inBreak(place, t, minutes) {
+  const b = scheduleOf(place).brk;
+  return !!b && t < b[1] && t + minutes > b[0];
+}
+
 export function isOpenNow(place, now = new Date()) {
-  if (!place.hours) return true;
-  const [o, c] = openRange(place);
+  const h = hoursFor(place, isoDate(now));
+  if (!h) return false;
   const m = now.getHours() * 60 + now.getMinutes();
-  return m >= o && m < c;
+  return m >= h[0] && m < h[1] && !inBreak(place, m, 1);
 }
-export const hoursText = (place) => (place.hours ? `${hhmm(place.hours[0] * 60)}–${hhmm(place.hours[1] * 60)}` : 'Цілодобово');
+
+export const rangeText = (h) => (!h ? 'Вихідний' : h[0] === 0 && h[1] === 24 * 60 ? 'Цілодобово' : `${hhmm(h[0])}–${hhmm(h[1])}`);
+export const hoursText = (place, iso = isoDate(new Date())) => rangeText(hoursFor(place, iso));
+
+// ---------- клієнти й телефони ----------
+
+// Ключ клієнта за номером телефону: 0671234567, +38 067 123 45 67 і 380671234567 — один і той самий.
+export function phoneKey(phone) {
+  let d = String(phone ?? '').replace(/\D/g, '');
+  if (!d) return null;
+  if (d.length === 10 && d.startsWith('0')) d = `38${d}`;
+  if (d.length === 9) d = `380${d}`;
+  return `tel:${d}`;
+}
 export const bookingStart = (b) => { const d = parseDate(b.date); d.setMinutes(toMin(b.time)); return d; };
 export const fmtTime = (ms) => new Date(ms).toLocaleString('uk-UA', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
 export const fmtDate = (s) => parseDate(s).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' });
 export const km = (n) => `${n.toLocaleString('uk-UA')} км`;
 
 // Категорія послуги: задана в CRM або за каталогом, з якого її взято.
-// Категорія послуги за каталогом, з якого її взято.
 const WASH_IDS = ['express', 'complex', 'inside', 'wax', 'engine', 'dry'];
 const TIRE_IDS = ['change', 'balance', 'repair', 'storage', 'rolling'];
 const DETAIL_IDS = ['polish', 'ceramic', 'ppf', 'deepclean', 'headlights'];
@@ -152,6 +202,7 @@ export function applyOverrides() {
     p.phone = o.phone ?? p.basePhone;
     p.hours = o.hours !== undefined ? o.hours : p.baseHours;
     p.boxes = o.boxes ?? p.baseBoxes;
+    p.schedule = o.schedule ?? null;
     p.allServices = o.services ?? p.baseServices;
     p.services = p.allServices.filter((s) => !s.off);
     // Категорії точки — ті, у яких є хоч одна активна послуга (точка могла додати нову).
@@ -167,6 +218,40 @@ export function saveOverride(placeId, patch) {
 }
 
 applyOverrides();
+
+// ---------- персональні послуги й витрати ----------
+
+// Персональна послуга з індивідуальною ціною для конкретного клієнта точки.
+// clientKey — tel:… або car:…; клієнт бачить її в застосунку, якщо його телефон чи авто збігаються.
+export const offersOf = (placeId, clientKey) =>
+  store.get('biz.offers', []).filter((o) => o.placeId === placeId && o.active !== false && (!clientKey || o.clientKey === clientKey));
+
+// Персональну послугу подаємо так само, як звичайну: одна ціна для всіх класів авто.
+export const offerAsService = (o) => ({ id: `offer:${o.id}`, name: o.name, min: o.min, price: [o.price, o.price, o.price], cat: o.cat, personal: true, note: o.note });
+
+export const EXPENSE_CATS = ['Хімія й витратні матеріали', 'Запчастини', 'Зарплата', 'Оренда', 'Комунальні послуги', 'Реклама', 'Податки', 'Обладнання й ремонт', 'Інше'];
+export const PAY_METHODS = { cash: 'Готівка', card: 'Картка', account: 'Рахунок' };
+
+// Витрати точки за проміжком дат: разові плюс щомісячні, розгорнуті на кожен місяць до кінця проміжку
+// (або до дати зупинки). Розгорнуті записи мають id «шаблон@дата».
+export function expensesIn(placeId, from, to) {
+  const out = [];
+  for (const e of store.get('biz.expenses', []).filter((x) => x.placeId === placeId)) {
+    if (!e.recurring) {
+      if (e.date >= from && e.date <= to) out.push(e);
+      continue;
+    }
+    const start = parseDate(e.date);
+    for (let k = 0; ; k++) {
+      const d = new Date(start.getFullYear(), start.getMonth() + k, 1);
+      const day = Math.min(start.getDate(), new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate());
+      const iso = isoDate(new Date(d.getFullYear(), d.getMonth(), day));
+      if (iso > to || (e.until && iso > e.until)) break;
+      if (iso >= from) out.push({ ...e, id: `${e.id}@${iso}`, template: e.id, date: iso });
+    }
+  }
+  return out.sort((a, b) => b.date.localeCompare(a.date));
+}
 
 // ---------- гроші ----------
 

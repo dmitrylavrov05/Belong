@@ -222,6 +222,11 @@ h2.big { font-size: 20px; }
 .badges.lg .badge { padding: 5px 10px; }
 .badge.open { background: var(--ok-soft); color: var(--ok); }
 .badge.closed { color: var(--muted); }
+.badge.personal { background: var(--accent-soft); color: var(--text); padding: 2px 7px; font-size: 11px; vertical-align: 1px; }
+.hours-list .item { padding: 10px 14px; font-size: 15px; }
+.hours-list .item.today { font-weight: 700; }
+.profile-card { gap: 12px; }
+.sheet .pf .field input { height: 44px; }
 
 .empty { text-align: center; padding: 32px 16px; color: var(--muted); }
 .empty-ic { width: 64px; height: 64px; margin: 0 auto 8px; border-radius: 50%; background: var(--soft); color: var(--navy); display: flex; align-items: center; justify-content: center; }
@@ -270,6 +275,8 @@ label.item { cursor: pointer; padding: 10px 14px; }
 .day b { font-size: 18px; color: var(--text); }
 .day[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: var(--on-navy); }
 .day[aria-pressed="true"] b { color: var(--on-navy); }
+.day.closed { background: var(--soft); border-color: var(--soft); cursor: not-allowed; }
+.day.closed b { color: var(--muted); }
 
 .slots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
 .slot { height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); font-size: 15px; font-weight: 500; }

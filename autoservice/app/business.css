@@ -241,6 +241,49 @@ table.t small { display: block; color: var(--muted); font-size: 12px; }
 
 /* ---------- вузькі екрани ---------- */
 
+/* перерва в журналі */
+.break-block { position: absolute; left: 0; right: 0; z-index: 0; pointer-events: none; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: var(--muted); background: repeating-linear-gradient(135deg, var(--soft) 0 6px, transparent 6px 12px); border-block: 1px dashed var(--line); }
+.biz-h3 { font-size: 16px; font-weight: 700; margin: 22px 0 10px; }
+.panel h3 { font-size: 16px; margin: 0 0 8px; }
+.title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.title-row h1 { margin-bottom: 4px; }
+.filters .spacer { flex: 1; }
+.kpi .value.small-value { font-size: 18px; line-height: 1.25; }
+.kpi .value.neg { color: var(--danger, #b42318); }
+
+/* профіль точки: графік */
+.settings-grid { align-items: start; }
+.week { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; }
+.week legend { font-weight: 700; font-size: 15px; margin-bottom: 8px; padding: 0; }
+.week-row { display: grid; grid-template-columns: minmax(130px, 1fr) minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; }
+.week-row .row { gap: 8px; }
+.week-row .select { width: 100%; min-width: 0; height: 40px; }
+.week-row .select:disabled { opacity: .45; }
+.small-btn { justify-self: start; min-height: 36px; font-size: 14px; }
+.special-list, .offer-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.special-list li, .offer-list li { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; }
+.special-list li > span, .offer-list .name { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.special-list small, .offer-list small { color: var(--muted); font-size: 13px; }
+.offer-list .price { white-space: nowrap; }
+.offer-list li.off .name, .offer-list li.off .price { opacity: .5; }
+
+/* фінансовий звіт */
+table.t.pnl td { padding: 7px 4px; }
+table.t.pnl tr.h td { font-weight: 700; padding-top: 14px; border-bottom: 0; }
+table.t.pnl tr.t td { font-weight: 700; }
+table.t.pnl tfoot td { font-weight: 700; border-top: 2px solid var(--text); }
+table.t.pnl tfoot tr + tr td { border-top: 0; font-weight: 500; color: var(--muted); }
+
+/* імпорт */
+.import-grid { align-items: start; }
+.map-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin: 10px 0 4px; }
+.map-grid .select { width: 100%; }
+.howto { margin-top: 16px; }
+.howto summary { cursor: pointer; font-weight: 600; }
+.howto ul { margin: 12px 0 0; padding-left: 20px; display: grid; gap: 6px; line-height: 1.45; }
+.notice.ok a { color: inherit; }
+
 @media (max-width: 960px) {
   .biz-shell { flex-direction: column; }
   .biz-side { position: static; height: auto; width: auto; flex-direction: row; align-items: center; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--line); overflow-x: auto; }
@@ -257,4 +300,6 @@ table.t small { display: block; color: var(--muted); font-size: 12px; }
   .kpi .value { font-size: 22px; }
   .kpi.hero .value { font-size: 36px; }
   .form-grid { grid-template-columns: 1fr; }
+  .week-row { grid-template-columns: 1fr auto 1fr; }
+  .week-row > .row { grid-column: 1 / -1; }
 }
