@@ -16,6 +16,7 @@ test.afterEach(async ({ page }) => {
 
 test('каталог фільтрується за категорією, пошуком і обраним', async ({ page }) => {
   await page.goto('/');
+  await expect(page).toHaveTitle('CARCAR');
   await expect(page.getByText('Час на зимову гуму')).toBeVisible();
   await expect(page.locator('#list article')).toHaveCount(7);
 
@@ -112,11 +113,11 @@ test('гроші утримуються до коду, а комісія бер�
   await expect(balance).toContainText('Утримується до виконання900 ₴');
 
   await page.getByLabel('Код клієнта').fill('0000' === code ? '1111' : '0000');
-  await page.getByRole('button', { name: 'Підтвердити' }).click();
+  await page.getByRole('button', { name: 'Підтвердити кодом' }).click();
   await expect(page.locator('#toast')).toHaveText('Невірний код');
 
   await page.getByLabel('Код клієнта').fill(code);
-  await page.getByRole('button', { name: 'Підтвердити' }).click();
+  await page.getByRole('button', { name: 'Підтвердити кодом' }).click();
   await expect(balance).toContainText('Доступно до виведення900 ₴');
 
   // 7% від 900 ₴ = 63 ₴, на картку 837 ₴.
@@ -143,7 +144,7 @@ test('доплата на місці, спір і рішення модерат�
   await expect(page.locator('article').first()).toContainText('1 050 ₴');
 
   await openPartner(page, 'Шиномонтаж «Колесо»');
-  await page.getByRole('button', { name: 'Виконано без коду' }).click();
+  await page.getByRole('button', { name: 'Машина готова' }).click();
 
   await page.goto('/#/bookings');
   answers.push('Не відбалансували колеса');
@@ -162,7 +163,7 @@ test('доплата на місці, спір і рішення модерат�
 test('якщо клієнт мовчить, гроші переходять точці через 24 години', async ({ page }) => {
   await bookTomorrow(page);
   await openPartner(page, 'Шиномонтаж «Колесо»');
-  await page.getByRole('button', { name: 'Виконано без коду' }).click();
+  await page.getByRole('button', { name: 'Машина готова' }).click();
   await page.goto('/#/bookings');
   await expect(page.locator('article').first()).toContainText('Чекає вашого підтвердження');
 
@@ -191,6 +192,71 @@ test('пізнє скасування й неявка: частина гроше
   page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Клієнт не приїхав' }).click();
   await expect(page.getByRole('region', { name: 'Баланс' })).toContainText('Доступно до виведення900 ₴');
+});
+
+const PIXEL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+
+async function addCar(page, extra = async () => {}) {
+  await page.goto('/#/garage');
+  await page.getByLabel('Марка').fill('Skoda');
+  await page.getByLabel('Модель').fill('Octavia');
+  await extra();
+  await page.getByRole('button', { name: 'Зберегти' }).click();
+}
+
+test('«Машина готова» з фото потрапляє клієнту й у сервісну книжку', async ({ page }) => {
+  await addCar(page);
+  await bookTomorrow(page);
+  await openPartner(page, 'Шиномонтаж «Колесо»');
+  await page.getByLabel(/Додати фото результату/).setInputFiles({ name: 'wheel.png', mimeType: 'image/png', buffer: PIXEL });
+  await expect(page.getByText('Обрано фото: 1')).toBeVisible();
+  await page.getByLabel('Пробіг, км').fill('84200');
+  await page.getByLabel('Коментар для клієнта').fill('Літні шини здали на зберігання');
+  await page.getByRole('button', { name: 'Машина готова' }).click();
+  await expect(page.locator('#toast')).toHaveText('Клієнт отримав сповіщення «Машина готова»');
+  await expect(page.locator('.tabs a[data-tab="bookings"]')).toHaveAttribute('data-badge', '');
+
+  await page.getByRole('link', { name: 'Мої записи' }).click();
+  const card = page.locator('article').first();
+  await expect(card).toContainText('Машина готова!');
+  await expect(card.getByRole('img', { name: 'Фото результату 1' })).toBeVisible();
+  await expect(card).toContainText('Літні шини здали на зберігання');
+  await card.getByRole('button', { name: '✅ Усе добре' }).click();
+  await expect(card).toContainText('Виконано');
+  await expect(page.locator('.tabs a[data-tab="bookings"]')).not.toHaveAttribute('data-badge');
+
+  await page.goto('/#/garage');
+  await page.getByRole('link', { name: /Skoda Octavia/ }).click();
+  await expect(page.getByText('Перевзування зроблено 5 жовтня 2026 р.')).toBeVisible();
+  const log = page.locator('.log-item').first();
+  await expect(log).toContainText('Сезонне перевзування (4 колеса)');
+  await expect(log).toContainText('Шиномонтаж «Колесо» · 84 200 км');
+  await expect(log.getByRole('img', { name: 'Фото 1' })).toBeVisible();
+});
+
+test('сервісна книжка нагадує про шини, оливу й поліс', async ({ page }) => {
+  await addCar(page, async () => {
+    await page.getByLabel('Пробіг, км (необовʼязково)').fill('50000');
+    await page.getByLabel('Поліс ОСЦПВ дійсний до (необовʼязково)').fill('2026-10-24');
+  });
+  await expect(page.getByRole('link', { name: /Skoda Octavia/ })).toContainText('Час перевзутися на зимові шини і ще 1');
+  await page.getByRole('link', { name: /Skoda Octavia/ }).click();
+  await expect(page.getByText('Немає даних про заміну оливи')).toBeVisible();
+  await expect(page.getByText('Поліс ОСЦПВ закінчується через 20 днів')).toBeVisible();
+
+  await page.getByLabel('Що зроблено').fill('Заміна оливи та фільтра');
+  await page.getByLabel('Пробіг, км (необовʼязково)').fill('40500');
+  await page.getByLabel('Сума, ₴ (необовʼязково)').fill('1800');
+  await page.getByRole('button', { name: 'Додати в книжку' }).click();
+  await expect(page.getByText('Заміна оливи через 500 км')).toBeVisible();
+  await expect(page.locator('.log-item').first()).toContainText('1 800 ₴');
+
+  const { violations } = await new AxeBuilder({ page }).analyze();
+  expect(violations.map((v) => v.id)).toEqual([]);
+
+  await page.locator('.reminder', { hasText: 'Час перевзутися' }).getByRole('link', { name: 'Записатися' }).click();
+  await expect(page.getByRole('button', { name: '🛞 Шиномонтаж' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#list article')).toHaveCount(4);
 });
 
 for (const path of ['/', '/#/place/motor', '/#/book/blysk', '/#/bookings', '/#/garage', '/#/partner']) {

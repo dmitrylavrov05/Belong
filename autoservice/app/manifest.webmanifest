@@ -1,12 +1,12 @@
 {
-  "name": "АвтоЗапис — мийки, шиномонтаж, СТО Києва",
-  "short_name": "АвтоЗапис",
+  "name": "CARCAR — мийки, шиномонтаж, СТО Києва",
+  "short_name": "CARCAR",
   "lang": "uk",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f4f6fa",
-  "theme_color": "#0b63f6",
+  "background_color": "#f3f5f8",
+  "theme_color": "#c8402b",
   "icons": [
     { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ]

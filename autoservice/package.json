@@ -1,8 +1,8 @@
 {
-  "name": "autozapis",
+  "name": "carcar",
   "private": true,
   "type": "module",
-  "description": "АвтоЗапись: мойки, шиномонтаж и СТО города с онлайн-записью (PWA без сборки).",
+  "description": "CARCAR: мойки, шиномонтаж и СТО Киева с онлайн-записью и оплатой (PWA без сборки).",
   "scripts": {
     "serve": "node scripts/serve.mjs app 4174",
     "test": "playwright test"

@@ -1,11 +1,11 @@
-import { CITY, CATEGORIES, CAR_CLASSES, PLACES, PAYMENT } from './data.js';
+import { CITY, CATEGORIES, CAR_CLASSES, PLACES, PAYMENT, MAINTENANCE } from './data.js';
 
 // ---------- сховище (лише на цьому пристрої) ----------
 
 const store = {
   get(key, fallback) {
     try {
-      const raw = localStorage.getItem(`autozapis.${key}`);
+      const raw = localStorage.getItem(`carcar.${key}`);
       return raw ? JSON.parse(raw) : fallback;
     } catch {
       return fallback;
@@ -13,9 +13,11 @@ const store = {
   },
   set(key, value) {
     try {
-      localStorage.setItem(`autozapis.${key}`, JSON.stringify(value));
+      localStorage.setItem(`carcar.${key}`, JSON.stringify(value));
+      return true;
     } catch {
       // Приватний режим або переповнення: працюємо без збереження.
+      return false;
     }
   },
 };
@@ -356,6 +358,7 @@ function confirmBooking() {
     date: draft.date,
     time: draft.time,
     car: car ? carLabel(car) : CAR_CLASSES[cls],
+    carId: car?.id ?? null,
     state: 'paid',
     code: newCode(),
     createdAt: Date.now(),
@@ -374,8 +377,7 @@ const HOUR = 3600000;
 const newCode = () => String(1000 + Math.floor(Math.random() * 9000));
 
 function save() {
-  store.set('bookings', bookings);
-  store.set('payouts', payouts);
+  return store.set('bookings', bookings) && store.set('payouts', payouts);
 }
 
 // Автоматично передаємо гроші точці, якщо клієнт не відповів за autoReleaseHours.
@@ -431,6 +433,14 @@ const STATE_LABEL = {
   refunded: ['cancelled', 'Гроші повернено'],
 };
 
+// Фото, коментар і пробіг, які точка додала, коли машина була готова.
+function result(b) {
+  if (!b.photos?.length && !b.note && !b.km) return '';
+  return `${b.photos?.length ? `<div class="photos">${b.photos.map((src, i) => `<img src="${esc(src)}" alt="Фото результату ${i + 1}">`).join('')}</div>` : ''}
+    ${b.note ? `<div class="small">💬 ${esc(b.note)}</div>` : ''}
+    ${b.km ? `<div class="small muted">Пробіг: ${b.km.toLocaleString('uk-UA')} км</div>` : ''}`;
+}
+
 function bookingCard(b, highlight) {
   const p = placeById(b.placeId);
   const [cls, label] = STATE_LABEL[b.state];
@@ -455,14 +465,17 @@ function bookingCard(b, highlight) {
         ? `Безкоштовне скасування до ${fmtTime(bookingStart(b) - PAYMENT.freeCancelHours * HOUR)}.`
         : `Пізнє скасування: повернемо ${uah(t.refund)}, ${uah(t.placeAmount)} отримає точка.`}</p>`;
   } else if (b.state === 'done') {
-    body = `<div class="notice">Точка позначила роботу виконаною. Підтвердіть або відкрийте спір до
+    body = `<div class="notice"><b>🎉 Машина готова!</b> Перевірте результат і підтвердіть або відкрийте спір до
         ${fmtTime(b.doneAt + PAYMENT.autoReleaseHours * HOUR)}, інакше гроші автоматично перейдуть точці.</div>
+      ${result(b)}
       <div class="row">
         <button class="btn primary" data-action="client-ok" data-id="${b.id}">✅ Усе добре</button>
         <button class="btn danger" data-action="dispute" data-id="${b.id}">Відкрити спір</button>
       </div>`;
   } else if (b.state === 'dispute') {
-    body = `<div class="notice warn">Спір: «${esc(b.disputeReason)}». Модератор перевірить і вирішить, кому передати гроші.</div>`;
+    body = `<div class="notice warn">Спір: «${esc(b.disputeReason)}». Модератор перевірить і вирішить, кому передати гроші.</div>${result(b)}`;
+  } else if (b.state === 'completed') {
+    body = result(b);
   } else if (b.state === 'cancelled' || b.state === 'noshow' || b.state === 'refunded') {
     body = `<div class="small muted">Повернено ${uah(b.refund ?? b.paid)} на картку${b.placeAmount ? `, ${uah(b.placeAmount)} отримала точка` : ''}.</div>`;
   }
@@ -500,20 +513,32 @@ function partnerBooking(b) {
   const [cls, label] = STATE_LABEL[b.state];
   let actions = '';
   if (b.state === 'paid') {
-    actions = `<form class="code-form" data-id="${b.id}">
-        <label class="field" style="margin:0;flex:1"><span>Код клієнта</span>
-          <input name="code" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="0000"></label>
-        <button class="btn primary" type="submit">Підтвердити</button>
+    actions = `<form class="ready-form stack" data-id="${b.id}">
+        <div class="row" style="align-items:center">
+          <label class="btn photo-pick">📷 Додати фото результату (до 3)
+            <input class="sr-only" name="photos" type="file" accept="image/*" capture="environment" multiple></label>
+          <span class="small muted photo-count" aria-live="polite"></span>
+        </div>
+        <div class="two">
+          <label class="field"><span>Пробіг, км</span><input name="km" type="number" inputmode="numeric" min="0" autocomplete="off"></label>
+          <label class="field"><span>Код клієнта</span><input name="code" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="0000"></label>
+        </div>
+        <label class="field"><span>Коментар для клієнта</span><input name="note" autocomplete="off" placeholder="Наприклад, старі колодки в багажнику"></label>
+        <div class="row">
+          <button class="btn primary" type="submit" name="mode" value="code">Підтвердити кодом</button>
+          <button class="btn" type="submit" name="mode" value="ready">Машина готова</button>
+        </div>
       </form>
       <div class="row">
-        <button class="btn" data-action="done" data-id="${b.id}">Виконано без коду</button>
         ${b.extra ? '' : `<button class="btn" data-action="extra" data-id="${b.id}">＋ Доплата</button>`}
         ${started ? `<button class="btn danger" data-action="noshow" data-id="${b.id}">Клієнт не приїхав</button>` : ''}
       </div>
       ${b.extra ? `<p class="small muted" style="margin:0">Запит на доплату +${uah(b.extra.amount)} чекає відповіді клієнта.</p>` : ''}
       ${b.extraDeclined ? '<p class="small muted" style="margin:0">Клієнт відхилив доплату.</p>' : ''}`;
   } else if (b.state === 'done') {
-    actions = `<p class="small muted" style="margin:0">Чекаємо підтвердження клієнта. Гроші надійдуть автоматично ${fmtTime(b.doneAt + PAYMENT.autoReleaseHours * HOUR)}.</p>`;
+    actions = `<p class="small muted" style="margin:0">Чекаємо підтвердження клієнта. Гроші надійдуть автоматично ${fmtTime(b.doneAt + PAYMENT.autoReleaseHours * HOUR)}.</p>${result(b)}`;
+  } else if (b.state === 'completed') {
+    actions = result(b);
   } else if (b.state === 'dispute') {
     actions = `<div class="notice warn">Клієнт відкрив спір: «${esc(b.disputeReason)}»</div>`;
   }
@@ -570,15 +595,80 @@ function viewPartner() {
     <p class="note">Демо: записи, баланс і виплати зберігаються на цьому пристрої, тож клієнта й точку можна перевірити на одному телефоні.</p>`;
 }
 
+// ---------- гараж і сервісна книжка ----------
+
+const fmtDate = (s) => parseDate(s).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' });
+const km = (n) => `${n.toLocaleString('uk-UA')} км`;
+
+// Історія авто: завершені записи в CARCAR плюс записи, додані вручну.
+function historyOf(car) {
+  const fromApp = bookings
+    .filter((b) => b.carId === car.id && b.state === 'completed')
+    .map((b) => ({ date: b.date, km: b.km, text: b.services.join(', '), cost: b.paid, place: placeById(b.placeId)?.name, photos: b.photos, note: b.note }));
+  return [...fromApp, ...(car.log ?? [])].sort((x, y) => (x.date < y.date ? 1 : -1));
+}
+
+const currentKm = (car) => Math.max(car.mileage || 0, ...historyOf(car).map((h) => h.km || 0));
+
+function reminders(car) {
+  const out = [];
+  const now = new Date();
+  const history = historyOf(car);
+
+  const m = now.getMonth();
+  const winter = m >= 9 && m <= 10;
+  const summer = m >= 2 && m <= 3;
+  if (winter || summer) {
+    const since = isoDate(winter ? new Date(now.getFullYear(), 8, 1) : new Date(now.getFullYear(), 1, 15));
+    const done = history.find((h) => h.date >= since && /перевзування/i.test(h.text));
+    out.push(done
+      ? { level: 'ok', text: `Перевзування зроблено ${fmtDate(done.date)}` }
+      : { level: 'due', text: `Час перевзутися на ${winter ? 'зимові' : 'літні'} шини`, cat: 'tires' });
+  }
+
+  const oil = history.find((h) => /олив|масл/i.test(h.text));
+  const cur = currentKm(car);
+  if (!oil) {
+    out.push({ level: 'info', text: 'Немає даних про заміну оливи — додайте запис нижче' });
+  } else {
+    const ageMonths = (now - parseDate(oil.date)) / (30.4 * 24 * HOUR);
+    const left = oil.km && cur ? oil.km + MAINTENANCE.oilKm - cur : null;
+    if (ageMonths >= MAINTENANCE.oilMonths || (left !== null && left <= 0)) {
+      out.push({ level: 'due', text: left !== null && left <= 0 ? `Пора міняти оливу: прострочено на ${km(-left)}` : 'Пора міняти оливу: минув рік', cat: 'service' });
+    } else if (left !== null && left <= MAINTENANCE.oilWarnKm) {
+      out.push({ level: 'due', text: `Заміна оливи через ${km(left)}`, cat: 'service' });
+    } else {
+      out.push({ level: 'ok', text: left !== null ? `Олива: ще ${km(left)}` : `Оливу міняли ${fmtDate(oil.date)}` });
+    }
+  }
+
+  if (car.insuranceUntil) {
+    const days = Math.ceil((parseDate(car.insuranceUntil) - now) / (24 * HOUR));
+    if (days < 0) out.push({ level: 'due', text: 'Поліс ОСЦПВ прострочено' });
+    else if (days <= MAINTENANCE.insuranceWarnDays) out.push({ level: 'due', text: `Поліс ОСЦПВ закінчується через ${days} ${plural(days, 'день', 'дні', 'днів')}` });
+    else out.push({ level: 'ok', text: `Поліс ОСЦПВ до ${fmtDate(car.insuranceUntil)}` });
+  }
+  return out;
+}
+
+const reminderRow = (r) => `<div class="reminder ${r.level}">
+    <span class="small">${r.level === 'due' ? '⚠️' : r.level === 'ok' ? '✅' : 'ℹ️'} ${esc(r.text)}</span>
+    ${r.cat ? `<a class="btn" href="#/" data-action="cat" data-cat="${r.cat}">Записатися</a>` : ''}
+  </div>`;
+
 function viewGarage() {
   return `<h1>Гараж</h1>
-    <p class="muted">Авто в гаражі потрібні, щоб одразу бачити ціни для свого класу й не вводити дані під час запису.</p>
+    <p class="muted">Сервісна книжка кожного авто: історія обслуговування, пробіг і нагадування.</p>
     <div class="stack">
-      ${cars.map((c) => `<article class="card place-head">
-        <div><h2 class="card-title">${esc(c.make)} ${esc(c.model)}</h2>
-        <div class="small muted">${[c.plate, CAR_CLASSES[c.cls], c.tires && `шини ${c.tires}`].filter(Boolean).map(esc).join(' · ')}</div></div>
-        <button class="btn danger" data-action="delcar" data-id="${c.id}" aria-label="Видалити ${esc(c.make)} ${esc(c.model)}">Видалити</button>
-      </article>`).join('')}
+      ${cars.map((c) => {
+        const due = reminders(c).filter((r) => r.level === 'due');
+        return `<a class="card car-link" href="#/garage/${c.id}">
+          <h2 class="card-title">${esc(c.make)} ${esc(c.model)}</h2>
+          <div class="small muted">${[c.plate, CAR_CLASSES[c.cls], currentKm(c) ? km(currentKm(c)) : ''].filter(Boolean).map(esc).join(' · ')}</div>
+          ${due.length ? `<div class="badges"><span class="badge" style="background:var(--warn-soft)">⚠️ ${esc(due[0].text)}${due.length > 1 ? ` і ще ${due.length - 1}` : ''}</span></div>` : ''}
+          <div class="small" style="margin-top:6px;color:var(--accent);font-weight:600">Сервісна книжка →</div>
+        </a>`;
+      }).join('')}
     </div>
     <h2>${cars.length ? 'Додати ще авто' : 'Додати авто'}</h2>
     <form class="card" id="carform">
@@ -586,9 +676,49 @@ function viewGarage() {
       <label class="field"><span>Модель</span><input name="model" required placeholder="Наприклад, Octavia" autocomplete="off"></label>
       <label class="field"><span>Держномер (необовʼязково)</span><input name="plate" placeholder="AA1234BB" autocomplete="off"></label>
       <label class="field"><span>Клас</span><select name="cls">${CAR_CLASSES.map((c, i) => `<option value="${i}">${c}</option>`).join('')}</select></label>
+      <label class="field"><span>Пробіг, км (необовʼязково)</span><input name="mileage" type="number" inputmode="numeric" min="0" autocomplete="off"></label>
       <label class="field"><span>Розмір шин (необовʼязково)</span><input name="tires" placeholder="205/55 R16" autocomplete="off"></label>
+      <label class="field"><span>Поліс ОСЦПВ дійсний до (необовʼязково)</span><input name="insuranceUntil" type="date"></label>
       <button class="btn primary block" type="submit">Зберегти</button>
     </form>`;
+}
+
+function viewCar(id) {
+  const c = cars.find((x) => x.id === id);
+  if (!c) return viewNotFound();
+  const history = historyOf(c);
+  return `<a class="back" href="#/garage">← Гараж</a>
+    <h1>${esc(c.make)} ${esc(c.model)}</h1>
+    <div class="small muted">${[c.plate, CAR_CLASSES[c.cls], c.tires && `шини ${c.tires}`].filter(Boolean).map(esc).join(' · ')}</div>
+    <h2>Нагадування</h2>
+    <div class="stack">${reminders(c).map(reminderRow).join('')}</div>
+    <h2>Пробіг</h2>
+    <form class="card row" id="kmform" data-id="${c.id}" style="align-items:end">
+      <label class="field" style="margin:0;flex:1"><span>Поточний пробіг, км</span>
+        <input name="km" type="number" inputmode="numeric" min="0" value="${currentKm(c) || ''}" autocomplete="off"></label>
+      <button class="btn" type="submit">Оновити</button>
+    </form>
+    <h2>Історія обслуговування</h2>
+    <div class="card stack">
+      ${history.length ? history.map((h) => `<div class="log-item stack">
+        <div class="place-head"><b>${fmtDate(h.date)}</b>${h.cost ? `<b>${uah(h.cost)}</b>` : ''}</div>
+        <div>${esc(h.text)}</div>
+        <div class="small muted">${[h.place, h.km && km(h.km)].filter(Boolean).map(esc).join(' · ')}</div>
+        ${h.note ? `<div class="small">💬 ${esc(h.note)}</div>` : ''}
+        ${h.photos?.length ? `<div class="photos">${h.photos.map((src, i) => `<img src="${esc(src)}" alt="Фото ${i + 1}">`).join('')}</div>` : ''}
+      </div>`).join('') : '<p class="muted" style="margin:0">Тут зʼявляться всі візити через CARCAR. Роботи в інших сервісах можна додати вручну.</p>'}
+    </div>
+    <h2>Додати запис вручну</h2>
+    <form class="card" id="logform" data-id="${c.id}">
+      <label class="field"><span>Дата</span><input name="date" type="date" required value="${isoDate(new Date())}"></label>
+      <label class="field"><span>Що зроблено</span><input name="text" required placeholder="Наприклад, заміна оливи та фільтра" autocomplete="off"></label>
+      <label class="field"><span>Пробіг, км (необовʼязково)</span><input name="km" type="number" inputmode="numeric" min="0" autocomplete="off"></label>
+      <label class="field"><span>Сума, ₴ (необовʼязково)</span><input name="cost" type="number" inputmode="numeric" min="0" autocomplete="off"></label>
+      <button class="btn primary block" type="submit">Додати в книжку</button>
+    </form>
+    <div class="row" style="margin-top:20px">
+      <button class="btn danger" data-action="delcar" data-id="${c.id}">Видалити авто</button>
+    </div>`;
 }
 
 function viewNotFound() {
@@ -603,8 +733,8 @@ function downloadIcs(b) {
   const end = new Date(start.getTime() + b.minutes * 60000);
   const fmt = (d) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
   const ics = [
-    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//AutoZapys//UK', 'BEGIN:VEVENT',
-    `UID:${b.id}@autozapis`, `DTSTART:${fmt(start)}`, `DTEND:${fmt(end)}`,
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//CARCAR//UK', 'BEGIN:VEVENT',
+    `UID:${b.id}@carcar`, `DTSTART:${fmt(start)}`, `DTEND:${fmt(end)}`,
     `SUMMARY:${p.name}`, `LOCATION:${CITY.name}\\, ${p.address}`, `DESCRIPTION:${b.services.join('\\, ')}`,
     'BEGIN:VALARM', 'TRIGGER:-PT1H', 'ACTION:DISPLAY', 'DESCRIPTION:Скоро запис', 'END:VALARM',
     'END:VEVENT', 'END:VCALENDAR',
@@ -614,6 +744,39 @@ function downloadIcs(b) {
   a.download = `zapis-${b.date}.ics`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// Зменшує фото до 720 px, щоб воно вмістилося у сховище пристрою.
+async function shrinkPhoto(file) {
+  try {
+    const img = await createImageBitmap(file);
+    const k = Math.min(1, 720 / Math.max(img.width, img.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(img.width * k);
+    canvas.height = Math.round(img.height * k);
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', 0.7);
+  } catch {
+    return null;
+  }
+}
+
+// «Машина готова»: точка додає фото, пробіг і коментар, а потім або вводить код клієнта
+// (гроші одразу точці), або чекає підтвердження клієнта.
+async function finishJob(form, mode) {
+  const b = bookings.find((x) => x.id === form.dataset.id);
+  const f = new FormData(form);
+  if (mode === 'code' && f.get('code').trim() !== b.code) { toast('Невірний код'); return; }
+  const files = f.getAll('photos').filter((x) => x.size).slice(0, 3);
+  const photos = (await Promise.all(files.map(shrinkPhoto))).filter(Boolean);
+  Object.assign(b, { photos, note: f.get('note').trim() || null, km: Number(f.get('km')) || null });
+  if (mode === 'code') Object.assign(b, { state: 'completed', releasedAt: Date.now() });
+  else Object.assign(b, { state: 'done', doneAt: Date.now() });
+  const dropped = !save() && photos.length > 0;
+  if (dropped) { b.photos = []; save(); }
+  route();
+  if (dropped) toast('Фото не вмістилися в памʼять пристрою, запис збережено без них');
+  else toast(mode === 'code' ? `Код вірний: ${uah(b.paid)} зараховано на баланс` : 'Клієнт отримав сповіщення «Машина готова»');
 }
 
 // Дії із записом з боку клієнта, точки й модератора. Повертають false, якщо нічого не змінилося.
@@ -646,10 +809,6 @@ const bookingActions = {
     Object.assign(b, { state: 'dispute', disputeReason: reason });
     toast('Спір відкрито, гроші заморожено');
   },
-  done(b) {
-    Object.assign(b, { state: 'done', doneAt: Date.now() });
-    toast(`Клієнт має ${PAYMENT.autoReleaseHours} год на підтвердження`);
-  },
   extra(b) {
     const amount = Math.round(Number(prompt('Сума доплати, ₴')));
     if (!(amount > 0)) return false;
@@ -681,6 +840,9 @@ function route() {
   const view = $('#view');
   const tab = ['bookings', 'garage', 'partner'].includes(page) ? page : 'catalog';
   settle();
+  // Крапка на вкладці «Мої записи», коли машина готова й чекає підтвердження.
+  const ready = bookings.some((b) => b.state === 'done' || b.extra);
+  document.querySelector('.tabs a[data-tab="bookings"]').toggleAttribute('data-badge', ready);
   document.querySelectorAll('.tabs a').forEach((a) => {
     if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
@@ -690,7 +852,7 @@ function route() {
   else if (page === 'place') view.innerHTML = viewPlace(arg);
   else if (page === 'book') { view.innerHTML = viewBook(arg); if ($('#book')) renderBook(); }
   else if (page === 'bookings') view.innerHTML = viewBookings(arg);
-  else if (page === 'garage') view.innerHTML = viewGarage();
+  else if (page === 'garage') view.innerHTML = arg ? viewCar(arg) : viewGarage();
   else if (page === 'partner') view.innerHTML = viewPartner();
   else view.innerHTML = viewNotFound();
 
@@ -707,7 +869,8 @@ document.addEventListener('click', (e) => {
   if (action === 'cat') {
     ui.cat = el.dataset.cat;
     e.preventDefault();
-    route();
+    if (location.hash && location.hash !== '#/') location.hash = '#/';
+    else route();
   } else if (action === 'toggle') {
     ui[el.dataset.key] = !ui[el.dataset.key];
     el.setAttribute('aria-pressed', ui[el.dataset.key]);
@@ -757,9 +920,10 @@ document.addEventListener('click', (e) => {
       date: nextDays()[0], time: null, carId: cars[0]?.id ?? null,
     };
   } else if (action === 'delcar') {
+    if (!confirm('Видалити авто разом із сервісною книжкою?')) return;
     cars = cars.filter((c) => c.id !== id);
     store.set('cars', cars);
-    route();
+    if (location.hash === '#/garage') route(); else location.hash = '#/garage';
   }
 });
 
@@ -779,6 +943,9 @@ document.addEventListener('change', (e) => {
   } else if (t.id === 'sort') {
     ui.sort = t.value;
     renderList();
+  } else if (t.name === 'photos') {
+    const n = Math.min(t.files.length, 3);
+    t.closest('form').querySelector('.photo-count').textContent = n ? `Обрано фото: ${n}` : '';
   } else if (t.id === 'partner-place') {
     ui.partner = t.value;
     store.set('partner', ui.partner);
@@ -791,16 +958,27 @@ document.addEventListener('input', (e) => {
 });
 
 document.addEventListener('submit', (e) => {
-  if (e.target.matches('.code-form')) {
+  if (e.target.matches('.ready-form')) {
     e.preventDefault();
-    const b = bookings.find((x) => x.id === e.target.dataset.id);
-    const code = new FormData(e.target).get('code').trim();
-    if (code !== b.code) { toast('Невірний код'); return; }
-    b.state = 'completed';
-    b.releasedAt = Date.now();
-    save();
+    finishJob(e.target, e.submitter?.value ?? 'ready');
+    return;
+  }
+  if (e.target.id === 'kmform' || e.target.id === 'logform') {
+    e.preventDefault();
+    const car = cars.find((c) => c.id === e.target.dataset.id);
+    const f = new FormData(e.target);
+    if (e.target.id === 'kmform') {
+      car.mileage = Number(f.get('km')) || 0;
+      toast('Пробіг оновлено');
+    } else {
+      car.log = [...(car.log ?? []), {
+        id: uid(), date: f.get('date'), text: f.get('text').trim(),
+        km: Number(f.get('km')) || null, cost: Number(f.get('cost')) || null,
+      }];
+      toast('Запис додано в сервісну книжку');
+    }
+    store.set('cars', cars);
     route();
-    toast(`Код вірний: ${uah(b.paid)} зараховано на баланс`);
     return;
   }
   if (e.target.id !== 'carform') return;
@@ -813,6 +991,9 @@ document.addEventListener('submit', (e) => {
     plate: f.get('plate').trim().toUpperCase(),
     cls: Number(f.get('cls')),
     tires: f.get('tires').trim(),
+    mileage: Number(f.get('mileage')) || 0,
+    insuranceUntil: f.get('insuranceUntil') || null,
+    log: [],
   };
   cars.push(car);
   store.set('cars', cars);
