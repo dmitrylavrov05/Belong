@@ -18,7 +18,7 @@ test('каталог фільтрується за категорією, пош�
   await page.goto('/');
   await expect(page).toHaveTitle('CARCAR');
   await expect(page.getByText('Час на зимову гуму')).toBeVisible();
-  await expect(page.locator('#list article')).toHaveCount(7);
+  await expect(page.locator('#list article')).toHaveCount(9);
 
   await page.getByRole('button', { name: '🛞 Шиномонтаж' }).click();
   await expect(page.locator('#list article')).toHaveCount(4);
@@ -194,6 +194,40 @@ test('пізнє скасування й неявка: частина гроше
   await expect(page.getByRole('region', { name: 'Баланс' })).toContainText('Доступно до виведення900 ₴');
 });
 
+test.describe('поруч зі мною', () => {
+  // Користувач на Троєщині.
+  test.use({ geolocation: { latitude: 50.512, longitude: 30.602 }, permissions: ['geolocation'] });
+
+  test('найближчі точки зверху, з відстанню', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: '📍 Поруч' }).click();
+    await expect(page.locator('#count')).toContainText('відстань від вас');
+    const first = page.locator('#list article').first();
+    await expect(first).toContainText('Чисто і швидко');
+    await expect(first.locator('.badge.dist')).toHaveText(/📍 \d+ м/);
+    await expect(page.getByLabel('Сортування')).toHaveValue('near');
+
+    await page.getByRole('button', { name: '✨ Детейлінг' }).click();
+    await expect(page.locator('#list article')).toHaveCount(2);
+    await expect(page.locator('#list article').first()).toContainText('Кераміка Про');
+
+    await page.locator('#list article').first().getByRole('link').first().click();
+    await expect(page.getByText(/км від вас/)).toBeVisible();
+    await expect(page.getByText('Керамічне покриття кузова')).toBeVisible();
+  });
+});
+
+test('без геолокації відстань рахується від центру Києва', async ({ page }) => {
+  await page.addInitScript(() => {
+    navigator.geolocation.getCurrentPosition = (ok, fail) => setTimeout(() => fail({ code: 1 }), 10);
+  });
+  await page.goto('/');
+  await page.getByLabel('Сортування').selectOption('near');
+  await expect(page.locator('#toast')).toContainText('від центру Києва');
+  await expect(page.locator('#count')).toContainText('відстань від центру Києва');
+  await expect(page.locator('#list article').first()).toContainText('Автомийка «Блиск»');
+});
+
 const PIXEL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 
 async function addCar(page, extra = async () => {}) {
@@ -275,5 +309,5 @@ test('працює без збереження в localStorage', async ({ page }
     Object.defineProperty(window, 'localStorage', { get() { throw new Error('blocked'); } });
   });
   await page.goto('/');
-  await expect(page.locator('#list article')).toHaveCount(7);
+  await expect(page.locator('#list article')).toHaveCount(9);
 });

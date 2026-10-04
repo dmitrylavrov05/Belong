@@ -82,7 +82,49 @@ function minPrice(place, cat, cls) {
 // Категорія послуги за каталогом, з якого її взято.
 const WASH_IDS = ['express', 'complex', 'inside', 'wax', 'engine', 'dry'];
 const TIRE_IDS = ['change', 'balance', 'repair', 'storage', 'rolling'];
-const serviceCat = (s) => (WASH_IDS.includes(s.id) ? 'wash' : TIRE_IDS.includes(s.id) ? 'tires' : 'service');
+const DETAIL_IDS = ['polish', 'ceramic', 'ppf', 'deepclean', 'headlights'];
+const serviceCat = (s) =>
+  WASH_IDS.includes(s.id) ? 'wash' : TIRE_IDS.includes(s.id) ? 'tires' : DETAIL_IDS.includes(s.id) ? 'detailing' : 'service';
+
+// ---------- відстань ----------
+
+// Відстань по прямій між двома точками, км (формула гаверсинуса).
+function distanceKm(a, b) {
+  const rad = (x) => (x * Math.PI) / 180;
+  const dLat = rad(b.lat - a.lat);
+  const dLng = rad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 6371 * 2 * Math.asin(Math.sqrt(h));
+}
+
+const fmtDist = (d) => (d < 1 ? `${Math.max(50, Math.round((d * 1000) / 50) * 50)} м` : `${d.toLocaleString('uk-UA', { maximumFractionDigits: 1 })} км`);
+const distTo = (p) => (ui.pos ? distanceKm(ui.pos, p) : null);
+
+// Місце користувача тримаємо лише в памʼяті й нікуди не надсилаємо.
+function locate() {
+  if (ui.locating) return;
+  ui.locating = true;
+  const done = (pos, fallback) => {
+    Object.assign(ui, { pos, posFallback: fallback, locating: false });
+    if ($('#list')) renderList();
+    if (fallback) toast('Не вдалося визначити ваше місце — рахуємо відстань від центру Києва');
+  };
+  if (!navigator.geolocation) { done(CITY.center, true); return; }
+  navigator.geolocation.getCurrentPosition(
+    (p) => done({ lat: p.coords.latitude, lng: p.coords.longitude }, false),
+    () => done(CITY.center, true),
+    { timeout: 8000, maximumAge: 300000 },
+  );
+}
+
+function setSort(value) {
+  ui.sort = value;
+  if (value === 'near' && !ui.pos) locate();
+  if ($('#sort')) $('#sort').value = value;
+  const near = $('[data-action="near"]');
+  if (near) near.setAttribute('aria-pressed', value === 'near');
+  renderList();
+}
 
 // Вільні вікна: крок 30 хвилин, частина вікон зайнята (стабільно для дня й точки),
 // плюс власні записи користувача в цій точці.
@@ -152,6 +194,7 @@ function filteredPlaces() {
     rating: (a, b) => b.rating - a.rating,
     price: (a, b) => minPrice(a, ui.cat, ui.cls) - minPrice(b, ui.cat, ui.cls),
     reviews: (a, b) => b.reviews - a.reviews,
+    near: (a, b) => (ui.pos ? distTo(a) - distTo(b) : b.rating - a.rating),
   }[ui.sort];
   return list.sort(by);
 }
@@ -175,6 +218,7 @@ function placeCard(p) {
         <span>${esc(p.district)}, ${esc(p.address)}</span>
       </div>
       <div class="badges">
+        ${ui.pos ? `<span class="badge dist">📍 ${fmtDist(distTo(p))}</span>` : ''}
         <span class="badge ${open ? 'open' : 'closed'}">${open ? 'Відчинено' : 'Зачинено'} · ${hoursText(p)}</span>
         <span class="badge">від ${uah(minPrice(p, ui.cat, ui.cls))}</span>
       </div>
@@ -187,15 +231,17 @@ function renderList() {
   $('#list').innerHTML = list.length
     ? list.map(placeCard).join('')
     : `<div class="empty"><div class="emoji" aria-hidden="true">🔍</div><p>Нічого не знайшлося. Спробуйте змінити фільтри.</p></div>`;
-  $('#count').textContent = `${list.length} ${plural(list.length, 'місце', 'місця', 'місць')}`;
+  const where = ui.locating ? ' · визначаємо ваше місце…' : ui.sort === 'near' && ui.pos ? ` · відстань від ${ui.posFallback ? 'центру Києва' : 'вас'}` : '';
+  $('#count').textContent = `${list.length} ${plural(list.length, 'місце', 'місця', 'місць')}${where}`;
 }
 
 function viewCatalog() {
   const chip = (label, attrs, on) => `<button class="chip" ${attrs} aria-pressed="${on}">${label}</button>`;
   return `${seasonBanner()}
-    <h1>Мийки, шиномонтаж і СТО</h1>
+    <h1>Мийки, шиномонтаж, СТО й детейлінг</h1>
     <input id="q" class="search" type="search" placeholder="Назва, адреса або послуга" aria-label="Пошук" value="${esc(ui.q)}">
-    <div class="chips" role="group" aria-label="Категорія">
+    <div class="chips" role="group" aria-label="Фільтри">
+      ${chip('📍 Поруч', 'data-action="near"', ui.sort === 'near')}
       ${chip('Усі', 'data-action="cat" data-cat="all"', ui.cat === 'all')}
       ${CATEGORIES.map((c) => chip(`${c.icon} ${c.name}`, `data-action="cat" data-cat="${c.id}"`, ui.cat === c.id)).join('')}
       ${chip('Відчинено зараз', 'data-action="toggle" data-key="openNow"', ui.openNow)}
@@ -211,6 +257,7 @@ function viewCatalog() {
           <option value="rating" ${ui.sort === 'rating' ? 'selected' : ''}>За рейтингом</option>
           <option value="price" ${ui.sort === 'price' ? 'selected' : ''}>Спочатку дешевші</option>
           <option value="reviews" ${ui.sort === 'reviews' ? 'selected' : ''}>За відгуками</option>
+          <option value="near" ${ui.sort === 'near' ? 'selected' : ''}>Найближчі</option>
         </select>
       </span>
     </div>
@@ -234,6 +281,7 @@ function viewPlace(id) {
       <span class="rating">★ ${p.rating.toFixed(1)}</span>
       <span>${p.reviews} ${plural(p.reviews, 'відгук', 'відгуки', 'відгуків')}</span>
       <span>${p.boxes} ${plural(p.boxes, 'бокс', 'бокси', 'боксів')}</span>
+      ${ui.pos ? `<span>📍 ${fmtDist(distTo(p))} від ${ui.posFallback ? 'центру' : 'вас'}</span>` : ''}
     </div>
     <div class="badges">
       <span class="badge ${open ? 'open' : 'closed'}">${open ? 'Відчинено' : 'Зачинено'} · ${hoursText(p)}</span>
@@ -871,6 +919,8 @@ document.addEventListener('click', (e) => {
     e.preventDefault();
     if (location.hash && location.hash !== '#/') location.hash = '#/';
     else route();
+  } else if (action === 'near') {
+    setSort(ui.sort === 'near' ? 'rating' : 'near');
   } else if (action === 'toggle') {
     ui[el.dataset.key] = !ui[el.dataset.key];
     el.setAttribute('aria-pressed', ui[el.dataset.key]);
@@ -941,8 +991,7 @@ document.addEventListener('change', (e) => {
     store.set('cls', ui.cls);
     if (t.id === 'cls') renderList(); else renderBook();
   } else if (t.id === 'sort') {
-    ui.sort = t.value;
-    renderList();
+    setSort(t.value);
   } else if (t.name === 'photos') {
     const n = Math.min(t.files.length, 3);
     t.closest('form').querySelector('.photo-count').textContent = n ? `Обрано фото: ${n}` : '';

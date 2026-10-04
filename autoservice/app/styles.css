@@ -135,6 +135,7 @@ h2 { font-size: 18px; margin: 24px 0 10px; }
 
 .badge { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--navy-soft); color: var(--text); }
 .badge.open { background: var(--ok-soft); color: var(--ok); font-weight: 600; }
+.badge.dist { font-weight: 700; }
 .badge.closed { background: var(--line); color: var(--muted); }
 .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 

@@ -6,12 +6,15 @@ export const CITY = {
   name: 'Київ',
   // Маршрут у Google Maps: до адреси точки додається назва міста.
   mapsSearch: 'https://www.google.com/maps/search/?api=1&query=',
+  // Майдан Незалежності: від нього рахуємо відстань, якщо геолокація недоступна.
+  center: { lat: 50.4501, lng: 30.5234 },
 };
 
 export const CATEGORIES = [
   { id: 'wash', name: 'Мийка', icon: '🫧' },
   { id: 'tires', name: 'Шиномонтаж', icon: '🛞' },
   { id: 'service', name: 'СТО', icon: '🔧' },
+  { id: 'detailing', name: 'Детейлінг', icon: '✨' },
 ];
 
 // Ціна залежить від класу авто: [легкове, кросовер, позашляховик/мінівен], у гривнях.
@@ -44,13 +47,24 @@ const SERVICE = {
   battery: { name: 'Заміна акумулятора', min: 20, price: [150, 150, 200] },
 };
 
+const DETAILING = {
+  polish: { name: 'Полірування кузова', min: 180, price: [3500, 4200, 5000] },
+  ceramic: { name: 'Керамічне покриття кузова', min: 360, price: [9000, 11000, 13000] },
+  ppf: { name: 'Антигравійна плівка: капот і бампер', min: 480, price: [12000, 14000, 16000] },
+  deepclean: { name: 'Глибока хімчистка салону з розбиранням', min: 300, price: [4000, 4800, 5600] },
+  headlights: { name: 'Полірування фар', min: 60, price: [600, 600, 700] },
+};
+
 const pick = (catalog, ids, k = 1) =>
   ids.map((id) => ({ id, ...catalog[id], price: catalog[id].price.map((p) => Math.round((p * k) / 10) * 10) }));
 
 // hours: [відкриття, закриття] у годинах; null — цілодобово.
+// lat, lng — приблизні координати для сортування «Поруч» (демо).
 export const PLACES = [
   {
     id: 'blysk',
+    lat: 50.433,
+    lng: 30.518,
     name: 'Автомийка «Блиск»',
     cats: ['wash'],
     address: 'вул. Велика Васильківська, 45',
@@ -65,6 +79,8 @@ export const PLACES = [
   },
   {
     id: 'aqua24',
+    lat: 50.489,
+    lng: 30.495,
     name: 'Аква 24',
     cats: ['wash'],
     address: 'просп. Степана Бандери, 20',
@@ -79,6 +95,8 @@ export const PLACES = [
   },
   {
     id: 'koleso',
+    lat: 50.407,
+    lng: 30.652,
     name: 'Шиномонтаж «Колесо»',
     cats: ['tires'],
     address: 'Харківське шосе, 58',
@@ -93,6 +111,8 @@ export const PLACES = [
   },
   {
     id: 'shynservis',
+    lat: 50.457,
+    lng: 30.375,
     name: 'ШинСервіс',
     cats: ['tires', 'service'],
     address: 'просп. Берестейський, 120',
@@ -107,6 +127,8 @@ export const PLACES = [
   },
   {
     id: 'motor',
+    lat: 50.48,
+    lng: 30.488,
     name: 'СТО «Мотор»',
     cats: ['service'],
     address: 'вул. Кирилівська, 77',
@@ -121,6 +143,8 @@ export const PLACES = [
   },
   {
     id: 'avtodoktor',
+    lat: 50.429,
+    lng: 30.472,
     name: 'Автодоктор',
     cats: ['service', 'tires'],
     address: 'просп. Валерія Лобановського, 14',
@@ -135,6 +159,8 @@ export const PLACES = [
   },
   {
     id: 'chysto',
+    lat: 50.51,
+    lng: 30.6,
     name: 'Чисто і швидко',
     cats: ['wash', 'tires'],
     address: 'просп. Червоної Калини, 31',
@@ -146,6 +172,38 @@ export const PLACES = [
     boxes: 3,
     tags: ['Мийка + перевзування за раз', 'Wi‑Fi'],
     services: [...pick(WASH, ['express', 'complex', 'inside'], 0.85), ...pick(TIRES, ['change', 'balance', 'repair'], 0.95)],
+  },
+  {
+    id: 'hlyanets',
+    lat: 50.4255,
+    lng: 30.5120,
+    name: 'Детейлінг-студія «Глянець»',
+    cats: ['detailing'],
+    address: 'вул. Антоновича, 100',
+    district: 'Голосіївський',
+    phone: '+380 44 000 00 08',
+    hours: [9, 20],
+    rating: 4.9,
+    reviews: 118,
+    boxes: 2,
+    tags: ['Тепла камера', 'Гарантія на кераміку 2 роки'],
+    services: pick(DETAILING, ['polish', 'ceramic', 'ppf', 'deepclean', 'headlights']),
+  },
+  {
+    id: 'keramika',
+    lat: 50.4570,
+    lng: 30.6150,
+    name: 'Кераміка Про',
+    cats: ['detailing', 'wash'],
+    address: 'просп. Соборності, 17',
+    district: 'Дніпровський',
+    phone: '+380 44 000 00 09',
+    hours: [8, 21],
+    rating: 4.6,
+    reviews: 65,
+    boxes: 3,
+    tags: ['Детейлінг-мийка', 'Генератор: працює під час відключень'],
+    services: [...pick(WASH, ['complex', 'wax'], 1.2), ...pick(DETAILING, ['polish', 'ceramic', 'headlights'], 0.9)],
   },
 ];
 
