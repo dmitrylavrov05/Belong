@@ -316,6 +316,8 @@ label.item { cursor: pointer; padding: 10px 14px; }
 .review p { margin: 0; font-size: 15px; }
 .review .small { display: flex; align-items: center; gap: 5px; }
 .review .small .ic { color: var(--ok); }
+.review .reply { background: var(--soft); border-radius: 12px; padding: 10px 12px; font-size: 14px; }
+.review .reply b { display: block; font-size: 13px; margin-bottom: 2px; }
 .my-review { background: var(--soft); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
 .my-review p { margin: 0; font-size: 14px; }
 

@@ -499,10 +499,11 @@ test('працює без збереження в localStorage', async ({ page }
   await expect(page.locator('#list article')).toHaveCount(9);
 });
 
-test('файл для дизайну design/carcar-prototype.html зібрано з поточної версії', () => {
+test('файли для дизайну в design/ зібрано з поточної версії', () => {
   test.skip(test.info().project.name !== 'desktop', 'достатньо однієї перевірки');
-  const fresh = join(mkdtempSync(join(tmpdir(), 'carcar-')), 'bundle.html');
-  execFileSync('node', ['scripts/bundle.mjs', fresh]);
-  const committed = readFileSync('design/carcar-prototype.html', 'utf8');
-  expect(committed === readFileSync(fresh, 'utf8'), 'запустіть npm run bundle').toBe(true);
+  const dir = mkdtempSync(join(tmpdir(), 'carcar-'));
+  execFileSync('node', ['scripts/bundle.mjs', dir]);
+  for (const f of ['carcar-prototype.html', 'carcar-business.html']) {
+    expect(readFileSync(`design/${f}`, 'utf8') === readFileSync(join(dir, f), 'utf8'), `${f}: запустіть npm run bundle`).toBe(true);
+  }
 });

@@ -1,28 +1,14 @@
 import { CITY, CATEGORIES, CAR_CLASSES, PLACES, PAYMENT, MAINTENANCE, REFERRAL } from './data.js';
+import {
+  store, icon, esc, uah, pad, hhmm, toMin, isoDate, parseDate, uid, placeById, plural, duration, dayLabel, rating, tel,
+  openRange, isOpenNow, hoursText, bookingStart, fmtTime, fmtDate, km, serviceCat, catById, shrinkPhoto,
+  applyOverrides, ACTIVE, BLOCKING, HOUR, isCarcar, price, complete, isFrozen, placeShare, balanceFor, settleAll, ratingFor,
+} from './core.js';
 
 // ---------- сховище (лише на цьому пристрої) ----------
 
-const store = {
-  get(key, fallback) {
-    try {
-      const raw = localStorage.getItem(`carcar.${key}`);
-      return raw ? JSON.parse(raw) : fallback;
-    } catch {
-      return fallback;
-    }
-  },
-  set(key, value) {
-    try {
-      localStorage.setItem(`carcar.${key}`, JSON.stringify(value));
-      return true;
-    } catch {
-      // Приватний режим або переповнення: працюємо без збереження.
-      return false;
-    }
-  },
-};
-
 let cars = store.get('cars', []);
+// Усі записи: клієнта (без source), внесені точкою в CRM ('crm') і демо-історія панелі ('demo').
 let bookings = store.get('bookings', []).map((b) =>
   // Записи з версії без оплати: вважаємо їх оплаченими або скасованими з поверненням.
   b.state ? b : { ...b, paid: b.total, state: b.status === 'cancelled' ? 'cancelled' : 'paid' });
@@ -40,119 +26,24 @@ function newRefCode() {
 }
 let favs = new Set(store.get('favs', []));
 
+// Записи цього клієнта — те, що він бачить у «Мої записи».
+const mine = () => bookings.filter((b) => !b.source);
+
 const ui = { cat: 'all', q: '', sort: 'rating', openNow: false, favOnly: false, cls: store.get('cls', 0), partner: store.get('partner', null) };
 let draft = null; // чернетка запису: { placeId, services: Set, date, time, carId, paying }
-
-// ---------- іконки (лінійні, з дизайну CARCAR) ----------
-
-const ICONS = {
-  pin: '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
-  snow: '<path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9M9.5 4.5 12 7l2.5-2.5M9.5 19.5 12 17l2.5 2.5"/>',
-  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/>',
-  chevR: '<path d="m9 5 7 7-7 7"/>',
-  chevL: '<path d="m15 5-7 7 7 7"/>',
-  search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/>',
-  drop: '<path d="M12 3.5s6 6.4 6 10.5a6 6 0 0 1-12 0c0-4.1 6-10.5 6-10.5z"/>',
-  wheel: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5"/>',
-  wrench: '<path d="M15 4a5 5 0 0 0-4.6 6.9L4 17.3 6.7 20l6.4-6.4A5 5 0 0 0 20 9l-3 1-2.5-2.5L15.5 4.5z"/>',
-  sparkle: '<path d="M12 3.5 13.8 10 20.5 12 13.8 14 12 20.5 10.2 14 3.5 12 10.2 10z"/>',
-  heart: '<path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20z"/>',
-  heartFill: '<path fill="currentColor" d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20z"/>',
-  star: '<path fill="currentColor" stroke="none" d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.9 6.8 19.6l1-5.8L3.5 9.7l5.9-.8z"/>',
-  calendar: '<rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
-  car: '<path d="M5 16.5V12l1.8-4.6A2 2 0 0 1 8.7 6h6.6a2 2 0 0 1 1.9 1.4L19 12v4.5"/><rect x="3.5" y="12" width="17" height="5" rx="1.5"/><path d="M6 17v2M18 17v2"/>',
-  carSide: '<path d="M5 16.5V12l1.8-4.6A2 2 0 0 1 8.7 6h6.6a2 2 0 0 1 1.9 1.4L19 12v4.5"/><rect x="3.5" y="12" width="17" height="5" rx="1.5"/>',
-  bolt: '<path d="M13 3 5 13.5h6L10 21l8-10.5h-6z"/>',
-  phone: '<path d="M5 4h3.5l1.5 4-2 1.3a11 11 0 0 0 6.7 6.7L16 14l4 1.5V19a1.5 1.5 0 0 1-1.6 1.5A16 16 0 0 1 3.5 5.6 1.5 1.5 0 0 1 5 4z"/>',
-  route: '<circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8.5 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.5"/>',
-  check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
-  shield: '<path d="M12 3.5 5 6v5.5c0 4.3 3 7.8 7 9 4-1.2 7-4.7 7-9V6z"/><path d="m9 12 2 2 4-4"/>',
-  cash: '<rect x="3" y="6.5" width="18" height="11" rx="2"/><circle cx="12" cy="12" r="2.5"/>',
-  undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
-  card: '<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h3"/>',
-  checkCircle: '<circle cx="12" cy="12" r="8.5"/><path d="m8.5 12.2 2.4 2.4 4.6-4.8"/>',
-  image: '<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m20.5 16-5-5-9 8.5"/>',
-  chat: '<path d="M20 12a7.5 7.5 0 0 1-11 6.6L4 20l1.4-4.6A7.5 7.5 0 1 1 20 12z"/>',
-  gauge: '<path d="M4.5 17a8.5 8.5 0 1 1 15 0"/><path d="m12 13 3.5-4"/>',
-  warn: '<path d="M12 4 2.8 19.5h18.4z"/><path d="M12 10v4M12 17v.01"/>',
-  info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8v.01"/>',
-  camera: '<path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1.5-2h6l1.5 2h2A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5z"/><circle cx="12" cy="13" r="3.5"/>',
-  plus: '<path d="M12 5v14M5 12h14"/>',
-  repeat: '<path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5"/><path d="M20 4v4.5h-4.5"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 15.5"/><path d="M4 20v-4.5h4.5"/>',
-  gift: '<rect x="3.5" y="8.5" width="17" height="4" rx="1"/><path d="M5 12.5V20h14v-7.5M12 8.5V20"/><path d="M12 8.5C10.5 5 7 5 7 7s3 1.5 5 1.5zM12 8.5c1.5-3.5 5-3.5 5-1.5s-3 1.5-5 1.5z"/>',
-  share: '<circle cx="18" cy="5.5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><path d="m8.2 10.8 7.6-4.1M8.2 13.2l7.6 4.1"/>',
-  copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/>',
-  scale: '<path d="M12 4v16M8 20h8M5 7h14"/><path d="M5 7 2.5 13a3 3 0 0 0 5 0zM19 7l-2.5 6a3 3 0 0 0 5 0z"/>',
-};
-
-const icon = (name, size = 18) =>
-  `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICONS[name]}</svg>`;
 
 // ---------- утиліти ----------
 
 const $ = (sel, root = document) => root.querySelector(sel);
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const uah = (n) => `${n.toLocaleString('uk-UA')} ₴`;
-const pad = (n) => String(n).padStart(2, '0');
-const hhmm = (min) => `${pad(Math.floor(min / 60))}:${pad(min % 60)}`;
-const toMin = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
-const isoDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const parseDate = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
-const uid = () => Math.random().toString(36).slice(2, 10);
-const placeById = (id) => PLACES.find((p) => p.id === id);
-const plural = (n, one, few, many) => {
-  const m10 = n % 10, m100 = n % 100;
-  if (m10 === 1 && m100 !== 11) return one;
-  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
-  return many;
-};
-const duration = (min) => (min < 60 ? `${min} хв` : `${Math.floor(min / 60)} год${min % 60 ? ` ${min % 60} хв` : ''}`);
-const dayLabel = (s, opts = { weekday: 'short', day: 'numeric', month: 'long' }) =>
-  parseDate(s).toLocaleDateString('uk-UA', opts);
-const rating = (r) => r.toLocaleString('uk-UA', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-const tel = (p) => `tel:${p.phone.replace(/[^+\d]/g, '')}`;
-
-function hash(str) {
-  let h = 2166136261;
-  for (const ch of str) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
-  return h >>> 0;
-}
-
-function openRange(place) {
-  return place.hours ? [place.hours[0] * 60, place.hours[1] * 60] : [0, 24 * 60];
-}
-
-function isOpenNow(place, now = new Date()) {
-  if (!place.hours) return true;
-  const [o, c] = openRange(place);
-  const m = now.getHours() * 60 + now.getMinutes();
-  return m >= o && m < c;
-}
-
-const hoursText = (place) => (place.hours ? `${hhmm(place.hours[0] * 60)}–${hhmm(place.hours[1] * 60)}` : 'Цілодобово');
-const bookingStart = (b) => { const d = parseDate(b.date); d.setMinutes(toMin(b.time)); return d; };
 
 function minPrice(place, cat, cls) {
   const list = cat === 'all' ? place.services : place.services.filter((s) => serviceCat(s) === cat);
   return Math.min(...list.map((s) => s.price[cls]));
 }
 
-// Категорія послуги за каталогом, з якого її взято.
-const WASH_IDS = ['express', 'complex', 'inside', 'wax', 'engine', 'dry'];
-const TIRE_IDS = ['change', 'balance', 'repair', 'storage', 'rolling'];
-const DETAIL_IDS = ['polish', 'ceramic', 'ppf', 'deepclean', 'headlights'];
-const serviceCat = (s) =>
-  WASH_IDS.includes(s.id) ? 'wash' : TIRE_IDS.includes(s.id) ? 'tires' : DETAIL_IDS.includes(s.id) ? 'detailing' : 'service';
-const catById = (id) => CATEGORIES.find((c) => c.id === id);
-
 // ---------- рейтинг з відгуків ----------
 
-function ratingOf(placeId) {
-  const list = reviews.filter((r) => r.placeId === placeId);
-  const dist = [1, 2, 3, 4, 5].map((n) => list.filter((r) => r.stars === n).length);
-  const avg = list.length ? list.reduce((a, r) => a + r.stars, 0) / list.length : 0;
-  return { avg, count: list.length, dist };
-}
+const ratingOf = (placeId) => ratingFor(placeId, reviews);
 
 const reviewsWord = (n) => plural(n, 'відгук', 'відгуки', 'відгуків');
 
@@ -207,22 +98,24 @@ function setSort(value) {
   renderList();
 }
 
-// Вільні вікна: крок 30 хвилин, частина вікон зайнята (стабільно для дня й точки),
-// плюс власні активні записи користувача в цій точці.
+// Вільні вікна: крок 30 хвилин. Вікно зайняте, якщо в клієнта тут уже є свій запис
+// або на цей час не лишилося вільних боксів за журналом точки (записи CARCAR і з CRM).
 function slotsFor(place, date, minutes) {
   const [open, close] = openRange(place);
   const now = new Date();
   const today = date === isoDate(now);
   const nowMin = now.getHours() * 60 + now.getMinutes();
-  const mine = bookings
-    .filter((b) => b.placeId === place.id && b.date === date && ACTIVE.includes(b.state))
-    .map((b) => [toMin(b.time), toMin(b.time) + b.minutes]);
+  const span = (b) => [toMin(b.time), toMin(b.time) + b.minutes];
+  const atPlace = bookings.filter((b) => b.placeId === place.id && b.date === date);
+  const own = atPlace.filter((b) => !b.source && ACTIVE.includes(b.state)).map(span);
+  const all = atPlace.filter((b) => BLOCKING.includes(b.state)).map(span);
   const slots = [];
   for (let t = open; t + minutes <= close; t += 30) {
+    const overlaps = (list) => list.filter(([s, e]) => t < e && t + minutes > s).length;
     const busy =
       (today && t < nowMin + 30) ||
-      hash(`${place.id}|${date}|${t}`) % 10 < 3 ||
-      mine.some(([s, e]) => t < e && t + minutes > s);
+      overlaps(own) > 0 ||
+      overlaps(all) >= place.boxes;
     slots.push({ time: hhmm(t), busy });
   }
   return slots;
@@ -252,9 +145,6 @@ const empty = (ic, text, action = '') => `<div class="empty"><div class="empty-i
 
 // ---------- приведи друга ----------
 
-// Повна ціна замовлення: те, що заплатив клієнт, плюс бонус, який доплачує CARCAR.
-const price = (b) => b.paid + (b.bonus || 0);
-
 function saveReferral() {
   store.set('wallet', wallet);
   store.set('referral', referral);
@@ -280,7 +170,7 @@ function acceptInvite() {
   if (!/^CAR[A-Z0-9]{5}$/.test(c)) { toast('Посилання-запрошення недійсне'); return; }
   if (c === referral.code) { toast('Це ваше посилання — надішліть його другу'); return; }
   if (referral.invitedBy) { toast('Ви вже отримали бонус за запрошенням'); return; }
-  if (bookings.length) { toast('Бонус за запрошенням діє лише для нових користувачів'); return; }
+  if (mine().length) { toast('Бонус за запрошенням діє лише для нових користувачів'); return; }
   referral.invitedBy = c;
   addBonus(REFERRAL.bonus, 'Бонус за запрошенням друга');
   route();
@@ -435,6 +325,7 @@ function reviewItem(r) {
     <div class="head">${stars(r.stars)}<span class="small muted">${fmtDate(r.date)}</span></div>
     ${r.text ? `<p>${esc(r.text)}</p>` : ''}
     <div class="small muted">${icon('checkCircle', 14)}Підтверджений візит · ${esc(r.services)}</div>
+    ${r.reply ? `<div class="reply"><b>Відповідь точки</b>${esc(r.reply.text)}</div>` : ''}
   </article>`;
 }
 
@@ -629,58 +520,21 @@ function confirmBooking() {
 
 // ---------- оплата й утримання коштів ----------
 
-const ACTIVE = ['paid', 'done', 'dispute'];
-const HOUR = 3600000;
-
 function save() {
   return store.set('bookings', bookings) && store.set('payouts', payouts) && store.set('reviews', reviews);
 }
 
-// Клієнт підтвердив (або мовчав після «Машина готова»): замовлення завершене,
-// гроші точці заморожені ще на freezeHours, щоб клієнт встиг відкрити спір.
-function complete(b, at = Date.now()) {
-  Object.assign(b, { state: 'completed', completedAt: at, unfreezeAt: at + PAYMENT.freezeHours * HOUR });
-}
-
-const isFrozen = (b) => b.state === 'completed' && Date.now() < (b.unfreezeAt ?? 0);
-
-// Автоматично передаємо гроші точці, якщо клієнт не відповів за autoReleaseHours.
 function settle() {
-  let changed = false;
-  for (const b of bookings) {
-    if (b.state === 'done' && Date.now() - b.doneAt >= PAYMENT.autoReleaseHours * HOUR) {
-      complete(b, b.doneAt + PAYMENT.autoReleaseHours * HOUR);
-      changed = true;
-    }
-  }
-  if (changed) save();
+  if (settleAll(bookings)) save();
 }
 
-// Скільки з оплати клієнта належить точці (до комісії).
-function placeShare(b) {
-  if (b.state === 'completed') return price(b);
-  if (b.state === 'cancelled' || b.state === 'noshow') return b.placeAmount ?? 0;
-  return 0;
-}
-
-// available — можна вивести; frozen — замовлення в роботі плюс підтверджені, що ще не розморозились.
-function balanceOf(placeId) {
-  const own = bookings.filter((b) => b.placeId === placeId);
-  const earned = own.filter((b) => !isFrozen(b)).reduce((a, b) => a + placeShare(b), 0);
-  const withdrawn = payouts.filter((x) => x.placeId === placeId).reduce((a, x) => a + x.gross, 0);
-  const frozen = own.filter((b) => ACTIVE.includes(b.state) || isFrozen(b))
-    .reduce((a, b) => a + price(b), 0);
-  const next = own.filter(isFrozen).sort((a, b) => a.unfreezeAt - b.unfreezeAt)[0];
-  return { available: earned - withdrawn, frozen, next };
-}
+const balanceOf = (placeId) => balanceFor(placeId, bookings, payouts);
 
 function cancelTerms(b) {
   const free = bookingStart(b) - Date.now() >= PAYMENT.freeCancelHours * HOUR;
   const placeAmount = free ? 0 : Math.round(b.paid * PAYMENT.lateCancelShare);
   return { free, placeAmount, refund: b.paid - placeAmount };
 }
-
-const fmtTime = (ms) => new Date(ms).toLocaleString('uk-UA', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
 
 function steps(b) {
   const at = b.state === 'completed' && isFrozen(b) ? 1 : { paid: 0, done: 1, dispute: 1, completed: 2 }[b.state];
@@ -803,10 +657,11 @@ function bookingCard(b, highlight) {
 }
 
 function viewBookings(highlightId) {
-  const sorted = [...bookings].sort((a, b) => bookingStart(a) - bookingStart(b));
+  const list = mine();
+  const sorted = [...list].sort((a, b) => bookingStart(a) - bookingStart(b));
   const active = sorted.filter((b) => ACTIVE.includes(b.state));
   const rest = sorted.filter((b) => !ACTIVE.includes(b.state)).reverse();
-  if (!bookings.length) {
+  if (!list.length) {
     return `<h1>Мої записи</h1>${empty('calendar', 'Записів поки немає.', '<a class="btn primary" href="#/">Знайти мийку або сервіс</a>')}${inviteCard()}`;
   }
   return `<h1>Мої записи</h1>
@@ -831,7 +686,7 @@ function partnerRow(b) {
 function viewPartner() {
   if (!placeById(ui.partner)) ui.partner = PLACES[0].id;
   const p = placeById(ui.partner);
-  const own = bookings.filter((b) => b.placeId === p.id).sort((a, b) => bookingStart(a) - bookingStart(b));
+  const own = bookings.filter((b) => b.placeId === p.id && isCarcar(b)).sort((a, b) => bookingStart(a) - bookingStart(b));
   const active = own.filter((b) => ACTIVE.includes(b.state));
   const rest = own.filter((b) => !ACTIVE.includes(b.state)).reverse();
   const bal = balanceOf(p.id);
@@ -839,6 +694,8 @@ function viewPartner() {
   const history = payouts.filter((x) => x.placeId === p.id).reverse();
   const disputes = bookings.filter((b) => b.state === 'dispute').length;
   return `<h1>Кабінет точки</h1>
+    <a class="card link-card" href="business.html" style="margin-bottom:12px">${icon('chart', 22)}<span>Повна панель для бізнесу
+      <small class="small muted" style="display:block;font-weight:400">Журнал по боксах, клієнти, прайс, фінанси й аналітика — зручно з компʼютера</small></span>${icon('chevR', 18)}</a>
     <label class="field"><span>Точка</span><select id="partner-place">
       ${PLACES.map((x) => `<option value="${x.id}" ${x.id === p.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}
     </select></label>
@@ -920,9 +777,6 @@ function viewDisputes() {
 }
 
 // ---------- гараж і сервісна книжка ----------
-
-const fmtDate = (s) => parseDate(s).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' });
-const km = (n) => `${n.toLocaleString('uk-UA')} км`;
 
 // Історія авто: завершені записи в CARCAR плюс записи, додані вручну.
 function historyOf(car) {
@@ -1070,21 +924,6 @@ function downloadIcs(b) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
-// Зменшує фото до 720 px, щоб воно вмістилося у сховище пристрою.
-async function shrinkPhoto(file) {
-  try {
-    const img = await createImageBitmap(file);
-    const k = Math.min(1, 720 / Math.max(img.width, img.height));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(img.width * k);
-    canvas.height = Math.round(img.height * k);
-    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL('image/jpeg', 0.7);
-  } catch {
-    return null;
-  }
-}
-
 // «Машина готова»: точка додає фото, пробіг і коментар, а клієнт отримує сповіщення
 // й підтверджує виконання. Після цього повертаємось у кабінет.
 async function finishJob(form) {
@@ -1172,7 +1011,7 @@ function route() {
   const tab = page === 'disputes' ? 'partner' : page === 'invite' ? '' : ['bookings', 'garage', 'partner'].includes(page) ? page : 'catalog';
   settle();
   // Крапка на вкладці «Мої записи», коли машина готова або точка просить доплату.
-  const ready = bookings.some((b) => b.state === 'done' || b.extra);
+  const ready = mine().some((b) => b.state === 'done' || b.extra);
   document.querySelector('.tabs a[data-tab="bookings"]').toggleAttribute('data-badge', ready);
   document.querySelectorAll('.tabs a').forEach((a) => {
     if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page');
@@ -1377,6 +1216,15 @@ document.addEventListener('submit', (e) => {
 
 $('#city').innerHTML = `${icon('pin', 18)}${esc(CITY.name)}`;
 window.addEventListener('hashchange', route);
+// Панель для бізнесу в іншій вкладці змінила записи, прайс чи години — перечитуємо й перемальовуємо.
+window.addEventListener('storage', (e) => {
+  if (!e.key?.startsWith('carcar.')) return;
+  bookings = store.get('bookings', []);
+  payouts = store.get('payouts', []);
+  reviews = store.get('reviews', []);
+  applyOverrides();
+  if (!draft?.paying) route();
+});
 route();
 acceptInvite();
 
