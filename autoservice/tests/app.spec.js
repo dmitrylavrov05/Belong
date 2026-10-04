@@ -1,5 +1,9 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { execFileSync } from 'node:child_process';
+import { readFileSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 // Фіксований час: неділя, 4 жовтня 2026, 10:00 — сезон перевзування.
 test.beforeEach(async ({ page }) => {
@@ -310,4 +314,12 @@ test('працює без збереження в localStorage', async ({ page }
   });
   await page.goto('/');
   await expect(page.locator('#list article')).toHaveCount(9);
+});
+
+test('файл для дизайну design/carcar-prototype.html зібрано з поточної версії', () => {
+  test.skip(test.info().project.name !== 'desktop', 'достатньо однієї перевірки');
+  const fresh = join(mkdtempSync(join(tmpdir(), 'carcar-')), 'bundle.html');
+  execFileSync('node', ['scripts/bundle.mjs', fresh]);
+  const committed = readFileSync('design/carcar-prototype.html', 'utf8');
+  expect(committed === readFileSync(fresh, 'utf8'), 'запустіть npm run bundle').toBe(true);
 });

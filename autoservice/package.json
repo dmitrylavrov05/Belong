@@ -5,6 +5,7 @@
   "description": "CARCAR: мойки, шиномонтаж и СТО Киева с онлайн-записью и оплатой (PWA без сборки).",
   "scripts": {
     "serve": "node scripts/serve.mjs app 4174",
+    "bundle": "node scripts/bundle.mjs",
     "test": "playwright test"
   },
   "devDependencies": {
