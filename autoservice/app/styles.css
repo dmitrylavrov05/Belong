@@ -71,7 +71,7 @@ h2 { font-size: 18px; margin: 24px 0 10px; }
 
 .tabs {
   position: fixed; inset: auto 0 0 0; z-index: 5;
-  display: grid; grid-template-columns: repeat(3, 1fr);
+  display: grid; grid-template-columns: repeat(4, 1fr);
   background: var(--card);
   border-top: 1px solid var(--line);
   padding-bottom: env(safe-area-inset-bottom);
@@ -185,6 +185,26 @@ label.field input, label.field select {
 .status { font-size: 13px; font-weight: 600; }
 .status.upcoming { color: var(--ok); }
 .status.past, .status.cancelled { color: var(--muted); }
+.status.warn { color: var(--warn); }
+
+.steps { display: flex; list-style: none; margin: 0; padding: 0; gap: 4px; font-size: 12px; }
+.steps li { flex: 1; text-align: center; padding-top: 8px; border-top: 4px solid var(--line); color: var(--muted); }
+.steps li.on { border-color: var(--ok); color: var(--text); }
+
+.notice { background: var(--accent-soft); border-radius: 12px; padding: 10px 12px; }
+.notice.warn { background: var(--warn-soft); }
+
+.code-box { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  border: 1px dashed var(--line); border-radius: 12px; padding: 10px 12px; }
+.code { font: 700 28px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 6px; }
+
+.code-form { display: flex; gap: 8px; align-items: end; }
+
+.balance { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.balance b { display: block; font-size: 22px; }
+
+.perks { list-style: none; margin: 0 0 12px; padding: 0; }
+.perks li + li { margin-top: 4px; }
 
 .toast {
   position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 10;

@@ -1,6 +1,6 @@
 // Кеш для роботи без мережі: застосунок відкривається, навіть якщо зник інтернет
 // (зокрема під час відключень світла).
-const CACHE = 'autozapys-v2';
+const CACHE = 'autozapys-v3';
 const FILES = ['./', 'index.html', 'styles.css', 'app.js', 'data.js', 'icon.svg', 'manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
