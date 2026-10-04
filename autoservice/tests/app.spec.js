@@ -325,6 +325,96 @@ test('без геолокації відстань рахується від ц�
   await expect(page.locator('#list article').first()).toContainText('Автомийка «Блиск»');
 });
 
+test.describe('приведи друга', () => {
+  test.use({ permissions: ['clipboard-read', 'clipboard-write'] });
+
+  test('друг за посиланням отримує 150 ₴, платить менше, а точка отримує повну ціну', async ({ page }) => {
+    await page.goto('/?ref=CARTEST2');
+    await expect(page.locator('#toast')).toHaveText('Вам нараховано 150 ₴ на перше замовлення');
+    await expect(page).not.toHaveURL(/ref=/);
+    await expect(page.locator('.bonus-banner')).toContainText('У вас 150 ₴ бонусу');
+
+    await page.goto('/#/book/koleso');
+    await page.getByLabel(/Сезонне перевзування/).check();
+    await page.getByRole('button', { name: /Завтра/ }).click();
+    await page.locator('.slot:not([disabled])').first().click();
+    await page.locator('[data-action="confirm"]').click();
+    await expect(page.locator('.summary')).toContainText('Бонус «Приведи друга»');
+    await expect(page.locator('.summary')).toContainText('−150 ₴');
+    await page.getByRole('button', { name: 'Оплатити 750 ₴' }).click();
+    const card = page.locator('article').first();
+    await expect(card).toContainText('Оплачено 750 ₴ + бонус 150 ₴');
+
+    await page.goto('/');
+    await expect(page.locator('.bonus-banner')).toHaveCount(0);
+
+    await openPartner(page, 'Шиномонтаж «Колесо»');
+    await expect(page.getByRole('region', { name: 'Баланс' })).toContainText('Заморожено900 ₴');
+    await confirmAfterVisit(page);
+    await page.clock.setFixedTime(new Date(2026, 9, 7, 21, 31));
+    await openPartner(page, 'Шиномонтаж «Колесо»');
+    await expect(page.getByRole('region', { name: 'Баланс' })).toContainText('Доступно до виведення900 ₴');
+  });
+
+  test('бонус лише від 300 ₴, його можна не використовувати, а при скасуванні він повертається', async ({ page }) => {
+    await page.goto('/?ref=CARTEST2');
+    await page.goto('/#/book/blysk');
+    await page.getByLabel(/Експрес-мийка/).check();
+    await page.getByRole('button', { name: /Завтра/ }).click();
+    await page.locator('.slot:not([disabled])').first().click();
+    await page.locator('[data-action="confirm"]').click();
+    await expect(page.locator('.summary')).toContainText('Бонус 150 ₴ діє для замовлень від 300 ₴');
+    await expect(page.getByRole('button', { name: 'Оплатити 250 ₴' })).toBeVisible();
+    await page.getByRole('button', { name: 'Назад' }).click();
+
+    await page.getByLabel(/Комплекс: кузов/).check();
+    await page.locator('.slot:not([disabled])').first().click();
+    await page.locator('[data-action="confirm"]').click();
+    await expect(page.getByRole('button', { name: 'Оплатити 650 ₴' })).toBeVisible();
+    await page.getByLabel(/Бонус «Приведи друга»/).uncheck();
+    await expect(page.getByRole('button', { name: 'Оплатити 800 ₴' })).toBeVisible();
+    await page.getByLabel(/Бонус «Приведи друга»/).check();
+    await page.getByRole('button', { name: 'Оплатити 650 ₴' }).click();
+
+    page.once('dialog', (d) => d.accept());
+    await page.getByRole('button', { name: 'Скасувати' }).click();
+    await expect(page.locator('article').first()).toContainText('Повернено 650 ₴ на картку і 150 ₴ на бонусний рахунок');
+    await page.goto('/#/invite');
+    await expect(page.locator('.bonus-sum')).toHaveText('150 ₴');
+  });
+
+  test('власне, недійсне чи запізніле запрошення бонусу не дає', async ({ page }) => {
+    await page.goto('/#/invite');
+    const code = (await page.locator('.ref-code').textContent()).trim();
+    await page.goto(`/?ref=${code}`);
+    await expect(page.locator('#toast')).toHaveText('Це ваше посилання — надішліть його другу');
+    await page.goto('/?ref=hello');
+    await expect(page.locator('#toast')).toHaveText('Посилання-запрошення недійсне');
+
+    await bookTomorrow(page);
+    await page.goto('/?ref=CARTEST2');
+    await expect(page.locator('#toast')).toHaveText('Бонус за запрошенням діє лише для нових користувачів');
+    await page.goto('/#/invite');
+    await expect(page.locator('.bonus-sum')).toHaveText('0 ₴');
+  });
+
+  test('сторінка «Приведи друга»: посилання копіюється, бонус за друга нараховується', async ({ page }) => {
+    await page.goto('/#/bookings');
+    await page.getByRole('link', { name: /Приведи друга/ }).click();
+    await expect(page.getByRole('heading', { name: 'Приведи друга' })).toBeVisible();
+    const code = (await page.locator('.ref-code').textContent()).trim();
+    expect(code).toMatch(/^CAR[A-Z0-9]{5}$/);
+
+    await page.getByRole('button', { name: 'Скопіювати' }).click();
+    await expect(page.locator('#toast')).toHaveText('Посилання скопійовано');
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(`?ref=${code}`);
+
+    await page.getByRole('button', { name: 'Демо: друг завершив перше замовлення' }).click();
+    await expect(page.locator('.bonus-sum')).toHaveText('150 ₴');
+    await expect(page.getByText('Друг 1')).toBeVisible();
+  });
+});
+
 const PIXEL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 
 async function addCar(page, extra = async () => {}) {
@@ -390,7 +480,7 @@ test('сервісна книжка нагадує про шини, оливу �
   await expect(page.locator('#list article')).toHaveCount(4);
 });
 
-for (const path of ['/', '/#/place/motor', '/#/book/blysk', '/#/bookings', '/#/garage', '/#/partner', '/#/disputes']) {
+for (const path of ['/', '/#/place/motor', '/#/book/blysk', '/#/bookings', '/#/garage', '/#/partner', '/#/disputes', '/#/invite']) {
   test(`доступність і верстка: ${path}`, async ({ page }) => {
     await page.goto(path);
     await page.locator('main *').first().waitFor();

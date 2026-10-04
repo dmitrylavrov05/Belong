@@ -28,6 +28,7 @@
   --accent: #c8402b;
   --accent-hover: #a8341f;
   --on-accent: #ffffff;
+  --accent-soft: #fdecea;
   --navy: #1e3a5f;
   --on-navy: #ffffff;
   --ok: #137a3f;
@@ -52,6 +53,7 @@
     --accent: #ff7a66;
     --accent-hover: #ff9585;
     --on-accent: #10151c;
+    --accent-soft: #3a1d18;
     --navy: #9db8dc;
     --on-navy: #10151c;
     --ok: #5fd48f;
@@ -430,6 +432,33 @@ label.item { cursor: pointer; padding: 10px 14px; }
 .link-card > span { flex: 1; font-weight: 600; }
 .link-card > .ic:first-child { color: var(--accent); }
 .link-card .count { flex: none; min-width: 24px; height: 24px; padding: 0 7px; border-radius: 999px; background: var(--warn-soft); color: var(--warn); font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+
+/* ---------- приведи друга ---------- */
+
+.invite-card > span small { display: block; font-size: 13px; font-weight: 400; color: var(--muted); }
+.invite-card > .ic:first-child { color: var(--accent); }
+.bonus-banner { display: flex; align-items: center; gap: 10px; background: var(--ok-soft); color: var(--text); border-radius: 14px; padding: 10px 12px; font-size: 14px; margin-bottom: 10px; }
+.bonus-banner:hover { color: var(--text); }
+.bonus-banner > .ic { color: var(--ok); }
+.invite-hero { display: flex; gap: 14px; align-items: center; background: var(--accent-soft); border-radius: 16px; padding: 16px; font-size: 14px; line-height: 1.45; }
+.invite-hero b { display: block; font-size: 20px; margin-bottom: 4px; }
+.invite-ic { width: 56px; height: 56px; border-radius: 16px; background: var(--accent); color: var(--on-accent); display: flex; align-items: center; justify-content: center; flex: none; }
+.ref-code { font-size: 28px; font-weight: 800; letter-spacing: 2px; }
+.ref-link { width: 100%; height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--soft); font-size: 14px; color: var(--muted); }
+.how { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; font-size: 15px; }
+.bonus-sum { font-size: 24px; font-weight: 800; }
+.ledger { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.ledger li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; font-size: 14px; }
+.ledger li + li { border-top: 1px solid var(--line); }
+.ledger small { display: block; font-size: 12px; color: var(--muted); }
+.ledger b { white-space: nowrap; }
+.ledger b.plus { color: var(--ok); }
+.card.ledger { padding: 4px 14px; }
+.bonus-line { display: flex; align-items: center; gap: 12px; background: var(--ok-soft); border-radius: 12px; padding: 10px 12px; font-size: 15px; cursor: pointer; }
+.bonus-line span { flex: 1; }
+.bonus-line small { display: block; font-size: 12px; color: var(--muted); }
+.bonus-line b { color: var(--ok); white-space: nowrap; }
+.my-review a { font-size: 14px; font-weight: 600; }
 
 /* ---------- повідомлення ---------- */
 

@@ -39,6 +39,7 @@
   --accent: #c8402b;
   --accent-hover: #a8341f;
   --on-accent: #ffffff;
+  --accent-soft: #fdecea;
   --navy: #1e3a5f;
   --on-navy: #ffffff;
   --ok: #137a3f;
@@ -63,6 +64,7 @@
     --accent: #ff7a66;
     --accent-hover: #ff9585;
     --on-accent: #10151c;
+    --accent-soft: #3a1d18;
     --navy: #9db8dc;
     --on-navy: #10151c;
     --ok: #5fd48f;
@@ -442,6 +444,33 @@ label.item { cursor: pointer; padding: 10px 14px; }
 .link-card > .ic:first-child { color: var(--accent); }
 .link-card .count { flex: none; min-width: 24px; height: 24px; padding: 0 7px; border-radius: 999px; background: var(--warn-soft); color: var(--warn); font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 
+/* ---------- приведи друга ---------- */
+
+.invite-card > span small { display: block; font-size: 13px; font-weight: 400; color: var(--muted); }
+.invite-card > .ic:first-child { color: var(--accent); }
+.bonus-banner { display: flex; align-items: center; gap: 10px; background: var(--ok-soft); color: var(--text); border-radius: 14px; padding: 10px 12px; font-size: 14px; margin-bottom: 10px; }
+.bonus-banner:hover { color: var(--text); }
+.bonus-banner > .ic { color: var(--ok); }
+.invite-hero { display: flex; gap: 14px; align-items: center; background: var(--accent-soft); border-radius: 16px; padding: 16px; font-size: 14px; line-height: 1.45; }
+.invite-hero b { display: block; font-size: 20px; margin-bottom: 4px; }
+.invite-ic { width: 56px; height: 56px; border-radius: 16px; background: var(--accent); color: var(--on-accent); display: flex; align-items: center; justify-content: center; flex: none; }
+.ref-code { font-size: 28px; font-weight: 800; letter-spacing: 2px; }
+.ref-link { width: 100%; height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--soft); font-size: 14px; color: var(--muted); }
+.how { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; font-size: 15px; }
+.bonus-sum { font-size: 24px; font-weight: 800; }
+.ledger { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.ledger li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; font-size: 14px; }
+.ledger li + li { border-top: 1px solid var(--line); }
+.ledger small { display: block; font-size: 12px; color: var(--muted); }
+.ledger b { white-space: nowrap; }
+.ledger b.plus { color: var(--ok); }
+.card.ledger { padding: 4px 14px; }
+.bonus-line { display: flex; align-items: center; gap: 12px; background: var(--ok-soft); border-radius: 12px; padding: 10px 12px; font-size: 15px; cursor: pointer; }
+.bonus-line span { flex: 1; }
+.bonus-line small { display: block; font-size: 12px; color: var(--muted); }
+.bonus-line b { color: var(--ok); white-space: nowrap; }
+.my-review a { font-size: 14px; font-weight: 600; }
+
 /* ---------- повідомлення ---------- */
 
 .toast {
@@ -678,6 +707,13 @@ const MAINTENANCE = {
   insuranceWarnDays: 30, // попереджати про кінець поліса за N днів
 };
 
+// «Приведи друга»: обом по bonus ₴ на наступне замовлення. Бонус оплачує CARCAR,
+// точка отримує повну ціну.
+const REFERRAL = {
+  bonus: 150, // друг отримує одразу, той, хто запросив, — коли друг завершить перше замовлення
+  minOrder: 300, // бонус списується лише із замовлення від цієї суми, не більше bonus за раз
+};
+
 
 // ---------- сховище (лише на цьому пристрої) ----------
 
@@ -708,6 +744,15 @@ let bookings = store.get('bookings', []).map((b) =>
 let payouts = store.get('payouts', []);
 // Відгуки клієнтів: лише по завершених замовленнях, один на замовлення.
 let reviews = store.get('reviews', []);
+// «Приведи друга»: бонусний рахунок, власний код і хто запросив цього користувача.
+let wallet = store.get('wallet', { bonus: 0, history: [] });
+let referral = store.get('referral', null) ?? { code: newRefCode(), friends: [] };
+store.set('referral', referral);
+
+function newRefCode() {
+  const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // без схожих 0/O та 1/I
+  return `CAR${Array.from({ length: 5 }, () => abc[Math.floor(Math.random() * abc.length)]).join('')}`;
+}
 let favs = new Set(store.get('favs', []));
 
 const ui = { cat: 'all', q: '', sort: 'rating', openNow: false, favOnly: false, cls: store.get('cls', 0), partner: store.get('partner', null) };
@@ -749,6 +794,9 @@ const ICONS = {
   camera: '<path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1.5-2h6l1.5 2h2A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5z"/><circle cx="12" cy="13" r="3.5"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   repeat: '<path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5"/><path d="M20 4v4.5h-4.5"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 15.5"/><path d="M4 20v-4.5h4.5"/>',
+  gift: '<rect x="3.5" y="8.5" width="17" height="4" rx="1"/><path d="M5 12.5V20h14v-7.5M12 8.5V20"/><path d="M12 8.5C10.5 5 7 5 7 7s3 1.5 5 1.5zM12 8.5c1.5-3.5 5-3.5 5-1.5s-3 1.5-5 1.5z"/>',
+  share: '<circle cx="18" cy="5.5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><path d="m8.2 10.8 7.6-4.1M8.2 13.2l7.6 4.1"/>',
+  copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/>',
   scale: '<path d="M12 4v16M8 20h8M5 7h14"/><path d="M5 7 2.5 13a3 3 0 0 0 5 0zM19 7l-2.5 6a3 3 0 0 0 5 0z"/>',
 };
 
@@ -917,6 +965,83 @@ const favButton = (p, withName) => `<button class="fav" data-action="fav" data-i
     aria-label="${favs.has(p.id) ? 'Прибрати з обраного' : 'В обране'}${withName ? `: ${esc(p.name)}` : ''}">${icon(favs.has(p.id) ? 'heartFill' : 'heart', 22)}</button>`;
 const empty = (ic, text, action = '') => `<div class="empty"><div class="empty-ic">${icon(ic, 28)}</div><p>${text}</p>${action}</div>`;
 
+// ---------- приведи друга ----------
+
+// Повна ціна замовлення: те, що заплатив клієнт, плюс бонус, який доплачує CARCAR.
+const price = (b) => b.paid + (b.bonus || 0);
+
+function saveReferral() {
+  store.set('wallet', wallet);
+  store.set('referral', referral);
+}
+
+function addBonus(amount, text) {
+  wallet.bonus += amount;
+  wallet.history.unshift({ amount, text, at: Date.now() });
+  saveReferral();
+}
+
+const inviteLink = () => `${location.origin}${location.pathname}?ref=${referral.code}`;
+
+// Скільки бонусу можна списати із замовлення на суму total.
+const bonusFor = (total) => (total >= REFERRAL.minOrder ? Math.min(wallet.bonus, REFERRAL.bonus, total) : 0);
+
+// Друг відкрив застосунок за посиланням ?ref=КОД: новому користувачу — бонус на перше замовлення.
+function acceptInvite() {
+  const code = new URLSearchParams(location.search).get('ref');
+  if (!code) return;
+  history.replaceState(null, '', location.pathname + location.hash);
+  const c = code.trim().toUpperCase();
+  if (!/^CAR[A-Z0-9]{5}$/.test(c)) { toast('Посилання-запрошення недійсне'); return; }
+  if (c === referral.code) { toast('Це ваше посилання — надішліть його другу'); return; }
+  if (referral.invitedBy) { toast('Ви вже отримали бонус за запрошенням'); return; }
+  if (bookings.length) { toast('Бонус за запрошенням діє лише для нових користувачів'); return; }
+  referral.invitedBy = c;
+  addBonus(REFERRAL.bonus, 'Бонус за запрошенням друга');
+  route();
+  toast(`Вам нараховано ${uah(REFERRAL.bonus)} на перше замовлення`);
+}
+
+const inviteCard = () => `<a class="card link-card invite-card" href="#/invite">${icon('gift', 24)}<span>Приведи друга — по ${uah(REFERRAL.bonus)} вам і другу
+    <small>${wallet.bonus ? `На бонусному рахунку: ${uah(wallet.bonus)}` : 'Бонус на наступне замовлення'}</small></span>${icon('chevR', 18)}</a>`;
+
+function viewInvite() {
+  return `<h1>Приведи друга</h1>
+    <div class="invite-hero">
+      <span class="invite-ic">${icon('gift', 30)}</span>
+      <div><b>По ${uah(REFERRAL.bonus)} вам і другу</b>
+      Друг отримає бонус на перше замовлення одразу, а ви — коли він завершить своє перше замовлення.</div>
+    </div>
+    <section class="card" aria-label="Ваше посилання" style="margin-top:14px">
+      <div class="small muted">Ваш код</div>
+      <div class="ref-code">${referral.code}</div>
+      <input class="ref-link" id="ref-link" readonly value="${esc(inviteLink())}" aria-label="Посилання для друга">
+      <div class="grid2">
+        <button class="btn primary" data-action="share">${icon('share', 18)}Поділитися</button>
+        <button class="btn" data-action="copy">${icon('copy', 18)}Скопіювати</button>
+      </div>
+    </section>
+    <h2>Як це працює</h2>
+    <ol class="how">
+      <li>Надішліть посилання другу у Viber, Telegram чи Instagram.</li>
+      <li>Друг відкриває CARCAR за посиланням і одразу отримує ${uah(REFERRAL.bonus)} на перше замовлення.</li>
+      <li>Коли друг завершить перше замовлення, ${uah(REFERRAL.bonus)} отримаєте ви.</li>
+    </ol>
+    <h2>Бонусний рахунок</h2>
+    <section class="card" aria-label="Бонусний рахунок">
+      <div class="head"><span>Доступно</span><b class="bonus-sum">${uah(wallet.bonus)}</b></div>
+      <p class="fine">Бонус списується автоматично під час оплати: до ${uah(REFERRAL.bonus)} з одного замовлення від ${uah(REFERRAL.minOrder)}. Точка отримує повну ціну. Вивести бонус на картку не можна.</p>
+      ${wallet.history.length ? `<ul class="ledger">${wallet.history.map((h) => `<li><span>${esc(h.text)}<small>${fmtTime(h.at)}</small></span>
+        <b class="${h.amount > 0 ? 'plus' : ''}">${h.amount > 0 ? '+' : '−'}${uah(Math.abs(h.amount))}</b></li>`).join('')}</ul>` : ''}
+    </section>
+    <h2>Запрошені друзі</h2>
+    ${referral.friends.length
+      ? `<ul class="ledger card">${referral.friends.map((f, i) => `<li><span>Друг ${i + 1}<small>Завершив перше замовлення · ${fmtTime(f.at)}</small></span><b class="plus">+${uah(REFERRAL.bonus)}</b></li>`).join('')}</ul>`
+      : '<p class="muted">Поки нікого. Бонус зʼявиться, щойно друг завершить перше замовлення.</p>'}
+    <button class="btn" data-action="demo-friend" style="margin-top:12px">Демо: друг завершив перше замовлення</button>
+    <p class="note">Демо: у справжньому сервісі бонус нарахує сервер, коли друг завершить замовлення на своєму телефоні.</p>`;
+}
+
 // ---------- каталог ----------
 
 function seasonBanner() {
@@ -1012,7 +1137,9 @@ function viewCatalog() {
         </select>
       </span>
     </div>
+    ${wallet.bonus ? `<a class="bonus-banner" href="#/invite">${icon('gift', 20)}<span>У вас ${uah(wallet.bonus)} бонусу — спишеться під час оплати замовлення від ${uah(REFERRAL.minOrder)}</span></a>` : ''}
     <div id="list" class="stack"></div>
+    <div style="margin-top:14px">${inviteCard()}</div>
     <p class="note">Демо-дані: назви, номери будинків і телефони вигадані. Список місць задається у файлі data.js.</p>`;
 }
 
@@ -1116,6 +1243,7 @@ function renderBook() {
   const chosen = p.services.filter((s) => draft.services.has(s.id));
   const minutes = chosen.reduce((a, s) => a + s.min, 0);
   const total = chosen.reduce((a, s) => a + s.price[cls], 0);
+  const bonus = draft.useBonus !== false ? bonusFor(total) : 0;
   const slots = minutes ? slotsFor(p, draft.date, minutes) : [];
   if (draft.time && !slots.some((s) => s.time === draft.time && !s.busy)) draft.time = null;
   const free = slots.filter((s) => !s.busy);
@@ -1161,14 +1289,18 @@ function renderBook() {
     ${draft.paying ? `<div class="sheet-dim" data-action="unpay"></div>
     <div class="sheet summary" role="dialog" aria-modal="true" aria-label="Оплата">
       <div class="handle"></div>
-      <div class="sheet-total"><span>До сплати</span><b>${uah(total)}</b></div>
+      <div class="sheet-total"><span>До сплати</span><b>${uah(total - bonus)}</b></div>
+      ${wallet.bonus ? (bonusFor(total)
+        ? `<label class="bonus-line"><input class="check" type="checkbox" id="usebonus" ${draft.useBonus !== false ? 'checked' : ''}>
+            <span>Бонус «Приведи друга»<small>Вартість ${uah(total)}, точка отримає повну суму</small></span><b>−${uah(bonusFor(total))}</b></label>`
+        : `<p class="small muted" style="margin:0">Бонус ${uah(wallet.bonus)} діє для замовлень від ${uah(REFERRAL.minOrder)}.</p>`) : ''}
       <ul class="perks">
         <li><span class="perk-ic ok">${icon('shield', 20)}</span>Гроші утримуються, доки роботу не виконано</li>
         <li><span class="perk-ic">${icon('cash', 20)}</span>Комісія для клієнта — 0 ₴</li>
         <li><span class="perk-ic">${icon('undo', 20)}</span>Безкоштовне скасування за ${PAYMENT.freeCancelHours} год до візиту</li>
       </ul>
       <div class="stack" style="gap:8px">
-        <button class="btn primary block" data-action="pay">${icon('card', 20)}Оплатити ${uah(total)}</button>
+        <button class="btn primary block" data-action="pay">${icon('card', 20)}Оплатити ${uah(total - bonus)}</button>
         <button class="btn block" data-action="unpay">Назад</button>
       </div>
       <p class="demo">Демо-оплата: гроші не списуються.</p>
@@ -1186,12 +1318,14 @@ function confirmBooking() {
   const chosen = p.services.filter((s) => draft.services.has(s.id));
   const car = cars.find((c) => c.id === draft.carId);
   const total = chosen.reduce((a, s) => a + s.price[cls], 0);
+  const bonus = draft.useBonus !== false ? bonusFor(total) : 0;
   const b = {
     id: uid(),
     placeId: p.id,
     services: chosen.map((s) => s.name),
     total,
-    paid: total,
+    paid: total - bonus,
+    bonus,
     minutes: chosen.reduce((a, s) => a + s.min, 0),
     date: draft.date,
     time: draft.time,
@@ -1202,6 +1336,7 @@ function confirmBooking() {
   };
   bookings.push(b);
   save();
+  if (bonus) addBonus(-bonus, `Списано на замовлення: ${p.name}`);
   draft = null;
   location.hash = `#/bookings/${b.id}`;
   toast('Оплачено, ви записані');
@@ -1238,7 +1373,7 @@ function settle() {
 
 // Скільки з оплати клієнта належить точці (до комісії).
 function placeShare(b) {
-  if (b.state === 'completed') return b.paid;
+  if (b.state === 'completed') return price(b);
   if (b.state === 'cancelled' || b.state === 'noshow') return b.placeAmount ?? 0;
   return 0;
 }
@@ -1248,7 +1383,8 @@ function balanceOf(placeId) {
   const own = bookings.filter((b) => b.placeId === placeId);
   const earned = own.filter((b) => !isFrozen(b)).reduce((a, b) => a + placeShare(b), 0);
   const withdrawn = payouts.filter((x) => x.placeId === placeId).reduce((a, x) => a + x.gross, 0);
-  const frozen = own.filter((b) => ACTIVE.includes(b.state) || isFrozen(b)).reduce((a, b) => a + b.paid, 0);
+  const frozen = own.filter((b) => ACTIVE.includes(b.state) || isFrozen(b))
+    .reduce((a, b) => a + price(b), 0);
   const next = own.filter(isFrozen).sort((a, b) => a.unfreezeAt - b.unfreezeAt)[0];
   return { available: earned - withdrawn, frozen, next };
 }
@@ -1279,11 +1415,11 @@ const STATE_LABEL = {
   refunded: ['', 'Гроші повернено'],
 };
 
-const cardHead = (b, title, sm) => {
+const cardHead = (b, title, sm, amount = b.paid) => {
   const [cls, label] = isFrozen(b) ? ['go', 'Виконано · гроші заморожені'] : STATE_LABEL[b.state];
   return `<div class="head">
       <div><div class="bk-status ${cls}">${label}</div><h3 class="bk-title${sm ? ' sm' : ''}">${title}</h3></div>
-      <div class="bk-price">${uah(b.paid)}</div>
+      <div class="bk-price">${uah(amount)}</div>
     </div>`;
 };
 
@@ -1301,7 +1437,8 @@ function result(b) {
 function reviewBlock(b) {
   const mine = reviews.find((r) => r.bookingId === b.id);
   if (mine) {
-    return `<div class="my-review"><div class="head"><b>Ваш відгук</b>${stars(mine.stars)}</div>${mine.text ? `<p>${esc(mine.text)}</p>` : ''}</div>`;
+    return `<div class="my-review"><div class="head"><b>Ваш відгук</b>${stars(mine.stars)}</div>${mine.text ? `<p>${esc(mine.text)}</p>` : ''}
+      <a href="#/invite">Сподобалось? Приведіть друга — по ${uah(REFERRAL.bonus)} обом</a></div>`;
   }
   return `<form class="review-form" data-id="${b.id}">
     <fieldset class="star-input">
@@ -1322,6 +1459,7 @@ function bookingCard(b, highlight) {
       <div class="il">${icon('carSide', 18)}${esc(b.car)}</div>
       ${p ? `<div class="il">${icon('pin', 18)}${esc(p.address)}</div>` : ''}
       <div class="svc">${b.services.map(esc).join(', ')}</div>
+      ${b.bonus ? `<div class="il">${icon('gift', 18)}Оплачено ${uah(b.paid)} + бонус ${uah(b.bonus)}</div>` : ''}
     </div>`;
   let body = lines;
   const started = bookingStart(b) <= new Date();
@@ -1369,7 +1507,7 @@ function bookingCard(b, highlight) {
     }
     body += reviewBlock(b);
   } else {
-    body += `<p class="small muted" style="margin:0">Повернено ${uah(b.refund ?? b.paid)} на картку${b.placeAmount ? `, ${uah(b.placeAmount)} отримала точка` : ''}.</p>`;
+    body += `<p class="small muted" style="margin:0">Повернено ${uah(b.refund ?? b.paid)} на картку${b.bonusReturned ? ` і ${uah(b.bonus)} на бонусний рахунок` : ''}${b.placeAmount ? `, ${uah(b.placeAmount)} отримала точка` : ''}.</p>`;
   }
   return `<article class="bk${highlight ? ' hl' : ''}" id="b-${b.id}">
     ${cardHead(b, esc(p?.name ?? 'Сервіс'))}
@@ -1384,9 +1522,10 @@ function viewBookings(highlightId) {
   const active = sorted.filter((b) => ACTIVE.includes(b.state));
   const rest = sorted.filter((b) => !ACTIVE.includes(b.state)).reverse();
   if (!bookings.length) {
-    return `<h1>Мої записи</h1>${empty('calendar', 'Записів поки немає.', '<a class="btn primary" href="#/">Знайти мийку або сервіс</a>')}`;
+    return `<h1>Мої записи</h1>${empty('calendar', 'Записів поки немає.', '<a class="btn primary" href="#/">Знайти мийку або сервіс</a>')}${inviteCard()}`;
   }
   return `<h1>Мої записи</h1>
+    ${inviteCard()}
     <h2>Активні</h2>
     <div class="stack">${active.length ? active.map((b) => bookingCard(b, b.id === highlightId)).join('') : '<p class="muted">Немає активних записів.</p>'}</div>
     ${rest.length ? `<h2>Історія</h2><div class="stack">${rest.map((b) => bookingCard(b, b.id === highlightId)).join('')}</div>` : ''}`;
@@ -1400,7 +1539,7 @@ function partnerRow(b) {
     <div><div class="bk-status ${cls}">${label}</div>
       <h3>${dayLabel(b.date, { day: 'numeric', month: 'short' })}, ${b.time} · ${esc(b.car)}</h3>
       <div class="small muted" style="margin-top:2px">${b.services.map(esc).join(', ')}</div></div>
-    <span class="price">${uah(ACTIVE.includes(b.state) || isFrozen(b) ? b.paid : placeShare(b))}</span>
+    <span class="price">${uah(ACTIVE.includes(b.state) || isFrozen(b) ? price(b) : placeShare(b))}</span>
   </a>`;
 }
 
@@ -1426,7 +1565,7 @@ function viewPartner() {
       <button class="btn primary block" data-action="payout" ${bal.available > 0 ? '' : 'disabled'}>
         ${icon('card', 20)}${bal.available > 0 ? `Вивести ${uah(bal.available - fee)} на картку` : 'Немає коштів для виведення'}
       </button>
-      <p class="fine">Гроші за замовлення заморожені, доки клієнт не підтвердить виконання, і ще ${PAYMENT.freezeHours} год після цього.${bal.next ? ` Найближче розморожування: ${uah(bal.next.paid)} — ${fmtTime(bal.next.unfreezeAt)}.` : ''}
+      <p class="fine">Гроші за замовлення заморожені, доки клієнт не підтвердить виконання, і ще ${PAYMENT.freezeHours} год після цього.${bal.next ? ` Найближче розморожування: ${uah(price(bal.next))} — ${fmtTime(bal.next.unfreezeAt)}.` : ''}
         Комісія сервісу ${Math.round(PAYMENT.commission * 100)}% утримується лише під час виведення${bal.available > 0 ? `: ${uah(fee)}` : ''}. Для клієнтів комісії немає.</p>
     </section>
     <a class="card link-card" href="#/place/${p.id}" style="margin-top:12px">${icon('star', 22)}<span>Сторінка точки й відгуки<small class="small muted" style="display:block;font-weight:400">${ratingOf(p.id).count ? `Рейтинг ${rating(ratingOf(p.id).avg)} · ${ratingOf(p.id).count} ${reviewsWord(ratingOf(p.id).count)}` : 'Ще немає відгуків'}</small></span>${icon('chevR', 18)}</a>
@@ -1466,7 +1605,7 @@ function viewPartnerJob(id) {
   } else if (b.state === 'done') {
     body = `<p class="small muted" style="margin:0">Чекаємо підтвердження клієнта. Якщо він не відповість, замовлення підтвердиться автоматично ${fmtTime(b.doneAt + PAYMENT.autoReleaseHours * HOUR)}.</p>${result(b)}`;
   } else if (isFrozen(b)) {
-    body = `<div class="notice ok">${icon('checkCircle', 22)}<div><b>Клієнт підтвердив виконання</b>${uah(b.paid)} заморожено до ${fmtTime(b.unfreezeAt)}, потім їх можна вивести.</div></div>${result(b)}`;
+    body = `<div class="notice ok">${icon('checkCircle', 22)}<div><b>Клієнт підтвердив виконання</b>${uah(price(b))} заморожено до ${fmtTime(b.unfreezeAt)}, потім їх можна вивести.</div></div>${result(b)}`;
   } else if (b.state === 'dispute') {
     body = `<div class="notice warn"><div class="label">Скарга клієнта</div>«${esc(b.disputeReason)}»</div>`;
   } else {
@@ -1475,7 +1614,7 @@ function viewPartnerJob(id) {
   return `${back('#/partner', 'Кабінет точки')}
     <h1>Запис клієнта</h1>
     <article class="bk">
-      ${cardHead(b, `${dayLabel(b.date, { day: 'numeric', month: 'short' })}, ${b.time} · ${esc(b.car)}`, true).replace('<h3', '<h2').replace('</h3>', '</h2>')}
+      ${cardHead(b, `${dayLabel(b.date, { day: 'numeric', month: 'short' })}, ${b.time} · ${esc(b.car)}`, true, price(b)).replace('<h3', '<h2').replace('</h3>', '</h2>')}
       <div class="small muted" style="font-size:14px">${b.services.map(esc).join(', ')}</div>
       ${body}
     </article>`;
@@ -1487,7 +1626,7 @@ function viewDisputes() {
     <h1>Модерація спорів</h1>
     <p class="lead">У справжньому сервісі цей розділ бачить лише модератор платформи.</p>
     <div class="stack">${list.length ? list.map((b) => `<article class="bk">
-        ${cardHead(b, esc(placeById(b.placeId)?.name ?? ''), true).replace('<h3', '<h2').replace('</h3>', '</h2>')}
+        ${cardHead(b, esc(placeById(b.placeId)?.name ?? ''), true, price(b)).replace('<h3', '<h2').replace('</h3>', '</h2>')}
         <div class="notice warn"><div class="label">Скарга клієнта</div><span style="font-size:15px">«${esc(b.disputeReason)}»</span></div>
         <div class="grid2">
           <button class="btn" data-action="resolve-client" data-id="${b.id}">Повернути клієнту</button>
@@ -1504,7 +1643,7 @@ const km = (n) => `${n.toLocaleString('uk-UA')} км`;
 function historyOf(car) {
   const fromApp = bookings
     .filter((b) => b.carId === car.id && b.state === 'completed')
-    .map((b) => ({ date: b.date, km: b.km, text: b.services.join(', '), cost: b.paid, place: placeById(b.placeId)?.name, photos: b.photos, note: b.note }));
+    .map((b) => ({ date: b.date, km: b.km, text: b.services.join(', '), cost: price(b), place: placeById(b.placeId)?.name, photos: b.photos, note: b.note }));
   return [...fromApp, ...(car.log ?? [])].sort((x, y) => (x.date < y.date ? 1 : -1));
 }
 
@@ -1675,6 +1814,13 @@ async function finishJob(form) {
   toast(dropped ? 'Фото не вмістилися в памʼять пристрою, запис збережено без них' : 'Клієнт отримав сповіщення «Машина готова»');
 }
 
+// Бонус зі скасованого чи поверненого замовлення повертається на бонусний рахунок.
+function returnBonus(b, why) {
+  if (!b.bonus || b.bonusReturned) return;
+  b.bonusReturned = true;
+  addBonus(b.bonus, `Повернення бонусу: ${why}`);
+}
+
 // Дії із записом з боку клієнта, точки й модератора. Повертають false, якщо нічого не змінилося.
 const bookingActions = {
   cancel(b) {
@@ -1682,6 +1828,7 @@ const bookingActions = {
     const msg = t.free ? `Скасувати запис? Повернемо ${uah(t.refund)}.` : `Скасувати запис? Повернемо ${uah(t.refund)}, ${uah(t.placeAmount)} отримає точка за пізнє скасування.`;
     if (!confirm(msg)) return false;
     Object.assign(b, { state: 'cancelled', refund: t.refund, placeAmount: t.placeAmount });
+    returnBonus(b, 'скасоване замовлення');
     toast('Запис скасовано');
   },
   'extra-ok'(b) {
@@ -1721,6 +1868,7 @@ const bookingActions = {
   },
   'resolve-client'(b) {
     Object.assign(b, { state: 'refunded', refund: b.paid, placeAmount: 0 });
+    returnBonus(b, 'повернення за спором');
     toast('Гроші повернено клієнту');
   },
   'resolve-place'(b) {
@@ -1736,7 +1884,7 @@ const bookingActions = {
 function route() {
   const [, page = '', arg] = location.hash.replace(/^#/, '').split('/');
   const view = $('#view');
-  const tab = page === 'disputes' ? 'partner' : ['bookings', 'garage', 'partner'].includes(page) ? page : 'catalog';
+  const tab = page === 'disputes' ? 'partner' : page === 'invite' ? '' : ['bookings', 'garage', 'partner'].includes(page) ? page : 'catalog';
   settle();
   // Крапка на вкладці «Мої записи», коли машина готова або точка просить доплату.
   const ready = bookings.some((b) => b.state === 'done' || b.extra);
@@ -1753,6 +1901,7 @@ function route() {
   else if (page === 'garage') view.innerHTML = arg ? viewCar(arg) : viewGarage();
   else if (page === 'partner') view.innerHTML = arg ? viewPartnerJob(arg) : viewPartner();
   else if (page === 'disputes') view.innerHTML = viewDisputes();
+  else if (page === 'invite') view.innerHTML = viewInvite();
   else view.innerHTML = viewNotFound();
 
   const target = arg && page === 'bookings' ? $(`#b-${arg}`) : null;
@@ -1806,6 +1955,21 @@ document.addEventListener('click', (e) => {
     $(draft.paying ? '[data-action="pay"]' : '[data-action="confirm"]')?.focus();
   } else if (action === 'pay') {
     confirmBooking();
+  } else if (action === 'share' || action === 'copy') {
+    const url = inviteLink();
+    const copy = () => navigator.clipboard.writeText(url)
+      .then(() => toast('Посилання скопійовано'))
+      .catch(() => { $('#ref-link')?.select(); toast('Скопіюйте посилання вручну'); });
+    if (action === 'share' && navigator.share) {
+      navigator.share({ title: 'CARCAR', text: `Записуйся на мийку, шиномонтаж чи СТО через CARCAR — ${uah(REFERRAL.bonus)} на перше замовлення`, url }).catch(() => {});
+    } else {
+      copy();
+    }
+  } else if (action === 'demo-friend') {
+    referral.friends.push({ at: Date.now() });
+    addBonus(REFERRAL.bonus, 'Друг завершив перше замовлення');
+    route();
+    toast(`Вам нараховано ${uah(REFERRAL.bonus)}`);
   } else if (action === 'payout') {
     const { available } = balanceOf(ui.partner);
     const fee = Math.round(available * PAYMENT.commission);
@@ -1844,6 +2008,10 @@ document.addEventListener('change', (e) => {
   } else if (t.id === 'car') {
     draft.carId = t.value;
     renderBook();
+  } else if (t.id === 'usebonus') {
+    draft.useBonus = t.checked;
+    renderBook();
+    $('#usebonus')?.focus();
   } else if (t.id === 'bookcls' || t.id === 'cls') {
     ui.cls = Number(t.value);
     store.set('cls', ui.cls);
@@ -1925,6 +2093,7 @@ document.addEventListener('submit', (e) => {
 $('#city').innerHTML = `${icon('pin', 18)}${esc(CITY.name)}`;
 window.addEventListener('hashchange', route);
 route();
+acceptInvite();
 
 </script>
 </body>
