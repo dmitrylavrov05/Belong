@@ -1,5 +1,6 @@
-// Кэш для работы без сети: приложение открывается, даже если интернет пропал.
-const CACHE = 'autozapis-v1';
+// Кеш для роботи без мережі: застосунок відкривається, навіть якщо зник інтернет
+// (зокрема під час відключень світла).
+const CACHE = 'autozapys-v2';
 const FILES = ['./', 'index.html', 'styles.css', 'app.js', 'data.js', 'icon.svg', 'manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
@@ -14,7 +15,7 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// Сначала сеть (чтобы свежие цены приходили сразу), при ошибке — кэш.
+// Спочатку мережа (щоб свіжі ціни приходили одразу), у разі помилки — кеш.
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
   e.respondWith(

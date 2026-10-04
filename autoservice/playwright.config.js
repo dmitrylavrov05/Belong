@@ -8,7 +8,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: 0,
   reporter: [['list']],
-  use: { baseURL: `http://localhost:${PORT}`, trace: 'retain-on-failure', locale: 'ru-RU' },
+  use: { baseURL: `http://localhost:${PORT}`, trace: 'retain-on-failure', locale: 'uk-UA' },
   webServer: {
     command: `node scripts/serve.mjs app ${PORT}`,
     url: `http://localhost:${PORT}/`,
