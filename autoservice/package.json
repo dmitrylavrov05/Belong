@@ -1,0 +1,14 @@
+{
+  "name": "autozapis",
+  "private": true,
+  "type": "module",
+  "description": "АвтоЗапись: мойки, шиномонтаж и СТО города с онлайн-записью (PWA без сборки).",
+  "scripts": {
+    "serve": "node scripts/serve.mjs app 4174",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.11.0",
+    "@playwright/test": "1.56.1"
+  }
+}
