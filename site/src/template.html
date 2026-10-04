@@ -72,6 +72,7 @@
       <span class="logo__word">belong</span>
     </a>
     <nav class="nav" aria-label="{{a11y.mainNav|attr}}">
+      <a href="#inside">{{nav.inside}}</a>
       <a href="#how">{{nav.how}}</a>
       <a href="#day">{{nav.day}}</a>
       <a href="#play">{{nav.play}}</a>
@@ -156,6 +157,59 @@
         <span><b>{{hero.float2Label}}</b><span>{{hero.float2}}</span></span>
       </div>
     </div>
+  </div>
+</section>
+
+<section class="section" id="inside" aria-labelledby="inside-title">
+  <div class="wrap">
+    <div class="section__head">
+      <p class="eyebrow">{{inside.eyebrow}}</p>
+      <h2 class="section__title" id="inside-title">{{inside.title}}</h2>
+      <p class="section__lead">{{inside.lead}}</p>
+    </div>
+    <div class="shots" tabindex="0" role="region" aria-label="{{inside.title|attr}}">
+      <figure class="shot">
+        <div class="shot__phone"><img src="{{@root}}assets/shots/{{@lang}}-today.webp" width="520" height="1125" loading="lazy" decoding="async" alt="{{inside.today.alt|attr}}"></div>
+        <figcaption><b>{{inside.today.t}}</b><span>{{inside.today.d}}</span></figcaption>
+      </figure>
+      <figure class="shot">
+        <div class="shot__phone"><img src="{{@root}}assets/shots/{{@lang}}-photos.webp" width="520" height="1125" loading="lazy" decoding="async" alt="{{inside.photos.alt|attr}}"></div>
+        <figcaption><b>{{inside.photos.t}}</b><span>{{inside.photos.d}}</span></figcaption>
+      </figure>
+      <figure class="shot">
+        <div class="shot__phone"><img src="{{@root}}assets/shots/{{@lang}}-chat.webp" width="520" height="1125" loading="lazy" decoding="async" alt="{{inside.chat.alt|attr}}"></div>
+        <figcaption><b>{{inside.chat.t}}</b><span>{{inside.chat.d}}</span></figcaption>
+      </figure>
+      <figure class="shot">
+        <div class="shot__phone"><img src="{{@root}}assets/shots/{{@lang}}-letters.webp" width="520" height="1125" loading="lazy" decoding="async" alt="{{inside.letters.alt|attr}}"></div>
+        <figcaption><b>{{inside.letters.t}}</b><span>{{inside.letters.d}}</span></figcaption>
+      </figure>
+      <figure class="shot">
+        <div class="shot__phone"><img src="{{@root}}assets/shots/{{@lang}}-movies.webp" width="520" height="1125" loading="lazy" decoding="async" alt="{{inside.movies.alt|attr}}"></div>
+        <figcaption><b>{{inside.movies.t}}</b><span>{{inside.movies.d}}</span></figcaption>
+      </figure>
+      <figure class="shot">
+        <div class="shot__phone"><img src="{{@root}}assets/shots/{{@lang}}-scratch.webp" width="520" height="1125" loading="lazy" decoding="async" alt="{{inside.scratch.alt|attr}}"></div>
+        <figcaption><b>{{inside.scratch.t}}</b><span>{{inside.scratch.d}}</span></figcaption>
+      </figure>
+      <figure class="shot">
+        <div class="shot__phone"><img src="{{@root}}assets/shots/{{@lang}}-month.webp" width="520" height="1125" loading="lazy" decoding="async" alt="{{inside.month.alt|attr}}"></div>
+        <figcaption><b>{{inside.month.t}}</b><span>{{inside.month.d}}</span></figcaption>
+      </figure>
+      <figure class="shot">
+        <div class="shot__phone"><img src="{{@root}}assets/shots/{{@lang}}-us.webp" width="520" height="1125" loading="lazy" decoding="async" alt="{{inside.us.alt|attr}}"></div>
+        <figcaption><b>{{inside.us.t}}</b><span>{{inside.us.d}}</span></figcaption>
+      </figure>
+      <figure class="shot">
+        <div class="shot__phone"><img src="{{@root}}assets/shots/{{@lang}}-settings.webp" width="520" height="1125" loading="lazy" decoding="async" alt="{{inside.settings.alt|attr}}"></div>
+        <figcaption><b>{{inside.settings.t}}</b><span>{{inside.settings.d}}</span></figcaption>
+      </figure>
+      <figure class="shot">
+        <div class="shot__phone"><img src="{{@root}}assets/shots/{{@lang}}-dreams.webp" width="520" height="1125" loading="lazy" decoding="async" alt="{{inside.dreams.alt|attr}}"></div>
+        <figcaption><b>{{inside.dreams.t}}</b><span>{{inside.dreams.d}}</span></figcaption>
+      </figure>
+    </div>
+    <p class="shots__hint" aria-hidden="true">{{inside.hint}}</p>
   </div>
 </section>
 
@@ -536,6 +590,34 @@
           <div><dt>{{month.hoursLabel}}</dt><dd id="story-hours">{{month.hours}}</dd></div>
           <div><dt>{{month.moodLabel}}</dt><dd>{{month.mood}}</dd></div>
         </dl>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="section section--tint" id="stories" aria-labelledby="stories-title">
+  <div class="wrap">
+    <div class="section__head">
+      <p class="eyebrow">{{stories.eyebrow}}</p>
+      <h2 class="section__title" id="stories-title">{{stories.title}}</h2>
+      <p class="section__lead">{{stories.lead}}</p>
+    </div>
+    <div class="stories">
+      <figure class="storycard">
+        <img src="{{@root}}assets/shots/{{@lang}}-card-wrapped.webp" width="540" height="960" loading="lazy" decoding="async" alt="{{stories.wrapped.alt|attr}}">
+        <figcaption>{{stories.wrapped.t}}</figcaption>
+      </figure>
+      <figure class="storycard">
+        <img src="{{@root}}assets/shots/{{@lang}}-card-taps.webp" width="540" height="960" loading="lazy" decoding="async" alt="{{stories.taps.alt|attr}}">
+        <figcaption>{{stories.taps.t}}</figcaption>
+      </figure>
+      <figure class="storycard">
+        <img src="{{@root}}assets/shots/{{@lang}}-card-milestone.webp" width="540" height="960" loading="lazy" decoding="async" alt="{{stories.milestone.alt|attr}}">
+        <figcaption>{{stories.milestone.t}}</figcaption>
+      </figure>
+      <figure class="storycard">
+        <img src="{{@root}}assets/shots/{{@lang}}-card-scratch.webp" width="540" height="960" loading="lazy" decoding="async" alt="{{stories.scratch.alt|attr}}">
+        <figcaption>{{stories.scratch.t}}</figcaption>
       </figure>
     </div>
   </div>

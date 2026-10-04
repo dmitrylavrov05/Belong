@@ -758,3 +758,50 @@ select:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--him), 0 
 .game__text { font-size: var(--fs-small); }
 
 .mood, .ph-moods span, .dcard__art, .float__emoji, .mini__photo, .result__list span[aria-hidden] { font-family: var(--emoji); }
+
+/* ---------- Inside the app: real screenshots in phone frames ---------- */
+.shots {
+  display: flex;
+  gap: 24px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding: 8px 4px 24px;
+  margin: 8px -4px 0;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+.shots:focus-visible { outline: 3px solid var(--him); outline-offset: 4px; border-radius: 24px; }
+.shot { flex: 0 0 248px; margin: 0; scroll-snap-align: start; }
+.shot__phone {
+  border-radius: 38px;
+  padding: 9px;
+  background: #1d1820;
+  box-shadow: 0 24px 48px rgba(43, 34, 51, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.shot__phone img { display: block; width: 100%; height: auto; border-radius: 30px; background: var(--sunk); }
+.shot figcaption { display: grid; gap: 4px; margin-top: 14px; padding: 0 6px; }
+.shot figcaption b { font-size: var(--fs-body, 17px); color: var(--ink); }
+.shot figcaption span { font-size: var(--fs-small, 14px); color: var(--ink-2); line-height: 1.45; }
+.shots__hint { margin-top: 4px; font-size: var(--fs-small, 14px); color: var(--ink-2); }
+@media (min-width: 1100px) { .shots__hint { display: none; } }
+@media (max-width: 520px) { .shot { flex-basis: 72vw; } }
+
+/* ---------- Story cards ---------- */
+.stories { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; margin-top: 8px; }
+.storycard { margin: 0; }
+.storycard img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 9 / 16;
+  object-fit: cover;
+  border-radius: 22px;
+  box-shadow: 0 18px 40px rgba(43, 34, 51, 0.16);
+  background: var(--sunk);
+}
+.storycard figcaption { margin-top: 12px; font-weight: 700; color: var(--ink); text-align: center; }
+@media (max-width: 860px) { .stories { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (prefers-reduced-motion: no-preference) {
+  .storycard img { transition: transform 0.25s ease; }
+  .storycard:hover img { transform: translateY(-4px) rotate(-1deg); }
+}

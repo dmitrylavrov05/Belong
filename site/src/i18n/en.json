@@ -22,7 +22,8 @@
     "faq": "FAQ",
     "cta": "Get early access",
     "thisLang": "EN",
-    "otherLang": "UA"
+    "otherLang": "UA",
+    "inside": "Inside"
   },
   "hero": {
     "eyebrow": "For couples · Coming to iOS and Android",
@@ -64,6 +65,62 @@
     "tabChat": "Chat",
     "tabGames": "Games",
     "tabUs": "Us"
+  },
+  "inside": {
+    "eyebrow": "Inside the app",
+    "title": "Real screens, made for two",
+    "lead": "Every picture here is the app itself, with the example couple Yulia and Igor.",
+    "hint": "Swipe to see more →",
+    "today": {
+      "t": "Today",
+      "d": "Your photo together, each other's mood, a note, dates and the plan.",
+      "alt": "Today screen: the couple's photo, the partner's mood, a note and the plan"
+    },
+    "photos": {
+      "t": "Photos of the day",
+      "d": "Up to five each, every day. They come back in your monthly and yearly story.",
+      "alt": "Photos of the day grouped by date"
+    },
+    "chat": {
+      "t": "Chat",
+      "d": "Messages, photos and voice notes, plus a big “thinking of you”.",
+      "alt": "Chat with a photo and a voice message"
+    },
+    "letters": {
+      "t": "Open when…",
+      "d": "Letters that open on a chosen day, or when they're needed most.",
+      "alt": "Letters to open later, some still sealed"
+    },
+    "movies": {
+      "t": "Films and series",
+      "d": "A shared list, a random pick for tonight, and suggestions you'd both enjoy.",
+      "alt": "Films and series to watch together"
+    },
+    "scratch": {
+      "t": "100 dates",
+      "d": "A scratch-off poster: go on a date, then rub off its square together.",
+      "alt": "Scratch-off poster of 100 date ideas"
+    },
+    "month": {
+      "t": "Your month and year",
+      "d": "A collage of your photos, moods and what you did together.",
+      "alt": "Monthly report with a photo collage"
+    },
+    "us": {
+      "t": "Us",
+      "d": "Everything for the two of you, in tidy groups, and your shared timeline.",
+      "alt": "The Us tab with grouped tiles"
+    },
+    "settings": {
+      "t": "Make it yours",
+      "d": "Photo or emoji avatars, pet names, together or apart.",
+      "alt": "Settings with both avatars"
+    },
+    "dreams": {
+      "t": "Dreams and goals",
+      "d": "A wish map that turns into goals with a shared savings jar.",
+      "alt": "Dreams screen with a goal at 51%"
+    }
   },
   "how": {
     "eyebrow": "How it works",
@@ -255,6 +312,27 @@
     "hoursLabel": "time difference",
     "mood": "😊",
     "moodLabel": "average mood"
+  },
+  "stories": {
+    "eyebrow": "Made to share",
+    "title": "Cards for your stories",
+    "lead": "Your year, your milestones and your date poster turn into 9:16 cards for Instagram and Threads in one tap.",
+    "wrapped": {
+      "t": "Belong Wrapped: your year",
+      "alt": "Story card: Our 2026, Belong Wrapped"
+    },
+    "taps": {
+      "t": "How often you thought of each other",
+      "alt": "Story card: 121 thinking-of-you taps"
+    },
+    "milestone": {
+      "t": "1000 days together",
+      "alt": "Story card: 1000 days together on the couple's photo"
+    },
+    "scratch": {
+      "t": "100 dates poster",
+      "alt": "Story card: the 100 dates poster with 8 squares scratched"
+    }
   },
   "price": {
     "eyebrow": "Pricing",
