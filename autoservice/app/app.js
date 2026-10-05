@@ -6,10 +6,11 @@ import {
   POWER, powerOf, worksInBlackout,
 } from './core.js';
 import {
-  CHANNELS, inboxFor, markRead, dealsOf, dealAt, dealPrice, dealCovers, hotDeals, queueOf, queueEnabled, saveQueue, queueEstimate,
+  CHANNELS, inboxFor, markRead, dealsOf, dealsOn, weeklyDealsOf, daysText, dealAt, dealPrice, dealCovers, hotDeals, queueOf, queueEnabled, saveQueue, queueEstimate,
   checkWaitlist, openStarts, passesOf, sellPass, passActive, passLeft, usableSubs, findCert, redeemPass, restorePass,
   SEASONS, myTires, tireDue, seasonDue,
 } from './ops.js';
+import { mountMap } from './map.js';
 
 // ---------- сховище (лише на цьому пристрої) ----------
 
@@ -40,7 +41,7 @@ let profile = { name: '', phone: '', optIn: false, ...store.get('profile', {}) }
 // Записи цього клієнта — те, що він бачить у «Мої записи».
 const mine = () => bookings.filter((b) => !b.source);
 
-const ui = { cat: 'all', q: '', sort: 'rating', openNow: false, favOnly: false, cls: store.get('cls', 0), partner: store.get('partner', null) };
+const ui = { view: store.get('view', 'list'), cat: 'all', q: '', sort: 'rating', openNow: false, favOnly: false, cls: store.get('cls', 0), partner: store.get('partner', null) };
 let draft = null; // чернетка запису: { placeId, services: Set, date, time, carId, paying }
 
 // ---------- утиліти ----------
@@ -342,7 +343,7 @@ function hotBlock() {
   const when = (d) => (d === isoDate(new Date()) ? 'Сьогодні' : 'Завтра');
   return `<section class="hot" aria-labelledby="h-hot">
     <h2 id="h-hot" class="hot-title">${icon('bolt', 18)}Гарячі вікна</h2>
-    <div class="hot-row">${list.map(({ place: p, deal: d, free }) => `<a class="card hot-card" href="#/book/${p.id}/${d.date}/${free[0]}">
+    <div class="hot-row">${list.map(({ place: p, deal: d, free }) => `<a class="card hot-card" href="#/book/${p.id}/${d.date}/${free[0]}" data-track="hot_click" data-place="${p.id}">
       <span class="hot-pct">−${d.pct}%</span>
       <b>${esc(p.name)}</b>
       <span class="small">${when(d.date)} · ${hhmm(d.from)}–${hhmm(d.to)}</span>
@@ -351,9 +352,60 @@ function hotBlock() {
   </section>`;
 }
 
+// ---------- анонімна статистика ----------
+
+// Події для зведеної статистики CARCAR: без імен і телефонів, лише що відкривали й що натискали.
+// Зберігаємо останні 5000 подій на пристрої; у робочій версії їх приймає сервер.
+function track(type, data = {}) {
+  const all = store.get('analytics', []);
+  all.push({ t: type, at: Date.now(), ...data });
+  store.set('analytics', all.slice(-5000));
+}
+
+// ---------- карта ----------
+
+let mapApi = null;
+const mapState = {};
+
+function mapPin(p) {
+  const open = isOpenNow(p);
+  const cat = catById(p.cats[0]);
+  const deal = dealsOf(p.id).length ? Math.max(...dealsOf(p.id).map((d) => d.pct)) : 0;
+  const pw = powerOf(p.id);
+  const r = ratingOf(p.id);
+  return {
+    id: p.id, lat: p.lat, lng: p.lng, cls: `c-${p.cats[0]}${open ? '' : ' shut'}`,
+    html: `<span class="pin-shape">${icon(cat.icon, 16)}</span>${deal ? `<span class="pin-deal">−${deal}%</span>` : ''}${pw && pw.state !== 'closed' ? `<span class="pin-bolt">${icon('bolt', 11)}</span>` : ''}`,
+    label: esc(`${p.name}: ${cat.name.toLowerCase()}, ${open ? 'відчинено' : 'зачинено'}, від ${uah(minPrice(p, ui.cat, ui.cls))}${r.count ? `, рейтинг ${rating(r.avg)}` : ''}${deal ? `, знижка до ${deal}%` : ''}`),
+  };
+}
+
+function mapCard(id) {
+  const p = placeById(id);
+  if (!p) return '<p class="small muted map-empty">Натисніть на точку на карті, щоб побачити деталі.</p>';
+  const maps = `${CITY.mapsSearch}${encodeURIComponent(`${CITY.name}, ${p.address}`)}`;
+  return `${placeCard(p)}
+    <div class="grid2" style="margin-top:8px"><a class="btn primary" href="#/book/${p.id}">Записатися</a>
+      <a class="btn" href="${maps}" target="_blank" rel="noopener">${icon('route', 18)}Маршрут</a></div>`;
+}
+
+function renderMap(list) {
+  if (!$('#map')) {
+    $('#list').innerHTML = `<div class="map" id="map" tabindex="0" role="region" aria-label="Карта точок. Стрілки зсувають карту, плюс і мінус змінюють масштаб"></div>
+      <div id="map-card" aria-live="polite"></div>`;
+    mapApi = mountMap($('#map'), {
+      places: list.map(mapPin), pos: ui.pos, state: mapState,
+      onSelect: (id) => { $('#map-card').innerHTML = mapCard(id); track('map_pin', { placeId: id }); },
+    });
+  } else mapApi.setPins(list.map(mapPin));
+  if (mapState.sel && !list.some((p) => p.id === mapState.sel)) mapState.sel = null;
+  $('#map-card').innerHTML = mapCard(mapState.sel);
+}
+
 function renderList() {
   const list = filteredPlaces();
-  $('#list').innerHTML = list.length ? list.map(placeCard).join('') : empty('search', 'Нічого не знайшлося. Спробуйте змінити фільтри.');
+  if (ui.view === 'map') renderMap(list);
+  else $('#list').innerHTML = list.length ? list.map(placeCard).join('') : empty('search', 'Нічого не знайшлося. Спробуйте змінити фільтри.');
   const where = ui.locating ? ' · визначаємо ваше місце…' : ui.sort === 'near' && ui.pos ? ` · від ${ui.posFallback ? 'центру Києва' : 'вас'}` : '';
   $('#count').textContent = `${list.length} ${plural(list.length, 'місце', 'місця', 'місць')}${where}`;
 }
@@ -373,6 +425,10 @@ function viewCatalog() {
       ${chip(`${icon('heart', 16)}Обране`, 'data-action="toggle" data-key="favOnly"', ui.favOnly)}
     </div>
     <div class="toolbar">
+      <span class="seg-mini" role="group" aria-label="Вигляд">
+        <button data-action="view" data-v="list" aria-pressed="${ui.view !== 'map'}">${icon('list', 16)}Список</button>
+        <button data-action="view" data-v="map" aria-pressed="${ui.view === 'map'}">${icon('pin', 16)}Карта</button>
+      </span>
       <span class="small muted" id="count"></span>
       <span class="row">
         <select id="cls" class="pill-select" aria-label="Клас авто для цін">
@@ -471,7 +527,7 @@ function viewPlace(id) {
         <span class="name"><span class="badge personal">Для вас</span> ${esc(s.name)}<small>${duration(s.min)}${s.note ? ` · ${esc(s.note)}` : ''}</small></span>
         <span class="price">${uah(s.price[0])}</span></div>`).join('')}</div>` : ''}
     ${queueBlock(p)}
-    ${dealsOf(p.id).length ? `<p class="notice deal-note">${icon('bolt', 18)}<span><b>Гарячі вікна</b>${dealsOf(p.id).map((d) => `${dayLabel(d.date, { weekday: 'short', day: 'numeric', month: 'long' })}, ${hhmm(d.from)}–${hhmm(d.to)}: −${d.pct}%`).join('; ')}. Знижку видно біля часу під час запису.</span></p>` : ''}
+    ${dealsCard(p)}
     <h2 class="big" id="services">Послуги та ціни</h2>
     <p class="small muted" style="margin:-6px 0 0">Ціни для класу «${CAR_CLASSES[ui.cls]}». Остаточну вартість майстер підтвердить на місці.</p>
     ${groups.map(([c, items]) => `
@@ -493,6 +549,36 @@ function viewPlace(id) {
     <div class="dock-space"></div>
     <div class="dock">${isListed(p) ? `<a class="btn primary block" href="#/book/${p.id}">Записатися онлайн</a>`
       : '<p class="notice" style="margin:0">Точка зараз не приймає онлайн-записи в CARCAR.</p>'}</div>`;
+}
+
+// ---------- знижки за годинами ----------
+
+// Картка знижок точки: щотижневі щасливі години й разові гарячі вікна.
+function dealsCard(p) {
+  const weekly = weeklyDealsOf(p.id);
+  const once = dealsOf(p.id).filter((d) => d.date).sort((a, b) => (a.date + a.from).localeCompare(b.date + b.from));
+  if (!weekly.length && !once.length) return '';
+  const svc = (d) => (d.services?.length ? d.services.map((id) => p.allServices.find((x) => x.id === id)?.name).filter(Boolean).map(esc).join(', ') : 'усі послуги');
+  const row = (when, d) => `<li><span class="dc-pct">−${d.pct}%</span><span><b>${when}, ${hhmm(d.from)}–${hhmm(d.to)}</b><small>${svc(d)}</small></span></li>`;
+  return `<section class="card deals-card" aria-labelledby="h-deals">
+    <h2 id="h-deals" class="car-name">${icon('bolt', 20)}Знижки за годинами</h2>
+    <ul>${weekly.map((d) => row(daysText(d.days), d)).join('')}${once.map((d) => row(dayLabel(d.date, { weekday: 'short', day: 'numeric', month: 'long' }), d)).join('')}</ul>
+    <a class="btn" href="#/book/${p.id}">Обрати час зі знижкою</a>
+  </section>`;
+}
+
+// Смуга дня на сторінці запису: робочі години й відрізки зі знижкою.
+function dayDealsBar(p, date) {
+  const h = hoursFor(p, date);
+  const deals = dealsOn(p.id, date);
+  if (!h || !deals.length) return '';
+  const span = h[1] - h[0];
+  const pos = (t) => `${((Math.max(h[0], Math.min(h[1], t)) - h[0]) / span) * 100}%`;
+  return `<div class="day-deals">
+    <div class="dd-track" aria-hidden="true">${deals.map((d) => `<b style="left:${pos(d.from)};width:calc(${pos(d.to)} - ${pos(d.from)})">−${d.pct}%</b>`).join('')}
+      <i style="left:0">${hhmm(h[0])}</i><i style="right:0">${hhmm(h[1])}</i></div>
+    <p class="dd-text">${icon('bolt', 16)}${deals.map((d) => `−${d.pct}% з ${hhmm(d.from)} до ${hhmm(d.to)}${d.services?.length ? ' на окремі послуги' : ''}`).join(' · ')}</p>
+  </div>`;
 }
 
 // ---------- жива черга ----------
@@ -703,19 +789,24 @@ function renderBook() {
         const date = parseDate(d);
         const wd = i === 0 ? 'Сьогодні' : i === 1 ? 'Завтра' : date.toLocaleDateString('uk-UA', { weekday: 'short' });
         const closed = !hoursFor(p, d);
-        return `<button class="day${closed ? ' closed' : ''}" data-action="day" data-date="${d}" aria-pressed="${d === draft.date}" ${closed ? `disabled aria-label="${wd}, ${date.getDate()}, вихідний"` : ''}>
+        const best = closed ? 0 : Math.max(0, ...dealsOn(p.id, d).map((x) => x.pct));
+        return `<button class="day${closed ? ' closed' : ''}${best ? ' has-deal' : ''}" data-action="day" data-date="${d}" aria-pressed="${d === draft.date}" ${closed ? `disabled aria-label="${wd}, ${date.getDate()}, вихідний"` : best ? `aria-label="${wd}, ${date.getDate()}, є знижка до ${best}%"` : ''}>
           <span>${wd}</span><b>${date.getDate()}</b><span>${closed ? 'вихідний' : date.toLocaleDateString('uk-UA', { month: 'short' })}</span>
+          ${best ? `<span class="day-deal">−${best}%</span>` : ''}
         </button>`;
       }).join('')}
     </div>
     ${hoursFor(p, draft.date) ? `<p class="small muted" style="margin:8px 0 0">Працюємо ${rangeText(hoursFor(p, draft.date))}${scheduleOf(p).brk ? `, перерва ${rangeText(scheduleOf(p).brk)}` : ''}</p>` : ''}
+    ${dayDealsBar(p, draft.date)}
     ${!minutes
       ? '<p class="muted">Оберіть послуги, щоб побачити вільний час.</p>'
       : free.length
         ? `<div class="slots" role="group" aria-label="Час">${slots.map((s) => {
             const d = !s.busy && dealAt(p.id, draft.date, s.time);
-            return `<button class="slot${d ? ' hot' : ''}" data-action="time" data-time="${s.time}"
-            ${s.busy ? `disabled aria-label="${s.time}, зайнято"` : d ? `aria-label="${s.time}, знижка ${d.pct}%"` : ''} aria-pressed="${s.time === draft.time}">${s.time}${d ? `<small>−${d.pct}%</small>` : ''}</button>`;
+            const sum = d ? chosen.reduce((a, x) => a + (!x.personal && dealCovers(d, x.id) ? dealPrice(x.price[cls], d.pct) : x.price[cls]), 0) : 0;
+            const off = d && sum < q.listTotal;
+            return `<button class="slot${off ? ' hot' : ''}" data-action="time" data-time="${s.time}"
+            ${s.busy ? `disabled aria-label="${s.time}, зайнято"` : off ? `aria-label="${s.time}, знижка ${d.pct}%, ${uah(sum)}"` : ''} aria-pressed="${s.time === draft.time}">${s.time}${off ? `<small>−${d.pct}% · ${uah(sum)}</small>` : ''}</button>`;
           }).join('')}</div>`
         : '<p class="muted">На цей день вільного часу немає. Оберіть інший день або станьте в лист очікування.</p>'}
     ${minutes ? waitlistBlock(p, minutes, chosen) : ''}
@@ -754,6 +845,7 @@ function renderBook() {
       <p class="demo">Імʼя й телефон бачить лише точка — щоб звʼязатися й показувати вам персональні ціни. Демо-оплата: гроші не списуються.</p>
     </div>` : `<div class="dock summary">
       <div class="total"><span>${chosen.length ? `${chosen.length} ${plural(chosen.length, 'послуга', 'послуги', 'послуг')} · ${duration(minutes)}` : 'Нічого не обрано'}</span><span>${q.deal ? `<s class="muted">${uah(q.listTotal)}</s> ` : ''}${uah(total - q.covered)}</span></div>
+      ${q.deal ? `<p class="save-pill">${icon('bolt', 14)}${q.deal.days ? 'Щасливі години' : 'Гаряче вікно'} −${q.deal.pct}%: ви економите ${uah(q.listTotal - total)}</p>` : ''}
       <button class="btn primary block" data-action="confirm" ${chosen.length && draft.time ? '' : 'disabled'}>
         ${draft.time ? `Записатися на ${dayLabel(draft.date, { day: 'numeric', month: 'long' })}, ${draft.time}` : 'Оберіть час'}
       </button>
@@ -802,6 +894,7 @@ function confirmBooking() {
   if (fromBal) addMoney(-fromBal, `Оплата замовлення: ${p.name}`);
   draft = null;
   location.hash = `#/bookings/${b.id}`;
+  track('paid', { placeId: p.id, amount: total, deal: !!q.deal, pass: q.use?.kind ?? null, bonus: !!bonus, balance: !!fromBal, leadH: Math.round((bookingStart(b) - Date.now()) / HOUR) });
   toast('Оплачено, ви записані');
 }
 
@@ -1316,6 +1409,7 @@ function returnBonus(b, why) {
 const bookingActions = {
   cancel(b) {
     const t = cancelTerms(b);
+    track('cancel_try', { placeId: b.placeId, free: t.free });
     const msg = t.free
       ? `Скасувати запис? Повернемо ${uah(t.refund)} на баланс CARCAR.`
       : `До візиту менше ${cancelWindow()}, тому оплата ${uah(t.placeAmount)} зарахується точці за послугу — повернення не буде. Скасувати запис?`;
@@ -1397,6 +1491,8 @@ function route() {
     else a.removeAttribute('aria-current');
   });
 
+  if (page === 'place') track('view_place', { placeId: arg });
+  else if (page === 'book' && draft?.placeId !== arg) track('open_book', { placeId: arg, from: sub ? 'link' : 'page' });
   if (page === '') { view.innerHTML = viewCatalog(); renderList(); }
   else if (page === 'place') view.innerHTML = viewPlace(arg);
   else if (page === 'book') { view.innerHTML = viewBook(arg, sub, extra); if ($('#book')) renderBook(); }
@@ -1419,6 +1515,8 @@ function route() {
 }
 
 document.addEventListener('click', (e) => {
+  const tr = e.target.closest('[data-track]');
+  if (tr) track(tr.dataset.track, { placeId: tr.dataset.place ?? null });
   // Переходи всередині сторінки бізнесу: хеш зайнятий роутером, тож прокручуємо самі.
   const jump = e.target.closest('[data-jump]');
   if (jump) {
@@ -1432,13 +1530,22 @@ document.addEventListener('click', (e) => {
 
   if (action === 'cat') {
     ui.cat = el.dataset.cat;
+    if (ui.cat !== 'all') track('filter', { name: `cat:${ui.cat}` });
     e.preventDefault();
     if (location.hash && location.hash !== '#/') location.hash = '#/';
     else route();
   } else if (action === 'near') {
     setSort(ui.sort === 'near' ? 'rating' : 'near');
+  } else if (action === 'view') {
+    ui.view = el.dataset.v;
+    store.set('view', ui.view);
+    for (const b of el.parentElement.children) b.setAttribute('aria-pressed', b === el);
+    $('#list').innerHTML = '';
+    renderList();
+    if (ui.view === 'map') track('map_open');
   } else if (action === 'toggle') {
     ui[el.dataset.key] = !ui[el.dataset.key];
+    if (ui[el.dataset.key]) track('filter', { name: el.dataset.key });
     el.setAttribute('aria-pressed', ui[el.dataset.key]);
     renderList();
   } else if (action === 'fav') {
@@ -1460,6 +1567,7 @@ document.addEventListener('click', (e) => {
     renderBook();
   } else if (action === 'confirm' || action === 'unpay') {
     draft.paying = action === 'confirm';
+    if (draft.paying) track('open_pay', { placeId: draft.placeId });
     renderBook();
     $(draft.paying ? '[data-action="pay"]' : '[data-action="confirm"]')?.focus();
   } else if (action === 'pay') {
@@ -1508,6 +1616,7 @@ document.addEventListener('click', (e) => {
     if (!confirm(`Купити «${plan.name}» за ${uah(plan.price)}? Оплата карткою через CARCAR.`)) return;
     const sold = sellPass(p.id, plan, { clientName: profile.name, phone: profile.phone, clientKey: myKeys()[0], source: 'carcar', buyer: 'app' });
     route();
+    track('buy_pass', { placeId: p.id, kind: plan.kind, amount: plan.price });
     toast(plan.kind === 'cert' ? `Сертифікат куплено, код ${sold.code} — його можна подарувати` : 'Абонемент куплено — спишеться під час запису');
   } else if (action === 'queue-leave') {
     const list = store.get('biz.queue', {})[el.dataset.place] ?? [];
@@ -1589,7 +1698,13 @@ document.addEventListener('change', (e) => {
 });
 
 document.addEventListener('input', (e) => {
-  if (e.target.id === 'q') { ui.q = e.target.value; renderList(); }
+  if (e.target.id === 'q') {
+    ui.q = e.target.value;
+    renderList();
+    // Пошук фіксуємо, коли людина перестала друкувати.
+    clearTimeout(ui.qT);
+    ui.qT = setTimeout(() => { if (ui.q.trim().length >= 3) track('search', { q: ui.q.trim().toLowerCase().slice(0, 40), found: filteredPlaces().length }); }, 1200);
+  }
   if (e.target.id === 'pf-name') draft.pfName = e.target.value;
   if (e.target.id === 'pf-phone') draft.pfPhone = e.target.value;
 });
@@ -1610,6 +1725,7 @@ document.addEventListener('submit', (e) => {
     });
     save();
     route();
+    track('review', { placeId: b.placeId });
     toast('Дякуємо за відгук!');
     return;
   }
@@ -1632,6 +1748,7 @@ document.addEventListener('submit', (e) => {
     }]);
     draft.waitOpen = false;
     renderBook();
+    track('waitlist_join', { placeId: p.id });
     toast('Готово! Повідомимо, щойно звільниться час');
     return;
   }
@@ -1646,6 +1763,7 @@ document.addEventListener('submit', (e) => {
     saveQueue(p.id, [...(store.get('biz.queue', {})[p.id] ?? []).filter((q) => q.day === entry.day), entry]);
     store.set('queue.mine', [...myQueue(), { id: entry.id, placeId: p.id }]);
     route();
+    track('queue_join', { placeId: p.id });
     toast('Ви в черзі — точка бачить ваше авто');
     return;
   }
@@ -1668,6 +1786,7 @@ document.addEventListener('submit', (e) => {
     saveRequests();
     route();
     $('#ask')?.scrollIntoView({ block: 'start' });
+    track('ask', { placeId: e.target.dataset.place ?? null });
     toast('Повідомлення надіслано точці');
     return;
   }
@@ -1733,6 +1852,7 @@ window.addEventListener('storage', (e) => {
   applyOverrides();
   if (!draft?.paying) route();
 });
+track('session', { view: ui.view });
 route();
 acceptInvite();
 

@@ -11,7 +11,7 @@ import {
   ROLES, staffOf, workBase, POWER, powerOf, setPower,
 } from './core.js';
 import {
-  CHANNELS, sendMessages, viberLink, telegramLink, dealsOf, queueOf, queueEnabled, saveQueue, queueEstimate, checkWaitlist,
+  CHANNELS, sendMessages, viberLink, telegramLink, dealsOf, weeklyDealsOf, daysText, queueOf, queueEnabled, saveQueue, queueEstimate, checkWaitlist,
   PASS_KIND, passesOf, savePasses, sellPass, passActive, passLeft, usableSubs, findCert, redeemPass, restorePass,
   SEASONS, TIRE_STATE, tiresOf, saveTires, seasonDue, tireDue, clientKeyOf,
 } from './ops.js';
@@ -1805,7 +1805,7 @@ function viewMailings() {
   const all = recipients(seg);
   const ok = all.filter(optedIn);
   const camps = store.peek('biz.campaigns', []).filter((x) => x.placeId === ui.place).sort((a, b) => b.at - a.at);
-  const deal = dealsOf(ui.place)[0];
+  const deal = dealsOf(ui.place).find((d) => d.date);
   const text = ui.mailText ?? `{імʼя}, давно не бачились! ${place().name} чекає на вас — запишіться через CARCAR${deal ? ` — ${dayLabel(deal.date, { day: 'numeric', month: 'long' })} з ${hhmm(deal.from)} до ${hhmm(deal.to)} знижка −${deal.pct}%` : ''}.`;
   return `<h1>Розсилки</h1><p class="page-sub">Повідомлення у Viber чи Telegram для сегмента клієнтів. Лише тим, хто дав згоду на розсилки.</p>
     <div class="grid-2" style="align-items:start">
@@ -1859,7 +1859,9 @@ function viewDeals() {
     ${ideas.length ? `<section class="panel" aria-labelledby="h-ideas"><h2 id="h-ideas">Порожній час, який можна заповнити</h2>
       <ul class="special-list">${ideas.map((x) => `<li><span><b>${dayLabel(x.d, { weekday: 'short', day: 'numeric', month: 'long' })}, ${hhmm(x.from)}–${hhmm(x.to)}</b><small>усі ${p.boxes} ${plural(p.boxes, 'бокс', 'бокси', 'боксів')} вільні</small></span>
         <button class="btn primary" data-action="deal-quick" data-d="${x.d}" data-from="${x.from}" data-to="${x.to}">Знижка −20%</button></li>`).join('')}</ul></section>` : ''}
-    <div class="grid-2" style="margin-top:16px;align-items:start">
+    ${weeklyDealsSection()}
+    <h2 class="biz-h2">Разові гарячі вікна</h2>
+    <div class="grid-2" style="align-items:start">
       <form id="deal-form" class="panel stack" style="gap:12px">
         <h2>Нове гаряче вікно</h2>
         <div class="form-grid">
@@ -1882,6 +1884,51 @@ function viewDeals() {
         }).join('')}</ul>` : '<p class="muted" style="margin:0">Немає гарячих вікон.</p>'}
       </section>
     </div>`;
+}
+
+// Щотижневі «щасливі години»: тиждень у вигляді смуг, де видно, коли діє знижка.
+function weeklyDealsSection() {
+  const p = place();
+  const weekly = weeklyDealsOf(ui.place);
+  const [o, c] = widestRange(p);
+  const span = c - o;
+  const pos = (t) => `${((Math.max(o, Math.min(c, t)) - o) / span) * 100}%`;
+  const ticks = [];
+  for (let t = Math.ceil(o / 120) * 120; t <= c; t += 120) ticks.push(t);
+  return `<section class="panel" aria-labelledby="h-weekly" style="margin-top:16px">
+    <h2 id="h-weekly">Щасливі години щотижня</h2>
+    <p class="sub">Постійна знижка на певні години — наприклад, будні зранку. Клієнти бачать її в розкладі точки й під час запису.</p>
+    <div class="week-bands" aria-hidden="true">
+      <div class="wb-row wb-axis"><span></span><div class="wb-track">${ticks.map((t) => `<i style="left:${pos(t)}">${hhmm(t)}</i>`).join('')}</div></div>
+      ${WEEKDAYS.map((w, i) => {
+        const h = scheduleOf(p).week[i];
+        const segs = weekly.filter((d) => d.days.includes(i));
+        return `<div class="wb-row"><span>${w}</span><div class="wb-track ${h ? '' : 'closed'}">
+          ${h ? `<b class="wb-open" style="left:${pos(h[0])};width:calc(${pos(h[1])} - ${pos(h[0])})"></b>` : '<em>вихідний</em>'}
+          ${segs.map((d) => `<b class="wb-deal" style="left:${pos(d.from)};width:calc(${pos(d.to)} - ${pos(d.from)})">−${d.pct}%</b>`).join('')}
+        </div></div>`;
+      }).join('')}
+    </div>
+    ${weekly.length ? `<ul class="special-list" style="margin-top:12px">${weekly.map((d) => {
+      const used = own().filter((b) => b.deal?.id === d.id && BLOCKING.concat('completed').includes(b.state)).length;
+      return `<li><span><b>−${d.pct}% · ${daysText(d.days)}, ${hhmm(d.from)}–${hhmm(d.to)}</b>
+        <small>${d.services?.length ? d.services.map((id) => esc(p.allServices.find((x) => x.id === id)?.name ?? '')).join(', ') : 'усі послуги'} · записів зі знижкою: ${used}</small></span>
+        <button class="btn" data-action="deal-stop" data-id="${d.id}" aria-label="Зупинити: ${daysText(d.days)}, ${hhmm(d.from)}–${hhmm(d.to)}">Зупинити</button></li>`;
+    }).join('')}</ul>` : '<p class="muted">Щасливих годин ще немає.</p>'}
+    <form id="weekly-form" class="stack" style="gap:12px;margin-top:14px">
+      <fieldset class="radio-row"><legend>Дні тижня</legend>
+        ${WEEKDAYS.map((w, i) => `<label><input type="checkbox" name="days" value="${i}" ${i < 5 ? 'checked' : ''}> ${WEEKDAY_NAMES[i]}</label>`).join('')}</fieldset>
+      <div class="form-grid">
+        <label class="field"><span>Знижка щотижня</span><select name="pct">${[10, 15, 20, 25, 30].map((v) => `<option value="${v}" ${v === 15 ? 'selected' : ''}>−${v}%</option>`).join('')}</select></label>
+        <label class="field"><span>Діє до (необовʼязково)</span><input name="until" type="date" min="${today()}"></label>
+        <label class="field"><span>Щасливі години з</span><select name="from">${timeOpts(600, 0, 1410)}</select></label>
+        <label class="field"><span>Щасливі години до</span><select name="to">${timeOpts(720, 30, 1440)}</select></label>
+      </div>
+      <fieldset class="radio-row svc-scope"><legend>На які послуги (не обрано — на всі)</legend>
+        ${p.services.map((x) => `<label><input type="checkbox" name="services" value="${x.id}"> ${esc(x.name)}</label>`).join('')}</fieldset>
+      <button class="btn primary" type="submit" style="align-self:flex-start">Додати щасливі години</button>
+    </form>
+  </section>`;
 }
 
 function saveDeal(d) {
@@ -2059,6 +2106,17 @@ async function submitOps(f) {
     ui.mailText = null;
     rerenderKeepScroll();
     toast(`Розсилку надіслано: ${list.length} ${plural(list.length, 'клієнт', 'клієнти', 'клієнтів')} у ${CHANNELS[channel]}`);
+    return true;
+  }
+  if (f.id === 'weekly-form') {
+    const days = d.getAll('days').map(Number);
+    const from = Number(d.get('from'));
+    const to = Number(d.get('to'));
+    if (!days.length) { toast('Оберіть хоча б один день тижня'); return true; }
+    if (to <= from) { toast('Кінець має бути пізніше за початок'); return true; }
+    saveDeal({ days, from, to, pct: Number(d.get('pct')), services: d.getAll('services'), until: d.get('until') || null });
+    rerenderKeepScroll();
+    toast(`Щасливі години −${d.get('pct')}%: ${daysText(days)}, ${hhmm(from)}–${hhmm(to)}`);
     return true;
   }
   if (f.id === 'deal-form') {

@@ -501,7 +501,7 @@ label.item { cursor: pointer; padding: 10px 14px; }
 /* повідомлення, гарячі вікна, черга, абонементи, акт приймання */
 .inbox-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; color: var(--text); margin-left: 4px; }
 .inbox-btn:hover { background: var(--soft); }
-.inbox-btn .count { position: absolute; top: 4px; right: 2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.inbox-btn .count { position: absolute; top: 4px; right: 2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 .badge.deal { background: var(--accent-soft); color: var(--text); }
 .badge.power .ic, .badge.deal .ic { flex: none; }
 .hot { margin-top: 14px; }
@@ -510,7 +510,7 @@ label.item { cursor: pointer; padding: 10px 14px; }
 .hot-row { display: flex; gap: 10px; overflow-x: auto; margin: 0 -16px; padding: 2px 16px 6px; scrollbar-width: none; }
 .hot-row::-webkit-scrollbar { display: none; }
 .hot-card { flex: 0 0 210px; display: flex; flex-direction: column; gap: 3px; text-decoration: none; color: var(--text); }
-.hot-pct { align-self: flex-start; background: var(--accent); color: #fff; font-weight: 800; font-size: 14px; padding: 2px 8px; border-radius: 999px; margin-bottom: 4px; }
+.hot-pct { align-self: flex-start; background: var(--accent); color: var(--on-accent); font-weight: 800; font-size: 14px; padding: 2px 8px; border-radius: 999px; margin-bottom: 4px; }
 .slot { display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; }
 .slot small { font-size: 11px; font-weight: 700; color: var(--accent); }
 .slot.hot { border-color: var(--accent); }
@@ -529,6 +529,68 @@ label.item { cursor: pointer; padding: 10px 14px; }
 .notice > .ic { flex: none; }
 
 [hidden] { display: none !important; }
+
+/* знижки за годинами */
+.deals-card { margin-top: 14px; display: grid; gap: 10px; background: linear-gradient(135deg, var(--accent-soft), var(--bg) 70%); }
+.deals-card h2 { display: flex; align-items: center; gap: 8px; margin: 0; }
+.deals-card h2 .ic { color: var(--accent); }
+.deals-card ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.deals-card li { display: flex; align-items: center; gap: 12px; }
+.deals-card li > span:last-child { display: flex; flex-direction: column; gap: 1px; }
+.deals-card small { color: var(--muted); font-size: 13px; }
+.dc-pct { flex: none; min-width: 54px; text-align: center; background: var(--accent); color: var(--on-accent); font-weight: 800; border-radius: 10px; padding: 6px 8px; }
+.day { position: relative; }
+.day.has-deal { border-color: var(--accent); }
+.day-deal { display: block; margin-top: 3px; background: var(--accent); color: var(--on-accent) !important; font-size: 10px; font-weight: 800; padding: 1px 5px; border-radius: 999px; }
+.day-deals { margin-top: 12px; }
+.dd-track { position: relative; height: 26px; border-radius: 8px; background: var(--soft); margin-bottom: 18px; }
+.dd-track b { position: absolute; top: 0; bottom: 0; border-radius: 8px; background: var(--accent); color: var(--on-accent); font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; overflow: hidden; white-space: nowrap; }
+.dd-track i { position: absolute; top: 30px; font-style: normal; font-size: 11px; color: var(--muted); }
+.dd-text { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 14px; font-weight: 600; }
+.dd-text .ic { color: var(--accent); flex: none; }
+.slot.hot { border-color: var(--accent); background: var(--accent-soft); height: 54px; }
+.slot.hot small { font-size: 11px; }
+.save-pill { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; font-size: 13px; font-weight: 700; color: var(--accent); }
+
+/* карта */
+.seg-mini { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.seg-mini button { display: inline-flex; align-items: center; gap: 4px; border: 0; background: var(--bg); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; padding: 6px 10px; min-height: 34px; cursor: pointer; }
+.seg-mini button[aria-pressed="true"] { background: var(--navy); color: var(--on-navy); }
+.map { position: relative; height: min(62vh, 560px); border-radius: 16px; overflow: hidden; touch-action: none; cursor: grab; user-select: none; border: 1px solid var(--line); background: var(--map-out, #eef1f4); }
+.map:active { cursor: grabbing; }
+.map:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.map-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.map-land-out { fill: var(--map-out, #eef1f4); }
+.map-city { fill: var(--map-land, #f9faf7); stroke: var(--map-edge, #c9d1db); stroke-width: 1.5; vector-effect: non-scaling-stroke; stroke-dasharray: 6 4; }
+.map-water { fill: none; stroke: var(--map-water, #a9cdf0); stroke-width: 16; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.map-water.thin { stroke-width: 6; }
+.map-label { font-size: calc(11px / var(--z, 1)); fill: var(--muted); text-anchor: middle; font-weight: 600; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.map.zoomed .map-label { opacity: .9; }
+.map-pins { position: absolute; inset: 0; pointer-events: none; }
+.pin { position: absolute; left: 0; top: 0; margin: -38px 0 0 -17px; width: 34px; height: 38px; border: 0; padding: 0; background: none; pointer-events: auto; cursor: pointer; }
+.pin-shape { position: absolute; inset: 0; padding-bottom: 6px; display: flex; align-items: center; justify-content: center; color: #fff;
+  background: #1e3a5f; clip-path: path('M17 38 L10 29 A15 15 0 1 1 24 29 Z'); filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .3)); }
+.pin.c-wash .pin-shape { background: #2a78d6; }
+.pin.c-tires .pin-shape { background: #1e3a5f; }
+.pin.c-service .pin-shape { background: #6b4fd6; }
+.pin.c-detailing .pin-shape { background: #b5361f; }
+.pin.shut .pin-shape { background: #7b8494; }
+.pin.sel, .pin:focus-visible { scale: 1.3; transform-origin: 17px 38px; z-index: 2; outline: none; }
+.pin.sel .pin-shape, .pin:focus-visible .pin-shape { background: var(--accent); }
+.pin-deal { position: absolute; top: -8px; left: 22px; background: var(--accent); color: var(--on-accent); font-size: 10px; font-weight: 800; padding: 1px 4px; border-radius: 999px; white-space: nowrap; box-shadow: 0 0 0 2px var(--bg); }
+.pin-bolt { position: absolute; top: -6px; left: -8px; width: 16px; height: 16px; border-radius: 50%; background: #f3b850; color: #10151c; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 2px var(--bg); }
+.me-dot { position: absolute; left: 0; top: 0; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: #2a78d6; border: 3px solid #fff; box-shadow: 0 0 0 6px rgba(42, 120, 214, .25); }
+.map-ctrl { position: absolute; right: 10px; top: 10px; display: grid; gap: 6px; }
+.map-btn { width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 20px; font-weight: 700; cursor: pointer; box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
+.map-hint { position: absolute; left: 10px; bottom: 8px; margin: 0; font-size: 12px; color: var(--muted); background: color-mix(in srgb, var(--bg) 85%, transparent); padding: 2px 8px; border-radius: 6px; pointer-events: none; }
+#map-card { margin-top: 12px; }
+.map-empty { text-align: center; margin: 8px 0; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .map { --map-out: #141a22; --map-land: #1b222c; --map-edge: #3a4555; --map-water: #24476d; }
+}
+.slot.hot small { color: var(--accent-hover); }
+.slot.hot[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: var(--on-navy); }
+.slot.hot[aria-pressed="true"] small { color: var(--on-navy); }
 </style>
   <style>
 /* Панель для бізнесу CARCAR: десктоп-перший макет поверх токенів і компонентів styles.css. */
@@ -869,6 +931,36 @@ table.t tr.off td { opacity: .55; }
 .intake { display: grid; gap: 6px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
 .queue-list { counter-reset: q; }
 
+/* щасливі години: тиждень смугами */
+.week-bands { display: grid; gap: 6px; margin-top: 12px; }
+.wb-row { display: grid; grid-template-columns: 32px 1fr; align-items: center; gap: 8px; font-size: 13px; }
+.wb-track { position: relative; height: 22px; border-radius: 6px; background: var(--soft); }
+.wb-track.closed em { position: absolute; left: 8px; top: 3px; font-style: normal; color: var(--muted); font-size: 12px; }
+.wb-open { position: absolute; top: 0; bottom: 0; background: var(--line); border-radius: 6px; }
+.wb-deal { position: absolute; top: 0; bottom: 0; border-radius: 6px; background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.wb-axis .wb-track { background: none; height: 16px; }
+.wb-axis i { position: absolute; transform: translateX(-50%); font-style: normal; font-size: 11px; color: var(--muted); }
+
+/* статистика застосунку */
+.funnel { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 10px; }
+.funnel li { display: grid; grid-template-columns: minmax(120px, 160px) 1fr minmax(90px, auto); align-items: center; gap: 10px; font-size: 14px; }
+.f-track { height: 22px; background: var(--soft); border-radius: 6px; overflow: hidden; }
+.f-fill { display: block; height: 100%; background: var(--series-1); border-radius: 6px; }
+.f-val { display: flex; flex-direction: column; text-align: right; }
+.f-val small { color: var(--muted); font-size: 12px; }
+.heat { display: grid; gap: 3px; margin-top: 10px; overflow-x: auto; }
+.heat-row { display: grid; grid-template-columns: 28px repeat(15, minmax(22px, 1fr)); gap: 3px; align-items: center; }
+.heat-h, .heat-d { font-size: 11px; color: var(--muted); text-align: center; }
+.heat-c { display: block; height: 24px; border-radius: 4px; }
+.heat-c.l0 { background: var(--soft); }
+.heat-c.l1 { background: color-mix(in srgb, var(--series-1) 18%, var(--soft)); }
+.heat-c.l2 { background: color-mix(in srgb, var(--series-1) 36%, var(--soft)); }
+.heat-c.l3 { background: color-mix(in srgb, var(--series-1) 54%, var(--soft)); }
+.heat-c.l4 { background: color-mix(in srgb, var(--series-1) 74%, var(--soft)); }
+.heat-c.l5 { background: var(--series-1); }
+.heat-legend { display: flex; align-items: center; gap: 4px; margin-top: 8px; font-size: 12px; color: var(--muted); }
+.heat-legend i { width: 18px; height: 12px; }
+
 @media (max-width: 960px) {
   .biz-shell { flex-direction: column; }
   .biz-side { position: static; height: auto; width: auto; flex-direction: row; align-items: center; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--line); overflow-x: auto; }
@@ -891,6 +983,8 @@ table.t tr.off td { opacity: .55; }
   .week-row { grid-template-columns: 1fr auto 1fr; }
   .week-row > .row { grid-column: 1 / -1; }
   .admin-badge { display: none; }
+  .funnel li { grid-template-columns: 1fr auto; }
+  .funnel .f-track { grid-column: 1 / -1; grid-row: 2; }
 }
 </style>
 </head>
@@ -2243,10 +2337,213 @@ function viewCommission() {
     </table></div>`;
 }
 
+// ---------- статистика застосунку ----------
+
+// Анонімні події застосунку клієнта (див. track в app.js) і записи — за обраний період.
+const events = () => store.get('analytics', []);
+const evIn = (list, [from, to]) => {
+  const a = parseDate(from).getTime();
+  const z = parseDate(addDays(to, 1)).getTime();
+  return list.filter((e) => e.at >= a && e.at < z);
+};
+const count = (list, t) => list.filter((e) => e.t === t).length;
+const share = (a, b) => (b ? `${Math.round((a / b) * 100)}%` : '—');
+const LEAD = [['до 2 год', 0, 2], ['2–24 год', 2, 24], ['1–3 дні', 24, 72], ['3–7 днів', 72, 168], ['понад тиждень', 168, Infinity]];
+const WD_FULL = ['понеділок', 'вівторок', 'середа', 'четвер', 'пʼятниця', 'субота', 'неділя'];
+
+function viewStats() {
+  const n = ui.period;
+  const range = rangeOf(n);
+  const ev = evIn(events(), range);
+  const prevEv = evIn(events(), rangeOf(n, 1));
+  const app = bookings.filter((b) => isCarcar(b) && inRange(b, range));
+  const paidN = count(ev, 'paid');
+  const sessions = count(ev, 'session');
+  const funnel = [['Переглянули точку', count(ev, 'view_place')], ['Відкрили запис', count(ev, 'open_book')], ['Перейшли до оплати', count(ev, 'open_pay')], ['Оплатили', paidN]];
+
+  // Записи по днях: через застосунок і внесені точками в журнал.
+  const days = [];
+  for (let d = range[0]; d <= range[1]; d = addDays(d, 1)) days.push(d);
+  const all = bookings.filter((b) => inRange(b, range) && b.state !== 'refunded');
+  const byDay = days.map((d) => {
+    const x = parseDate(d);
+    return { label: dayLabel(d), short: `${x.getDate()}.${pad(x.getMonth() + 1)}`, values: [all.filter((b) => b.date === d && isCarcar(b)).length, all.filter((b) => b.date === d && !isCarcar(b)).length] };
+  });
+  charts = { 'ch-days': { title: 'Записи по днях', cats: byDay, series: ['Через застосунок', 'У журналі точок'], fmt: (v) => String(v) } };
+
+  // Теплова карта: день тижня × година початку записів через застосунок.
+  const hours = Array.from({ length: 15 }, (_, i) => 8 + i);
+  const grid = WD_FULL.map((_, w) => hours.map((h) => app.filter((b) => (parseDate(b.date).getDay() + 6) % 7 === w && Math.floor(Number(b.time.slice(0, 2))) === h).length));
+  const max = Math.max(1, ...grid.flat());
+  const level = (v) => (v === 0 ? 0 : Math.min(5, Math.ceil((v / max) * 5)));
+
+  // Як платять клієнти.
+  const paidApp = app.filter((b) => b.state !== 'cancelled' || b.placeAmount);
+  const pays = [
+    { name: 'Лише карткою', value: paidApp.filter((b) => !b.bonus && !b.fromBalance && !b.covered).length },
+    { name: 'З бонусом «Приведи друга»', value: paidApp.filter((b) => b.bonus).length },
+    { name: 'З балансу CARCAR', value: paidApp.filter((b) => b.fromBalance).length },
+    { name: 'За абонементом', value: paidApp.filter((b) => b.passUse?.kind === 'sub').length },
+    { name: 'Сертифікатом', value: paidApp.filter((b) => b.passUse?.kind === 'cert').length },
+    { name: 'Зі знижкою за годинами', value: paidApp.filter((b) => b.deal).length },
+  ];
+  const lead = LEAD.map(([name, a, z]) => ({ name, value: ev.filter((e) => e.t === 'paid' && e.leadH >= a && e.leadH < z).length }));
+
+  // Пошук і фільтри.
+  const searches = new Map();
+  for (const e of ev.filter((x) => x.t === 'search')) {
+    const s = searches.get(e.q) ?? { q: e.q, n: 0, empty: 0 };
+    s.n++;
+    if (!e.found) s.empty++;
+    searches.set(e.q, s);
+  }
+  const topSearch = [...searches.values()].sort((a, b) => b.n - a.n).slice(0, 8);
+  const FILTER_NAMES = { openNow: 'Відчинено зараз', blackout: 'Працює при відключеннях', favOnly: 'Обране', 'cat:wash': 'Мийка', 'cat:tires': 'Шиномонтаж', 'cat:service': 'СТО', 'cat:detailing': 'Детейлінг' };
+  const filters = Object.entries(FILTER_NAMES).map(([k, name]) => ({ name, value: ev.filter((e) => e.t === 'filter' && e.name === k).length })).filter((x) => x.value).sort((a, b) => b.value - a.value);
+
+  // Утримання: скільки клієнтів повернулися.
+  const byClient = new Map();
+  for (const b of bookings.filter((x) => isCarcar(x) && x.state === 'completed')) {
+    const k = b.clientPhone?.replace(/\D/g, '').slice(-9) || b.car;
+    byClient.set(k, [...(byClient.get(k) ?? []), b.date]);
+  }
+  const clients = [...byClient.values()];
+  const repeat = clients.filter((d) => d.length > 1);
+  const gaps = repeat.flatMap((d) => { const s = [...d].sort(); return s.slice(1).map((x, i) => (parseDate(x) - parseDate(s[i])) / 864e5); });
+
+  // Функції застосунку.
+  const wl = store.get('waitlist', []);
+  const passesSold = PLACES.flatMap((p) => (store.peek('biz.passes', {})[p.id]?.sold ?? [])).filter((x) => x.soldAt >= parseDate(range[0]).getTime());
+  const intakes = bookings.filter((b) => b.intake && inRange(b, range));
+  const reqs = store.get('requests', []).filter((r) => r.at >= parseDate(range[0]).getTime());
+  const camps = store.get('biz.campaigns', []).filter((c) => c.at >= parseDate(range[0]).getTime());
+  const vis = visibleReviews(reviews).filter((r) => r.at >= parseDate(range[0]).getTime());
+  const features = [
+    ['Карта', `${count(ev, 'map_open')} відкриттів · ${count(ev, 'map_pin')} натискань на точки`],
+    ['Гарячі вікна й щасливі години', `${count(ev, 'hot_click')} переходів з головної · ${app.filter((b) => b.deal).length} записів зі знижкою · знижок на ${uah(app.filter((b) => b.deal).reduce((a, b) => a + ((b.listTotal ?? b.total) - b.total), 0))}`],
+    ['Абонементи й сертифікати', `${passesSold.length} продано на ${uah(passesSold.reduce((a, x) => a + x.price, 0))}, з них у застосунку ${passesSold.filter((x) => x.source === 'carcar').length}`],
+    ['Лист очікування', `${count(ev, 'waitlist_join')} заявок · сповіщено ${wl.filter((w) => w.status === 'notified').length} · чекають ${wl.filter((w) => w.status === 'active').length}`],
+    ['Жива черга', `${count(ev, 'queue_join')} клієнтів стали в чергу з телефона`],
+    ['Акт приймання', `${intakes.length} актів · підтверджено ${intakes.filter((b) => b.intake.ack?.ok).length} · із зауваженнями ${intakes.filter((b) => b.intake.ack && !b.intake.ack.ok).length}`],
+    ['Запити «не знайшов послугу»', `${reqs.length} запитів · відповіли ${reqs.filter((r) => r.messages.some((m) => m.from === 'biz')).length} · додано послуг ${reqs.filter((r) => r.service).length}`],
+    ['Розсилки точок', `${camps.length} розсилок · ${camps.reduce((a, c) => a + c.count, 0)} отримувачів`],
+    ['Відгуки', `${vis.length} нових · середня оцінка ${vis.length ? rating(vis.reduce((a, r) => a + r.stars, 0) / vis.length) : '—'} · з відповіддю точки ${share(vis.filter((r) => r.reply).length, vis.length)}`],
+  ];
+
+  const geo = (key) => {
+    const m = new Map();
+    for (const b of app) {
+      const p = PLACES.find((x) => x.id === b.placeId);
+      if (!p) continue;
+      const k = key(p);
+      m.set(k, (m.get(k) ?? 0) + 1);
+    }
+    return [...m].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+  };
+
+  const demoEv = events().some((e) => e.demo);
+  return `<h1>Статистика застосунку</h1><p class="page-sub">Як клієнти користуються CARCAR: відвідування, воронка запису, оплата, пошук, функції й повернення. Події анонімні — без імен і телефонів.</p>
+    <div class="filters">
+      <div class="seg" role="group" aria-label="Період">${[7, 30, 90].map((d) => `<button data-action="period" data-n="${d}" aria-pressed="${d === n}">${d} ${daysWord(d)}</button>`).join('')}</div>
+      <span class="small muted">${fmtDate(range[0])} — ${fmtDate(range[1])}</span>
+      <span class="spacer"></span>
+      ${demoEv ? '<button class="btn" data-action="stats-demo-clear">Очистити демо-активність</button>' : ''}
+      <button class="btn" data-action="stats-demo">Згенерувати демо-активність</button>
+    </div>
+    ${demoEv ? '<p class="small muted">Частину подій згенеровано для демонстрації на основі записів у системі.</p>' : ''}
+    <section class="kpis" aria-label="Показники застосунку">
+      <div class="kpi hero"><span class="label">Сеанси</span><span class="value">${sessions}</span>${delta(sessions, count(prevEv, 'session'))}<span class="kpi-note">переглядів точок ${count(ev, 'view_place')}</span></div>
+      <div class="kpi"><span class="label">Оплачених записів</span><span class="value">${paidN}</span>${delta(paidN, count(prevEv, 'paid'))}</div>
+      <div class="kpi"><span class="label">Конверсія сеансу в запис</span><span class="value">${share(paidN, sessions)}</span></div>
+      <div class="kpi"><span class="label">Повертаються</span><span class="value">${share(repeat.length, clients.length)}</span><span class="kpi-note">${repeat.length} з ${clients.length} клієнтів · ${gaps.length ? `між візитами ≈ ${Math.round(gaps.reduce((a, x) => a + x, 0) / gaps.length)} ${daysWord(Math.round(gaps.reduce((a, x) => a + x, 0) / gaps.length))}` : ''}</span></div>
+      <div class="kpi"><span class="label">Скасовано клієнтами</span><span class="value">${app.filter((b) => b.state === 'cancelled').length}</span><span class="kpi-note">вчасно ${app.filter((b) => b.state === 'cancelled' && !b.placeAmount).length} · пізно ${app.filter((b) => b.state === 'cancelled' && b.placeAmount).length}</span></div>
+      <div class="kpi"><span class="label">Неявки</span><span class="value">${share(app.filter((b) => b.state === 'noshow').length, app.length)}</span></div>
+    </section>
+    <div class="grid-2" style="margin-top:16px">
+      <section class="panel" aria-labelledby="h-funnel">
+        <h2 id="h-funnel">Воронка запису</h2><p class="sub">Скільки людей дійшло до кожного кроку</p>
+        <ol class="funnel">${funnel.map(([name, v], i) => `<li><span class="f-name">${name}</span>
+          <span class="f-track"><span class="f-fill" style="width:${funnel[0][1] ? Math.max(2, (v / funnel[0][1]) * 100) : 0}%"></span></span>
+          <span class="f-val"><b>${v}</b>${i ? `<small>${share(v, funnel[i - 1][1])} з попереднього</small>` : ''}</span></li>`).join('')}</ol>
+        ${funnel[0][1] ? `<p class="small muted" style="margin:8px 0 0">Найбільше губимо між «${funnel.slice(1).map(([name, v], i) => [name, v / Math.max(1, funnel[i][1]), funnel[i][0]]).sort((a, b) => a[1] - b[1])[0][2]}» і наступним кроком.</p>` : ''}
+      </section>
+      <section class="panel" aria-labelledby="h-days">
+        <h2 id="h-days">Записи по днях</h2>
+        ${legend(['Через застосунок', 'У журналі точок'])}
+        <div class="chart" id="ch-days"></div>
+        ${tableView(['День', 'Через застосунок', 'У журналі'], byDay.map((x) => [x.label, String(x.values[0]), String(x.values[1])]))}
+      </section>
+    </div>
+    <section class="panel" aria-labelledby="h-heat" style="margin-top:16px">
+      <h2 id="h-heat">Коли записуються</h2><p class="sub">Записи через застосунок за днем тижня й годиною початку — темніше означає більше</p>
+      <div class="heat" role="table" tabindex="0" aria-label="Записи за днем тижня й годиною">
+        <div class="heat-row" role="row"><span role="columnheader"><span class="sr-only">День</span></span>${hours.map((h) => `<span class="heat-h" role="columnheader">${h}</span>`).join('')}</div>
+        ${grid.map((row, w) => `<div class="heat-row" role="row"><span class="heat-d" role="rowheader">${WEEKDAYS[w]}</span>
+          ${row.map((v, i) => `<span class="heat-c l${level(v)}" role="cell" data-tip="${esc(JSON.stringify({ t: `${WD_FULL[w]}, ${pad(hours[i])}:00–${pad(hours[i] + 1)}:00`, r: [['s1', String(v), 'записів']] }))}" tabindex="-1"><span class="sr-only">${v}</span></span>`).join('')}</div>`).join('')}
+      </div>
+      <div class="heat-legend" aria-hidden="true"><span>менше</span>${[0, 1, 2, 3, 4, 5].map((l) => `<i class="heat-c l${l}"></i>`).join('')}<span>більше</span></div>
+    </section>
+    <div class="grid-3" style="margin-top:16px">
+      <section class="panel" aria-labelledby="h-pay"><h2 id="h-pay">Як платять</h2><p class="sub">Записів через застосунок</p>${hbars(pays, (v) => String(v))}</section>
+      <section class="panel" aria-labelledby="h-lead"><h2 id="h-lead">За скільки записуються</h2><p class="sub">Від оплати до візиту</p>${hbars(lead, (v) => String(v))}</section>
+      <section class="panel" aria-labelledby="h-geo"><h2 id="h-geo">Райони</h2><p class="sub">Записи через застосунок</p>${geo((p) => p.district).length ? hbars(geo((p) => p.district), (v) => String(v)) : '<p class="muted" style="margin:0">Немає записів.</p>'}</section>
+      <section class="panel" aria-labelledby="h-cat2"><h2 id="h-cat2">Категорії</h2><p class="sub">Записи через застосунок</p>${geo((p) => catById(p.cats[0]).name).length ? hbars(geo((p) => catById(p.cats[0]).name), (v) => String(v)) : '<p class="muted" style="margin:0">Немає записів.</p>'}</section>
+      <section class="panel" aria-labelledby="h-search"><h2 id="h-search">Що шукають</h2><p class="sub">Запити в пошуку; без результатів — що варто додати</p>
+        ${topSearch.length ? `<ul class="special-list">${topSearch.map((x) => `<li><span><b>«${esc(x.q)}»</b><small>${x.n} ${plural(x.n, 'раз', 'рази', 'разів')}${x.empty ? ` · без результатів ${x.empty}` : ''}</small></span></li>`).join('')}</ul>` : '<p class="muted" style="margin:0">Пошукових запитів немає.</p>'}
+      </section>
+      <section class="panel" aria-labelledby="h-filt"><h2 id="h-filt">Фільтри</h2><p class="sub">Скільки разів увімкнули</p>${filters.length ? hbars(filters, (v) => String(v)) : '<p class="muted" style="margin:0">Фільтрами не користувалися.</p>'}</section>
+    </div>
+    <h2 class="biz-h2">Функції застосунку</h2>
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Використання функцій"><table class="t">
+      <thead><tr><th>Функція</th><th>За період</th></tr></thead>
+      <tbody>${features.map(([a, b]) => `<tr><td><b>${a}</b></td><td>${b}</td></tr>`).join('')}</tbody>
+    </table></div>`;
+}
+
+// Демо-активність: події, що могли б передувати записам через застосунок за 90 днів, плюс ті, хто не дійшов до оплати.
+function statsDemo() {
+  const rnd = (() => { let s = 20261004; return () => { s = (s * 1103515245 + 12345) % 2147483648; return s / 2147483648; }; })();
+  const out = events().filter((e) => !e.demo);
+  const since = Date.now() - 90 * 864e5;
+  const app = bookings.filter((b) => isCarcar(b) && b.source === 'demo');
+  const ev = (t, at, data = {}) => out.push({ t, at: Math.round(at), demo: true, ...data });
+  const words = ['мийка', 'шиномонтаж', 'полірування', 'кераміка', 'хімчистка', 'перевзування', 'розвал', 'кондиціонер', 'мийка двигуна', 'оболонь', 'троєщина', 'антидощ', 'фари'];
+  for (const b of app) {
+    const start = bookingStart(b).getTime();
+    const leadH = [1, 3, 8, 20, 40, 70, 120, 200][Math.floor(rnd() * 8)];
+    const at = Math.max(since, start - leadH * HOUR);
+    ev('session', at - 600000, { view: rnd() < 0.3 ? 'map' : 'list' });
+    ev('view_place', at - 420000, { placeId: b.placeId });
+    ev('open_book', at - 300000, { placeId: b.placeId });
+    ev('open_pay', at - 60000, { placeId: b.placeId });
+    ev('paid', at, { placeId: b.placeId, amount: b.total, deal: !!b.deal, leadH });
+  }
+  // Ті, хто подивився й пішов: більше переглядів, ніж записів.
+  const extra = app.length * 4;
+  for (let i = 0; i < extra; i++) {
+    const at = since + rnd() * (Date.now() - since);
+    const p = PLACES[Math.floor(rnd() * PLACES.length)];
+    ev('session', at - 300000, { view: rnd() < 0.3 ? 'map' : 'list' });
+    if (rnd() < 0.8) ev('view_place', at - 200000, { placeId: p.id });
+    if (rnd() < 0.25) ev('open_book', at - 100000, { placeId: p.id });
+    if (rnd() < 0.07) ev('open_pay', at, { placeId: p.id });
+    if (rnd() < 0.35) { const q = words[Math.floor(rnd() * words.length)]; ev('search', at - 250000, { q, found: /антидощ|фари|кондиціонер/.test(q) && rnd() < 0.7 ? 0 : 1 + Math.floor(rnd() * 4) }); }
+    if (rnd() < 0.2) ev('filter', at - 240000, { name: ['openNow', 'blackout', 'cat:wash', 'cat:tires', 'cat:detailing', 'favOnly'][Math.floor(rnd() * 6)] });
+    if (rnd() < 0.15) { ev('map_open', at - 230000); ev('map_pin', at - 220000, { placeId: p.id }); }
+    if (rnd() < 0.05) ev('hot_click', at - 210000, { placeId: p.id });
+    if (rnd() < 0.02) ev('queue_join', at, { placeId: p.id });
+    if (rnd() < 0.015) ev('waitlist_join', at, { placeId: p.id });
+  }
+  out.sort((a, b) => a.at - b.at);
+  store.set('analytics', out.slice(-20000));
+  return app.length;
+}
+
 // ---------- роутер і події ----------
 
 const NAV = [
   ['', 'Огляд', 'chart'],
+  ['stats', 'Статистика застосунку', 'users'],
   ['places', 'Точки', 'shield'],
   ['reviews', 'Відгуки', 'star'],
   ['disputes', 'Спори', 'scale'],
@@ -2267,6 +2564,7 @@ function route() {
   else if (page === 'reviews') view.innerHTML = viewReviews();
   else if (page === 'disputes') view.innerHTML = viewDisputes();
   else if (page === 'commission') view.innerHTML = viewCommission();
+  else if (page === 'stats') view.innerHTML = viewStats();
   else view.innerHTML = '<p>Сторінку не знайдено.</p>';
   mountCharts();
 }
@@ -2284,6 +2582,15 @@ document.addEventListener('click', (e) => {
   if (!el) return;
   const { action, id } = el.dataset;
   if (action === 'period') { ui.period = Number(el.dataset.n); rerender(); }
+  else if (action === 'stats-demo') {
+    const n = statsDemo();
+    rerender();
+    toast(n ? `Згенеровано демо-активність для ${n} записів` : 'Спершу заповніть демо-історію хоча б для однієї точки в панелі бізнесу');
+  } else if (action === 'stats-demo-clear') {
+    store.set('analytics', events().filter((e) => !e.demo));
+    rerender();
+    toast('Демо-активність очищено');
+  }
   else if (action === 'place-filter') { ui.places = el.dataset.f; rerender(); }
   else if (action === 'review-filter') { ui.reviews = el.dataset.f; rerender(); }
   else if (action === 'review-restore') {

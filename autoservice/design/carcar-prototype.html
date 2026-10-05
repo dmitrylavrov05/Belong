@@ -502,7 +502,7 @@ label.item { cursor: pointer; padding: 10px 14px; }
 /* повідомлення, гарячі вікна, черга, абонементи, акт приймання */
 .inbox-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; color: var(--text); margin-left: 4px; }
 .inbox-btn:hover { background: var(--soft); }
-.inbox-btn .count { position: absolute; top: 4px; right: 2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.inbox-btn .count { position: absolute; top: 4px; right: 2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 .badge.deal { background: var(--accent-soft); color: var(--text); }
 .badge.power .ic, .badge.deal .ic { flex: none; }
 .hot { margin-top: 14px; }
@@ -511,7 +511,7 @@ label.item { cursor: pointer; padding: 10px 14px; }
 .hot-row { display: flex; gap: 10px; overflow-x: auto; margin: 0 -16px; padding: 2px 16px 6px; scrollbar-width: none; }
 .hot-row::-webkit-scrollbar { display: none; }
 .hot-card { flex: 0 0 210px; display: flex; flex-direction: column; gap: 3px; text-decoration: none; color: var(--text); }
-.hot-pct { align-self: flex-start; background: var(--accent); color: #fff; font-weight: 800; font-size: 14px; padding: 2px 8px; border-radius: 999px; margin-bottom: 4px; }
+.hot-pct { align-self: flex-start; background: var(--accent); color: var(--on-accent); font-weight: 800; font-size: 14px; padding: 2px 8px; border-radius: 999px; margin-bottom: 4px; }
 .slot { display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; }
 .slot small { font-size: 11px; font-weight: 700; color: var(--accent); }
 .slot.hot { border-color: var(--accent); }
@@ -530,6 +530,68 @@ label.item { cursor: pointer; padding: 10px 14px; }
 .notice > .ic { flex: none; }
 
 [hidden] { display: none !important; }
+
+/* знижки за годинами */
+.deals-card { margin-top: 14px; display: grid; gap: 10px; background: linear-gradient(135deg, var(--accent-soft), var(--bg) 70%); }
+.deals-card h2 { display: flex; align-items: center; gap: 8px; margin: 0; }
+.deals-card h2 .ic { color: var(--accent); }
+.deals-card ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.deals-card li { display: flex; align-items: center; gap: 12px; }
+.deals-card li > span:last-child { display: flex; flex-direction: column; gap: 1px; }
+.deals-card small { color: var(--muted); font-size: 13px; }
+.dc-pct { flex: none; min-width: 54px; text-align: center; background: var(--accent); color: var(--on-accent); font-weight: 800; border-radius: 10px; padding: 6px 8px; }
+.day { position: relative; }
+.day.has-deal { border-color: var(--accent); }
+.day-deal { display: block; margin-top: 3px; background: var(--accent); color: var(--on-accent) !important; font-size: 10px; font-weight: 800; padding: 1px 5px; border-radius: 999px; }
+.day-deals { margin-top: 12px; }
+.dd-track { position: relative; height: 26px; border-radius: 8px; background: var(--soft); margin-bottom: 18px; }
+.dd-track b { position: absolute; top: 0; bottom: 0; border-radius: 8px; background: var(--accent); color: var(--on-accent); font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; overflow: hidden; white-space: nowrap; }
+.dd-track i { position: absolute; top: 30px; font-style: normal; font-size: 11px; color: var(--muted); }
+.dd-text { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 14px; font-weight: 600; }
+.dd-text .ic { color: var(--accent); flex: none; }
+.slot.hot { border-color: var(--accent); background: var(--accent-soft); height: 54px; }
+.slot.hot small { font-size: 11px; }
+.save-pill { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; font-size: 13px; font-weight: 700; color: var(--accent); }
+
+/* карта */
+.seg-mini { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.seg-mini button { display: inline-flex; align-items: center; gap: 4px; border: 0; background: var(--bg); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; padding: 6px 10px; min-height: 34px; cursor: pointer; }
+.seg-mini button[aria-pressed="true"] { background: var(--navy); color: var(--on-navy); }
+.map { position: relative; height: min(62vh, 560px); border-radius: 16px; overflow: hidden; touch-action: none; cursor: grab; user-select: none; border: 1px solid var(--line); background: var(--map-out, #eef1f4); }
+.map:active { cursor: grabbing; }
+.map:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.map-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.map-land-out { fill: var(--map-out, #eef1f4); }
+.map-city { fill: var(--map-land, #f9faf7); stroke: var(--map-edge, #c9d1db); stroke-width: 1.5; vector-effect: non-scaling-stroke; stroke-dasharray: 6 4; }
+.map-water { fill: none; stroke: var(--map-water, #a9cdf0); stroke-width: 16; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.map-water.thin { stroke-width: 6; }
+.map-label { font-size: calc(11px / var(--z, 1)); fill: var(--muted); text-anchor: middle; font-weight: 600; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.map.zoomed .map-label { opacity: .9; }
+.map-pins { position: absolute; inset: 0; pointer-events: none; }
+.pin { position: absolute; left: 0; top: 0; margin: -38px 0 0 -17px; width: 34px; height: 38px; border: 0; padding: 0; background: none; pointer-events: auto; cursor: pointer; }
+.pin-shape { position: absolute; inset: 0; padding-bottom: 6px; display: flex; align-items: center; justify-content: center; color: #fff;
+  background: #1e3a5f; clip-path: path('M17 38 L10 29 A15 15 0 1 1 24 29 Z'); filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .3)); }
+.pin.c-wash .pin-shape { background: #2a78d6; }
+.pin.c-tires .pin-shape { background: #1e3a5f; }
+.pin.c-service .pin-shape { background: #6b4fd6; }
+.pin.c-detailing .pin-shape { background: #b5361f; }
+.pin.shut .pin-shape { background: #7b8494; }
+.pin.sel, .pin:focus-visible { scale: 1.3; transform-origin: 17px 38px; z-index: 2; outline: none; }
+.pin.sel .pin-shape, .pin:focus-visible .pin-shape { background: var(--accent); }
+.pin-deal { position: absolute; top: -8px; left: 22px; background: var(--accent); color: var(--on-accent); font-size: 10px; font-weight: 800; padding: 1px 4px; border-radius: 999px; white-space: nowrap; box-shadow: 0 0 0 2px var(--bg); }
+.pin-bolt { position: absolute; top: -6px; left: -8px; width: 16px; height: 16px; border-radius: 50%; background: #f3b850; color: #10151c; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 2px var(--bg); }
+.me-dot { position: absolute; left: 0; top: 0; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: #2a78d6; border: 3px solid #fff; box-shadow: 0 0 0 6px rgba(42, 120, 214, .25); }
+.map-ctrl { position: absolute; right: 10px; top: 10px; display: grid; gap: 6px; }
+.map-btn { width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 20px; font-weight: 700; cursor: pointer; box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
+.map-hint { position: absolute; left: 10px; bottom: 8px; margin: 0; font-size: 12px; color: var(--muted); background: color-mix(in srgb, var(--bg) 85%, transparent); padding: 2px 8px; border-radius: 6px; pointer-events: none; }
+#map-card { margin-top: 12px; }
+.map-empty { text-align: center; margin: 8px 0; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .map { --map-out: #141a22; --map-land: #1b222c; --map-edge: #3a4555; --map-water: #24476d; }
+}
+.slot.hot small { color: var(--accent-hover); }
+.slot.hot[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: var(--on-navy); }
+.slot.hot[aria-pressed="true"] small { color: var(--on-navy); }
 </style>
 </head>
 <body>
@@ -1295,26 +1357,52 @@ function openStarts(place, date, minutes, bookings, { lead = scheduleOf(place).l
 
 // ---------- гарячі вікна ----------
 
-// Точка ставить знижку на час, де мало записів. Знижка діє на запис, що починається у вікні.
-const dealsOf = (placeId) => (store.peek('biz.deals', {})[placeId] ?? []).filter((d) => d.active !== false && d.date >= opsToday());
+// Два види знижок на час: гаряче вікно на конкретну дату (date) і щотижневі «щасливі години»
+// (days — дні тижня, 0 — понеділок). Знижка діє на запис, що починається у вікні.
+const allDeals = (placeId) => (store.peek('biz.deals', {})[placeId] ?? []).filter((d) => d.active !== false);
+const dealsOf = (placeId) => allDeals(placeId).filter((d) => (d.days ? !d.until || d.until >= opsToday() : d.date >= opsToday()));
+const weeklyDealsOf = (placeId) => dealsOf(placeId).filter((d) => d.days);
+
+// Усі знижки, що діють на дату, — разові й щотижневі, з датою для зручності.
+function dealsOn(placeId, date) {
+  const wd = weekdayOf(date);
+  return dealsOf(placeId).filter((d) => (d.days ? d.days.includes(wd) : d.date === date)).map((d) => ({ ...d, date }))
+    .sort((a, b) => a.from - b.from);
+}
 
 function dealAt(placeId, date, time) {
   const t = toMin(time);
-  return dealsOf(placeId).filter((d) => d.date === date && t >= d.from && t < d.to).sort((a, b) => b.pct - a.pct)[0] ?? null;
+  return dealsOn(placeId, date).filter((d) => t >= d.from && t < d.to).sort((a, b) => b.pct - a.pct)[0] ?? null;
 }
 
 const dealPrice = (price, pct) => Math.round((price * (100 - pct)) / 100 / 10) * 10;
 // Чи діє знижка на послугу: на всі послуги або лише на обрані точкою.
 const dealCovers = (deal, serviceId) => !!deal && (!deal.services?.length || deal.services.includes(serviceId));
 
-// Гарячі пропозиції для каталогу: сьогоднішні й завтрашні вікна, у яких ще є вільний час.
+const OPS_WD = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
+// «Пн–Пт», «Сб–Нд», «Щодня» або перелік днів.
+function daysText(days) {
+  const d = [...days].sort((a, b) => a - b);
+  if (d.length === 7) return 'Щодня';
+  const runs = [];
+  for (const x of d) {
+    const last = runs.at(-1);
+    if (last && x === last[1] + 1) last[1] = x; else runs.push([x, x]);
+  }
+  return runs.map(([a, z]) => (a === z ? OPS_WD[a] : z === a + 1 ? `${OPS_WD[a]}, ${OPS_WD[z]}` : `${OPS_WD[a]}–${OPS_WD[z]}`)).join(', ');
+}
+
+// Гарячі пропозиції для каталогу: знижки на сьогодні й завтра, у яких ще є вільний час.
 function hotDeals(bookings) {
   const out = [];
+  const days = [opsToday(), isoDate(new Date(Date.now() + 864e5))];
   for (const p of PLACES.filter(isListed)) {
-    for (const d of dealsOf(p.id)) {
-      const minMin = Math.min(...p.services.map((s) => s.min));
-      const free = openStarts(p, d.date, minMin, bookings).filter((x) => toMin(x) >= d.from && toMin(x) < d.to);
-      if (free.length) out.push({ place: p, deal: d, free });
+    const minMin = Math.min(...p.services.map((s) => s.min));
+    for (const date of days) {
+      for (const d of dealsOn(p.id, date)) {
+        const free = openStarts(p, date, minMin, bookings).filter((x) => toMin(x) >= d.from && toMin(x) < d.to);
+        if (free.length) out.push({ place: p, deal: d, free });
+      }
     }
   }
   return out.sort((a, b) => (a.deal.date + opsPad(a.deal.from)).localeCompare(b.deal.date + opsPad(b.deal.from)));
@@ -1500,6 +1588,168 @@ function myTires(keys) {
 
 const clientKeyOf = (phone, car) => phoneKey(phone) ?? (car ? `car:${car}` : null);
 
+// Інтерактивна схема Києва без зовнішніх тайлів: працює без інтернету (зокрема під час відключень).
+// Межа міста, Дніпро й центри районів — спрощені, щоб зорієнтуватися; для маршруту є Google Maps.
+// Масштаб і зсув — у «одиницях карти» (тисячні градуса широти); на екрані — пікселі.
+
+const MAP_BOX = { minLat: 50.29, maxLat: 50.61, minLng: 30.22, maxLng: 30.82 };
+const MAP_K = Math.cos((50.45 * Math.PI) / 180);
+const mapProject = (lat, lng) => [(lng - MAP_BOX.minLng) * MAP_K * 1000, (MAP_BOX.maxLat - lat) * 1000];
+const MAP_W = (MAP_BOX.maxLng - MAP_BOX.minLng) * MAP_K * 1000;
+const MAP_H = (MAP_BOX.maxLat - MAP_BOX.minLat) * 1000;
+
+// Спрощена межа міста й русло Дніпра (широта, довгота).
+const KYIV_OUTLINE = [[50.59, 30.47], [50.585, 30.56], [50.56, 30.64], [50.53, 30.72], [50.48, 30.78], [50.42, 30.79], [50.37, 30.74],
+  [50.33, 30.68], [50.31, 30.6], [50.32, 30.52], [50.35, 30.45], [50.38, 30.37], [50.41, 30.3], [50.45, 30.25], [50.5, 30.28], [50.54, 30.33],
+  [50.565, 30.4]];
+const DNIPRO = [[50.62, 30.505], [50.585, 30.515], [50.55, 30.525], [50.515, 30.53], [50.49, 30.545], [50.47, 30.56], [50.455, 30.575],
+  [50.44, 30.575], [50.425, 30.58], [50.41, 30.59], [50.39, 30.6], [50.37, 30.61], [50.345, 30.625], [50.32, 30.64], [50.28, 30.66]];
+// Русанівська протока й Труханів острів — щоб лівий берег читався.
+const RUSANIVKA = [[50.455, 30.585], [50.445, 30.6], [50.43, 30.6], [50.42, 30.59]];
+const DESNA = [[50.6, 30.56], [50.58, 30.545], [50.56, 30.535]];
+
+const pathOf = (pts) => pts.map(([la, ln], i) => `${i ? 'L' : 'M'}${mapProject(la, ln).map((v) => v.toFixed(1)).join(',')}`).join('');
+
+// Малює карту в el і повертає функцію, яка оновлює піни (під час фільтрації стан масштабу зберігається).
+// opts: places — [{ id, lat, lng, html, label, cls }], pos — {lat, lng} користувача, state — обʼєкт зі станом
+// (x, y, z), який живе між перемальовуваннями, onSelect(id).
+let mapResize = null;
+
+function mountMap(el, opts) {
+  const st = opts.state;
+  const W = () => el.clientWidth;
+  const H = () => el.clientHeight;
+  // Увесь Київ у кадрі, центр — середина точок.
+  const fit = (list) => {
+    const pts = list.map((p) => mapProject(p.lat, p.lng));
+    const xs = pts.map((p) => p[0]);
+    const ys = pts.map((p) => p[1]);
+    st.x = xs.length ? (Math.min(...xs) + Math.max(...xs)) / 2 : MAP_W / 2;
+    st.y = ys.length ? (Math.min(...ys) + Math.max(...ys)) / 2 : MAP_H / 2;
+    // Масштаб — щоб усі точки помістилися з полями, але не ближче за кілька кварталів.
+    const spanX = xs.length ? Math.max(...xs) - Math.min(...xs) : MAP_W * 0.6;
+    const spanY = ys.length ? Math.max(...ys) - Math.min(...ys) : MAP_H * 0.6;
+    st.z = Math.max(0.8, Math.min(6, (W() - 80) / Math.max(spanX, 20), (H() - 100) / Math.max(spanY, 20)));
+  };
+  if (!st.z) fit(opts.places);
+  el.innerHTML = `<svg class="map-svg" aria-hidden="true" preserveAspectRatio="none">
+      <rect class="map-land-out" x="-200" y="-200" width="${MAP_W + 400}" height="${MAP_H + 400}"/>
+      <path class="map-city" d="${pathOf(KYIV_OUTLINE)}Z"/>
+      <path class="map-water" d="${pathOf(DNIPRO)}"/>
+      <path class="map-water thin" d="${pathOf(RUSANIVKA)}"/>
+      <path class="map-water thin" d="${pathOf(DESNA)}"/>
+      ${Object.entries(DISTRICTS).map(([name, [la, ln]]) => { const [x, y] = mapProject(la, ln); return `<text class="map-label" x="${x}" y="${y}">${name}</text>`; }).join('')}
+    </svg>
+    <div class="map-pins"></div>
+    <div class="map-ctrl">
+      <button type="button" class="map-btn" data-map="in" aria-label="Наблизити">+</button>
+      <button type="button" class="map-btn" data-map="out" aria-label="Віддалити">−</button>
+      <button type="button" class="map-btn" data-map="fit" aria-label="Увесь Київ">⤢</button>
+    </div>
+    <p class="map-hint">Схема міста · перетягуйте й масштабуйте</p>`;
+  const svg = el.querySelector('svg');
+  const layer = el.querySelector('.map-pins');
+  let places = opts.places;
+
+  function draw() {
+    const w = W();
+    const h = H();
+    svg.setAttribute('viewBox', `${st.x - w / 2 / st.z} ${st.y - h / 2 / st.z} ${w / st.z} ${h / st.z}`);
+    svg.style.setProperty('--z', st.z);
+    el.classList.toggle('zoomed', st.z > 2.2);
+    for (const pin of layer.children) {
+      const [x, y] = pin.dataset.xy.split(',').map(Number);
+      pin.style.transform = `translate(${(x - st.x) * st.z + w / 2}px, ${(y - st.y) * st.z + h / 2}px)`;
+    }
+  }
+
+  function setPins(list) {
+    places = list;
+    layer.innerHTML = list.map((p) => `<button type="button" class="pin ${p.cls}${p.id === st.sel ? ' sel' : ''}" data-pin="${p.id}" data-xy="${mapProject(p.lat, p.lng).join(',')}"
+      aria-label="${p.label}" aria-pressed="${p.id === st.sel}">${p.html}</button>`).join('')
+      + (opts.pos ? `<span class="me-dot" data-xy="${mapProject(opts.pos.lat, opts.pos.lng).join(',')}" role="img" aria-label="Ви тут"></span>` : '');
+    draw();
+  }
+
+  const zoomAt = (k, cx = W() / 2, cy = H() / 2) => {
+    const nz = Math.max(0.8, Math.min(14, st.z * k));
+    // Точка під курсором лишається на місці.
+    st.x += (cx - W() / 2) / st.z - (cx - W() / 2) / nz;
+    st.y += (cy - H() / 2) / st.z - (cy - H() / 2) / nz;
+    st.z = nz;
+    draw();
+  };
+
+  // Перетягування мишею чи пальцем, щипок двома пальцями.
+  const pointers = new Map();
+  let pinchDist = 0;
+  let moved = 0;
+  el.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('.map-btn')) return;
+    pointers.set(e.pointerId, [e.clientX, e.clientY]);
+    moved = 0;
+    if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinchDist = Math.hypot(a[0] - b[0], a[1] - b[1]); }
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (!pointers.has(e.pointerId)) return;
+    const [px, py] = pointers.get(e.pointerId);
+    pointers.set(e.pointerId, [e.clientX, e.clientY]);
+    if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+      const r = el.getBoundingClientRect();
+      if (pinchDist) zoomAt(d / pinchDist, (a[0] + b[0]) / 2 - r.left, (a[1] + b[1]) / 2 - r.top);
+      pinchDist = d;
+      return;
+    }
+    moved += Math.abs(e.clientX - px) + Math.abs(e.clientY - py);
+    if (moved > 4 && !el.hasPointerCapture(e.pointerId)) el.setPointerCapture(e.pointerId);
+    st.x -= (e.clientX - px) / st.z;
+    st.y -= (e.clientY - py) / st.z;
+    draw();
+  });
+  const up = (e) => { pointers.delete(e.pointerId); if (pointers.size < 2) pinchDist = 0; };
+  el.addEventListener('pointerup', up);
+  el.addEventListener('pointercancel', up);
+  el.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const r = el.getBoundingClientRect();
+    zoomAt(e.deltaY < 0 ? 1.25 : 0.8, e.clientX - r.left, e.clientY - r.top);
+  }, { passive: false });
+  el.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-map]');
+    if (b) {
+      if (b.dataset.map === 'in') zoomAt(1.5);
+      else if (b.dataset.map === 'out') zoomAt(1 / 1.5);
+      else { fit(places); draw(); }
+      return;
+    }
+    const pin = e.target.closest('[data-pin]');
+    if (pin && moved < 6) {
+      st.sel = pin.dataset.pin;
+      for (const x of layer.querySelectorAll('[data-pin]')) {
+        x.classList.toggle('sel', x === pin);
+        x.setAttribute('aria-pressed', x === pin);
+      }
+      opts.onSelect(st.sel);
+    }
+  });
+  // Клавіатура: стрілки зсувають, + і − масштабують.
+  el.addEventListener('keydown', (e) => {
+    if (e.target !== el) return;
+    const step = 60 / st.z;
+    const keys = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+    if (keys[e.key]) { st.x += keys[e.key][0]; st.y += keys[e.key][1]; draw(); e.preventDefault(); }
+    if (e.key === '+' || e.key === '=') { zoomAt(1.25); e.preventDefault(); }
+    if (e.key === '-') { zoomAt(0.8); e.preventDefault(); }
+  });
+  if (mapResize) window.removeEventListener('resize', mapResize);
+  mapResize = draw;
+  window.addEventListener('resize', mapResize);
+  setPins(places);
+  return { setPins, draw };
+}
+
 
 // ---------- сховище (лише на цьому пристрої) ----------
 
@@ -1530,7 +1780,7 @@ let profile = { name: '', phone: '', optIn: false, ...store.get('profile', {}) }
 // Записи цього клієнта — те, що він бачить у «Мої записи».
 const mine = () => bookings.filter((b) => !b.source);
 
-const ui = { cat: 'all', q: '', sort: 'rating', openNow: false, favOnly: false, cls: store.get('cls', 0), partner: store.get('partner', null) };
+const ui = { view: store.get('view', 'list'), cat: 'all', q: '', sort: 'rating', openNow: false, favOnly: false, cls: store.get('cls', 0), partner: store.get('partner', null) };
 let draft = null; // чернетка запису: { placeId, services: Set, date, time, carId, paying }
 
 // ---------- утиліти ----------
@@ -1832,7 +2082,7 @@ function hotBlock() {
   const when = (d) => (d === isoDate(new Date()) ? 'Сьогодні' : 'Завтра');
   return `<section class="hot" aria-labelledby="h-hot">
     <h2 id="h-hot" class="hot-title">${icon('bolt', 18)}Гарячі вікна</h2>
-    <div class="hot-row">${list.map(({ place: p, deal: d, free }) => `<a class="card hot-card" href="#/book/${p.id}/${d.date}/${free[0]}">
+    <div class="hot-row">${list.map(({ place: p, deal: d, free }) => `<a class="card hot-card" href="#/book/${p.id}/${d.date}/${free[0]}" data-track="hot_click" data-place="${p.id}">
       <span class="hot-pct">−${d.pct}%</span>
       <b>${esc(p.name)}</b>
       <span class="small">${when(d.date)} · ${hhmm(d.from)}–${hhmm(d.to)}</span>
@@ -1841,9 +2091,60 @@ function hotBlock() {
   </section>`;
 }
 
+// ---------- анонімна статистика ----------
+
+// Події для зведеної статистики CARCAR: без імен і телефонів, лише що відкривали й що натискали.
+// Зберігаємо останні 5000 подій на пристрої; у робочій версії їх приймає сервер.
+function track(type, data = {}) {
+  const all = store.get('analytics', []);
+  all.push({ t: type, at: Date.now(), ...data });
+  store.set('analytics', all.slice(-5000));
+}
+
+// ---------- карта ----------
+
+let mapApi = null;
+const mapState = {};
+
+function mapPin(p) {
+  const open = isOpenNow(p);
+  const cat = catById(p.cats[0]);
+  const deal = dealsOf(p.id).length ? Math.max(...dealsOf(p.id).map((d) => d.pct)) : 0;
+  const pw = powerOf(p.id);
+  const r = ratingOf(p.id);
+  return {
+    id: p.id, lat: p.lat, lng: p.lng, cls: `c-${p.cats[0]}${open ? '' : ' shut'}`,
+    html: `<span class="pin-shape">${icon(cat.icon, 16)}</span>${deal ? `<span class="pin-deal">−${deal}%</span>` : ''}${pw && pw.state !== 'closed' ? `<span class="pin-bolt">${icon('bolt', 11)}</span>` : ''}`,
+    label: esc(`${p.name}: ${cat.name.toLowerCase()}, ${open ? 'відчинено' : 'зачинено'}, від ${uah(minPrice(p, ui.cat, ui.cls))}${r.count ? `, рейтинг ${rating(r.avg)}` : ''}${deal ? `, знижка до ${deal}%` : ''}`),
+  };
+}
+
+function mapCard(id) {
+  const p = placeById(id);
+  if (!p) return '<p class="small muted map-empty">Натисніть на точку на карті, щоб побачити деталі.</p>';
+  const maps = `${CITY.mapsSearch}${encodeURIComponent(`${CITY.name}, ${p.address}`)}`;
+  return `${placeCard(p)}
+    <div class="grid2" style="margin-top:8px"><a class="btn primary" href="#/book/${p.id}">Записатися</a>
+      <a class="btn" href="${maps}" target="_blank" rel="noopener">${icon('route', 18)}Маршрут</a></div>`;
+}
+
+function renderMap(list) {
+  if (!$('#map')) {
+    $('#list').innerHTML = `<div class="map" id="map" tabindex="0" role="region" aria-label="Карта точок. Стрілки зсувають карту, плюс і мінус змінюють масштаб"></div>
+      <div id="map-card" aria-live="polite"></div>`;
+    mapApi = mountMap($('#map'), {
+      places: list.map(mapPin), pos: ui.pos, state: mapState,
+      onSelect: (id) => { $('#map-card').innerHTML = mapCard(id); track('map_pin', { placeId: id }); },
+    });
+  } else mapApi.setPins(list.map(mapPin));
+  if (mapState.sel && !list.some((p) => p.id === mapState.sel)) mapState.sel = null;
+  $('#map-card').innerHTML = mapCard(mapState.sel);
+}
+
 function renderList() {
   const list = filteredPlaces();
-  $('#list').innerHTML = list.length ? list.map(placeCard).join('') : empty('search', 'Нічого не знайшлося. Спробуйте змінити фільтри.');
+  if (ui.view === 'map') renderMap(list);
+  else $('#list').innerHTML = list.length ? list.map(placeCard).join('') : empty('search', 'Нічого не знайшлося. Спробуйте змінити фільтри.');
   const where = ui.locating ? ' · визначаємо ваше місце…' : ui.sort === 'near' && ui.pos ? ` · від ${ui.posFallback ? 'центру Києва' : 'вас'}` : '';
   $('#count').textContent = `${list.length} ${plural(list.length, 'місце', 'місця', 'місць')}${where}`;
 }
@@ -1863,6 +2164,10 @@ function viewCatalog() {
       ${chip(`${icon('heart', 16)}Обране`, 'data-action="toggle" data-key="favOnly"', ui.favOnly)}
     </div>
     <div class="toolbar">
+      <span class="seg-mini" role="group" aria-label="Вигляд">
+        <button data-action="view" data-v="list" aria-pressed="${ui.view !== 'map'}">${icon('list', 16)}Список</button>
+        <button data-action="view" data-v="map" aria-pressed="${ui.view === 'map'}">${icon('pin', 16)}Карта</button>
+      </span>
       <span class="small muted" id="count"></span>
       <span class="row">
         <select id="cls" class="pill-select" aria-label="Клас авто для цін">
@@ -1961,7 +2266,7 @@ function viewPlace(id) {
         <span class="name"><span class="badge personal">Для вас</span> ${esc(s.name)}<small>${duration(s.min)}${s.note ? ` · ${esc(s.note)}` : ''}</small></span>
         <span class="price">${uah(s.price[0])}</span></div>`).join('')}</div>` : ''}
     ${queueBlock(p)}
-    ${dealsOf(p.id).length ? `<p class="notice deal-note">${icon('bolt', 18)}<span><b>Гарячі вікна</b>${dealsOf(p.id).map((d) => `${dayLabel(d.date, { weekday: 'short', day: 'numeric', month: 'long' })}, ${hhmm(d.from)}–${hhmm(d.to)}: −${d.pct}%`).join('; ')}. Знижку видно біля часу під час запису.</span></p>` : ''}
+    ${dealsCard(p)}
     <h2 class="big" id="services">Послуги та ціни</h2>
     <p class="small muted" style="margin:-6px 0 0">Ціни для класу «${CAR_CLASSES[ui.cls]}». Остаточну вартість майстер підтвердить на місці.</p>
     ${groups.map(([c, items]) => `
@@ -1983,6 +2288,36 @@ function viewPlace(id) {
     <div class="dock-space"></div>
     <div class="dock">${isListed(p) ? `<a class="btn primary block" href="#/book/${p.id}">Записатися онлайн</a>`
       : '<p class="notice" style="margin:0">Точка зараз не приймає онлайн-записи в CARCAR.</p>'}</div>`;
+}
+
+// ---------- знижки за годинами ----------
+
+// Картка знижок точки: щотижневі щасливі години й разові гарячі вікна.
+function dealsCard(p) {
+  const weekly = weeklyDealsOf(p.id);
+  const once = dealsOf(p.id).filter((d) => d.date).sort((a, b) => (a.date + a.from).localeCompare(b.date + b.from));
+  if (!weekly.length && !once.length) return '';
+  const svc = (d) => (d.services?.length ? d.services.map((id) => p.allServices.find((x) => x.id === id)?.name).filter(Boolean).map(esc).join(', ') : 'усі послуги');
+  const row = (when, d) => `<li><span class="dc-pct">−${d.pct}%</span><span><b>${when}, ${hhmm(d.from)}–${hhmm(d.to)}</b><small>${svc(d)}</small></span></li>`;
+  return `<section class="card deals-card" aria-labelledby="h-deals">
+    <h2 id="h-deals" class="car-name">${icon('bolt', 20)}Знижки за годинами</h2>
+    <ul>${weekly.map((d) => row(daysText(d.days), d)).join('')}${once.map((d) => row(dayLabel(d.date, { weekday: 'short', day: 'numeric', month: 'long' }), d)).join('')}</ul>
+    <a class="btn" href="#/book/${p.id}">Обрати час зі знижкою</a>
+  </section>`;
+}
+
+// Смуга дня на сторінці запису: робочі години й відрізки зі знижкою.
+function dayDealsBar(p, date) {
+  const h = hoursFor(p, date);
+  const deals = dealsOn(p.id, date);
+  if (!h || !deals.length) return '';
+  const span = h[1] - h[0];
+  const pos = (t) => `${((Math.max(h[0], Math.min(h[1], t)) - h[0]) / span) * 100}%`;
+  return `<div class="day-deals">
+    <div class="dd-track" aria-hidden="true">${deals.map((d) => `<b style="left:${pos(d.from)};width:calc(${pos(d.to)} - ${pos(d.from)})">−${d.pct}%</b>`).join('')}
+      <i style="left:0">${hhmm(h[0])}</i><i style="right:0">${hhmm(h[1])}</i></div>
+    <p class="dd-text">${icon('bolt', 16)}${deals.map((d) => `−${d.pct}% з ${hhmm(d.from)} до ${hhmm(d.to)}${d.services?.length ? ' на окремі послуги' : ''}`).join(' · ')}</p>
+  </div>`;
 }
 
 // ---------- жива черга ----------
@@ -2193,19 +2528,24 @@ function renderBook() {
         const date = parseDate(d);
         const wd = i === 0 ? 'Сьогодні' : i === 1 ? 'Завтра' : date.toLocaleDateString('uk-UA', { weekday: 'short' });
         const closed = !hoursFor(p, d);
-        return `<button class="day${closed ? ' closed' : ''}" data-action="day" data-date="${d}" aria-pressed="${d === draft.date}" ${closed ? `disabled aria-label="${wd}, ${date.getDate()}, вихідний"` : ''}>
+        const best = closed ? 0 : Math.max(0, ...dealsOn(p.id, d).map((x) => x.pct));
+        return `<button class="day${closed ? ' closed' : ''}${best ? ' has-deal' : ''}" data-action="day" data-date="${d}" aria-pressed="${d === draft.date}" ${closed ? `disabled aria-label="${wd}, ${date.getDate()}, вихідний"` : best ? `aria-label="${wd}, ${date.getDate()}, є знижка до ${best}%"` : ''}>
           <span>${wd}</span><b>${date.getDate()}</b><span>${closed ? 'вихідний' : date.toLocaleDateString('uk-UA', { month: 'short' })}</span>
+          ${best ? `<span class="day-deal">−${best}%</span>` : ''}
         </button>`;
       }).join('')}
     </div>
     ${hoursFor(p, draft.date) ? `<p class="small muted" style="margin:8px 0 0">Працюємо ${rangeText(hoursFor(p, draft.date))}${scheduleOf(p).brk ? `, перерва ${rangeText(scheduleOf(p).brk)}` : ''}</p>` : ''}
+    ${dayDealsBar(p, draft.date)}
     ${!minutes
       ? '<p class="muted">Оберіть послуги, щоб побачити вільний час.</p>'
       : free.length
         ? `<div class="slots" role="group" aria-label="Час">${slots.map((s) => {
             const d = !s.busy && dealAt(p.id, draft.date, s.time);
-            return `<button class="slot${d ? ' hot' : ''}" data-action="time" data-time="${s.time}"
-            ${s.busy ? `disabled aria-label="${s.time}, зайнято"` : d ? `aria-label="${s.time}, знижка ${d.pct}%"` : ''} aria-pressed="${s.time === draft.time}">${s.time}${d ? `<small>−${d.pct}%</small>` : ''}</button>`;
+            const sum = d ? chosen.reduce((a, x) => a + (!x.personal && dealCovers(d, x.id) ? dealPrice(x.price[cls], d.pct) : x.price[cls]), 0) : 0;
+            const off = d && sum < q.listTotal;
+            return `<button class="slot${off ? ' hot' : ''}" data-action="time" data-time="${s.time}"
+            ${s.busy ? `disabled aria-label="${s.time}, зайнято"` : off ? `aria-label="${s.time}, знижка ${d.pct}%, ${uah(sum)}"` : ''} aria-pressed="${s.time === draft.time}">${s.time}${off ? `<small>−${d.pct}% · ${uah(sum)}</small>` : ''}</button>`;
           }).join('')}</div>`
         : '<p class="muted">На цей день вільного часу немає. Оберіть інший день або станьте в лист очікування.</p>'}
     ${minutes ? waitlistBlock(p, minutes, chosen) : ''}
@@ -2244,6 +2584,7 @@ function renderBook() {
       <p class="demo">Імʼя й телефон бачить лише точка — щоб звʼязатися й показувати вам персональні ціни. Демо-оплата: гроші не списуються.</p>
     </div>` : `<div class="dock summary">
       <div class="total"><span>${chosen.length ? `${chosen.length} ${plural(chosen.length, 'послуга', 'послуги', 'послуг')} · ${duration(minutes)}` : 'Нічого не обрано'}</span><span>${q.deal ? `<s class="muted">${uah(q.listTotal)}</s> ` : ''}${uah(total - q.covered)}</span></div>
+      ${q.deal ? `<p class="save-pill">${icon('bolt', 14)}${q.deal.days ? 'Щасливі години' : 'Гаряче вікно'} −${q.deal.pct}%: ви економите ${uah(q.listTotal - total)}</p>` : ''}
       <button class="btn primary block" data-action="confirm" ${chosen.length && draft.time ? '' : 'disabled'}>
         ${draft.time ? `Записатися на ${dayLabel(draft.date, { day: 'numeric', month: 'long' })}, ${draft.time}` : 'Оберіть час'}
       </button>
@@ -2292,6 +2633,7 @@ function confirmBooking() {
   if (fromBal) addMoney(-fromBal, `Оплата замовлення: ${p.name}`);
   draft = null;
   location.hash = `#/bookings/${b.id}`;
+  track('paid', { placeId: p.id, amount: total, deal: !!q.deal, pass: q.use?.kind ?? null, bonus: !!bonus, balance: !!fromBal, leadH: Math.round((bookingStart(b) - Date.now()) / HOUR) });
   toast('Оплачено, ви записані');
 }
 
@@ -2806,6 +3148,7 @@ function returnBonus(b, why) {
 const bookingActions = {
   cancel(b) {
     const t = cancelTerms(b);
+    track('cancel_try', { placeId: b.placeId, free: t.free });
     const msg = t.free
       ? `Скасувати запис? Повернемо ${uah(t.refund)} на баланс CARCAR.`
       : `До візиту менше ${cancelWindow()}, тому оплата ${uah(t.placeAmount)} зарахується точці за послугу — повернення не буде. Скасувати запис?`;
@@ -2887,6 +3230,8 @@ function route() {
     else a.removeAttribute('aria-current');
   });
 
+  if (page === 'place') track('view_place', { placeId: arg });
+  else if (page === 'book' && draft?.placeId !== arg) track('open_book', { placeId: arg, from: sub ? 'link' : 'page' });
   if (page === '') { view.innerHTML = viewCatalog(); renderList(); }
   else if (page === 'place') view.innerHTML = viewPlace(arg);
   else if (page === 'book') { view.innerHTML = viewBook(arg, sub, extra); if ($('#book')) renderBook(); }
@@ -2909,6 +3254,8 @@ function route() {
 }
 
 document.addEventListener('click', (e) => {
+  const tr = e.target.closest('[data-track]');
+  if (tr) track(tr.dataset.track, { placeId: tr.dataset.place ?? null });
   // Переходи всередині сторінки бізнесу: хеш зайнятий роутером, тож прокручуємо самі.
   const jump = e.target.closest('[data-jump]');
   if (jump) {
@@ -2922,13 +3269,22 @@ document.addEventListener('click', (e) => {
 
   if (action === 'cat') {
     ui.cat = el.dataset.cat;
+    if (ui.cat !== 'all') track('filter', { name: `cat:${ui.cat}` });
     e.preventDefault();
     if (location.hash && location.hash !== '#/') location.hash = '#/';
     else route();
   } else if (action === 'near') {
     setSort(ui.sort === 'near' ? 'rating' : 'near');
+  } else if (action === 'view') {
+    ui.view = el.dataset.v;
+    store.set('view', ui.view);
+    for (const b of el.parentElement.children) b.setAttribute('aria-pressed', b === el);
+    $('#list').innerHTML = '';
+    renderList();
+    if (ui.view === 'map') track('map_open');
   } else if (action === 'toggle') {
     ui[el.dataset.key] = !ui[el.dataset.key];
+    if (ui[el.dataset.key]) track('filter', { name: el.dataset.key });
     el.setAttribute('aria-pressed', ui[el.dataset.key]);
     renderList();
   } else if (action === 'fav') {
@@ -2950,6 +3306,7 @@ document.addEventListener('click', (e) => {
     renderBook();
   } else if (action === 'confirm' || action === 'unpay') {
     draft.paying = action === 'confirm';
+    if (draft.paying) track('open_pay', { placeId: draft.placeId });
     renderBook();
     $(draft.paying ? '[data-action="pay"]' : '[data-action="confirm"]')?.focus();
   } else if (action === 'pay') {
@@ -2998,6 +3355,7 @@ document.addEventListener('click', (e) => {
     if (!confirm(`Купити «${plan.name}» за ${uah(plan.price)}? Оплата карткою через CARCAR.`)) return;
     const sold = sellPass(p.id, plan, { clientName: profile.name, phone: profile.phone, clientKey: myKeys()[0], source: 'carcar', buyer: 'app' });
     route();
+    track('buy_pass', { placeId: p.id, kind: plan.kind, amount: plan.price });
     toast(plan.kind === 'cert' ? `Сертифікат куплено, код ${sold.code} — його можна подарувати` : 'Абонемент куплено — спишеться під час запису');
   } else if (action === 'queue-leave') {
     const list = store.get('biz.queue', {})[el.dataset.place] ?? [];
@@ -3079,7 +3437,13 @@ document.addEventListener('change', (e) => {
 });
 
 document.addEventListener('input', (e) => {
-  if (e.target.id === 'q') { ui.q = e.target.value; renderList(); }
+  if (e.target.id === 'q') {
+    ui.q = e.target.value;
+    renderList();
+    // Пошук фіксуємо, коли людина перестала друкувати.
+    clearTimeout(ui.qT);
+    ui.qT = setTimeout(() => { if (ui.q.trim().length >= 3) track('search', { q: ui.q.trim().toLowerCase().slice(0, 40), found: filteredPlaces().length }); }, 1200);
+  }
   if (e.target.id === 'pf-name') draft.pfName = e.target.value;
   if (e.target.id === 'pf-phone') draft.pfPhone = e.target.value;
 });
@@ -3100,6 +3464,7 @@ document.addEventListener('submit', (e) => {
     });
     save();
     route();
+    track('review', { placeId: b.placeId });
     toast('Дякуємо за відгук!');
     return;
   }
@@ -3122,6 +3487,7 @@ document.addEventListener('submit', (e) => {
     }]);
     draft.waitOpen = false;
     renderBook();
+    track('waitlist_join', { placeId: p.id });
     toast('Готово! Повідомимо, щойно звільниться час');
     return;
   }
@@ -3136,6 +3502,7 @@ document.addEventListener('submit', (e) => {
     saveQueue(p.id, [...(store.get('biz.queue', {})[p.id] ?? []).filter((q) => q.day === entry.day), entry]);
     store.set('queue.mine', [...myQueue(), { id: entry.id, placeId: p.id }]);
     route();
+    track('queue_join', { placeId: p.id });
     toast('Ви в черзі — точка бачить ваше авто');
     return;
   }
@@ -3158,6 +3525,7 @@ document.addEventListener('submit', (e) => {
     saveRequests();
     route();
     $('#ask')?.scrollIntoView({ block: 'start' });
+    track('ask', { placeId: e.target.dataset.place ?? null });
     toast('Повідомлення надіслано точці');
     return;
   }
@@ -3223,6 +3591,7 @@ window.addEventListener('storage', (e) => {
   applyOverrides();
   if (!draft?.paying) route();
 });
+track('session', { view: ui.view });
 route();
 acceptInvite();
 

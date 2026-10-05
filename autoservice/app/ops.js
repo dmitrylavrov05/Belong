@@ -3,7 +3,7 @@
 // шинний готель і повідомлення клієнтам (розсилки, нагадування).
 import { PLACES } from './data.js';
 import {
-  store, uid, isoDate, parseDate, hhmm, toMin, plural, hoursFor, scheduleOf, inBreak, BLOCKING, phoneKey, isListed,
+  store, uid, isoDate, parseDate, hhmm, toMin, plural, hoursFor, scheduleOf, inBreak, BLOCKING, phoneKey, isListed, weekdayOf,
 } from './core.js';
 
 const opsToday = () => isoDate(new Date());
@@ -54,26 +54,52 @@ export function openStarts(place, date, minutes, bookings, { lead = scheduleOf(p
 
 // ---------- гарячі вікна ----------
 
-// Точка ставить знижку на час, де мало записів. Знижка діє на запис, що починається у вікні.
-export const dealsOf = (placeId) => (store.peek('biz.deals', {})[placeId] ?? []).filter((d) => d.active !== false && d.date >= opsToday());
+// Два види знижок на час: гаряче вікно на конкретну дату (date) і щотижневі «щасливі години»
+// (days — дні тижня, 0 — понеділок). Знижка діє на запис, що починається у вікні.
+const allDeals = (placeId) => (store.peek('biz.deals', {})[placeId] ?? []).filter((d) => d.active !== false);
+export const dealsOf = (placeId) => allDeals(placeId).filter((d) => (d.days ? !d.until || d.until >= opsToday() : d.date >= opsToday()));
+export const weeklyDealsOf = (placeId) => dealsOf(placeId).filter((d) => d.days);
+
+// Усі знижки, що діють на дату, — разові й щотижневі, з датою для зручності.
+export function dealsOn(placeId, date) {
+  const wd = weekdayOf(date);
+  return dealsOf(placeId).filter((d) => (d.days ? d.days.includes(wd) : d.date === date)).map((d) => ({ ...d, date }))
+    .sort((a, b) => a.from - b.from);
+}
 
 export function dealAt(placeId, date, time) {
   const t = toMin(time);
-  return dealsOf(placeId).filter((d) => d.date === date && t >= d.from && t < d.to).sort((a, b) => b.pct - a.pct)[0] ?? null;
+  return dealsOn(placeId, date).filter((d) => t >= d.from && t < d.to).sort((a, b) => b.pct - a.pct)[0] ?? null;
 }
 
 export const dealPrice = (price, pct) => Math.round((price * (100 - pct)) / 100 / 10) * 10;
 // Чи діє знижка на послугу: на всі послуги або лише на обрані точкою.
 export const dealCovers = (deal, serviceId) => !!deal && (!deal.services?.length || deal.services.includes(serviceId));
 
-// Гарячі пропозиції для каталогу: сьогоднішні й завтрашні вікна, у яких ще є вільний час.
+const OPS_WD = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
+// «Пн–Пт», «Сб–Нд», «Щодня» або перелік днів.
+export function daysText(days) {
+  const d = [...days].sort((a, b) => a - b);
+  if (d.length === 7) return 'Щодня';
+  const runs = [];
+  for (const x of d) {
+    const last = runs.at(-1);
+    if (last && x === last[1] + 1) last[1] = x; else runs.push([x, x]);
+  }
+  return runs.map(([a, z]) => (a === z ? OPS_WD[a] : z === a + 1 ? `${OPS_WD[a]}, ${OPS_WD[z]}` : `${OPS_WD[a]}–${OPS_WD[z]}`)).join(', ');
+}
+
+// Гарячі пропозиції для каталогу: знижки на сьогодні й завтра, у яких ще є вільний час.
 export function hotDeals(bookings) {
   const out = [];
+  const days = [opsToday(), isoDate(new Date(Date.now() + 864e5))];
   for (const p of PLACES.filter(isListed)) {
-    for (const d of dealsOf(p.id)) {
-      const minMin = Math.min(...p.services.map((s) => s.min));
-      const free = openStarts(p, d.date, minMin, bookings).filter((x) => toMin(x) >= d.from && toMin(x) < d.to);
-      if (free.length) out.push({ place: p, deal: d, free });
+    const minMin = Math.min(...p.services.map((s) => s.min));
+    for (const date of days) {
+      for (const d of dealsOn(p.id, date)) {
+        const free = openStarts(p, date, minMin, bookings).filter((x) => toMin(x) >= d.from && toMin(x) < d.to);
+        if (free.length) out.push({ place: p, deal: d, free });
+      }
     }
   }
   return out.sort((a, b) => (a.deal.date + opsPad(a.deal.from)).localeCompare(b.deal.date + opsPad(b.deal.from)));

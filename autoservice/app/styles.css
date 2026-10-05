@@ -491,7 +491,7 @@ label.item { cursor: pointer; padding: 10px 14px; }
 /* повідомлення, гарячі вікна, черга, абонементи, акт приймання */
 .inbox-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; color: var(--text); margin-left: 4px; }
 .inbox-btn:hover { background: var(--soft); }
-.inbox-btn .count { position: absolute; top: 4px; right: 2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.inbox-btn .count { position: absolute; top: 4px; right: 2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 .badge.deal { background: var(--accent-soft); color: var(--text); }
 .badge.power .ic, .badge.deal .ic { flex: none; }
 .hot { margin-top: 14px; }
@@ -500,7 +500,7 @@ label.item { cursor: pointer; padding: 10px 14px; }
 .hot-row { display: flex; gap: 10px; overflow-x: auto; margin: 0 -16px; padding: 2px 16px 6px; scrollbar-width: none; }
 .hot-row::-webkit-scrollbar { display: none; }
 .hot-card { flex: 0 0 210px; display: flex; flex-direction: column; gap: 3px; text-decoration: none; color: var(--text); }
-.hot-pct { align-self: flex-start; background: var(--accent); color: #fff; font-weight: 800; font-size: 14px; padding: 2px 8px; border-radius: 999px; margin-bottom: 4px; }
+.hot-pct { align-self: flex-start; background: var(--accent); color: var(--on-accent); font-weight: 800; font-size: 14px; padding: 2px 8px; border-radius: 999px; margin-bottom: 4px; }
 .slot { display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; }
 .slot small { font-size: 11px; font-weight: 700; color: var(--accent); }
 .slot.hot { border-color: var(--accent); }
@@ -519,3 +519,65 @@ label.item { cursor: pointer; padding: 10px 14px; }
 .notice > .ic { flex: none; }
 
 [hidden] { display: none !important; }
+
+/* знижки за годинами */
+.deals-card { margin-top: 14px; display: grid; gap: 10px; background: linear-gradient(135deg, var(--accent-soft), var(--bg) 70%); }
+.deals-card h2 { display: flex; align-items: center; gap: 8px; margin: 0; }
+.deals-card h2 .ic { color: var(--accent); }
+.deals-card ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.deals-card li { display: flex; align-items: center; gap: 12px; }
+.deals-card li > span:last-child { display: flex; flex-direction: column; gap: 1px; }
+.deals-card small { color: var(--muted); font-size: 13px; }
+.dc-pct { flex: none; min-width: 54px; text-align: center; background: var(--accent); color: var(--on-accent); font-weight: 800; border-radius: 10px; padding: 6px 8px; }
+.day { position: relative; }
+.day.has-deal { border-color: var(--accent); }
+.day-deal { display: block; margin-top: 3px; background: var(--accent); color: var(--on-accent) !important; font-size: 10px; font-weight: 800; padding: 1px 5px; border-radius: 999px; }
+.day-deals { margin-top: 12px; }
+.dd-track { position: relative; height: 26px; border-radius: 8px; background: var(--soft); margin-bottom: 18px; }
+.dd-track b { position: absolute; top: 0; bottom: 0; border-radius: 8px; background: var(--accent); color: var(--on-accent); font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; overflow: hidden; white-space: nowrap; }
+.dd-track i { position: absolute; top: 30px; font-style: normal; font-size: 11px; color: var(--muted); }
+.dd-text { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 14px; font-weight: 600; }
+.dd-text .ic { color: var(--accent); flex: none; }
+.slot.hot { border-color: var(--accent); background: var(--accent-soft); height: 54px; }
+.slot.hot small { font-size: 11px; }
+.save-pill { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; font-size: 13px; font-weight: 700; color: var(--accent); }
+
+/* карта */
+.seg-mini { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.seg-mini button { display: inline-flex; align-items: center; gap: 4px; border: 0; background: var(--bg); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; padding: 6px 10px; min-height: 34px; cursor: pointer; }
+.seg-mini button[aria-pressed="true"] { background: var(--navy); color: var(--on-navy); }
+.map { position: relative; height: min(62vh, 560px); border-radius: 16px; overflow: hidden; touch-action: none; cursor: grab; user-select: none; border: 1px solid var(--line); background: var(--map-out, #eef1f4); }
+.map:active { cursor: grabbing; }
+.map:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.map-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.map-land-out { fill: var(--map-out, #eef1f4); }
+.map-city { fill: var(--map-land, #f9faf7); stroke: var(--map-edge, #c9d1db); stroke-width: 1.5; vector-effect: non-scaling-stroke; stroke-dasharray: 6 4; }
+.map-water { fill: none; stroke: var(--map-water, #a9cdf0); stroke-width: 16; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.map-water.thin { stroke-width: 6; }
+.map-label { font-size: calc(11px / var(--z, 1)); fill: var(--muted); text-anchor: middle; font-weight: 600; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.map.zoomed .map-label { opacity: .9; }
+.map-pins { position: absolute; inset: 0; pointer-events: none; }
+.pin { position: absolute; left: 0; top: 0; margin: -38px 0 0 -17px; width: 34px; height: 38px; border: 0; padding: 0; background: none; pointer-events: auto; cursor: pointer; }
+.pin-shape { position: absolute; inset: 0; padding-bottom: 6px; display: flex; align-items: center; justify-content: center; color: #fff;
+  background: #1e3a5f; clip-path: path('M17 38 L10 29 A15 15 0 1 1 24 29 Z'); filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .3)); }
+.pin.c-wash .pin-shape { background: #2a78d6; }
+.pin.c-tires .pin-shape { background: #1e3a5f; }
+.pin.c-service .pin-shape { background: #6b4fd6; }
+.pin.c-detailing .pin-shape { background: #b5361f; }
+.pin.shut .pin-shape { background: #7b8494; }
+.pin.sel, .pin:focus-visible { scale: 1.3; transform-origin: 17px 38px; z-index: 2; outline: none; }
+.pin.sel .pin-shape, .pin:focus-visible .pin-shape { background: var(--accent); }
+.pin-deal { position: absolute; top: -8px; left: 22px; background: var(--accent); color: var(--on-accent); font-size: 10px; font-weight: 800; padding: 1px 4px; border-radius: 999px; white-space: nowrap; box-shadow: 0 0 0 2px var(--bg); }
+.pin-bolt { position: absolute; top: -6px; left: -8px; width: 16px; height: 16px; border-radius: 50%; background: #f3b850; color: #10151c; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 2px var(--bg); }
+.me-dot { position: absolute; left: 0; top: 0; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: #2a78d6; border: 3px solid #fff; box-shadow: 0 0 0 6px rgba(42, 120, 214, .25); }
+.map-ctrl { position: absolute; right: 10px; top: 10px; display: grid; gap: 6px; }
+.map-btn { width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 20px; font-weight: 700; cursor: pointer; box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
+.map-hint { position: absolute; left: 10px; bottom: 8px; margin: 0; font-size: 12px; color: var(--muted); background: color-mix(in srgb, var(--bg) 85%, transparent); padding: 2px 8px; border-radius: 6px; pointer-events: none; }
+#map-card { margin-top: 12px; }
+.map-empty { text-align: center; margin: 8px 0; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .map { --map-out: #141a22; --map-land: #1b222c; --map-edge: #3a4555; --map-water: #24476d; }
+}
+.slot.hot small { color: var(--accent-hover); }
+.slot.hot[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: var(--on-navy); }
+.slot.hot[aria-pressed="true"] small { color: var(--on-navy); }
