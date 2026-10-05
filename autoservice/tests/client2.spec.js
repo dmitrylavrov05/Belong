@@ -34,7 +34,7 @@ test('нагадування напередодні й за 2 години: «З
 
   await page.clock.setFixedTime(new Date(2026, 9, 4, 18, 30));
   await page.goto('/#/bookings');
-  await expect(page.locator('#inbox-btn .count')).toHaveText('1');
+  await expect(page.locator('#inbox-tab .tab-count')).toHaveText('1');
   const bar = page.getByRole('group', { name: 'Візит завтра о 10:00' });
   await bar.getByRole('button', { name: 'Запізнююсь на 15 хв' }).click();
   await expect(page.locator('#toast')).toHaveText('Точка знає: запізнюєтесь на 15 хв');
@@ -122,7 +122,7 @@ test('відгук із фото й відповідь точки в спові�
   await page.getByRole('button', { name: 'Відповісти' }).click();
 
   await page.goto('/#/bookings');
-  await expect(page.locator('#inbox-btn .count')).not.toHaveCount(0);
+  await expect(page.locator('#inbox-tab .tab-count')).not.toHaveCount(0);
   await expect(page.locator('.my-review .reply')).toContainText('Дякуємо, чекаємо навесні!');
   await page.goto('/#/inbox');
   await expect(page.locator('.msg-card', { hasText: 'відповіла на ваш відгук' })).toContainText('«Дякуємо, чекаємо навесні!»');

@@ -448,7 +448,8 @@ function viewCatalog() {
     ${wallet.bonus ? `<a class="bonus-banner" href="#/invite">${icon('gift', 20)}<span>У вас ${uah(wallet.bonus)} бонусу — спишеться під час оплати замовлення від ${uah(REFERRAL.minOrder)}</span></a>` : ''}
     <div id="list" class="stack"></div>
     <div style="margin-top:14px">${inviteCard()}</div>
-    <p class="note">Демо-дані: назви, номери будинків і телефони вигадані. Список місць задається у файлі data.js.</p>`;
+    <p class="note">Демо-дані: назви, номери будинків і телефони вигадані. Список місць задається у файлі data.js.</p>
+    <p class="note"><a href="#/partner">Для бізнесу: підключити свою мийку, шиномонтаж чи СТО</a></p>`;
 }
 
 // ---------- сторінка бізнесу ----------
@@ -677,7 +678,7 @@ function askBlock(p) {
 function requestsCard() {
   if (!requests.length) return '';
   const list = [...requests].sort((a, b) => (b.messages.at(-1).at) - (a.messages.at(-1).at)).slice(0, 5);
-  return `<h2>Запити до точок</h2>
+  return `<h2>Чати з точками</h2>
     <div class="stack" style="gap:8px">${list.map((r) => {
       const p = placeById(r.placeId);
       const [cls, label] = reqStatus(r);
@@ -1220,7 +1221,8 @@ function viewInbox() {
     ${waits.length ? `<h2>Лист очікування</h2><div class="stack" style="gap:8px">${waits.map((w) => `<div class="card head" style="align-items:center">
       <span><b>${esc(placeById(w.placeId)?.name ?? '')}</b><small class="small muted" style="display:block">${dayLabel(w.date, { day: 'numeric', month: 'long' })}, ${hhmm(w.from)}–${hhmm(w.to)} · ${esc(w.services.join(', '))}</small></span>
       <button class="btn" data-action="wait-cancel" data-id="${w.id}">Вийти</button></div>`).join('')}</div>` : ''}
-    <h2>Вхідні</h2>
+    ${requestsCard()}
+    <h2>Сповіщення</h2>
     ${list.length ? `<div class="stack" style="gap:8px">${list.map((m) => `<article class="card msg-card${m.read ? '' : ' unread'}">
       <div class="head"><b>${esc(placeById(m.placeId)?.name ?? 'CARCAR')}</b><span class="small muted">${CHANNELS[m.channel] ?? ''} · ${fmtTime(m.at)}</span></div>
       <p style="margin:6px 0 0">${esc(m.text)}</p>
@@ -1231,7 +1233,20 @@ function viewInbox() {
   return html;
 }
 
+// Лічильник на вкладці «Повідомлення»: непрочитані сповіщення й нові відповіді точок у чатах.
+function updateInboxBadge() {
+  const unread = inboxFor(myKeys()).filter((m) => !m.read).length + requests.filter((r) => r.unreadClient).length;
+  const count = $('#inbox-tab .tab-count');
+  count.textContent = unread > 9 ? '9+' : unread;
+  count.hidden = !unread;
+  $('#inbox-tab').setAttribute('aria-label', unread ? `Повідомлення, непрочитаних: ${unread}` : 'Повідомлення');
+}
+
 // ---------- гараж: шини на зберіганні й абонементи ----------
+
+// Вхід для власників точок — у профілі, а не в нижньому меню: клієнтам він не потрібен.
+const businessEntry = () => `<a class="card link-card biz-entry" href="#/partner" style="margin-top:16px">${icon('chart', 22)}<span>Для бізнесу
+    <small class="small muted" style="display:block;font-weight:400">Маєте мийку, шиномонтаж, СТО чи детейлінг? Кабінет точки й панель із записами, клієнтами й фінансами</small></span>${icon('chevR', 18)}</a>`;
 
 function garageExtras() {
   const keys = myKeys();
@@ -1257,12 +1272,11 @@ function viewBookings(highlightId) {
   const active = sorted.filter((b) => ACTIVE.includes(b.state));
   const rest = sorted.filter((b) => !ACTIVE.includes(b.state)).reverse();
   if (!list.length) {
-    return `<h1>Мої записи</h1>${empty('calendar', 'Записів поки немає.', '<a class="btn primary" href="#/">Знайти мийку або сервіс</a>')}${moneyCard()}${requestsCard()}${inviteCard()}`;
+    return `<h1>Мої записи</h1>${empty('calendar', 'Записів поки немає.', '<a class="btn primary" href="#/">Знайти мийку або сервіс</a>')}${moneyCard()}${inviteCard()}`;
   }
   return `<h1>Мої записи</h1>
     ${moneyCard()}
     ${subsCard()}
-    ${requestsCard()}
     ${inviteCard()}
     <h2>Активні</h2>
     <div class="stack">${active.length ? active.map((b) => bookingCard(b, b.id === highlightId)).join('') : '<p class="muted">Немає активних записів.</p>'}</div>
@@ -1292,7 +1306,7 @@ function viewPartner() {
   const ready = payoutReady(p.id);
   const history = payouts.filter((x) => x.placeId === p.id).reverse();
   const disputes = bookings.filter((b) => b.state === 'dispute').length;
-  return `<h1>Кабінет точки</h1>
+  return `${back('#/garage', 'Гараж')}<h1>Кабінет точки</h1>
     <a class="card link-card" href="business.html" style="margin-bottom:12px">${icon('chart', 22)}<span>Повна панель для бізнесу
       <small class="small muted" style="display:block;font-weight:400">Журнал по боксах, клієнти, прайс, фінанси й аналітика — зручно з компʼютера</small></span>${icon('chevR', 18)}</a>
     <label class="field"><span>Точка</span><select id="partner-place">
@@ -1482,7 +1496,8 @@ function viewGarage() {
       <label class="field"><span>Клас</span><select name="cls">${CAR_CLASSES.map((c, i) => `<option value="${i}">${c}</option>`).join('')}</select></label>
       <label class="field"><span>Пробіг, км (необовʼязково)</span><input name="mileage" type="number" inputmode="numeric" min="0" autocomplete="off"></label>
       <label class="field"><span>Розмір шин (необовʼязково)</span><input name="tires" placeholder="205/55 R16" autocomplete="off"></label>
-      <label class="field"><span>Поліс ОСЦПВ дійсний до (необовʼязково)</span><input name="insuranceUntil" type="date"></label>`, 'Зберегти')}`;
+      <label class="field"><span>Поліс ОСЦПВ дійсний до (необовʼязково)</span><input name="insuranceUntil" type="date"></label>`, 'Зберегти')}
+    ${businessEntry()}`;
 }
 
 function viewCar(id) {
@@ -1636,18 +1651,16 @@ const bookingActions = {
 function route() {
   const [, page = '', arg, sub, extra] = location.hash.replace(/^#/, '').split('/');
   const view = $('#view');
-  const tab = page === 'disputes' ? 'partner' : page === 'invite' || page === 'inbox' ? '' : ['bookings', 'garage', 'partner'].includes(page) ? page : 'catalog';
+  const tab = ['partner', 'disputes', 'invite'].includes(page) ? '' : ['bookings', 'garage', 'inbox'].includes(page) ? page : 'catalog';
   settle();
   // Хтось скасував запис — можливо, звільнився час для листа очікування.
   checkWaitlist(bookings);
   runSubscriptions();
   visitReminders();
   // Крапка на вкладці «Мої записи», коли машина готова, точка просить доплату чи підтвердити акт.
-  const ready = mine().some((b) => b.state === 'done' || b.extra || (b.intake && !b.intake.ack)) || requests.some((r) => r.unreadClient);
+  const ready = mine().some((b) => b.state === 'done' || b.extra || (b.intake && !b.intake.ack));
   document.querySelector('.tabs a[data-tab="bookings"]').toggleAttribute('data-badge', ready);
-  const unread = inboxFor(myKeys()).filter((m) => !m.read).length;
-  $('#inbox-btn').innerHTML = `${icon('bell', 22)}${unread ? `<span class="count">${unread}</span>` : ''}`;
-  $('#inbox-btn').setAttribute('aria-label', unread ? `Повідомлення, непрочитаних: ${unread}` : 'Повідомлення');
+
   document.querySelectorAll('.tabs a').forEach((a) => {
     if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
@@ -1671,6 +1684,7 @@ function route() {
     for (const r of requests) if (r.placeId === arg) r.unreadClient = false;
     saveRequests();
   }
+  updateInboxBadge();
   const target = arg && page === 'bookings' ? $(`#b-${arg}`) : sub === 'ask' ? $('#ask') : null;
   if (target) target.scrollIntoView({ block: 'center' });
   else window.scrollTo(0, 0);

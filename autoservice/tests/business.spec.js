@@ -518,9 +518,9 @@ test('клієнт не знайшов послугу: пише точці, то
   await page.getByRole('button', { name: /Усі · 1/ }).click();
   await expect(page.locator('article.req')).toContainText('Послугу додано');
 
-  // Клієнт бачить відповідь у «Мої записи» й персональну послугу на сторінці точки.
-  await page.goto('/#/bookings');
-  await expect(page.locator('.tabs a[data-tab="bookings"]')).toHaveAttribute('data-badge', '');
+  // Клієнт бачить відповідь у «Повідомленнях» і персональну послугу на сторінці точки.
+  await page.goto('/#/inbox');
+  await expect(page.locator('#inbox-tab .tab-count')).toHaveText('1');
   await page.getByRole('link', { name: /Шиномонтаж «Колесо».*Послугу додано/ }).click();
   await expect(page.locator('.req .thread')).toContainText('Так, робимо, близько години');
   await expect(page.locator('.req')).toContainText('Рихтування литого диска R17 — 650 ₴');

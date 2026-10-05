@@ -115,7 +115,7 @@ async function confirmAfterVisit(page, day = 5) {
 }
 
 async function openPartner(page, name) {
-  await page.getByRole('link', { name: 'Для бізнесу' }).click();
+  await page.goto('/#/partner');
   await page.getByLabel('Точка').selectOption({ label: name });
 }
 

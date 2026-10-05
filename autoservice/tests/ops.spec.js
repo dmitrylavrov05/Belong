@@ -149,9 +149,9 @@ test('шинний готель: прийом на зберігання, наг�
   await expect(page.locator('#toast')).toHaveText('Нагадування надіслано: 1');
 
   await setProfilePhone(page, '+380673334455');
-  await expect(page.locator('#inbox-btn .count')).toHaveText('1');
+  await expect(page.locator('#inbox-tab .tab-count')).toHaveText('1');
   await expect(page.getByRole('region', { name: 'Шини: Шиномонтаж «Колесо»' })).toContainText('Час ставити зимові шини');
-  await page.locator('#inbox-btn').click();
+  await page.locator('#inbox-tab').click();
   await expect(page.locator('.msg-card')).toContainText('пора ставити зимові шини');
   await page.getByRole('link', { name: 'Записатися на перевзування' }).click();
   await expect(page).toHaveURL(/#\/book\/koleso/);
