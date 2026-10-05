@@ -184,7 +184,7 @@ test('виїзд до вас: мийка біля дому з адресою н�
   await page.getByRole('button', { name: 'Виїзд до вас' }).click();
   await expect(page.locator('#count')).toHaveText('2 місця');
   await page.goto('/#/place/aqua24');
-  await expect(page.getByRole('region', { name: 'Виїзд до вас' })).toContainText('у радіусі 12 км від точки. Виїзд +250 ₴');
+  await expect(page.getByRole('region', { name: 'Виїзд до вас' })).toContainText('У радіусі 12 км, виїзд +250 ₴');
 
   await page.goto('/#/book/aqua24');
   await page.getByRole('button', { name: 'Виїзд до мене' }).click();

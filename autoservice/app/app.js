@@ -71,7 +71,7 @@ function ratingBadge(placeId) {
   const r = ratingOf(placeId);
   return r.count
     ? `<span class="rating">${icon('star', 14)}${rating(r.avg)}</span><span>${r.count} ${reviewsWord(r.count)}</span>`
-    : '<span>Ще немає відгуків</span>';
+    : '';
 }
 
 // ---------- відстань ----------
@@ -317,7 +317,7 @@ function placeCard(p) {
     <div class="head">
       <a class="place" href="#/place/${p.id}">
         <h2 class="pc-title">${esc(p.name)}</h2>
-        <div class="pc-cat">${icon(cats[0].icon, 14)}${cats.map((c) => c.name).join(' · ')}</div>
+        ${CATEGORIES.length > 1 ? `<div class="pc-cat">${icon(cats[0].icon, 14)}${cats.map((c) => c.name).join(' · ')}</div>` : ''}
       </a>
       ${favButton(p, true)}
     </div>
@@ -374,7 +374,7 @@ function promoBanner() {
   const one = pr.cats?.length === 1 ? pr.cats[0] : null;
   return `<a class="banner promo-banner" href="#/" ${one ? `data-action="cat" data-cat="${one}"` : ''}>
     <span class="banner-ic">${icon('gift', 22)}</span>
-    <span><b>${esc(pr.title)}</b><span class="small">Знижка ${promoText(pr)} застосується сама під час оплати. Код ${esc(pr.code)}, оплачує CARCAR</span></span>
+    <span><b>${esc(pr.title)}</b><span class="small">Знижка застосується автоматично під час оплати</span></span>
     ${icon('chevR', 18)}</a>`;
 }
 
@@ -472,9 +472,7 @@ function viewCatalog() {
     ${promoBanner()}
     ${wallet.bonus ? `<a class="bonus-banner" href="#/invite">${icon('gift', 20)}<span>У вас ${uah(wallet.bonus)} бонусу — спишеться під час оплати замовлення від ${uah(REFERRAL.minOrder)}</span></a>` : ''}
     <div id="list" class="stack"></div>
-    <div style="margin-top:14px">${inviteCard()}</div>
-    <p class="note">Демо-дані: назви, номери будинків і телефони вигадані. Список місць задається у файлі data.js.</p>
-    <p class="note"><a href="#/partner">Для бізнесу: підключити свою автомийку</a></p>`;
+    <p class="note">Демо: назви мийок, адреси й телефони вигадані.</p>`;
 }
 
 // ---------- сторінка бізнесу ----------
@@ -530,15 +528,13 @@ function viewPlace(id) {
   const maps = `${CITY.mapsSearch}${encodeURIComponent(`${CITY.name}, ${p.address}`)}`;
   const groups = CATEGORIES.map((c) => [c, p.services.filter((s) => serviceCat(s) === c.id)]).filter(([, s]) => s.length);
   const list = visibleReviews(reviews).filter((r) => r.placeId === p.id).sort((a, b) => b.at - a.at);
-  const cats = p.cats.map(catById);
+  const todayH = hoursFor(p, isoDate(new Date()));
   return `<div class="topbar">${back('#/', 'Усі місця')}${favButton(p, false)}</div>
     <h1>${esc(p.name)}</h1>
-    <div class="pc-cat" style="margin-top:-6px">${icon(cats[0].icon, 14)}${cats.map((c) => c.name).join(' · ')}</div>
-    <div class="meta lg" style="margin-top:8px">
+    ${list.length || ui.pos ? `<div class="meta lg" style="margin-top:-4px">
       ${ratingBadge(p.id)}
-      <span>${p.boxes} ${plural(p.boxes, 'бокс', 'бокси', 'боксів')}</span>
       ${ui.pos ? `<span>${fmtDist(distTo(p))} від ${ui.posFallback ? 'центру' : 'вас'}</span>` : ''}
-    </div>
+    </div>` : ''}
     <div class="badges lg" style="margin-top:12px">
       <span class="badge ${open ? 'open' : 'closed'}">${open ? 'Відчинено' : 'Зачинено'} · ${hoursText(p)}</span>
       ${powerBadge(p)}
@@ -551,35 +547,31 @@ function viewPlace(id) {
         <a class="btn" href="${maps}" target="_blank" rel="noopener">${icon('route', 18)}Маршрут</a>
       </div>
     </div>
-    <nav class="jump" aria-label="Розділи сторінки"><a href="#/place/${p.id}" data-jump="services">Послуги</a><a href="#/place/${p.id}" data-jump="hours">Графік</a><a href="#/place/${p.id}" data-jump="reviews">Відгуки${list.length ? ` (${list.length})` : ''}</a></nav>
     ${personalFor(p).length ? `<h2 class="big">Тільки для вас</h2>
-      <p class="small muted" style="margin:-6px 0 0">Персональні послуги й ціни, які точка підготувала саме для вас.</p>
       <div class="list personal-list" style="margin-top:10px">${personalFor(p).map((s) => `<div class="item">
         <span class="name"><span class="badge personal">Для вас</span> ${esc(s.name)}<small>${duration(s.min)}${s.note ? ` · ${esc(s.note)}` : ''}</small></span>
         <span class="price">${uah(s.price[0])}</span></div>`).join('')}</div>` : ''}
-    ${mobileOn(p) ? `<section class="card mobile-card" aria-label="Виїзд до вас">${icon('carSide', 22)}<div><b>Виїзд до вас</b>
-      <span class="small">${esc(p.mobile.services.map((id) => p.services.find((x) => x.id === id)?.name).filter(Boolean).join(', '))} — у вашому дворі чи біля офісу,
-      у радіусі ${p.mobile.radiusKm} км від точки. Виїзд +${uah(p.mobile.fee)}.</span></div></section>` : ''}
-    ${queueBlock(p)}
     ${dealsCard(p)}
     <h2 class="big" id="services">Послуги та ціни</h2>
-    <p class="small muted" style="margin:-6px 0 0">Ціни для класу «${CAR_CLASSES[ui.cls]}». Остаточну вартість майстер підтвердить на місці.</p>
+    <p class="small muted" style="margin:-6px 0 0">Для класу «${CAR_CLASSES[ui.cls]}»</p>
     ${groups.map(([c, items]) => `
-      <h3 class="cat-label">${icon(c.icon, 15)}${c.name}</h3>
-      <div class="list">
+      ${groups.length > 1 ? `<h3 class="cat-label">${icon(c.icon, 15)}${c.name}</h3>` : ''}
+      <div class="list" style="margin-top:10px">
         ${items.map((s) => `<div class="item">
           <span class="name">${esc(s.name)}<small>${duration(s.min)}</small></span>
           <span class="price">${uah(s.price[ui.cls])}</span>
         </div>`).join('')}
       </div>`).join('')}
+    ${mobileOn(p) ? `<section class="card mobile-card" aria-label="Виїзд до вас">${icon('carSide', 22)}<div><b>Можемо приїхати до вас</b>
+      <span class="small">У радіусі ${p.mobile.radiusKm} км, виїзд +${uah(p.mobile.fee)}. Оберіть «Виїзд до мене» під час запису.</span></div></section>` : ''}
+    ${queueBlock(p)}
     ${passesBlock(p)}
-    ${askBlock(p)}
-    <h2 class="big" id="hours">Графік роботи</h2>
-    ${scheduleBlock(p)}
-    <h2 class="big" id="reviews">Рейтинг і відгуки</h2>
+    <h2 class="big" id="reviews">Відгуки</h2>
     ${ratingSummary(p.id)}
-    <p class="small muted">Залишити відгук можна лише після завершеного замовлення через CARCAR, тому кожен відгук — від реального клієнта.</p>
     <div class="stack">${list.map(reviewItem).join('')}</div>
+    <details class="fold" id="hours"><summary>${icon('calendar', 20)}Графік роботи<span class="fold-note">${todayH ? `сьогодні ${rangeText(todayH)}` : 'сьогодні вихідний'}</span></summary>
+      ${scheduleBlock(p)}</details>
+    ${askBlock(p)}
     <div class="dock-space"></div>
     <div class="dock">${isListed(p) ? `<a class="btn primary block" href="#/book/${p.id}">Записатися онлайн</a>`
       : '<p class="notice" style="margin:0">Точка зараз не приймає онлайн-записи в CARCAR.</p>'}</div>`;
@@ -635,17 +627,18 @@ function queueBlock(p) {
     mine = `<p class="notice ok" style="margin:0">${icon('checkCircle', 20)}<span><b>Ви в черзі: ${pos}-й</b>У боксі приблизно о ${hhmm(eta)} (≈ ${duration(Math.max(0, eta - now))}).</span></p>
       <button class="btn" data-action="queue-leave" data-id="${me.id}" data-place="${p.id}">Вийти з черги</button>`;
   }
-  return `<section class="card queue-card" aria-labelledby="h-queue">
-    <h2 id="h-queue" class="car-name">${icon('list', 20)}Жива черга зараз</h2>
+  const wait = est.waitMin < 5 ? 'одразу' : `≈ ${duration(Math.round(est.waitMin / 5) * 5)}`;
+  return `<details class="fold queue-fold" ${me ? 'open' : ''}><summary>${icon('list', 20)}Без запису<span class="fold-note">${est.ahead} авто попереду · ${wait}</span></summary>
+    <section class="queue-card stack" aria-label="Жива черга зараз" style="gap:10px">
     <div class="tiles">
       <div class="tile"><span>Авто попереду</span><b>${est.ahead}</b></div>
-      <div class="tile ${est.waitMin < 15 ? 'ok' : ''}"><span>Чекати без запису</span><b>${est.waitMin < 5 ? 'одразу' : `≈ ${duration(Math.round(est.waitMin / 5) * 5)}`}</b></div>
+      <div class="tile ${est.waitMin < 15 ? 'ok' : ''}"><span>Чекати без запису</span><b>${wait}</b></div>
     </div>
     ${mine || `<form id="queue-join" class="inline-form" data-place="${p.id}">
       <label class="field"><span>Послуга</span><select name="service">${p.services.filter((x) => x.min <= 120).map((x) => `<option value="${x.id}">${esc(x.name)} · ${duration(x.min)}</option>`).join('')}</select></label>
       <button class="btn primary" type="submit">Стати в чергу</button></form>
-      <p class="fine">Оцінка з урахуванням записів на сьогодні. Приїжджайте — вас покличуть за номером авто${cars[0]?.plate ? ` ${esc(cars[0].plate)}` : ''}.</p>`}
-  </section>`;
+      <p class="fine">Приїжджайте — вас покличуть за номером авто${cars[0]?.plate ? ` ${esc(cars[0].plate)}` : ''}.</p>`}
+    </section></details>`;
 }
 
 // ---------- абонементи й сертифікати ----------
@@ -676,9 +669,11 @@ const thread = (r) => `<ol class="thread">${r.messages.map((m) => `<li class="ms
 
 function askBlock(p) {
   const list = requestsOf(p.id);
-  return `<section class="ask" id="ask" aria-labelledby="h-ask">
-    <h2 class="big" id="h-ask">Не знайшли потрібну послугу?</h2>
-    <p class="small muted" style="margin:-6px 0 0">Напишіть точці, що потрібно зробити. Вона може додати послугу до прайсу або підготувати персональну ціну для вас — відповідь зʼявиться тут.</p>
+  // Розгорнуто, якщо клієнт прийшов за посиланням «Напишіть точці» або вже листується з точкою.
+  const open = list.length || location.hash.endsWith('/ask');
+  return `<details class="ask fold" id="ask" ${open ? 'open' : ''}>
+    <summary>${icon('chat', 20)}Не знайшли потрібну послугу?</summary>
+    <p class="small muted" style="margin:0">Напишіть точці, що потрібно зробити. Вона може додати послугу до прайсу або підготувати персональну ціну для вас — відповідь зʼявиться тут.</p>
     ${list.map((r) => {
       const [cls, label] = reqStatus(r);
       return `<article class="card req">
@@ -699,7 +694,7 @@ function askBlock(p) {
       <button class="btn primary block" type="submit">${icon('chat', 18)}Надіслати точці</button>
       <p class="fine">Точка побачить запит, імʼя й телефон у своїй панелі. Персональну ціну ви побачите за цим телефоном.</p>
     </form>
-  </section>`;
+  </details>`;
 }
 
 // Запити на сторінці «Мої записи»: де відповіли й куди повернутися.
@@ -1766,7 +1761,7 @@ function viewGarage() {
   return `<h1>Гараж</h1>
     <form class="card profile-card" id="profileform">
       <h2 class="car-name">Ваш профіль</h2>
-      <p class="small muted" style="margin:0">Імʼя й телефон бачить точка, до якої ви записуєтесь. За телефоном вона може підготувати для вас персональні послуги й ціни.</p>
+      <p class="small muted" style="margin:0">Їх бачить лише мийка, до якої ви записуєтесь.</p>
       <div class="grid2">
         <label class="field"><span>Імʼя</span><input name="name" autocomplete="name" value="${esc(profile.name)}"></label>
         <label class="field"><span>Телефон</span><input name="phone" type="tel" autocomplete="tel" placeholder="+380" value="${esc(profile.phone)}"></label>
@@ -1776,7 +1771,6 @@ function viewGarage() {
     </form>
     ${supportCard()}
     ${garageExtras()}
-    <p class="lead" style="margin-top:16px">Сервісна книжка кожного авто: історія обслуговування, пробіг і нагадування.</p>
     <div class="stack">
       ${cars.map((c) => {
         const due = reminders(c).filter((r) => r.level === 'due');
@@ -1785,11 +1779,11 @@ function viewGarage() {
             <div><h2 class="car-name">${esc(c.make)} ${esc(c.model)}</h2>
             <div class="car-sub">${[c.plate, c.year, CAR_CLASSES[c.cls], currentKm(c) ? km(currentKm(c)) : ''].filter(Boolean).map(esc).join(' · ')}</div></div></div>
           ${due.length ? `<div class="warn-pill">${icon('warn', 16)}${esc(due[0].text)}${due.length > 1 ? ` і ще ${due.length - 1}` : ''}</div>` : ''}
-          <div class="card-foot">Сервісна книжка${icon('chevR', 18)}</div>
+          <div class="card-foot">Історія й нагадування${icon('chevR', 18)}</div>
         </a>`;
       }).join('')}
     </div>
-    <h2 class="big">${cars.length ? 'Додати ще авто' : 'Додати авто'}</h2>
+    <details class="fold add-car" ${cars.length ? '' : 'open'}><summary>${icon('plus', 20)}${cars.length ? 'Додати ще авто' : 'Додати авто'}</summary>
     ${carForm('carform', `
       <div class="plate-row">
         <label class="field"><span>Держномер</span><input name="plate" placeholder="AA1234BB" autocomplete="off" aria-describedby="plate-result"></label>
@@ -1800,8 +1794,8 @@ function viewGarage() {
       <label class="field"><span>Модель</span><input name="model" required placeholder="Наприклад, Octavia" autocomplete="off"></label>
       <label class="field"><span>Рік випуску (необовʼязково)</span><input name="year" type="number" inputmode="numeric" min="1950" max="${new Date().getFullYear() + 1}" autocomplete="off"></label>
       <label class="field"><span>Клас</span><select name="cls">${CAR_CLASSES.map((c, i) => `<option value="${i}">${c}</option>`).join('')}</select></label>
-      <label class="field"><span>Пробіг, км (необовʼязково)</span><input name="mileage" type="number" inputmode="numeric" min="0" autocomplete="off"></label>
       <label class="field"><span>Поліс ОСЦПВ дійсний до (необовʼязково)</span><input name="insuranceUntil" type="date"></label>`, 'Зберегти')}
+    </details>
     ${businessEntry()}`;
 }
 
@@ -1814,18 +1808,12 @@ function viewCar(id) {
     <div class="car-sub">${[c.plate, c.year && `${c.year} р.`, c.color, CAR_CLASSES[c.cls]].filter(Boolean).map(esc).join(' · ')}</div>
     <h2>Нагадування</h2>
     <div class="stack">${reminders(c).map(reminderRow).join('')}</div>
-    <h2>Пробіг</h2>
-    <form class="inline-form" id="kmform" data-id="${c.id}">
-      <label class="field"><span>Поточний пробіг, км</span>
-        <input name="km" type="number" inputmode="numeric" min="0" value="${currentKm(c) || ''}" autocomplete="off"></label>
-      <button class="btn" type="submit">Оновити</button>
-    </form>
     ${warrantiesOf(c).length ? `<h2>Гарантії</h2><div class="stack" style="gap:8px">${warrantiesOf(c).map((w) => {
       const live = w.until >= isoDate(new Date());
       return `<div class="reminder ${live ? 'ok' : ''}">${icon('shield', 20)}<div><b>${esc(w.name)}</b><span class="small">${esc(w.place)} · ${w.months} міс з ${fmtDate(w.from)} · ${live ? `діє до ${fmtDate(w.until)}` : `закінчилась ${fmtDate(w.until)}`}</span></div></div>`;
     }).join('')}</div>
     <p class="small muted">Якщо щось зламалося за гарантією — напишіть точці або відкрийте <a href="#/bookings">запис</a>; акт і кошторис збережені тут.</p>` : ''}
-    <h2>Історія обслуговування</h2>
+    <h2>Історія мийок</h2>
     <div class="card history">
       ${history.length ? history.map((h) => `<div class="log-item">
         <div class="log-head"><span>${fmtDate(h.date)}</span>${h.cost ? `<span>${uah(h.cost)}</span>` : ''}</div>
@@ -1835,12 +1823,12 @@ function viewCar(id) {
         ${h.photos?.length ? `<div class="thumbs">${h.photos.map((src, i) => `<img src="${esc(src)}" alt="Фото ${i + 1}">`).join('')}</div>` : ''}
       </div>`).join('') : '<p class="muted" style="margin:0">Тут зʼявляться всі візити через CARCAR. Мийки й догляд деінде можна додати вручну.</p>'}
     </div>
-    <h2>Додати запис вручну</h2>
+    <details class="fold"><summary>${icon('plus', 20)}Додати мийку вручну</summary>
     ${carForm('logform', `
       <label class="field"><span>Дата</span><input name="date" type="date" required value="${isoDate(new Date())}"></label>
-      <label class="field"><span>Що зроблено</span><input name="text" required placeholder="Наприклад, заміна оливи та фільтра" autocomplete="off"></label>
-      <label class="field"><span>Пробіг, км (необовʼязково)</span><input name="km" type="number" inputmode="numeric" min="0" autocomplete="off"></label>
-      <label class="field"><span>Сума, ₴ (необовʼязково)</span><input name="cost" type="number" inputmode="numeric" min="0" autocomplete="off"></label>`, 'Додати в книжку').replace('<form class="form-box" id="logform">', `<form class="form-box" id="logform" data-id="${c.id}">`)}
+      <label class="field"><span>Що зроблено</span><input name="text" required placeholder="Наприклад, мийка кузова на АЗС" autocomplete="off"></label>
+      <label class="field"><span>Сума, ₴ (необовʼязково)</span><input name="cost" type="number" inputmode="numeric" min="0" autocomplete="off"></label>`, 'Додати в історію').replace('<form class="form-box" id="logform">', `<form class="form-box" id="logform" data-id="${c.id}">`)}
+    </details>
     <button class="btn text-danger" data-action="delcar" data-id="${c.id}" style="margin-top:16px">Видалити авто</button>`;
 }
 
@@ -2491,7 +2479,7 @@ document.addEventListener('submit', async (e) => {
         id: uid(), date: f.get('date'), text: f.get('text').trim(),
         km: Number(f.get('km')) || null, cost: Number(f.get('cost')) || null,
       }];
-      toast('Запис додано в сервісну книжку');
+      toast('Мийку додано в історію');
     }
     store.set('cars', cars);
     route();
@@ -2508,7 +2496,7 @@ document.addEventListener('submit', async (e) => {
     color: e.target.dataset.color || null,
     plate: normPlate(f.get('plate')),
     cls: Number(f.get('cls')),
-    mileage: Number(f.get('mileage')) || 0,
+    mileage: 0,
     insuranceUntil: f.get('insuranceUntil') || null,
     log: [],
   };

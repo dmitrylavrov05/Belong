@@ -721,6 +721,19 @@ label.item { cursor: pointer; padding: 10px 14px; }
     .btn.primary:hover { box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 35%, transparent); }
   }
 }
+
+/* Згорнуті другорядні блоки: графік, «не знайшли послугу», додати авто */
+.fold { margin-top: 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--bg); box-shadow: var(--shadow-1); }
+.fold > summary { display: flex; align-items: center; gap: 10px; padding: 14px 16px; min-height: 52px; font-weight: 700; font-size: 16px; cursor: pointer; list-style: none; }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::after { content: ""; margin-left: auto; width: 9px; height: 9px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); transition: transform .2s; }
+.fold[open] > summary::after { transform: rotate(225deg); }
+.fold > summary .ic { color: var(--accent); flex: none; }
+.fold-note { font-weight: 500; font-size: 14px; color: var(--muted); margin-left: 4px; }
+.fold > :not(summary) { margin-left: 16px; margin-right: 16px; }
+.fold[open] > :last-child { margin-bottom: 16px; }
+.fold .form-box { margin: 0 12px 12px; }
+.promo-banner { margin-bottom: 12px; }
 </style>
   <style>
 /* Панель для бізнесу CARCAR: десктоп-перший макет поверх токенів і компонентів styles.css. */

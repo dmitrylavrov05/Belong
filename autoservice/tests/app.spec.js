@@ -279,7 +279,6 @@ test('рейтинг точки складається з відгуків пі�
   const first = page.locator('#list article').first();
   await expect(first).toContainText('Автомийка «Хвиля»');
   await expect(first).toContainText('4,5');
-  await expect(page.locator('#list article').nth(1)).toContainText('Ще немає відгуків');
 
   await openPartner(page, 'Автомийка «Хвиля»');
   await expect(page.getByRole('link', { name: /Сторінка точки й відгуки/ })).toContainText('Рейтинг 4,5 · 2 відгуки');
@@ -523,10 +522,11 @@ test('гараж нагадує помити авто й про поліс', asy
   await expect(page.getByText('Ще немає мийок цього авто в CARCAR')).toBeVisible();
   await expect(page.getByText('Поліс ОСЦПВ закінчується через 20 днів')).toBeVisible();
 
+  await page.locator('summary', { hasText: 'Додати мийку вручну' }).click();
   await page.getByLabel('Дата').fill('2026-09-01');
   await page.getByLabel('Що зроблено').fill('Мийка кузова на АЗС');
   await page.getByLabel('Сума, ₴ (необовʼязково)').fill('300');
-  await page.getByRole('button', { name: 'Додати в книжку' }).click();
+  await page.getByRole('button', { name: 'Додати в історію' }).click();
   await expect(page.getByText('Авто не мили 33 дні — час на мийку')).toBeVisible();
   await expect(page.locator('.log-item').first()).toContainText('300 ₴');
 

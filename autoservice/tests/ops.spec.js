@@ -279,6 +279,7 @@ test('жива черга: клієнт бачить авто попереду, 
   await expect(page.locator('#toast')).toHaveText('Авто додано в чергу');
 
   await page.goto('/#/place/blysk');
+  await page.locator('.queue-fold summary').click();
   const q = page.getByRole('region', { name: 'Жива черга зараз' });
   await expect(q).toContainText('Авто попереду1');
   await q.getByRole('button', { name: 'Стати в чергу' }).click();
@@ -292,7 +293,7 @@ test('жива черга: клієнт бачить авто попереду, 
   await page.goto('/#/place/blysk');
   await expect(q).toContainText('Ви в черзі: 1-й');
   await q.getByRole('button', { name: 'Вийти з черги' }).click();
-  await expect(q).toContainText('Авто попереду0');
+  await expect(page.locator('.queue-fold summary')).toContainText('0 авто попереду');
 });
 
 test('акт приймання з фото: точка фіксує стан, клієнт підтверджує', async ({ page }) => {

@@ -247,7 +247,28 @@ test.describe('анімації', () => {
   });
 });
 
+test.describe('заставка', () => {
+  test.use({ contextOptions: { reducedMotion: 'no-preference' } });
+  test('показується при запуску, зникає сама й лише раз за сесію', async ({ page }) => {
+    await page.goto('/');
+    const splash = page.locator('#splash');
+    await expect(splash).toBeVisible();
+    await expect(splash).toContainText('Автомийки Києва');
+    await expect(splash).toHaveCount(0, { timeout: 5000 });
+    await expect(page.locator('h1')).toHaveText('Автомийки Києва');
+    await page.reload();
+    await expect(page.locator('#splash')).toHaveCount(0);
+  });
+  test('дотик пропускає заставку', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('#splash').click();
+    await expect(page.locator('#splash')).toHaveCount(0, { timeout: 1500 });
+  });
+});
+
 test('без анімацій, якщо людина просить зменшити рух', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('#splash')).toHaveCount(0);
   await page.goto('/#/garage');
   await page.goto('/#/bookings');
   await expect(page.locator('#view')).not.toHaveClass(/view-enter/);

@@ -11,8 +11,82 @@
   <link rel="apple-touch-icon" href="icon.svg">
   <link rel="preload" href="fonts/onest-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="styles.css">
+  <style>
+    /* Заставка під час запуску: піна, бульбашки, логотип із відблиском і розкриття застосунку колом.
+       Стилі тут, щоб заставка зʼявилась ще до завантаження styles.css. */
+    #splash { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; overflow: hidden; color: #fff;
+      background: radial-gradient(120% 90% at 50% 38%, #e2553d 0%, #c8402b 45%, #8f2414 100%);
+      font-family: Onest, system-ui, sans-serif; clip-path: circle(150% at 50% 44%); cursor: pointer; }
+    #splash.out { transition: clip-path .75s cubic-bezier(.7, 0, .3, 1), opacity .75s ease; clip-path: circle(0% at 50% 44%); opacity: .6; pointer-events: none; }
+    .sp-core { position: relative; display: grid; justify-items: center; gap: 18px; transform: translateY(-4vh); }
+    .sp-logo { position: relative; width: 112px; height: 112px; border-radius: 30px; background: #fff; display: grid; place-items: center; overflow: hidden;
+      box-shadow: 0 18px 50px rgba(60, 10, 0, .35), inset 0 -6px 0 rgba(200, 64, 43, .12); animation: sp-pop .9s cubic-bezier(.2, 1.4, .3, 1) .15s both; }
+    .sp-logo svg { width: 76px; height: 76px; }
+    .sp-logo path { stroke-dasharray: 60; stroke-dashoffset: 60; animation: sp-draw .7s ease-out .55s forwards; }
+    .sp-logo path + path { animation-delay: .75s; }
+    .sp-logo::after { content: ""; position: absolute; inset: -40%; background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, .95) 50%, transparent 60%);
+      transform: translateX(-120%); animation: sp-shine 1s ease-in-out 1.25s forwards; }
+    .sp-spark { position: absolute; width: 22px; height: 22px; right: -12px; top: -12px; opacity: 0; animation: sp-spark .7s ease-out 1.5s forwards; }
+    .sp-spark::before, .sp-spark::after { content: ""; position: absolute; inset: 0; margin: auto; width: 4px; height: 22px; border-radius: 2px; background: #fff; }
+    .sp-spark::after { transform: rotate(90deg); }
+    .sp-word { display: flex; font-size: 38px; font-weight: 800; letter-spacing: .04em; line-height: 1; }
+    .sp-word span { display: inline-block; opacity: 0; transform: translateY(18px) scale(.9); animation: sp-up .55s cubic-bezier(.2, 1.3, .4, 1) forwards; }
+    .sp-word span:nth-child(n+4) { opacity: 0; color: rgba(255, 255, 255, .72); }
+    .sp-tag { font-size: 15px; font-weight: 500; letter-spacing: .02em; opacity: 0; animation: sp-fade .6s ease 1.35s forwards; color: rgba(255, 255, 255, .9); }
+    .sp-bubble { position: absolute; bottom: -60px; border-radius: 50%; opacity: 0;
+      background: radial-gradient(circle at 32% 30%, rgba(255, 255, 255, .95) 0 8%, rgba(255, 255, 255, .28) 9% 38%, rgba(255, 255, 255, .08) 60%, rgba(255, 255, 255, .35) 100%);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .45); animation: sp-rise var(--d) ease-in var(--t) forwards; }
+    .sp-waves { position: absolute; left: 0; right: 0; bottom: 0; height: 26vh; pointer-events: none; }
+    .sp-wave { position: absolute; left: 0; bottom: 0; width: 200%; height: 100%; animation: sp-flow 3.2s linear infinite, sp-swell 1.2s cubic-bezier(.2, .8, .2, 1) both; }
+    .sp-wave.back { opacity: .35; animation-duration: 4.6s, 1.4s; animation-direction: reverse, normal; bottom: 10px; }
+    .sp-wave path { fill: rgba(255, 255, 255, .16); }
+    @keyframes sp-pop { 0% { transform: scale(.2) rotate(-12deg); opacity: 0; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+    @keyframes sp-draw { to { stroke-dashoffset: 0; } }
+    @keyframes sp-shine { to { transform: translateX(120%); } }
+    @keyframes sp-spark { 0% { opacity: 0; transform: scale(.2) rotate(0); } 50% { opacity: 1; transform: scale(1.1) rotate(45deg); } 100% { opacity: 0; transform: scale(.6) rotate(90deg); } }
+    @keyframes sp-up { to { opacity: 1; transform: none; } }
+    @keyframes sp-fade { to { opacity: 1; } }
+    @keyframes sp-rise { 0% { opacity: 0; transform: translate(0, 0) scale(.6); } 15% { opacity: 1; } 50% { transform: translate(var(--x), -55vh) scale(1); }
+      100% { opacity: 0; transform: translate(calc(var(--x) * -1), -115vh) scale(1.15); } }
+    @keyframes sp-flow { to { transform: translateX(-50%); } }
+    @keyframes sp-swell { from { transform: translateY(100%); } }
+    @media (prefers-reduced-motion: reduce) { #splash { display: none; } }
+  </style>
 </head>
 <body>
+  <div id="splash" aria-hidden="true">
+    <div class="sp-waves">
+      <svg class="sp-wave back" viewBox="0 0 1200 120" preserveAspectRatio="none"><path d="M0 60 Q150 10 300 60 T600 60 T900 60 T1200 60 V120 H0Z"/></svg>
+      <svg class="sp-wave" viewBox="0 0 1200 120" preserveAspectRatio="none"><path d="M0 70 Q150 30 300 70 T600 70 T900 70 T1200 70 V120 H0Z"/></svg>
+    </div>
+    <div class="sp-core">
+      <div class="sp-logo"><svg viewBox="0 0 64 64"><path d="M30 21a12 12 0 1 0 0 22" fill="none" stroke="#c8402b" stroke-width="6" stroke-linecap="round"/><path d="M48 21a12 12 0 1 0 0 22" fill="none" stroke="#c8402b" stroke-width="6" stroke-linecap="round" opacity=".6"/></svg></div>
+      <span class="sp-spark"></span>
+      <div class="sp-word">CARCAR</div>
+      <div class="sp-tag">Автомийки Києва</div>
+    </div>
+  </div>
+  <script>
+    // Заставка лише раз за сесію і не для тих, хто просив зменшити рух.
+    (() => {
+      const el = document.getElementById('splash');
+      let seen = false;
+      try { seen = sessionStorage.getItem('carcar.splash') === '1'; sessionStorage.setItem('carcar.splash', '1'); } catch { /* приватний режим */ }
+      if (seen || matchMedia('(prefers-reduced-motion: reduce)').matches) { el.remove(); return; }
+      const word = el.querySelector('.sp-word');
+      word.innerHTML = [...'CARCAR'].map((c, i) => `<span style="animation-delay:${0.85 + i * 0.07}s">${c}</span>`).join('');
+      for (let i = 0; i < 16; i++) {
+        const b = document.createElement('span');
+        const size = 10 + Math.random() * 38;
+        b.className = 'sp-bubble';
+        b.style.cssText = `left:${Math.random() * 100}%;width:${size}px;height:${size}px;--d:${2.2 + Math.random() * 1.6}s;--t:${Math.random() * 1.2}s;--x:${(Math.random() - 0.5) * 60}px`;
+        el.append(b);
+      }
+      const done = () => { if (!el.isConnected || el.classList.contains('out')) return; el.classList.add('out'); setTimeout(() => el.remove(), 800); };
+      el.addEventListener('click', done);
+      setTimeout(done, 2400);
+    })();
+  </script>
   <header class="top">
     <a class="brand" href="#/" aria-label="CARCAR, на головну"><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#c8402b"/><path d="M15 10.5a6 6 0 1 0 0 11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/><path d="M24 10.5a6 6 0 1 0 0 11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".6"/></svg><span class="c1">CAR</span><span class="c2">CAR</span></a>
     <span class="city" id="city"></span>

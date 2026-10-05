@@ -722,9 +722,96 @@ label.item { cursor: pointer; padding: 10px 14px; }
     .btn.primary:hover { box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 35%, transparent); }
   }
 }
+
+/* Згорнуті другорядні блоки: графік, «не знайшли послугу», додати авто */
+.fold { margin-top: 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--bg); box-shadow: var(--shadow-1); }
+.fold > summary { display: flex; align-items: center; gap: 10px; padding: 14px 16px; min-height: 52px; font-weight: 700; font-size: 16px; cursor: pointer; list-style: none; }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::after { content: ""; margin-left: auto; width: 9px; height: 9px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); transition: transform .2s; }
+.fold[open] > summary::after { transform: rotate(225deg); }
+.fold > summary .ic { color: var(--accent); flex: none; }
+.fold-note { font-weight: 500; font-size: 14px; color: var(--muted); margin-left: 4px; }
+.fold > :not(summary) { margin-left: 16px; margin-right: 16px; }
+.fold[open] > :last-child { margin-bottom: 16px; }
+.fold .form-box { margin: 0 12px 12px; }
+.promo-banner { margin-bottom: 12px; }
 </style>
+  <style>
+    /* Заставка під час запуску: піна, бульбашки, логотип із відблиском і розкриття застосунку колом.
+       Стилі тут, щоб заставка зʼявилась ще до завантаження styles.css. */
+    #splash { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; overflow: hidden; color: #fff;
+      background: radial-gradient(120% 90% at 50% 38%, #e2553d 0%, #c8402b 45%, #8f2414 100%);
+      font-family: Onest, system-ui, sans-serif; clip-path: circle(150% at 50% 44%); cursor: pointer; }
+    #splash.out { transition: clip-path .75s cubic-bezier(.7, 0, .3, 1), opacity .75s ease; clip-path: circle(0% at 50% 44%); opacity: .6; pointer-events: none; }
+    .sp-core { position: relative; display: grid; justify-items: center; gap: 18px; transform: translateY(-4vh); }
+    .sp-logo { position: relative; width: 112px; height: 112px; border-radius: 30px; background: #fff; display: grid; place-items: center; overflow: hidden;
+      box-shadow: 0 18px 50px rgba(60, 10, 0, .35), inset 0 -6px 0 rgba(200, 64, 43, .12); animation: sp-pop .9s cubic-bezier(.2, 1.4, .3, 1) .15s both; }
+    .sp-logo svg { width: 76px; height: 76px; }
+    .sp-logo path { stroke-dasharray: 60; stroke-dashoffset: 60; animation: sp-draw .7s ease-out .55s forwards; }
+    .sp-logo path + path { animation-delay: .75s; }
+    .sp-logo::after { content: ""; position: absolute; inset: -40%; background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, .95) 50%, transparent 60%);
+      transform: translateX(-120%); animation: sp-shine 1s ease-in-out 1.25s forwards; }
+    .sp-spark { position: absolute; width: 22px; height: 22px; right: -12px; top: -12px; opacity: 0; animation: sp-spark .7s ease-out 1.5s forwards; }
+    .sp-spark::before, .sp-spark::after { content: ""; position: absolute; inset: 0; margin: auto; width: 4px; height: 22px; border-radius: 2px; background: #fff; }
+    .sp-spark::after { transform: rotate(90deg); }
+    .sp-word { display: flex; font-size: 38px; font-weight: 800; letter-spacing: .04em; line-height: 1; }
+    .sp-word span { display: inline-block; opacity: 0; transform: translateY(18px) scale(.9); animation: sp-up .55s cubic-bezier(.2, 1.3, .4, 1) forwards; }
+    .sp-word span:nth-child(n+4) { opacity: 0; color: rgba(255, 255, 255, .72); }
+    .sp-tag { font-size: 15px; font-weight: 500; letter-spacing: .02em; opacity: 0; animation: sp-fade .6s ease 1.35s forwards; color: rgba(255, 255, 255, .9); }
+    .sp-bubble { position: absolute; bottom: -60px; border-radius: 50%; opacity: 0;
+      background: radial-gradient(circle at 32% 30%, rgba(255, 255, 255, .95) 0 8%, rgba(255, 255, 255, .28) 9% 38%, rgba(255, 255, 255, .08) 60%, rgba(255, 255, 255, .35) 100%);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .45); animation: sp-rise var(--d) ease-in var(--t) forwards; }
+    .sp-waves { position: absolute; left: 0; right: 0; bottom: 0; height: 26vh; pointer-events: none; }
+    .sp-wave { position: absolute; left: 0; bottom: 0; width: 200%; height: 100%; animation: sp-flow 3.2s linear infinite, sp-swell 1.2s cubic-bezier(.2, .8, .2, 1) both; }
+    .sp-wave.back { opacity: .35; animation-duration: 4.6s, 1.4s; animation-direction: reverse, normal; bottom: 10px; }
+    .sp-wave path { fill: rgba(255, 255, 255, .16); }
+    @keyframes sp-pop { 0% { transform: scale(.2) rotate(-12deg); opacity: 0; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+    @keyframes sp-draw { to { stroke-dashoffset: 0; } }
+    @keyframes sp-shine { to { transform: translateX(120%); } }
+    @keyframes sp-spark { 0% { opacity: 0; transform: scale(.2) rotate(0); } 50% { opacity: 1; transform: scale(1.1) rotate(45deg); } 100% { opacity: 0; transform: scale(.6) rotate(90deg); } }
+    @keyframes sp-up { to { opacity: 1; transform: none; } }
+    @keyframes sp-fade { to { opacity: 1; } }
+    @keyframes sp-rise { 0% { opacity: 0; transform: translate(0, 0) scale(.6); } 15% { opacity: 1; } 50% { transform: translate(var(--x), -55vh) scale(1); }
+      100% { opacity: 0; transform: translate(calc(var(--x) * -1), -115vh) scale(1.15); } }
+    @keyframes sp-flow { to { transform: translateX(-50%); } }
+    @keyframes sp-swell { from { transform: translateY(100%); } }
+    @media (prefers-reduced-motion: reduce) { #splash { display: none; } }
+  </style>
 </head>
 <body>
+  <div id="splash" aria-hidden="true">
+    <div class="sp-waves">
+      <svg class="sp-wave back" viewBox="0 0 1200 120" preserveAspectRatio="none"><path d="M0 60 Q150 10 300 60 T600 60 T900 60 T1200 60 V120 H0Z"/></svg>
+      <svg class="sp-wave" viewBox="0 0 1200 120" preserveAspectRatio="none"><path d="M0 70 Q150 30 300 70 T600 70 T900 70 T1200 70 V120 H0Z"/></svg>
+    </div>
+    <div class="sp-core">
+      <div class="sp-logo"><svg viewBox="0 0 64 64"><path d="M30 21a12 12 0 1 0 0 22" fill="none" stroke="#c8402b" stroke-width="6" stroke-linecap="round"/><path d="M48 21a12 12 0 1 0 0 22" fill="none" stroke="#c8402b" stroke-width="6" stroke-linecap="round" opacity=".6"/></svg></div>
+      <span class="sp-spark"></span>
+      <div class="sp-word">CARCAR</div>
+      <div class="sp-tag">Автомийки Києва</div>
+    </div>
+  </div>
+  <script>
+    // Заставка лише раз за сесію і не для тих, хто просив зменшити рух.
+    (() => {
+      const el = document.getElementById('splash');
+      let seen = false;
+      try { seen = sessionStorage.getItem('carcar.splash') === '1'; sessionStorage.setItem('carcar.splash', '1'); } catch { /* приватний режим */ }
+      if (seen || matchMedia('(prefers-reduced-motion: reduce)').matches) { el.remove(); return; }
+      const word = el.querySelector('.sp-word');
+      word.innerHTML = [...'CARCAR'].map((c, i) => `<span style="animation-delay:${0.85 + i * 0.07}s">${c}</span>`).join('');
+      for (let i = 0; i < 16; i++) {
+        const b = document.createElement('span');
+        const size = 10 + Math.random() * 38;
+        b.className = 'sp-bubble';
+        b.style.cssText = `left:${Math.random() * 100}%;width:${size}px;height:${size}px;--d:${2.2 + Math.random() * 1.6}s;--t:${Math.random() * 1.2}s;--x:${(Math.random() - 0.5) * 60}px`;
+        el.append(b);
+      }
+      const done = () => { if (!el.isConnected || el.classList.contains('out')) return; el.classList.add('out'); setTimeout(() => el.remove(), 800); };
+      el.addEventListener('click', done);
+      setTimeout(done, 2400);
+    })();
+  </script>
   <header class="top">
     <a class="brand" href="#/" aria-label="CARCAR, на головну"><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#c8402b"/><path d="M15 10.5a6 6 0 1 0 0 11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/><path d="M24 10.5a6 6 0 1 0 0 11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".6"/></svg><span class="c1">CAR</span><span class="c2">CAR</span></a>
     <span class="city" id="city"></span>
@@ -2200,7 +2287,7 @@ function ratingBadge(placeId) {
   const r = ratingOf(placeId);
   return r.count
     ? `<span class="rating">${icon('star', 14)}${rating(r.avg)}</span><span>${r.count} ${reviewsWord(r.count)}</span>`
-    : '<span>Ще немає відгуків</span>';
+    : '';
 }
 
 // ---------- відстань ----------
@@ -2446,7 +2533,7 @@ function placeCard(p) {
     <div class="head">
       <a class="place" href="#/place/${p.id}">
         <h2 class="pc-title">${esc(p.name)}</h2>
-        <div class="pc-cat">${icon(cats[0].icon, 14)}${cats.map((c) => c.name).join(' · ')}</div>
+        ${CATEGORIES.length > 1 ? `<div class="pc-cat">${icon(cats[0].icon, 14)}${cats.map((c) => c.name).join(' · ')}</div>` : ''}
       </a>
       ${favButton(p, true)}
     </div>
@@ -2503,7 +2590,7 @@ function promoBanner() {
   const one = pr.cats?.length === 1 ? pr.cats[0] : null;
   return `<a class="banner promo-banner" href="#/" ${one ? `data-action="cat" data-cat="${one}"` : ''}>
     <span class="banner-ic">${icon('gift', 22)}</span>
-    <span><b>${esc(pr.title)}</b><span class="small">Знижка ${promoText(pr)} застосується сама під час оплати. Код ${esc(pr.code)}, оплачує CARCAR</span></span>
+    <span><b>${esc(pr.title)}</b><span class="small">Знижка застосується автоматично під час оплати</span></span>
     ${icon('chevR', 18)}</a>`;
 }
 
@@ -2601,9 +2688,7 @@ function viewCatalog() {
     ${promoBanner()}
     ${wallet.bonus ? `<a class="bonus-banner" href="#/invite">${icon('gift', 20)}<span>У вас ${uah(wallet.bonus)} бонусу — спишеться під час оплати замовлення від ${uah(REFERRAL.minOrder)}</span></a>` : ''}
     <div id="list" class="stack"></div>
-    <div style="margin-top:14px">${inviteCard()}</div>
-    <p class="note">Демо-дані: назви, номери будинків і телефони вигадані. Список місць задається у файлі data.js.</p>
-    <p class="note"><a href="#/partner">Для бізнесу: підключити свою автомийку</a></p>`;
+    <p class="note">Демо: назви мийок, адреси й телефони вигадані.</p>`;
 }
 
 // ---------- сторінка бізнесу ----------
@@ -2659,15 +2744,13 @@ function viewPlace(id) {
   const maps = `${CITY.mapsSearch}${encodeURIComponent(`${CITY.name}, ${p.address}`)}`;
   const groups = CATEGORIES.map((c) => [c, p.services.filter((s) => serviceCat(s) === c.id)]).filter(([, s]) => s.length);
   const list = visibleReviews(reviews).filter((r) => r.placeId === p.id).sort((a, b) => b.at - a.at);
-  const cats = p.cats.map(catById);
+  const todayH = hoursFor(p, isoDate(new Date()));
   return `<div class="topbar">${back('#/', 'Усі місця')}${favButton(p, false)}</div>
     <h1>${esc(p.name)}</h1>
-    <div class="pc-cat" style="margin-top:-6px">${icon(cats[0].icon, 14)}${cats.map((c) => c.name).join(' · ')}</div>
-    <div class="meta lg" style="margin-top:8px">
+    ${list.length || ui.pos ? `<div class="meta lg" style="margin-top:-4px">
       ${ratingBadge(p.id)}
-      <span>${p.boxes} ${plural(p.boxes, 'бокс', 'бокси', 'боксів')}</span>
       ${ui.pos ? `<span>${fmtDist(distTo(p))} від ${ui.posFallback ? 'центру' : 'вас'}</span>` : ''}
-    </div>
+    </div>` : ''}
     <div class="badges lg" style="margin-top:12px">
       <span class="badge ${open ? 'open' : 'closed'}">${open ? 'Відчинено' : 'Зачинено'} · ${hoursText(p)}</span>
       ${powerBadge(p)}
@@ -2680,35 +2763,31 @@ function viewPlace(id) {
         <a class="btn" href="${maps}" target="_blank" rel="noopener">${icon('route', 18)}Маршрут</a>
       </div>
     </div>
-    <nav class="jump" aria-label="Розділи сторінки"><a href="#/place/${p.id}" data-jump="services">Послуги</a><a href="#/place/${p.id}" data-jump="hours">Графік</a><a href="#/place/${p.id}" data-jump="reviews">Відгуки${list.length ? ` (${list.length})` : ''}</a></nav>
     ${personalFor(p).length ? `<h2 class="big">Тільки для вас</h2>
-      <p class="small muted" style="margin:-6px 0 0">Персональні послуги й ціни, які точка підготувала саме для вас.</p>
       <div class="list personal-list" style="margin-top:10px">${personalFor(p).map((s) => `<div class="item">
         <span class="name"><span class="badge personal">Для вас</span> ${esc(s.name)}<small>${duration(s.min)}${s.note ? ` · ${esc(s.note)}` : ''}</small></span>
         <span class="price">${uah(s.price[0])}</span></div>`).join('')}</div>` : ''}
-    ${mobileOn(p) ? `<section class="card mobile-card" aria-label="Виїзд до вас">${icon('carSide', 22)}<div><b>Виїзд до вас</b>
-      <span class="small">${esc(p.mobile.services.map((id) => p.services.find((x) => x.id === id)?.name).filter(Boolean).join(', '))} — у вашому дворі чи біля офісу,
-      у радіусі ${p.mobile.radiusKm} км від точки. Виїзд +${uah(p.mobile.fee)}.</span></div></section>` : ''}
-    ${queueBlock(p)}
     ${dealsCard(p)}
     <h2 class="big" id="services">Послуги та ціни</h2>
-    <p class="small muted" style="margin:-6px 0 0">Ціни для класу «${CAR_CLASSES[ui.cls]}». Остаточну вартість майстер підтвердить на місці.</p>
+    <p class="small muted" style="margin:-6px 0 0">Для класу «${CAR_CLASSES[ui.cls]}»</p>
     ${groups.map(([c, items]) => `
-      <h3 class="cat-label">${icon(c.icon, 15)}${c.name}</h3>
-      <div class="list">
+      ${groups.length > 1 ? `<h3 class="cat-label">${icon(c.icon, 15)}${c.name}</h3>` : ''}
+      <div class="list" style="margin-top:10px">
         ${items.map((s) => `<div class="item">
           <span class="name">${esc(s.name)}<small>${duration(s.min)}</small></span>
           <span class="price">${uah(s.price[ui.cls])}</span>
         </div>`).join('')}
       </div>`).join('')}
+    ${mobileOn(p) ? `<section class="card mobile-card" aria-label="Виїзд до вас">${icon('carSide', 22)}<div><b>Можемо приїхати до вас</b>
+      <span class="small">У радіусі ${p.mobile.radiusKm} км, виїзд +${uah(p.mobile.fee)}. Оберіть «Виїзд до мене» під час запису.</span></div></section>` : ''}
+    ${queueBlock(p)}
     ${passesBlock(p)}
-    ${askBlock(p)}
-    <h2 class="big" id="hours">Графік роботи</h2>
-    ${scheduleBlock(p)}
-    <h2 class="big" id="reviews">Рейтинг і відгуки</h2>
+    <h2 class="big" id="reviews">Відгуки</h2>
     ${ratingSummary(p.id)}
-    <p class="small muted">Залишити відгук можна лише після завершеного замовлення через CARCAR, тому кожен відгук — від реального клієнта.</p>
     <div class="stack">${list.map(reviewItem).join('')}</div>
+    <details class="fold" id="hours"><summary>${icon('calendar', 20)}Графік роботи<span class="fold-note">${todayH ? `сьогодні ${rangeText(todayH)}` : 'сьогодні вихідний'}</span></summary>
+      ${scheduleBlock(p)}</details>
+    ${askBlock(p)}
     <div class="dock-space"></div>
     <div class="dock">${isListed(p) ? `<a class="btn primary block" href="#/book/${p.id}">Записатися онлайн</a>`
       : '<p class="notice" style="margin:0">Точка зараз не приймає онлайн-записи в CARCAR.</p>'}</div>`;
@@ -2764,17 +2843,18 @@ function queueBlock(p) {
     mine = `<p class="notice ok" style="margin:0">${icon('checkCircle', 20)}<span><b>Ви в черзі: ${pos}-й</b>У боксі приблизно о ${hhmm(eta)} (≈ ${duration(Math.max(0, eta - now))}).</span></p>
       <button class="btn" data-action="queue-leave" data-id="${me.id}" data-place="${p.id}">Вийти з черги</button>`;
   }
-  return `<section class="card queue-card" aria-labelledby="h-queue">
-    <h2 id="h-queue" class="car-name">${icon('list', 20)}Жива черга зараз</h2>
+  const wait = est.waitMin < 5 ? 'одразу' : `≈ ${duration(Math.round(est.waitMin / 5) * 5)}`;
+  return `<details class="fold queue-fold" ${me ? 'open' : ''}><summary>${icon('list', 20)}Без запису<span class="fold-note">${est.ahead} авто попереду · ${wait}</span></summary>
+    <section class="queue-card stack" aria-label="Жива черга зараз" style="gap:10px">
     <div class="tiles">
       <div class="tile"><span>Авто попереду</span><b>${est.ahead}</b></div>
-      <div class="tile ${est.waitMin < 15 ? 'ok' : ''}"><span>Чекати без запису</span><b>${est.waitMin < 5 ? 'одразу' : `≈ ${duration(Math.round(est.waitMin / 5) * 5)}`}</b></div>
+      <div class="tile ${est.waitMin < 15 ? 'ok' : ''}"><span>Чекати без запису</span><b>${wait}</b></div>
     </div>
     ${mine || `<form id="queue-join" class="inline-form" data-place="${p.id}">
       <label class="field"><span>Послуга</span><select name="service">${p.services.filter((x) => x.min <= 120).map((x) => `<option value="${x.id}">${esc(x.name)} · ${duration(x.min)}</option>`).join('')}</select></label>
       <button class="btn primary" type="submit">Стати в чергу</button></form>
-      <p class="fine">Оцінка з урахуванням записів на сьогодні. Приїжджайте — вас покличуть за номером авто${cars[0]?.plate ? ` ${esc(cars[0].plate)}` : ''}.</p>`}
-  </section>`;
+      <p class="fine">Приїжджайте — вас покличуть за номером авто${cars[0]?.plate ? ` ${esc(cars[0].plate)}` : ''}.</p>`}
+    </section></details>`;
 }
 
 // ---------- абонементи й сертифікати ----------
@@ -2805,9 +2885,11 @@ const thread = (r) => `<ol class="thread">${r.messages.map((m) => `<li class="ms
 
 function askBlock(p) {
   const list = requestsOf(p.id);
-  return `<section class="ask" id="ask" aria-labelledby="h-ask">
-    <h2 class="big" id="h-ask">Не знайшли потрібну послугу?</h2>
-    <p class="small muted" style="margin:-6px 0 0">Напишіть точці, що потрібно зробити. Вона може додати послугу до прайсу або підготувати персональну ціну для вас — відповідь зʼявиться тут.</p>
+  // Розгорнуто, якщо клієнт прийшов за посиланням «Напишіть точці» або вже листується з точкою.
+  const open = list.length || location.hash.endsWith('/ask');
+  return `<details class="ask fold" id="ask" ${open ? 'open' : ''}>
+    <summary>${icon('chat', 20)}Не знайшли потрібну послугу?</summary>
+    <p class="small muted" style="margin:0">Напишіть точці, що потрібно зробити. Вона може додати послугу до прайсу або підготувати персональну ціну для вас — відповідь зʼявиться тут.</p>
     ${list.map((r) => {
       const [cls, label] = reqStatus(r);
       return `<article class="card req">
@@ -2828,7 +2910,7 @@ function askBlock(p) {
       <button class="btn primary block" type="submit">${icon('chat', 18)}Надіслати точці</button>
       <p class="fine">Точка побачить запит, імʼя й телефон у своїй панелі. Персональну ціну ви побачите за цим телефоном.</p>
     </form>
-  </section>`;
+  </details>`;
 }
 
 // Запити на сторінці «Мої записи»: де відповіли й куди повернутися.
@@ -3895,7 +3977,7 @@ function viewGarage() {
   return `<h1>Гараж</h1>
     <form class="card profile-card" id="profileform">
       <h2 class="car-name">Ваш профіль</h2>
-      <p class="small muted" style="margin:0">Імʼя й телефон бачить точка, до якої ви записуєтесь. За телефоном вона може підготувати для вас персональні послуги й ціни.</p>
+      <p class="small muted" style="margin:0">Їх бачить лише мийка, до якої ви записуєтесь.</p>
       <div class="grid2">
         <label class="field"><span>Імʼя</span><input name="name" autocomplete="name" value="${esc(profile.name)}"></label>
         <label class="field"><span>Телефон</span><input name="phone" type="tel" autocomplete="tel" placeholder="+380" value="${esc(profile.phone)}"></label>
@@ -3905,7 +3987,6 @@ function viewGarage() {
     </form>
     ${supportCard()}
     ${garageExtras()}
-    <p class="lead" style="margin-top:16px">Сервісна книжка кожного авто: історія обслуговування, пробіг і нагадування.</p>
     <div class="stack">
       ${cars.map((c) => {
         const due = reminders(c).filter((r) => r.level === 'due');
@@ -3914,11 +3995,11 @@ function viewGarage() {
             <div><h2 class="car-name">${esc(c.make)} ${esc(c.model)}</h2>
             <div class="car-sub">${[c.plate, c.year, CAR_CLASSES[c.cls], currentKm(c) ? km(currentKm(c)) : ''].filter(Boolean).map(esc).join(' · ')}</div></div></div>
           ${due.length ? `<div class="warn-pill">${icon('warn', 16)}${esc(due[0].text)}${due.length > 1 ? ` і ще ${due.length - 1}` : ''}</div>` : ''}
-          <div class="card-foot">Сервісна книжка${icon('chevR', 18)}</div>
+          <div class="card-foot">Історія й нагадування${icon('chevR', 18)}</div>
         </a>`;
       }).join('')}
     </div>
-    <h2 class="big">${cars.length ? 'Додати ще авто' : 'Додати авто'}</h2>
+    <details class="fold add-car" ${cars.length ? '' : 'open'}><summary>${icon('plus', 20)}${cars.length ? 'Додати ще авто' : 'Додати авто'}</summary>
     ${carForm('carform', `
       <div class="plate-row">
         <label class="field"><span>Держномер</span><input name="plate" placeholder="AA1234BB" autocomplete="off" aria-describedby="plate-result"></label>
@@ -3929,8 +4010,8 @@ function viewGarage() {
       <label class="field"><span>Модель</span><input name="model" required placeholder="Наприклад, Octavia" autocomplete="off"></label>
       <label class="field"><span>Рік випуску (необовʼязково)</span><input name="year" type="number" inputmode="numeric" min="1950" max="${new Date().getFullYear() + 1}" autocomplete="off"></label>
       <label class="field"><span>Клас</span><select name="cls">${CAR_CLASSES.map((c, i) => `<option value="${i}">${c}</option>`).join('')}</select></label>
-      <label class="field"><span>Пробіг, км (необовʼязково)</span><input name="mileage" type="number" inputmode="numeric" min="0" autocomplete="off"></label>
       <label class="field"><span>Поліс ОСЦПВ дійсний до (необовʼязково)</span><input name="insuranceUntil" type="date"></label>`, 'Зберегти')}
+    </details>
     ${businessEntry()}`;
 }
 
@@ -3943,18 +4024,12 @@ function viewCar(id) {
     <div class="car-sub">${[c.plate, c.year && `${c.year} р.`, c.color, CAR_CLASSES[c.cls]].filter(Boolean).map(esc).join(' · ')}</div>
     <h2>Нагадування</h2>
     <div class="stack">${reminders(c).map(reminderRow).join('')}</div>
-    <h2>Пробіг</h2>
-    <form class="inline-form" id="kmform" data-id="${c.id}">
-      <label class="field"><span>Поточний пробіг, км</span>
-        <input name="km" type="number" inputmode="numeric" min="0" value="${currentKm(c) || ''}" autocomplete="off"></label>
-      <button class="btn" type="submit">Оновити</button>
-    </form>
     ${warrantiesOf(c).length ? `<h2>Гарантії</h2><div class="stack" style="gap:8px">${warrantiesOf(c).map((w) => {
       const live = w.until >= isoDate(new Date());
       return `<div class="reminder ${live ? 'ok' : ''}">${icon('shield', 20)}<div><b>${esc(w.name)}</b><span class="small">${esc(w.place)} · ${w.months} міс з ${fmtDate(w.from)} · ${live ? `діє до ${fmtDate(w.until)}` : `закінчилась ${fmtDate(w.until)}`}</span></div></div>`;
     }).join('')}</div>
     <p class="small muted">Якщо щось зламалося за гарантією — напишіть точці або відкрийте <a href="#/bookings">запис</a>; акт і кошторис збережені тут.</p>` : ''}
-    <h2>Історія обслуговування</h2>
+    <h2>Історія мийок</h2>
     <div class="card history">
       ${history.length ? history.map((h) => `<div class="log-item">
         <div class="log-head"><span>${fmtDate(h.date)}</span>${h.cost ? `<span>${uah(h.cost)}</span>` : ''}</div>
@@ -3964,12 +4039,12 @@ function viewCar(id) {
         ${h.photos?.length ? `<div class="thumbs">${h.photos.map((src, i) => `<img src="${esc(src)}" alt="Фото ${i + 1}">`).join('')}</div>` : ''}
       </div>`).join('') : '<p class="muted" style="margin:0">Тут зʼявляться всі візити через CARCAR. Мийки й догляд деінде можна додати вручну.</p>'}
     </div>
-    <h2>Додати запис вручну</h2>
+    <details class="fold"><summary>${icon('plus', 20)}Додати мийку вручну</summary>
     ${carForm('logform', `
       <label class="field"><span>Дата</span><input name="date" type="date" required value="${isoDate(new Date())}"></label>
-      <label class="field"><span>Що зроблено</span><input name="text" required placeholder="Наприклад, заміна оливи та фільтра" autocomplete="off"></label>
-      <label class="field"><span>Пробіг, км (необовʼязково)</span><input name="km" type="number" inputmode="numeric" min="0" autocomplete="off"></label>
-      <label class="field"><span>Сума, ₴ (необовʼязково)</span><input name="cost" type="number" inputmode="numeric" min="0" autocomplete="off"></label>`, 'Додати в книжку').replace('<form class="form-box" id="logform">', `<form class="form-box" id="logform" data-id="${c.id}">`)}
+      <label class="field"><span>Що зроблено</span><input name="text" required placeholder="Наприклад, мийка кузова на АЗС" autocomplete="off"></label>
+      <label class="field"><span>Сума, ₴ (необовʼязково)</span><input name="cost" type="number" inputmode="numeric" min="0" autocomplete="off"></label>`, 'Додати в історію').replace('<form class="form-box" id="logform">', `<form class="form-box" id="logform" data-id="${c.id}">`)}
+    </details>
     <button class="btn text-danger" data-action="delcar" data-id="${c.id}" style="margin-top:16px">Видалити авто</button>`;
 }
 
@@ -4620,7 +4695,7 @@ document.addEventListener('submit', async (e) => {
         id: uid(), date: f.get('date'), text: f.get('text').trim(),
         km: Number(f.get('km')) || null, cost: Number(f.get('cost')) || null,
       }];
-      toast('Запис додано в сервісну книжку');
+      toast('Мийку додано в історію');
     }
     store.set('cars', cars);
     route();
@@ -4637,7 +4712,7 @@ document.addEventListener('submit', async (e) => {
     color: e.target.dataset.color || null,
     plate: normPlate(f.get('plate')),
     cls: Number(f.get('cls')),
-    mileage: Number(f.get('mileage')) || 0,
+    mileage: 0,
     insuranceUntil: f.get('insuranceUntil') || null,
     log: [],
   };

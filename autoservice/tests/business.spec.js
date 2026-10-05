@@ -535,6 +535,7 @@ test('клієнт не знайшов послугу: пише точці, то
 
   // Послуга для всіх потрапляє в загальний прайс.
   await page.goto('/#/place/blysk');
+  await page.locator('#ask summary').click();
   await page.locator('#askform').getByLabel('Що потрібно зробити?').fill('Мийка даху автобудинку');
   await page.locator('#askform').getByRole('button', { name: 'Надіслати точці' }).click();
   await page.goto(`${PANEL}#/requests`);
