@@ -8,7 +8,8 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: 0,
   reporter: [['list']],
-  use: { baseURL: `http://localhost:${PORT}`, trace: 'retain-on-failure', locale: 'uk-UA' },
+  // Анімації вимкнено, щоб перевірки доступності й скриншоти не ловили проміжні кадри; рух перевіряє окремий тест.
+  use: { baseURL: `http://localhost:${PORT}`, trace: 'retain-on-failure', locale: 'uk-UA', contextOptions: { reducedMotion: 'reduce' } },
   webServer: {
     command: `node scripts/serve.mjs app ${PORT}`,
     url: `http://localhost:${PORT}/`,

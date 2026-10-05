@@ -509,3 +509,104 @@ export function ratingFor(placeId, reviews) {
   const avg = list.length ? list.reduce((a, r) => a + r.stars, 0) / list.length : 0;
   return { avg, count: list.length, dist };
 }
+
+// ---------- підтримка CARCAR ----------
+
+// Звернення клієнтів і точок у підтримку. Повʼязане із записом (bookingId) звернення модератор
+// бачить поруч зі спором і може перевести в спір прямо зі звернення.
+// status: new — ще не відповіли, open — у роботі, waiting — чекаємо відповіді автора, closed — закрито.
+export const TICKET_TOPICS = {
+  booking: 'Запис і перенесення', payment: 'Оплата й повернення', quality: 'Якість послуги', dispute: 'Спір щодо замовлення',
+  payout: 'Виплати й комісія', review: 'Відгуки', account: 'Акаунт і дані', fraud: 'Підозра на шахрайство', other: 'Інше',
+};
+export const CLIENT_TOPICS = ['booking', 'payment', 'quality', 'dispute', 'account', 'fraud', 'other'];
+export const PLACE_TOPICS = ['payout', 'booking', 'dispute', 'review', 'account', 'fraud', 'other'];
+export const TICKET_STATUS = { new: ['Нове', 'warn'], open: ['У роботі', 'carcar'], waiting: ['Чекаємо відповіді', 'muted'], closed: ['Закрито', 'ok'] };
+// Термінові теми — гроші й шахрайство: відповідь за 2 години, решта — за добу.
+const URGENT = ['payment', 'dispute', 'fraud', 'payout'];
+export const slaHours = (t) => (t.priority === 'high' ? 2 : 24);
+
+export const ticketsAll = () => store.get('support', []);
+export const saveTickets = (list) => store.set('support', list);
+
+export function openTicket({ from, placeId = null, bookingId = null, topic, text, clientName = '', clientPhone = '', clientKey = null }) {
+  const list = ticketsAll();
+  const t = {
+    id: uid(), no: 1000 + list.length + 1, from, placeId, bookingId, topic, clientName, clientPhone, clientKey,
+    priority: URGENT.includes(topic) ? 'high' : 'normal', status: 'new',
+    messages: [{ from, text, at: Date.now() }], createdAt: Date.now(), updatedAt: Date.now(), unreadAdmin: true, unreadUser: false,
+  };
+  saveTickets([...list, t]);
+  return t;
+}
+
+// Повідомлення у зверненні. Відповідь CARCAR чекає реакції автора, відповідь автора повертає звернення в роботу.
+export function ticketReply(id, from, text, status) {
+  const list = ticketsAll();
+  const t = list.find((x) => x.id === id);
+  if (!t) return null;
+  t.messages.push({ from, text, at: Date.now() });
+  t.updatedAt = Date.now();
+  if (from === 'admin') {
+    t.firstReplyAt ??= Date.now();
+    t.status = status ?? 'waiting';
+    t.unreadUser = true;
+    t.unreadAdmin = false;
+  } else {
+    t.status = t.status === 'new' ? 'new' : 'open';
+    t.unreadAdmin = true;
+  }
+  saveTickets(list);
+  return t;
+}
+
+export function setTicket(id, patch) {
+  const list = ticketsAll();
+  const t = list.find((x) => x.id === id);
+  if (t) Object.assign(t, patch, { updatedAt: Date.now() });
+  saveTickets(list);
+  return t;
+}
+
+// Прострочено, якщо CARCAR ще не відповів у межах SLA.
+export const ticketOverdue = (t, now = Date.now()) => t.status === 'new' && now - t.createdAt > slaHours(t) * HOUR;
+
+// ---------- антифрод: обмеження ----------
+
+// Клієнти, яким CARCAR обмежив онлайн-запис після перевірки (ключ — tel:… або device).
+export const fraudState = () => ({ dismissed: {}, blocked: {}, ...store.get('admin.fraud', {}) });
+export const saveFraud = (s) => store.set('admin.fraud', s);
+export const isBlocked = (keys) => keys.some((k) => k && fraudState().blocked[k]);
+
+// ---------- рух ----------
+
+// Поява сторінки й «набігання» чисел у показниках — лише при переході на інший екран
+// і якщо людина не просила зменшити анімацію.
+const calm = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+export function enterView(view, changed) {
+  if (!changed || calm()) return;
+  view.classList.remove('view-enter');
+  void view.offsetWidth; // перезапуск анімації
+  view.classList.add('view-enter');
+  clearTimeout(enterView.t);
+  enterView.t = setTimeout(() => view.classList.remove('view-enter'), 900);
+  for (const el of view.querySelectorAll('.kpi .value, .tile b, .sheet-total b')) countUp(el);
+}
+
+function countUp(el) {
+  const text = el.textContent;
+  const m = text.match(/\d[\d\s  ]*(?:,\d+)?/);
+  if (!m) return;
+  const dec = m[0].includes(',') ? m[0].split(',')[1].length : 0;
+  const to = parseFloat(m[0].replace(/[\s  ]/g, '').replace(',', '.'));
+  if (!(to > 0)) return;
+  const start = performance.now();
+  const step = (now) => {
+    if (!el.isConnected) return;
+    const k = Math.min(1, (now - start) / 650);
+    const v = to * (1 - (1 - k) ** 3);
+    el.textContent = k < 1 ? text.replace(m[0], v.toLocaleString('uk-UA', { minimumFractionDigits: dec, maximumFractionDigits: dec })) : text;
+    if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}

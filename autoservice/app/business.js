@@ -8,7 +8,8 @@ import {
   weekdayOf, phoneKey, offersOf, offerAsService, EXPENSE_CATS, PAY_METHODS, expensesIn, serviceCat, catById, shrinkPhoto, applyOverrides, saveOverride,
   ACTIVE, BLOCKING, HOUR, isCarcar, price, isFrozen, balanceFor, settleAll, ratingFor,
   PARTNER_STATUS, partnerOf, savePartner, payoutReady, maskIban, commissionFor, addCustomPlace,
-  ROLES, staffOf, workBase, POWER, powerOf, setPower, mobileOn, spanOf, MOBILE_ROAD,
+  ROLES, staffOf, workBase, POWER, powerOf, setPower, TICKET_TOPICS, PLACE_TOPICS, TICKET_STATUS, ticketsAll, openTicket, ticketReply, setTicket, mobileOn, spanOf, MOBILE_ROAD,
+  enterView,
 } from './core.js';
 import {
   CHANNELS, sendMessages, viberLink, telegramLink, dealsOf, weeklyDealsOf, daysText, queueOf, queueEnabled, saveQueue, queueEstimate, checkWaitlist,
@@ -1453,7 +1454,7 @@ function me() {
 }
 // Що бачить кожна роль. Власник — усе; 'assign' — право призначати майстрів.
 const ACCESS = {
-  admin: ['', 'schedule', 'queue', 'clients', 'requests', 'tires', 'services', 'deals', 'passes', 'mailings', 'reviews', 'stock', 'settings', 'import', 'assign', 'offer'],
+  admin: ['', 'schedule', 'queue', 'clients', 'requests', 'support', 'tires', 'services', 'deals', 'passes', 'mailings', 'reviews', 'stock', 'settings', 'import', 'assign', 'offer'],
   master: ['schedule', 'queue', 'tires', 'earnings'],
 };
 const can = (page) => (me().role === 'owner' ? page !== 'earnings' : ACCESS[me().role].includes(page));
@@ -2306,6 +2307,12 @@ function bookingDrawer(id) {
         <p class="fine">Клієнт підтвердить виконання в застосунку — тоді гроші заморозяться на ${PAYMENT.freezeHours} год і стануть доступні до виведення.</p>
       </form>
       ${started ? `<button class="btn text-danger" data-action="carcar-noshow" data-id="${b.id}">Клієнт не приїхав</button>` : ''}`;
+  } else if (b.state === 'dispute') {
+    const t = ticketsAll().find((x) => x.bookingId === b.id && x.from === 'place');
+    actions = `<p class="notice warn"><b>Клієнт відкрив спір</b>«${esc(b.disputeReason ?? '')}». Гроші заморожені, доки модератор CARCAR не вирішить.</p>
+      ${t ? `<a class="btn" href="#/support/${t.id}" data-action="close-drawer-nav">Ваше пояснення: звернення №${t.no}</a>` : `<form class="stack" id="dispute-note" data-id="${b.id}" style="gap:8px">
+        <label class="field"><span>Пояснення для модератора</span><textarea name="text" rows="3" required maxlength="1000" placeholder="Що було зроблено, фото, домовленості з клієнтом"></textarea></label>
+        <button class="btn" type="submit" style="align-self:flex-start">Надіслати модератору</button></form>`}`;
   } else if (b.state === 'done') {
     actions = `<p class="notice">Чекаємо підтвердження клієнта. Якщо він не відповість, замовлення підтвердиться автоматично ${fmtTime(b.doneAt + PAYMENT.autoReleaseHours * HOUR)}.</p>
       <button class="btn" data-action="remind" data-id="${b.id}">${icon('chat', 18)}Нагадати клієнту</button>
@@ -2404,6 +2411,41 @@ function bizChat(b, text) {
   bookingDrawer(b.id);
   $('#bk-chat-form input')?.focus();
   toast('Повідомлення надіслано клієнту');
+}
+
+// ---------- підтримка CARCAR ----------
+
+const placeTickets = () => ticketsAll().filter((t) => t.placeId === ui.place && t.from === 'place').sort((a, b) => b.updatedAt - a.updatedAt);
+
+function viewSupport(openId) {
+  const list = placeTickets();
+  const sel = list.find((t) => t.id === openId);
+  if (sel?.unreadUser) setTicket(sel.id, { unreadUser: false });
+  const recent = own().filter(isCarcar).sort((a, b) => bookingStart(b) - bookingStart(a)).slice(0, 20);
+  return `<h1>Підтримка CARCAR</h1><p class="page-sub">Питання про виплати, комісію, спори й відгуки. Термінові питання про гроші розглядаємо до 2 годин, решту — протягом доби.</p>
+    <div class="grid-2">
+    <section class="panel stack" aria-labelledby="h-tickets" style="gap:10px">
+      <h2 id="h-tickets">Звернення</h2>
+      ${list.length ? `<ul class="special-list ticket-list">${list.map((t) => {
+        const [label, cls] = TICKET_STATUS[t.status];
+        return `<li${t.unreadUser ? ' class="unread"' : ''}><span><b>№${t.no} · ${TICKET_TOPICS[t.topic]}</b><small>${esc(t.messages.at(-1).text)}</small></span>
+          <span class="pill ${cls}">${t.unreadUser ? 'Нова відповідь' : label}</span><a class="btn" href="#/support/${t.id}">Відкрити</a></li>`;
+      }).join('')}</ul>` : '<p class="muted" style="margin:0">Звернень ще не було.</p>'}
+      ${sel ? `<article class="ticket-open stack" aria-label="Звернення №${sel.no}" style="gap:10px">
+        <div class="head"><b>№${sel.no} · ${TICKET_TOPICS[sel.topic]}</b><span class="pill ${TICKET_STATUS[sel.status][1]}">${TICKET_STATUS[sel.status][0]}</span></div>
+        <ol class="thread">${sel.messages.map((m) => `<li class="msg ${m.from === 'place' ? 'client' : 'biz'}"><span class="who">${m.from === 'admin' ? 'Підтримка CARCAR' : 'Ви'} · ${fmtTime(m.at)}</span>${esc(m.text)}</li>`).join('')}</ol>
+        <form class="inline-form" id="ticket-reply" data-id="${sel.id}"><label class="field"><span>Відповідь підтримці</span><input name="text" required maxlength="800" autocomplete="off"></label>
+          <button class="btn primary" type="submit">Надіслати</button></form></article>` : ''}
+    </section>
+    <form id="ticket-form" class="panel stack" aria-labelledby="h-new-ticket" style="gap:12px">
+      <h2 id="h-new-ticket">Нове звернення</h2>
+      <label class="field"><span>Тема</span><select name="topic">${PLACE_TOPICS.map((k) => `<option value="${k}">${TICKET_TOPICS[k]}</option>`).join('')}</select></label>
+      <label class="field"><span>Запис (необовʼязково)</span><select name="booking"><option value="">Не стосується запису</option>
+        ${recent.map((b) => `<option value="${b.id}">${dayLabel(b.date, { day: 'numeric', month: 'short' })} ${b.time} · ${esc(clientName(b))} · ${STATUS[b.state][0]}</option>`).join('')}</select></label>
+      <label class="field"><span>Опишіть питання</span><textarea name="text" rows="4" required maxlength="1000"></textarea></label>
+      <button class="btn primary" type="submit" style="align-self:flex-start">Надіслати</button>
+    </form>
+    </div>`;
 }
 
 // Вільні початки для нового запису: бокс вільний, якщо записів, що перетинаються, менше, ніж боксів.
@@ -2714,7 +2756,7 @@ const NAV = [
   ['Продажі', [['services', 'Послуги й ціни', 'list'], ['deals', 'Гарячі вікна', 'bolt'], ['passes', 'Абонементи й сертифікати', 'gift'],
     ['mailings', 'Розсилки', 'share'], ['reviews', 'Відгуки', 'star']]],
   ['Гроші', [['finance', 'Фінанси', 'card'], ['expenses', 'Витрати', 'cash'], ['stock', 'Склад', 'drop'], ['staff', 'Персонал', 'users'], ['earnings', 'Мій заробіток', 'cash']]],
-  ['Точка', [['settings', 'Профіль точки', 'settings'], ['import', 'Імпорт даних', 'upload'], ['connect', 'Підключення', 'shield']]],
+  ['Точка', [['settings', 'Профіль точки', 'settings'], ['import', 'Імпорт даних', 'upload'], ['connect', 'Підключення', 'shield'], ['support', 'Підтримка CARCAR', 'info']]],
 ];
 
 function renderChrome(page) {
@@ -2724,6 +2766,7 @@ function renderChrome(page) {
     reviews: [unanswered, 'без відповіді'], requests: [openReq, 'чекають відповіді'], stock: [lowStock().length, 'закінчується'],
     tires: [tiresOf(ui.place).filter((t) => tireDue(t) && !t.remindedAt).length, 'пора нагадати'],
     queue: [queueOf(ui.place).filter((q) => q.status === 'waiting').length, 'у черзі'],
+    support: [placeTickets().filter((t) => t.unreadUser).length, 'нові відповіді'],
   };
   const link = ([id, label, ic]) => `<a href="#/${id}" ${page === id ? 'aria-current="page"' : ''}>${icon(ic, 20)}${label}
     ${badge[id]?.[0] ? `<span class="count" aria-label="${badge[id][1]}: ${badge[id][0]}">${badge[id][0]}</span>` : ''}
@@ -2782,6 +2825,7 @@ function route() {
   else if (page === 'offer') view.innerHTML = viewOffer();
   else if (page === 'reviews') view.innerHTML = viewReviews();
   else if (page === 'settings') view.innerHTML = viewSettings();
+  else if (page === 'support') view.innerHTML = viewSupport(arg);
   else view.innerHTML = '<p>Сторінку не знайдено.</p>';
   // Поки точку не підключено, нагадуємо про це на кожному екрані, крім самого підключення.
   const st = partnerOf(ui.place).status;
@@ -2790,6 +2834,8 @@ function route() {
       <a href="#/connect">${st === 'draft' || st === 'changes' || st === 'rejected' ? 'Завершити підключення' : 'Деталі підключення'}</a></span></p>`);
   }
   mountCharts();
+  enterView(view, `${page}/${arg ?? ''}/${ui.place}` !== ui.lastView);
+  ui.lastView = `${page}/${arg ?? ''}/${ui.place}`;
 }
 
 function rerenderKeepScroll() {
@@ -3184,6 +3230,23 @@ document.addEventListener('submit', async (e) => {
   const f = e.target;
   e.preventDefault();
   if (f.id === 'connect-form') { saveConnect(e.submitter?.value ?? 'save'); return; }
+  if (f.id === 'ticket-form' || f.id === 'ticket-reply' || f.id === 'dispute-note') {
+    const d = new FormData(f);
+    const text = d.get('text').trim();
+    if (!text) return;
+    if (f.id === 'ticket-reply') {
+      ticketReply(f.dataset.id, 'place', text);
+      rerenderKeepScroll();
+      toast('Повідомлення надіслано в підтримку');
+      return;
+    }
+    const b = bookings.find((x) => x.id === (f.id === 'dispute-note' ? f.dataset.id : d.get('booking')));
+    const t = openTicket({ from: 'place', placeId: ui.place, bookingId: b?.id ?? null, topic: f.id === 'dispute-note' ? 'dispute' : d.get('topic'), text, clientName: b ? clientName(b) : '' });
+    if (f.id === 'dispute-note') { closeDrawer(); }
+    location.hash = `#/support/${t.id}`;
+    toast(`Звернення №${t.no} надіслано в CARCAR`);
+    return;
+  }
   if (f.id === 'bk-chat-form') {
     const text = new FormData(f).get('text').trim();
     if (text) bizChat(bookings.find((x) => x.id === f.dataset.id), text);

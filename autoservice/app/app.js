@@ -3,7 +3,8 @@ import {
   store, icon, esc, uah, pad, hhmm, toMin, isoDate, parseDate, uid, placeById, plural, duration, dayLabel, rating, tel,
   hoursFor, scheduleOf, inBreak, rangeText, WEEKDAY_NAMES, weekdayOf, phoneKey, offersOf, offerAsService, isOpenNow, hoursText, bookingStart, fmtTime, fmtDate, km, serviceCat, catById, shrinkPhoto,
   applyOverrides, isListed, payoutReady, maskIban, commissionFor, resolveDispute, visibleReviews, ACTIVE, BLOCKING, HOUR, isCarcar, price, complete, isFrozen, placeShare, balanceFor, settleAll, ratingFor,
-  POWER, powerOf, worksInBlackout, mobileOn, spanOf, laneCap, sameLane, MOBILE_ROAD, promosAll, promoCheck, promoText,
+  POWER, powerOf, worksInBlackout, TICKET_TOPICS, CLIENT_TOPICS, TICKET_STATUS, ticketsAll, openTicket, ticketReply, setTicket, isBlocked, mobileOn, spanOf, laneCap, sameLane, MOBILE_ROAD, promosAll, promoCheck, promoText,
+  enterView,
 } from './core.js';
 import {
   CHANNELS, inboxFor, markRead, sendMessages, dealsOf, dealsOn, weeklyDealsOf, daysText, dealAt, dealPrice, dealCovers, hotDeals, queueOf, queueEnabled, saveQueue, queueEstimate,
@@ -211,6 +212,23 @@ const inviteLink = () => `${location.origin}${location.pathname}?ref=${referral.
 const bonusFor = (total) => (total >= REFERRAL.minOrder ? Math.min(wallet.bonus, REFERRAL.bonus, total) : 0);
 
 // Друг відкрив застосунок за посиланням ?ref=КОД: новому користувачу — бонус на перше замовлення.
+// Рекламна кампанія CARCAR: посилання ?c=кампанія&promo=КОД. Запамʼятовуємо на 30 днів (остання кампанія),
+// промокод кампанії застосовується під час оплати, а запис отримує позначку кампанії — для розрахунку CAC.
+const CAMPAIGN_DAYS = 30;
+function acceptCampaign() {
+  const q = new URLSearchParams(location.search);
+  const c = q.get('c');
+  const code = q.get('promo');
+  if (!c && !code) return;
+  store.set('campaign', { id: c ?? null, code: code ? code.trim().toUpperCase() : null, at: Date.now() });
+  track('campaign_visit', { c: c ?? null, code: code ? code.trim().toUpperCase() : null });
+  if (!q.get('ref')) history.replaceState(null, '', location.pathname + location.hash);
+}
+const campaignNow = () => {
+  const x = store.get('campaign', null);
+  return x && Date.now() - x.at < CAMPAIGN_DAYS * 864e5 ? x : null;
+};
+
 function acceptInvite() {
   const code = new URLSearchParams(location.search).get('ref');
   if (!code) return;
@@ -723,6 +741,11 @@ function viewBook(id, date, time) {
   const p = placeById(id);
   if (!p) return viewNotFound();
   if (!isListed(p)) return `${back(`#/place/${p.id}`, esc(p.name))}<h1>Запис недоступний</h1><p class="muted">Точка зараз не приймає онлайн-записи в CARCAR.</p>`;
+  if (isBlocked(myKeys())) {
+    return `${back(`#/place/${p.id}`, esc(p.name))}<h1>Запис обмежено</h1>
+      <p class="notice warn">Служба безпеки CARCAR тимчасово обмежила онлайн-запис для цього профілю. Якщо це помилка — напишіть у підтримку, відповімо протягом доби.</p>
+      <a class="btn primary" href="#/support">Написати в підтримку</a>`;
+  }
   // Посилання з гарячого вікна чи листа очікування відкриває запис одразу на потрібний день і час.
   const prefill = date && bookingDays(p).includes(date);
   if (!draft || draft.placeId !== id || (prefill && draft.date !== date)) {
@@ -797,7 +820,9 @@ function quote(p) {
   let promo = null;
   let promoErr = null;
   if (chosen.length && draft.promo !== '') {
-    const pr = draft.promo ? promosAll().find((x) => x.code === draft.promo) : promosAll().find((x) => x.auto && promoFor(x, p, items).ok);
+    // Код із рекламного посилання — якщо клієнт сам не ввів інший.
+    const fromLink = draft.promo === undefined && campaignNow()?.code ? promosAll().find((x) => x.code === campaignNow().code && promoFor(x, p, items).ok) : null;
+    const pr = draft.promo ? promosAll().find((x) => x.code === draft.promo) : fromLink ?? promosAll().find((x) => x.auto && promoFor(x, p, items).ok);
     const r = pr ? promoFor(pr, p, items) : draft.promo ? { ok: false, why: 'Такого промокоду немає' } : null;
     if (r?.ok) promo = { code: pr.code, title: pr.title, amount: Math.min(r.amount, total - covered) };
     else if (draft.promo) promoErr = r.why;
@@ -1015,6 +1040,8 @@ function confirmBooking() {
     personal: chosen.filter((x) => x.personal).map((x) => x.id),
     mobile: mobileMode() ? { address: draft.addr.text.trim(), lat: draft.addr.lat, lng: draft.addr.lng, fee: q.fee, km: Math.round(addrCheck(p).km * 10) / 10 } : null,
     promo: q.promo ? { code: q.promo.code, amount: q.promo.amount } : null,
+    campaign: campaignNow()?.id ?? null,
+    firstOrder: !mine().some((x) => !(x.state === 'cancelled' && x.refundTo === 'balance')),
     installments: q.installments ? { ...q.installments, card: q.card } : null,
     state: 'paid',
     createdAt: Date.now(),
@@ -1180,6 +1207,7 @@ function bookingCard(b, highlight) {
     ${estimateBlock(b)}
     ${intakeBlock(b)}
     ${chatBlock(b)}
+    <a class="help-link small" href="${b.ticketId ? `#/support/t/${b.ticketId}` : `#/support/new/${b.id}`}">${icon('info', 16)}${b.ticketId ? 'Звернення в підтримку за цим записом' : 'Проблема із записом? Напишіть у підтримку CARCAR'}</a>
     ${!ACTIVE.includes(b.state) && p ? `<div class="grid2">
       <a class="btn" href="#/book/${p.id}" data-action="repeat" data-id="${b.id}">${icon('repeat', 18)}Повторити запис</a>
       ${p.cats.includes('wash') && !b.subId ? `<button class="btn" data-action="sub-open" data-id="${b.id}">${icon('calendar', 18)}Зробити регулярним</button>` : ''}
@@ -1258,6 +1286,60 @@ function bookingChatsCard() {
       <small class="small muted" style="display:block;font-weight:400">${last.from === 'biz' ? 'Точка: ' : last.from === 'client' ? 'Ви: ' : ''}${esc(last.text.length > 70 ? `${last.text.slice(0, 70).trimEnd()}…` : last.text)}</small></span>
       ${b.chatUnreadClient ? '<span class="count" aria-label="нове повідомлення">1</span>' : ''}${icon('chevR', 18)}</a>`;
   }).join('')}</div>`;
+}
+
+// ---------- підтримка CARCAR ----------
+
+const myTickets = () => ticketsAll().filter((t) => t.from === 'client' && (myKeys().includes(t.clientKey) || t.clientKey === 'device' || !t.clientKey))
+  .sort((a, b) => b.updatedAt - a.updatedAt);
+const ticketWho = (m) => (m.from === 'admin' ? 'Підтримка CARCAR' : m.from === 'place' ? 'Точка' : 'Ви');
+
+function ticketCard(t, open) {
+  const [label, cls] = TICKET_STATUS[t.status];
+  const b = t.bookingId ? bookings.find((x) => x.id === t.bookingId) : null;
+  return `<article class="card ticket${t.unreadUser ? ' unread' : ''}" id="t-${t.id}" aria-label="Звернення №${t.no}">
+    <div class="head"><b>№${t.no} · ${TICKET_TOPICS[t.topic]}</b><span class="pill-s ${cls}">${label}</span></div>
+    ${b ? `<a class="small" href="#/bookings/${b.id}">${esc(placeById(b.placeId)?.name ?? '')}, ${dayLabel(b.date, { day: 'numeric', month: 'short' })} ${b.time}${b.state === 'dispute' ? ' · спір відкрито' : ''}</a>` : ''}
+    ${open ? `<ol class="thread">${t.messages.map((m) => `<li class="msg ${m.from === 'client' ? 'client' : 'biz'}"><span class="who">${ticketWho(m)} · ${fmtTime(m.at)}</span>${esc(m.text)}</li>`).join('')}</ol>
+      ${t.status === 'closed' ? `<p class="small muted" style="margin:0">Звернення закрито. Якщо питання лишилось — напишіть, і ми відкриємо його знову.</p>` : ''}
+      <form class="ticket-reply inline-form" data-id="${t.id}"><label class="field"><span>Відповідь підтримці</span><input name="text" required maxlength="800" autocomplete="off"></label>
+        <button class="btn primary" type="submit">Надіслати</button></form>`
+      : `<p class="small muted" style="margin:0">${esc(t.messages.at(-1).text.slice(0, 90))}${t.messages.at(-1).text.length > 90 ? '…' : ''}</p>
+      <a class="btn" href="#/support/t/${t.id}">${t.unreadUser ? 'Нова відповідь — відкрити' : 'Відкрити'}</a>`}
+  </article>`;
+}
+
+function viewSupport(sub, arg) {
+  const list = myTickets();
+  if (sub === 't') {
+    const t = list.find((x) => x.id === arg);
+    if (!t) return viewNotFound();
+    if (t.unreadUser) setTicket(t.id, { unreadUser: false });
+    return `${back('#/support', 'Підтримка')}<h1>Звернення №${t.no}</h1>${ticketCard({ ...t, unreadUser: false }, true)}`;
+  }
+  const pre = sub === 'new' ? arg : '';
+  const pb = pre ? bookings.find((x) => x.id === pre) : null;
+  const options = mine().sort((a, b) => bookingStart(b) - bookingStart(a)).slice(0, 15);
+  return `${back('#/garage', 'Гараж')}<h1>Підтримка CARCAR</h1>
+    <p class="lead">Пишіть, якщо щось пішло не так з оплатою, записом чи якістю послуги. Термінові питання про гроші розглядаємо до 2 годин, решту — протягом доби.</p>
+    ${list.length ? `<h2>Ваші звернення</h2><div class="stack" style="gap:8px">${list.map((t) => ticketCard(t, false)).join('')}</div>` : ''}
+    <h2>Нове звернення</h2>
+    <form id="ticket-form" class="card stack">
+      <label class="field"><span>Тема</span><select name="topic">${CLIENT_TOPICS.map((k) => `<option value="${k}" ${pb && pb.state === 'done' && k === 'quality' ? 'selected' : ''}>${TICKET_TOPICS[k]}</option>`).join('')}</select></label>
+      <label class="field"><span>Запис</span><select name="booking"><option value="">Не стосується запису</option>
+        ${options.map((b) => `<option value="${b.id}" ${b.id === pre ? 'selected' : ''}>${esc(placeById(b.placeId)?.name ?? '')} · ${dayLabel(b.date, { day: 'numeric', month: 'short' })} ${b.time} · ${STATE_LABEL[b.state]?.[1] ?? ''}</option>`).join('')}</select></label>
+      <label class="field"><span>Що сталося?</span><textarea name="text" rows="4" required maxlength="1000" placeholder="Опишіть ситуацію: що, коли й що ви очікуєте від нас"></textarea></label>
+      <label class="check-row small"><input class="check" type="checkbox" name="dispute"><span>Відкрити спір: заморозити оплату за цим записом, доки модератор не вирішить (для виконаних чи оплачених записів)</span></label>
+      <button class="btn primary block" type="submit">${icon('chat', 18)}Надіслати в підтримку</button>
+      <p class="fine">Звернення бачить лише служба підтримки CARCAR${pb ? ' і, якщо потрібно, точка з вашого запису' : ''}. Відповідь прийде в «Повідомлення».</p>
+    </form>`;
+}
+
+function supportCard() {
+  const unread = myTickets().filter((t) => t.unreadUser).length;
+  return `<a class="card link-card" href="#/support" style="margin-top:16px">${icon('info', 22)}<span>Підтримка CARCAR
+    <small class="small muted" style="display:block;font-weight:400">Оплата, записи, спори й безпека — відповідаємо в застосунку</small></span>
+    ${unread ? `<span class="count" aria-label="нових відповідей: ${unread}">${unread}</span>` : ''}${icon('chevR', 18)}</a>`;
 }
 
 // ---------- перенесення запису ----------
@@ -1485,6 +1567,7 @@ function viewInbox() {
     ${waits.length ? `<h2>Лист очікування</h2><div class="stack" style="gap:8px">${waits.map((w) => `<div class="card head" style="align-items:center">
       <span><b>${esc(placeById(w.placeId)?.name ?? '')}</b><small class="small muted" style="display:block">${dayLabel(w.date, { day: 'numeric', month: 'long' })}, ${hhmm(w.from)}–${hhmm(w.to)} · ${esc(w.services.join(', '))}</small></span>
       <button class="btn" data-action="wait-cancel" data-id="${w.id}">Вийти</button></div>`).join('')}</div>` : ''}
+    ${myTickets().length ? `<h2>Підтримка CARCAR</h2><div class="stack" style="gap:8px">${myTickets().slice(0, 3).map((t) => ticketCard(t, false)).join('')}</div>` : ''}
     ${bookingChatsCard()}
     ${requestsCard()}
     <h2>Сповіщення</h2>
@@ -1500,7 +1583,7 @@ function viewInbox() {
 
 // Лічильник на вкладці «Повідомлення»: непрочитані сповіщення й нові відповіді точок у чатах.
 function updateInboxBadge() {
-  const unread = inboxFor(myKeys()).filter((m) => !m.read).length + requests.filter((r) => r.unreadClient).length + mine().filter((b) => b.chatUnreadClient).length;
+  const unread = inboxFor(myKeys()).filter((m) => !m.read).length + requests.filter((r) => r.unreadClient).length + mine().filter((b) => b.chatUnreadClient).length + myTickets().filter((t) => t.unreadUser).length;
   const count = $('#inbox-tab .tab-count');
   count.textContent = unread > 9 ? '9+' : unread;
   count.hidden = !unread;
@@ -1734,6 +1817,7 @@ function viewGarage() {
       <label class="check-row small"><input class="check" type="checkbox" name="optIn" ${profile.optIn ? 'checked' : ''}><span>Отримувати пропозиції точок, де я обслуговуюсь, у Viber чи Telegram</span></label>
       <button class="btn" type="submit">Зберегти профіль</button>
     </form>
+    ${supportCard()}
     ${garageExtras()}
     <p class="lead" style="margin-top:16px">Сервісна книжка кожного авто: історія обслуговування, пробіг і нагадування.</p>
     <div class="stack">
@@ -1895,6 +1979,9 @@ const bookingActions = {
     const reason = prompt('Що пішло не так?')?.trim();
     if (!reason) return false;
     Object.assign(b, { state: 'dispute', disputeReason: reason });
+    // Спір — це й звернення в підтримку: тут клієнт листується з модератором.
+    const t = openTicket({ from: 'client', placeId: b.placeId, bookingId: b.id, topic: 'dispute', text: reason, clientName: profile.name, clientPhone: profile.phone, clientKey: myKeys()[0] });
+    b.ticketId = t.id;
     toast('Спір відкрито, гроші заморожено');
   },
   extra(b) {
@@ -1929,7 +2016,7 @@ const bookingActions = {
 function route() {
   const [, page = '', arg, sub, extra] = location.hash.replace(/^#/, '').split('/');
   const view = $('#view');
-  const tab = ['partner', 'disputes', 'invite'].includes(page) ? '' : page === 'move' ? 'bookings' : ['bookings', 'garage', 'inbox'].includes(page) ? page : 'catalog';
+  const tab = ['partner', 'disputes', 'invite'].includes(page) ? '' : page === 'support' ? 'garage' : page === 'move' ? 'bookings' : ['bookings', 'garage', 'inbox'].includes(page) ? page : 'catalog';
   settle();
   // Хтось скасував запис — можливо, звільнився час для листа очікування.
   checkWaitlist(bookings);
@@ -1961,6 +2048,7 @@ function route() {
   else if (page === 'partner') view.innerHTML = arg ? viewPartnerJob(arg) : viewPartner();
   else if (page === 'disputes') view.innerHTML = viewDisputes();
   else if (page === 'invite') view.innerHTML = viewInvite();
+  else if (page === 'support') view.innerHTML = viewSupport(arg, sub);
   else view.innerHTML = viewNotFound();
 
   // Клієнт відкрив сторінку точки — відповіді на його запити прочитані.
@@ -1969,6 +2057,8 @@ function route() {
     saveRequests();
   }
   updateInboxBadge();
+  enterView(view, `${page}/${arg ?? ''}` !== ui.lastView);
+  ui.lastView = `${page}/${arg ?? ''}`;
   const target = arg && page === 'bookings' ? $(`#b-${arg}`) : sub === 'ask' ? $('#ask') : null;
   if (target) target.scrollIntoView({ block: 'center' });
   else window.scrollTo(0, 0);
@@ -2273,6 +2363,33 @@ document.addEventListener('submit', async (e) => {
     finishJob(e.target);
     return;
   }
+  if (e.target.id === 'ticket-form' || e.target.matches('.ticket-reply')) {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const text = f.get('text').trim();
+    if (!text) return;
+    if (e.target.matches('.ticket-reply')) {
+      ticketReply(e.target.dataset.id, 'client', text);
+      route();
+      toast('Повідомлення надіслано в підтримку');
+      return;
+    }
+    const b = bookings.find((x) => x.id === f.get('booking'));
+    let topic = f.get('topic');
+    let disputed = false;
+    if (f.get('dispute')) {
+      if (!b || !(b.state === 'done' || isFrozen(b) || (b.state === 'paid' && bookingStart(b) <= new Date()))) { toast('Спір можна відкрити лише після візиту, поки гроші за записом заморожені'); return; }
+      Object.assign(b, { state: 'dispute', disputeReason: text });
+      topic = 'dispute';
+      disputed = true;
+    }
+    const t = openTicket({ from: 'client', placeId: b?.placeId ?? null, bookingId: b?.id ?? null, topic, text, clientName: profile.name, clientPhone: profile.phone, clientKey: myKeys()[0] });
+    if (b) { b.ticketId = t.id; save(); }
+    track('ticket', { topic });
+    location.hash = `#/support/t/${t.id}`;
+    toast(disputed ? `Звернення №${t.no} створено, спір відкрито — гроші заморожено` : `Звернення №${t.no} створено — відповімо в «Повідомленнях»`);
+    return;
+  }
   if (e.target.matches('.chat-form')) {
     e.preventDefault();
     const text = new FormData(e.target).get('text').trim();
@@ -2461,6 +2578,7 @@ window.addEventListener('storage', (e) => {
   applyOverrides();
   if (!draft?.paying) route();
 });
+acceptCampaign();
 track('session', { view: ui.view });
 route();
 acceptInvite();

@@ -405,3 +405,23 @@ table.t tr.off td { opacity: .55; }
 .chat-list li.unread { border-color: var(--accent); }
 .chat-list li > span small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .est-row .select { width: 100%; min-width: 0; height: 40px; }
+
+/* Підтримка, антифрод, маркетинг */
+.pill.bad { background: var(--danger-soft, #fdecea); color: var(--danger); }
+.ticket-list li.unread, tr.unread td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+.ticket-open { border-top: 1px solid var(--line); padding-top: 12px; }
+.quick { display: flex; flex-wrap: wrap; gap: 6px; }
+.quick .chip { font-size: 13px; padding: 6px 10px; min-height: 34px; }
+.fraud-card { border-left: 4px solid var(--warn); }
+.fraud-card.high { border-left-color: var(--danger); }
+.fraud-lines { margin: 0; padding-left: 18px; font-size: 14px; display: grid; gap: 4px; }
+.fraud-lines .stars { margin-right: 4px; }
+.mini-funnel { display: grid; gap: 4px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.mini-funnel:first-of-type { border-top: 0; }
+.mini-funnel span { color: var(--muted); }
+.mini-funnel .track { height: 8px; border-radius: 4px; background: var(--soft); overflow: hidden; }
+.mini-funnel .fill { display: block; height: 100%; background: var(--series-1); border-radius: 4px; }
+.link-text { overflow-wrap: anywhere; }
+.spend-form { align-items: flex-end; }
+.spend-form .field input { width: 110px; }
+.camp-list li { flex-wrap: wrap; } .camp-list li > span { flex-basis: 100%; }

@@ -661,6 +661,66 @@ label.item { cursor: pointer; padding: 10px 14px; }
 .bk-chat .quick { display: flex; flex-wrap: wrap; gap: 6px; }
 .bk-chat .quick .chip { font-size: 13px; padding: 6px 10px; min-height: 34px; }
 .thread .msg.sys { justify-self: center; background: transparent; border: 1px dashed var(--line); font-size: 13px; color: var(--muted); }
+.pill-s { font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 999px; background: var(--soft); white-space: nowrap; }
+.pill-s.warn { background: var(--warn-soft); color: var(--warn); }
+.pill-s.ok { background: var(--ok-soft); color: var(--ok); }
+.pill-s.muted { color: var(--muted); }
+.ticket.unread { border-color: var(--accent); }
+.help-link { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+
+/* ---------- рух і глибина ----------
+   Анімації вмикаються лише для тих, хто не просив зменшити рух (prefers-reduced-motion). */
+:root { --ease: cubic-bezier(.2, .8, .2, 1); --shadow-1: 0 1px 2px rgba(16, 21, 28, .05), 0 3px 10px rgba(16, 21, 28, .04); --shadow-2: 0 10px 28px rgba(16, 21, 28, .12); }
+@media (prefers-color-scheme: dark) { :root { --shadow-1: 0 1px 2px rgba(0, 0, 0, .4); --shadow-2: 0 10px 28px rgba(0, 0, 0, .5); } }
+.card, .bk, .panel, .kpi { box-shadow: var(--shadow-1); }
+.tabs { background: color-mix(in srgb, var(--bg) 86%, transparent); backdrop-filter: saturate(1.6) blur(14px); -webkit-backdrop-filter: saturate(1.6) blur(14px); }
+.promo-banner { background: linear-gradient(120deg, var(--ok-soft), var(--soft)); }
+.btn, .chip, .slot, .day, .seg-mini button, .seg button, .radio-row label, .parts label { transition: transform .14s var(--ease), background-color .2s, border-color .2s, color .2s, box-shadow .2s; }
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes cc-view { from { opacity: 0; transform: translateY(10px); } }
+  @keyframes cc-rise { from { opacity: 0; transform: translateY(14px) scale(.985); } }
+  @keyframes cc-fade { from { opacity: 0; } }
+  @keyframes cc-sheet { from { transform: translateY(100%); } }
+  @keyframes cc-drawer { from { transform: translateX(40px); opacity: 0; } }
+  @keyframes cc-pop { 0% { transform: scale(.4); opacity: 0; } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
+  @keyframes cc-bounce { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-4px); } }
+  @keyframes cc-glow { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); } 100% { box-shadow: 0 0 0 14px transparent; } }
+  @keyframes cc-grow-x { from { transform: scaleX(0); } }
+  @keyframes cc-grow-y { from { transform: scaleY(0); } }
+  @keyframes cc-drop { from { transform: translateY(-14px); opacity: 0; } }
+  @keyframes cc-shimmer { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+
+  .view-enter { animation: cc-view .3s var(--ease) both; }
+  .view-enter > *, .view-enter .stack > *, .view-enter .kpis > *, .view-enter .grid-2 > * { animation: cc-rise .42s var(--ease) both; }
+  .view-enter > :nth-child(2), .view-enter .stack > :nth-child(2), .view-enter .kpis > :nth-child(2), .view-enter .grid-2 > :nth-child(2) { animation-delay: 40ms; }
+  .view-enter > :nth-child(3), .view-enter .stack > :nth-child(3), .view-enter .kpis > :nth-child(3) { animation-delay: 80ms; }
+  .view-enter > :nth-child(4), .view-enter .stack > :nth-child(4), .view-enter .kpis > :nth-child(4) { animation-delay: 120ms; }
+  .view-enter > :nth-child(5), .view-enter .stack > :nth-child(5) { animation-delay: 160ms; }
+  .view-enter > :nth-child(6), .view-enter .stack > :nth-child(6) { animation-delay: 200ms; }
+  .view-enter > :nth-child(n+7), .view-enter .stack > :nth-child(n+7) { animation-delay: 240ms; }
+
+  .btn:active:not(:disabled), .chip:active, .slot:active:not(:disabled), .day:active:not(:disabled) { transform: scale(.96); }
+  .slot[aria-pressed="true"], .day[aria-pressed="true"], .chip[aria-pressed="true"] { animation: cc-pop .3s var(--ease); }
+  .sheet { animation: cc-sheet .34s var(--ease) both; }
+  .sheet-dim, .drawer-dim { animation: cc-fade .22s both; }
+  .drawer { animation: cc-drawer .3s var(--ease) both; }
+  .tab-count:not([hidden]), .count, .tabs a[data-badge] .tab-ic::after { animation: cc-pop .4s var(--ease) both; }
+  .tabs a[aria-current="page"] .tab-ic { animation: cc-bounce .45s var(--ease); }
+  .bk.hl { animation: cc-glow 1.2s var(--ease) 2; }
+  .hbars .fill, .mini-funnel .fill, .bars .bar span, .track .fill { transform-origin: left; animation: cc-grow-x .7s var(--ease) both; }
+  svg .s1, svg .s2 { transform-box: fill-box; transform-origin: bottom; animation: cc-grow-y .6s var(--ease) both; }
+  .pin-shape { animation: cc-drop .4s var(--ease) both; }
+  .thread .msg { animation: cc-rise .3s var(--ease) both; }
+  .notice.ok .ic, .ok-text .ic { animation: cc-pop .5s var(--ease) both; }
+  .bk-chat, .estimate, .sub-form, #wait-form { animation: cc-rise .3s var(--ease) both; }
+
+  @media (hover: hover) {
+    a.card:hover, .link-card:hover, .hot-card:hover, article.card:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); }
+    a.card, .link-card, .hot-card, article.card { transition: transform .2s var(--ease), box-shadow .2s var(--ease), border-color .2s; }
+    .btn.primary:hover { box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 35%, transparent); }
+  }
+}
 </style>
   <style>
 /* Панель для бізнесу CARCAR: десктоп-перший макет поверх токенів і компонентів styles.css. */
@@ -1070,6 +1130,26 @@ table.t tr.off td { opacity: .55; }
 .chat-list li.unread { border-color: var(--accent); }
 .chat-list li > span small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .est-row .select { width: 100%; min-width: 0; height: 40px; }
+
+/* Підтримка, антифрод, маркетинг */
+.pill.bad { background: var(--danger-soft, #fdecea); color: var(--danger); }
+.ticket-list li.unread, tr.unread td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+.ticket-open { border-top: 1px solid var(--line); padding-top: 12px; }
+.quick { display: flex; flex-wrap: wrap; gap: 6px; }
+.quick .chip { font-size: 13px; padding: 6px 10px; min-height: 34px; }
+.fraud-card { border-left: 4px solid var(--warn); }
+.fraud-card.high { border-left-color: var(--danger); }
+.fraud-lines { margin: 0; padding-left: 18px; font-size: 14px; display: grid; gap: 4px; }
+.fraud-lines .stars { margin-right: 4px; }
+.mini-funnel { display: grid; gap: 4px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.mini-funnel:first-of-type { border-top: 0; }
+.mini-funnel span { color: var(--muted); }
+.mini-funnel .track { height: 8px; border-radius: 4px; background: var(--soft); overflow: hidden; }
+.mini-funnel .fill { display: block; height: 100%; background: var(--series-1); border-radius: 4px; }
+.link-text { overflow-wrap: anywhere; }
+.spend-form { align-items: flex-end; }
+.spend-form .field input { width: 110px; }
+.camp-list li { flex-wrap: wrap; } .camp-list li > span { flex-basis: 100%; }
 </style>
 </head>
 <body class="biz admin">
@@ -1839,6 +1919,107 @@ function ratingFor(placeId, reviews) {
   return { avg, count: list.length, dist };
 }
 
+// ---------- підтримка CARCAR ----------
+
+// Звернення клієнтів і точок у підтримку. Повʼязане із записом (bookingId) звернення модератор
+// бачить поруч зі спором і може перевести в спір прямо зі звернення.
+// status: new — ще не відповіли, open — у роботі, waiting — чекаємо відповіді автора, closed — закрито.
+const TICKET_TOPICS = {
+  booking: 'Запис і перенесення', payment: 'Оплата й повернення', quality: 'Якість послуги', dispute: 'Спір щодо замовлення',
+  payout: 'Виплати й комісія', review: 'Відгуки', account: 'Акаунт і дані', fraud: 'Підозра на шахрайство', other: 'Інше',
+};
+const CLIENT_TOPICS = ['booking', 'payment', 'quality', 'dispute', 'account', 'fraud', 'other'];
+const PLACE_TOPICS = ['payout', 'booking', 'dispute', 'review', 'account', 'fraud', 'other'];
+const TICKET_STATUS = { new: ['Нове', 'warn'], open: ['У роботі', 'carcar'], waiting: ['Чекаємо відповіді', 'muted'], closed: ['Закрито', 'ok'] };
+// Термінові теми — гроші й шахрайство: відповідь за 2 години, решта — за добу.
+const URGENT = ['payment', 'dispute', 'fraud', 'payout'];
+const slaHours = (t) => (t.priority === 'high' ? 2 : 24);
+
+const ticketsAll = () => store.get('support', []);
+const saveTickets = (list) => store.set('support', list);
+
+function openTicket({ from, placeId = null, bookingId = null, topic, text, clientName = '', clientPhone = '', clientKey = null }) {
+  const list = ticketsAll();
+  const t = {
+    id: uid(), no: 1000 + list.length + 1, from, placeId, bookingId, topic, clientName, clientPhone, clientKey,
+    priority: URGENT.includes(topic) ? 'high' : 'normal', status: 'new',
+    messages: [{ from, text, at: Date.now() }], createdAt: Date.now(), updatedAt: Date.now(), unreadAdmin: true, unreadUser: false,
+  };
+  saveTickets([...list, t]);
+  return t;
+}
+
+// Повідомлення у зверненні. Відповідь CARCAR чекає реакції автора, відповідь автора повертає звернення в роботу.
+function ticketReply(id, from, text, status) {
+  const list = ticketsAll();
+  const t = list.find((x) => x.id === id);
+  if (!t) return null;
+  t.messages.push({ from, text, at: Date.now() });
+  t.updatedAt = Date.now();
+  if (from === 'admin') {
+    t.firstReplyAt ??= Date.now();
+    t.status = status ?? 'waiting';
+    t.unreadUser = true;
+    t.unreadAdmin = false;
+  } else {
+    t.status = t.status === 'new' ? 'new' : 'open';
+    t.unreadAdmin = true;
+  }
+  saveTickets(list);
+  return t;
+}
+
+function setTicket(id, patch) {
+  const list = ticketsAll();
+  const t = list.find((x) => x.id === id);
+  if (t) Object.assign(t, patch, { updatedAt: Date.now() });
+  saveTickets(list);
+  return t;
+}
+
+// Прострочено, якщо CARCAR ще не відповів у межах SLA.
+const ticketOverdue = (t, now = Date.now()) => t.status === 'new' && now - t.createdAt > slaHours(t) * HOUR;
+
+// ---------- антифрод: обмеження ----------
+
+// Клієнти, яким CARCAR обмежив онлайн-запис після перевірки (ключ — tel:… або device).
+const fraudState = () => ({ dismissed: {}, blocked: {}, ...store.get('admin.fraud', {}) });
+const saveFraud = (s) => store.set('admin.fraud', s);
+const isBlocked = (keys) => keys.some((k) => k && fraudState().blocked[k]);
+
+// ---------- рух ----------
+
+// Поява сторінки й «набігання» чисел у показниках — лише при переході на інший екран
+// і якщо людина не просила зменшити анімацію.
+const calm = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+function enterView(view, changed) {
+  if (!changed || calm()) return;
+  view.classList.remove('view-enter');
+  void view.offsetWidth; // перезапуск анімації
+  view.classList.add('view-enter');
+  clearTimeout(enterView.t);
+  enterView.t = setTimeout(() => view.classList.remove('view-enter'), 900);
+  for (const el of view.querySelectorAll('.kpi .value, .tile b, .sheet-total b')) countUp(el);
+}
+
+function countUp(el) {
+  const text = el.textContent;
+  const m = text.match(/\d[\d\s  ]*(?:,\d+)?/);
+  if (!m) return;
+  const dec = m[0].includes(',') ? m[0].split(',')[1].length : 0;
+  const to = parseFloat(m[0].replace(/[\s  ]/g, '').replace(',', '.'));
+  if (!(to > 0)) return;
+  const start = performance.now();
+  const step = (now) => {
+    if (!el.isConnected) return;
+    const k = Math.min(1, (now - start) / 650);
+    const v = to * (1 - (1 - k) ** 3);
+    el.textContent = k < 1 ? text.replace(m[0], v.toLocaleString('uk-UA', { minimumFractionDigits: dec, maximumFractionDigits: dec })) : text;
+    if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
 // Графіки для панелі бізнесу й адмінки CARCAR: стовпчики (складені чи згруповані), горизонтальні
 // смуги, легенда, таблиця під графіком і один тултип на сторінку. Палітра — змінні --series-1/2.
 
@@ -2096,7 +2277,7 @@ function save() {
 
 load();
 
-const ui = { period: 30, places: 'queue', reviews: 'reported' };
+const ui = { period: 30, places: 'queue', reviews: 'reported', support: 'active', fraud: 'all' };
 const $ = (sel, root = document) => root.querySelector(sel);
 const today = () => isoDate(new Date());
 const addDays = (iso, n) => { const d = parseDate(iso); d.setDate(d.getDate() + n); return isoDate(d); };
@@ -2167,6 +2348,8 @@ function queues() {
     places: placeQueue,
     reviews: reviews.filter((r) => r.report?.status === 'open').length,
     disputes: bookings.filter((b) => b.state === 'dispute').length,
+    support: ticketsAll().filter((t) => t.unreadAdmin || t.status === 'new').length,
+    fraud: fraudSignals().length,
   };
 }
 const inQueue = (pt) => pt.status === 'pending' || pt.update === 'pending' || (pt.payout?.iban && !pt.payout.verified && pt.status === 'approved');
@@ -2404,6 +2587,26 @@ function viewReviews() {
 
 // ---------- спори ----------
 
+function disputeForm(b) {
+  return `<form class="dispute-form stack" data-id="${b.id}" style="gap:10px">
+        <fieldset class="radio-row"><legend>Рішення</legend>
+          <label><input type="radio" name="to" value="client" checked> Усе клієнту</label>
+          <label><input type="radio" name="to" value="place"> Усе точці</label>
+          <label><input type="radio" name="to" value="split"> Розділити</label></fieldset>
+        <div class="form-grid">
+          <label class="field"><span>Точці, ₴ (для «Розділити»)</span><input name="part" type="number" min="0" max="${price(b)}" step="1" value="${Math.round(price(b) / 2)}"></label>
+          <label class="field"><span>Пояснення рішення</span><input name="note" maxlength="300" autocomplete="off" placeholder="Бачать обидві сторони"></label>
+        </div>
+        <button class="btn primary" type="submit" style="align-self:flex-start">Ухвалити рішення</button>
+      </form>`;
+}
+
+// Звернення клієнта й точки, повʼязані із записом.
+function relatedTickets(b, except) {
+  const list = ticketsAll().filter((t) => t.bookingId === b.id && t.id !== except);
+  return list.length ? `<p class="small" style="margin:0">${icon('chat', 14)} Звернення: ${list.map((t) => `<a href="#/support/${t.id}">№${t.no} від ${t.from === 'place' ? 'точки' : 'клієнта'}${t.unreadAdmin ? ' (нове)' : ''}</a>`).join(', ')}</p>` : '';
+}
+
 function viewDisputes() {
   const open = bookings.filter((b) => b.state === 'dispute').sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
   const done = bookings.filter((b) => b.resolution).sort((a, b) => b.resolution.at - a.resolution.at).slice(0, 20);
@@ -2416,17 +2619,8 @@ function viewDisputes() {
       <p class="notice warn" style="margin:0"><b>Скарга клієнта</b>«${esc(b.disputeReason)}»</p>
       ${b.note || b.km ? `<p class="small muted" style="margin:0">Коментар точки: ${esc(b.note ?? '')}${b.km ? ` · пробіг ${b.km} км` : ''}</p>` : ''}
       ${b.photos?.length ? `<div class="photos">${b.photos.map((src, i) => `<img src="${esc(src)}" alt="Фото результату ${i + 1}">`).join('')}</div>` : '<p class="small muted" style="margin:0">Точка не додала фото результату.</p>'}
-      <form class="dispute-form stack" data-id="${b.id}" style="gap:10px">
-        <fieldset class="radio-row"><legend>Рішення</legend>
-          <label><input type="radio" name="to" value="client" checked> Усе клієнту</label>
-          <label><input type="radio" name="to" value="place"> Усе точці</label>
-          <label><input type="radio" name="to" value="split"> Розділити</label></fieldset>
-        <div class="form-grid">
-          <label class="field"><span>Точці, ₴ (для «Розділити»)</span><input name="part" type="number" min="0" max="${price(b)}" step="1" value="${Math.round(price(b) / 2)}"></label>
-          <label class="field"><span>Пояснення рішення</span><input name="note" maxlength="300" autocomplete="off" placeholder="Бачать обидві сторони"></label>
-        </div>
-        <button class="btn primary" type="submit" style="align-self:flex-start">Ухвалити рішення</button>
-      </form>
+      ${relatedTickets(b)}
+      ${disputeForm(b)}
     </article>`).join('') : `<div class="empty-state">${icon('scale', 32)}<h2>Відкритих спорів немає</h2><p>Клієнт може відкрити спір, поки гроші за замовленням заморожені.</p></div>`}
     </div>
     ${done.length ? `<h2 class="biz-h2">Вирішені</h2>
@@ -2435,6 +2629,454 @@ function viewDisputes() {
       <tbody>${done.map((b) => `<tr><td>${fmtTime(b.resolution.at)}</td><td>${esc(placeName(b.placeId))}</td><td>${esc(b.disputeReason ?? '')}${b.resolution.note ? `<small>${esc(b.resolution.note)}</small>` : ''}</td>
         <td class="num">${uah(b.resolution.placePart)}</td><td class="num">${uah(b.state === 'refunded' ? b.refund ?? 0 : 0)}</td></tr>`).join('')}</tbody>
     </table></div>` : ''}`;
+}
+
+// ---------- підтримка ----------
+
+const SUPPORT_FILTERS = {
+  active: ['Активні', (t) => t.status !== 'closed'],
+  new: ['Без відповіді', (t) => t.status === 'new'],
+  waiting: ['Чекаємо автора', (t) => t.status === 'waiting'],
+  closed: ['Закриті', (t) => t.status === 'closed'],
+  all: ['Усі', () => true],
+};
+const REPLY_TEMPLATES = [
+  'Дякуємо, що написали! Уже перевіряємо — відповімо найближчим часом.',
+  'Повернення зараховано на баланс CARCAR — ним можна оплатити наступний запис або вивести на картку.',
+  'Звʼязалися з точкою, чекаємо пояснення. Гроші за записом заморожені до рішення.',
+  'Питання вирішено. Якщо щось ще — просто напишіть у це звернення.',
+];
+const ticketFrom = (t) => (t.from === 'place' ? `Точка · ${esc(placeName(t.placeId))}` : `Клієнт${t.clientName ? ` · ${esc(t.clientName)}` : ''}`);
+const slaText = (t) => {
+  if (t.status !== 'new') return t.firstReplyAt ? `відповіли за ${Math.max(1, Math.round((t.firstReplyAt - t.createdAt) / 60000))} хв` : '—';
+  const left = t.createdAt + slaHours(t) * HOUR - Date.now();
+  return left < 0 ? `<span class="pill bad">прострочено на ${Math.ceil(-left / HOUR)} год</span>` : `<span class="pill ${left < HOUR ? 'warn' : ''}">ще ${left < HOUR ? `${Math.ceil(left / 60000)} хв` : `${Math.ceil(left / HOUR)} год`}</span>`;
+};
+
+function viewSupport(id) {
+  if (id) return viewTicket(id);
+  const all = ticketsAll();
+  const list = all.filter(SUPPORT_FILTERS[ui.support][1]).sort((a, b) => (b.priority === 'high') - (a.priority === 'high') || (b.unreadAdmin - a.unreadAdmin) || b.updatedAt - a.updatedAt);
+  const open = all.filter((t) => t.status !== 'closed');
+  const replied = all.filter((t) => t.firstReplyAt);
+  const avg = replied.length ? replied.reduce((a, t) => a + (t.firstReplyAt - t.createdAt), 0) / replied.length / 60000 : 0;
+  return `<h1>Підтримка</h1><p class="page-sub">Звернення клієнтів і точок. Повʼязані із записом — поруч зі спором: рішення за спором можна ухвалити прямо зі звернення.</p>
+    <section class="kpis" aria-label="Показники підтримки">
+      <div class="kpi hero"><span class="label">Відкриті звернення</span><span class="value">${open.length}</span><span class="kpi-note">з них термінові ${open.filter((t) => t.priority === 'high').length}</span></div>
+      <div class="kpi"><span class="label">Прострочено SLA</span><span class="value">${all.filter((t) => ticketOverdue(t)).length}</span><span class="kpi-note">гроші — 2 год, решта — 24 год</span></div>
+      <div class="kpi"><span class="label">Перша відповідь</span><span class="value">${replied.length ? (avg < 60 ? `${Math.round(avg)} хв` : `${(avg / 60).toLocaleString('uk-UA', { maximumFractionDigits: 1 })} год`) : '—'}</span><span class="kpi-note">у середньому</span></div>
+      <div class="kpi"><span class="label">Повʼязані зі спорами</span><span class="value">${open.filter((t) => bookings.find((b) => b.id === t.bookingId)?.state === 'dispute').length}</span></div>
+    </section>
+    <div class="filters"><div class="seg" role="group" aria-label="Фільтр звернень">
+      ${Object.entries(SUPPORT_FILTERS).map(([k, [label, fn]]) => `<button data-action="support-filter" data-f="${k}" aria-pressed="${ui.support === k}">${label} · ${all.filter(fn).length}</button>`).join('')}
+    </div></div>
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Звернення"><table class="t">
+      <thead><tr><th>№</th><th>Від кого</th><th>Тема</th><th>Запис</th><th>Останнє повідомлення</th><th>SLA</th><th>Статус</th></tr></thead>
+      <tbody>${list.length ? list.map((t) => {
+        const b = bookings.find((x) => x.id === t.bookingId);
+        const [label, cls] = TICKET_STATUS[t.status];
+        return `<tr class="link-row${t.unreadAdmin ? ' unread' : ''}" data-href="#/support/${t.id}"><td><a class="row-link" href="#/support/${t.id}">№${t.no}</a>${t.priority === 'high' ? '<small class="bad-text">терміново</small>' : ''}</td>
+          <td>${ticketFrom(t)}</td><td>${TICKET_TOPICS[t.topic]}</td>
+          <td>${b ? `${dayLabel(b.date, { day: 'numeric', month: 'short' })} ${b.time}${b.state === 'dispute' ? ' <span class="pill warn">Спір</span>' : ''}` : '—'}</td>
+          <td class="small">${esc(t.messages.at(-1).text.slice(0, 70))}${t.messages.at(-1).text.length > 70 ? '…' : ''}<small>${fmtTime(t.updatedAt)}</small></td>
+          <td>${slaText(t)}</td><td><span class="pill ${cls}">${label}</span>${t.unreadAdmin ? ' <span class="pill warn">нове</span>' : ''}</td></tr>`;
+      }).join('') : '<tr><td colspan="7" class="muted">Немає звернень у цьому списку.</td></tr>'}</tbody>
+    </table></div>`;
+}
+
+function viewTicket(id) {
+  const t = ticketsAll().find((x) => x.id === id);
+  if (!t) return `<a class="back" href="#/support">${icon('chevL', 22)}Підтримка</a><p>Звернення не знайдено.</p>`;
+  if (t.unreadAdmin) setTicket(t.id, { unreadAdmin: false });
+  const b = bookings.find((x) => x.id === t.bookingId);
+  const canDispute = b && (b.state === 'done' || isFrozen(b) || (b.state === 'paid' && bookingStart(b) <= new Date()));
+  const [label, cls] = TICKET_STATUS[t.status];
+  return `<a class="back" href="#/support">${icon('chevL', 22)}Підтримка</a>
+    <div class="title-row"><h1>Звернення №${t.no}</h1><div class="row"><span class="pill ${cls}">${label}</span>${t.priority === 'high' ? '<span class="pill bad">Терміново</span>' : ''}</div></div>
+    <p class="page-sub">${ticketFrom(t)} · ${TICKET_TOPICS[t.topic]} · створено ${fmtTime(t.createdAt)}${t.clientPhone ? ` · ${esc(t.clientPhone)}` : ''}</p>
+    <div class="grid-2">
+      <section class="panel stack" aria-labelledby="h-thread" style="gap:12px">
+        <h2 id="h-thread">Листування</h2>
+        <ol class="thread">${t.messages.map((m) => `<li class="msg ${m.from === 'admin' ? 'client' : 'biz'}"><span class="who">${m.from === 'admin' ? 'CARCAR' : m.from === 'place' ? 'Точка' : 'Клієнт'} · ${fmtTime(m.at)}</span>${esc(m.text)}</li>`).join('')}</ol>
+        <form id="admin-reply" class="stack" data-id="${t.id}" style="gap:10px">
+          <div class="quick" role="group" aria-label="Шаблони відповідей">${REPLY_TEMPLATES.map((x, i) => `<button class="chip" type="button" data-action="tpl" data-i="${i}">${esc(x.split(/[.!—]/)[0])}</button>`).join('')}</div>
+          <label class="field"><span>Відповідь</span><textarea name="text" rows="3" required maxlength="1000"></textarea></label>
+          <div class="row">
+            <label class="field" style="flex:1"><span>Після відповіді</span><select name="status">
+              <option value="waiting">Чекаємо відповіді автора</option><option value="open">Залишити в роботі</option><option value="closed">Закрити звернення</option></select></label>
+            <button class="btn primary" type="submit" style="align-self:flex-end">Надіслати</button>
+          </div>
+        </form>
+        ${t.status !== 'closed' ? `<button class="btn" data-action="ticket-close" data-id="${t.id}" style="align-self:flex-start">Закрити без відповіді</button>` : ''}
+      </section>
+      <section class="panel stack" aria-labelledby="h-linked" style="gap:10px">
+        <h2 id="h-linked">Запис і спір</h2>
+        ${b ? `<dl class="kv">
+            <dt>Точка</dt><dd><a href="#/places/${b.placeId}">${esc(placeName(b.placeId))}</a></dd>
+            <dt>Візит</dt><dd>${dayLabel(b.date, { weekday: 'short', day: 'numeric', month: 'long' })}, ${b.time} · ${esc(b.services.join(', '))}</dd>
+            <dt>Клієнт</dt><dd>${esc(b.clientName || '—')}${b.clientPhone ? ` · ${esc(b.clientPhone)}` : ''}</dd>
+            <dt>Сума</dt><dd>${uah(price(b))}${b.promo && !b.promo.returned ? ` · промокод ${esc(b.promo.code)}` : ''}</dd>
+            <dt>Стан</dt><dd>${b.state === 'dispute' ? '<span class="pill warn">Спір — гроші заморожено</span>' : esc(b.state)}${b.resolution ? ` · рішення ${fmtTime(b.resolution.at)}: точці ${uah(b.resolution.placePart)}` : ''}</dd>
+          </dl>
+          ${relatedTickets(b, t.id)}
+          ${b.state === 'dispute' ? `<p class="notice warn" style="margin:0"><b>Скарга клієнта</b>«${esc(b.disputeReason ?? '')}»</p>
+            ${b.photos?.length ? `<div class="photos">${b.photos.map((src, i) => `<img src="${esc(src)}" alt="Фото результату ${i + 1}">`).join('')}</div>` : '<p class="small muted" style="margin:0">Точка не додала фото результату.</p>'}
+            ${disputeForm(b)}`
+            : canDispute ? `<button class="btn primary" data-action="escalate" data-id="${t.id}" style="align-self:flex-start">${icon('scale', 18)}Перевести в спір і заморозити гроші</button>
+              <p class="fine">Гроші за записом заморожуються до рішення; обидві сторони побачать, що спір відкрито.</p>`
+            : '<p class="small muted" style="margin:0">Спір за цим записом зараз відкрити не можна: гроші вже передано точці або повернено.</p>'}`
+          : '<p class="muted" style="margin:0">Звернення не повʼязане із записом.</p>'}
+      </section>
+    </div>`;
+}
+
+// Рішення за спором — і відповідь у всіх повʼязаних зверненнях.
+function notifyResolution(b, text) {
+  for (const t of ticketsAll().filter((x) => x.bookingId === b.id && x.status !== 'closed')) ticketReply(t.id, 'admin', text, 'closed');
+}
+
+// ---------- антифрод ----------
+
+// Сигнали ризику за даними платформи: накрутка відгуків, масові скасування й неявки, зловживання
+// промокодами, підозрілі точки. Сигнал — не вирок: модератор перевіряє й вирішує.
+const DAY = 24 * HOUR;
+const normText = (t) => String(t ?? '').toLowerCase().replace(/[^a-zа-яіїєґ0-9]+/gi, ' ').trim();
+const clientOf = (b) => phoneKey(b.clientPhone) ?? (b.source ? `car:${b.plate || b.car}` : 'device');
+const reviewBooking = (r) => bookings.find((b) => b.id === r.bookingId);
+const reviewClient = (r) => (reviewBooking(r) ? clientOf(reviewBooking(r)) : r.clientKey ?? 'device');
+const REVIEW_LINE = (r) => `<li>${stars(r.stars)} <b>${esc(placeName(r.placeId))}</b> · ${fmtTime(r.at)}${r.text ? ` — «${esc(r.text.slice(0, 80))}»` : ''}</li>`;
+const FRAUD_KIND = { reviews: 'Відгуки', cancels: 'Скасування й промокоди', places: 'Точки' };
+
+function fraudSignals() {
+  const st = fraudState();
+  const out = [];
+  const add = (sig) => { if (!st.dismissed[sig.key]) out.push(sig); };
+  const now = Date.now();
+  const live = reviews.filter((r) => !r.hidden);
+
+  // Відгуки: сплеск за добу на одну точку.
+  for (const p of PLACES) {
+    const list = live.filter((r) => r.placeId === p.id).sort((a, b) => a.at - b.at);
+    let best = [];
+    for (let i = 0; i < list.length; i++) {
+      const win = list.filter((r) => r.at >= list[i].at && r.at < list[i].at + DAY);
+      if (win.length > best.length) best = win;
+    }
+    if (best.length >= 3) {
+      const five = best.filter((r) => r.stars >= 5).length;
+      add({ key: `burst:${p.id}:${best[0].id}`, kind: 'reviews', level: five === best.length ? 'high' : 'medium', title: `Сплеск відгуків: ${p.name}`,
+        detail: `${best.length} ${plural(best.length, 'відгук', 'відгуки', 'відгуків')} за добу, з них ${five} на 5 зірок. Звичайно — 0–1 на день.`, reviews: best });
+    }
+  }
+  // Однаковий текст у різних відгуках.
+  const byText = new Map();
+  for (const r of live) {
+    const t = normText(r.text);
+    if (t.length >= 12) byText.set(t, [...(byText.get(t) ?? []), r]);
+  }
+  for (const [, list] of byText) {
+    if (list.length >= 2) add({ key: `dup:${list[0].id}`, kind: 'reviews', level: 'high', title: 'Однаковий текст у різних відгуках', detail: `${list.length} відгуки з тим самим текстом — типова ознака накрутки.`, reviews: list });
+  }
+  // Відгук від власника чи працівника точки.
+  for (const r of live) {
+    const b = reviewBooking(r);
+    const p = PLACES.find((x) => x.id === r.placeId);
+    if (!b?.clientPhone || !p) continue;
+    const own = [phoneKey(p.phone), ...staffOf(p.id).map((x) => phoneKey(x.phone))].filter(Boolean);
+    if (own.includes(phoneKey(b.clientPhone))) {
+      add({ key: `self:${r.id}`, kind: 'reviews', level: 'high', title: `Відгук із телефону самої точки: ${p.name}`, detail: `Телефон клієнта ${esc(b.clientPhone)} збігається з телефоном точки чи її працівника.`, reviews: [r] });
+    }
+  }
+  // Один клієнт — відгуки на багато точок за 2 дні.
+  const byClient = new Map();
+  for (const r of live) byClient.set(reviewClient(r), [...(byClient.get(reviewClient(r)) ?? []), r]);
+  for (const [k, list] of byClient) {
+    const recent = list.filter((r) => now - r.at < 2 * DAY);
+    if (new Set(recent.map((r) => r.placeId)).size >= 3) {
+      add({ key: `many:${k}:${recent[0].id}`, kind: 'reviews', level: 'medium', title: 'Один клієнт оцінює багато точок поспіль', detail: `${recent.length} відгуків на ${new Set(recent.map((r) => r.placeId)).size} точки за 2 дні.`, reviews: recent });
+    }
+  }
+
+  // Масові скасування й неявки клієнта за 14 днів.
+  const since = isoDate(new Date(now - 14 * DAY));
+  const carcar = bookings.filter((b) => isCarcar(b) && b.date >= since);
+  const byCl = new Map();
+  for (const b of carcar) byCl.set(clientOf(b), [...(byCl.get(clientOf(b)) ?? []), b]);
+  for (const [k, list] of byCl) {
+    const lost = list.filter((b) => b.state === 'cancelled' || b.state === 'noshow');
+    if (lost.length >= 3) {
+      const free = lost.filter((b) => b.refundTo === 'balance' && b.state === 'cancelled').length;
+      add({ key: `cancel:${k}:${lost.length}`, kind: 'cancels', level: lost.length >= 5 ? 'high' : 'medium', client: k, title: `Масові скасування: ${esc(list.find((b) => b.clientName)?.clientName ?? (k === 'device' ? 'клієнт цього пристрою' : k.replace('tel:', '+')))}`,
+        detail: `${lost.length} скасувань і неявок за 14 днів (безкоштовних — ${free}) з ${list.length} записів. Може займати вільні вікна в точках.`,
+        lines: lost.map((b) => `<li>${esc(placeName(b.placeId))} · ${dayLabel(b.date, { day: 'numeric', month: 'short' })} ${b.time} · ${b.state === 'noshow' ? 'неявка' : 'скасовано'}</li>`) });
+    }
+  }
+  // Точка масово ставить неявки (гроші за неявку йдуть точці).
+  for (const p of PLACES) {
+    const past = carcar.filter((b) => b.placeId === p.id && ['completed', 'noshow', 'cancelled', 'refunded'].includes(b.state));
+    const ns = past.filter((b) => b.state === 'noshow');
+    if (ns.length >= 3 && ns.length / past.length >= 0.3) {
+      add({ key: `noshow:${p.id}:${ns.length}`, kind: 'cancels', level: 'high', place: p.id, title: `Багато неявок у точці: ${p.name}`,
+        detail: `${ns.length} з ${past.length} записів за 14 днів позначено «Клієнт не приїхав» (${Math.round((ns.length / past.length) * 100)}%). За неявку точка отримує оплату — перевірте, чи клієнти справді не приїздили.` });
+    }
+  }
+  // Зловживання промокодами: одне авто — різні телефони, або той самий телефон кілька разів.
+  const promoUse = bookings.filter((b) => b.promo && !b.promo.returned);
+  const byPlate = new Map();
+  for (const b of promoUse.filter((x) => x.plate)) byPlate.set(`${b.promo.code}|${b.plate}`, [...(byPlate.get(`${b.promo.code}|${b.plate}`) ?? []), b]);
+  for (const [k, list] of byPlate) {
+    const phones = new Set(list.map((b) => phoneKey(b.clientPhone) ?? 'device'));
+    if (list.length >= 2 && phones.size >= 2) {
+      const [code, plate] = k.split('|');
+      add({ key: `promo:${k}`, kind: 'cancels', level: 'medium', title: `Промокод ${code} кілька разів на одне авто`, detail: `Авто ${esc(plate)}: ${list.length} замовлень з ${code} з ${phones.size} різних телефонів — схоже на обхід «лише перше замовлення». Витрати ${uah(list.reduce((a, b) => a + b.promo.amount, 0))}.`,
+        clients: [...phones] });
+    }
+  }
+
+  // Підозрілі точки: дублікати контактів і реквізитів, «та сама адреса», демпінг, некоректний код.
+  const median = (arr) => { const a = [...arr].sort((x, y) => x - y); return a.length ? a[Math.floor(a.length / 2)] : 0; };
+  for (const p of PLACES) {
+    const pt = partnerOf(p.id);
+    if (pt.status === 'rejected') continue;
+    const why = [];
+    let score = 0;
+    // Дублікат приписуємо новій заявці, а не точці, що вже давно працює.
+    const others = PLACES.filter((x) => x.id !== p.id && (p.custom || !x.custom));
+    const dupPhone = others.find((x) => phoneKey(x.phone) === phoneKey(p.phone));
+    if (dupPhone) { why.push(`телефон збігається з «${esc(dupPhone.name)}»`); score += 2; }
+    const near = others.find((x) => Math.hypot((x.lat - p.lat) * 111, (x.lng - p.lng) * 71) < 0.06);
+    if (near) { why.push(`за ${Math.round(Math.hypot((near.lat - p.lat) * 111, (near.lng - p.lng) * 71) * 1000)} м від «${esc(near.name)}» — та сама адреса?`); score += 1; }
+    const c = pt.company;
+    if (c?.code && !codeValid(c.type, c.code)) { why.push('код юрособи з неправильною контрольною сумою'); score += 2; }
+    const sameCode = c?.code && others.find((x) => partnerOf(x.id).company?.code === c.code);
+    if (sameCode) { why.push(`той самий код юрособи, що й у «${esc(sameCode.name)}» (мережа чи підробка?)`); score += 1; }
+    const iban = pt.payout?.iban;
+    const sameIban = iban && others.find((x) => partnerOf(x.id).payout?.iban === iban);
+    if (sameIban) { why.push(`той самий IBAN для виплат, що й у «${esc(sameIban.name)}»`); score += 2; }
+    const cheap = p.services.filter((sv) => {
+      const m = median(PLACES.flatMap((x) => x.services.filter((y) => y.id === sv.id).map((y) => y.price[0])));
+      return m && sv.price[0] < m * 0.5;
+    });
+    if (cheap.length >= 2) { why.push(`ціни на ${cheap.length} ${plural(cheap.length, 'послугу', 'послуги', 'послуг')} удвічі нижчі за медіану міста`); score += 1; }
+    if (p.custom && !(pt.docs && Object.keys(pt.docs).length)) { why.push('нова точка без документів'); score += 1; }
+    if (why.length && score >= 2) {
+      add({ key: `place:${p.id}:${why.length}`, kind: 'places', level: score >= 4 ? 'high' : 'medium', place: p.id, title: `Підозріла точка: ${p.name}`,
+        detail: `${PARTNER_STATUS[pt.status][0]} · ${esc(p.address)}`, lines: why.map((w) => `<li>${w}</li>`) });
+    }
+  }
+  return out.sort((a, b) => (b.level === 'high') - (a.level === 'high'));
+}
+
+function fraudCard(sig) {
+  const ids = sig.reviews?.map((r) => r.id).join(',');
+  const pt = sig.place ? partnerOf(sig.place) : null;
+  const blocked = fraudState().blocked;
+  return `<article class="panel stack fraud-card ${sig.level}" style="gap:8px" aria-label="${esc(sig.title)}">
+    <div class="head"><b>${esc(sig.title)}</b><span class="pill ${sig.level === 'high' ? 'bad' : 'warn'}">${sig.level === 'high' ? 'Високий ризик' : 'Середній ризик'}</span></div>
+    <p class="small" style="margin:0">${sig.detail}</p>
+    ${sig.reviews ? `<ul class="fraud-lines">${sig.reviews.map(REVIEW_LINE).join('')}</ul>` : ''}
+    ${sig.lines ? `<ul class="fraud-lines">${sig.lines.join('')}</ul>` : ''}
+    <div class="row">
+      ${ids ? `<button class="btn text-danger" data-action="fraud-hide" data-ids="${ids}" data-key="${esc(sig.key)}">Приховати ${sig.reviews.length > 1 ? 'відгуки' : 'відгук'}</button>` : ''}
+      ${sig.client ? (blocked[sig.client] ? '<span class="pill muted">Запис обмежено</span>' : `<button class="btn text-danger" data-action="fraud-block" data-client="${esc(sig.client)}" data-key="${esc(sig.key)}">Обмежити онлайн-запис</button>`) : ''}
+      ${sig.clients ? `<button class="btn text-danger" data-action="fraud-block" data-client="${esc(sig.clients.join(','))}" data-key="${esc(sig.key)}">Обмежити ці профілі</button>` : ''}
+      ${sig.place && pt.status !== 'suspended' ? `<button class="btn text-danger" data-action="fraud-suspend" data-place="${sig.place}" data-key="${esc(sig.key)}">${pt.status === 'approved' ? 'Призупинити в каталозі' : 'Відхилити заявку'}</button>
+        <a class="btn" href="#/places/${sig.place}">Перевірити точку</a>` : ''}
+      <button class="btn" data-action="fraud-dismiss" data-key="${esc(sig.key)}">Не порушення</button>
+    </div>
+  </article>`;
+}
+
+function viewFraud() {
+  const all = fraudSignals();
+  const list = all.filter((x) => ui.fraud === 'all' || x.kind === ui.fraud);
+  const st = fraudState();
+  const blocked = Object.entries(st.blocked);
+  return `<h1>Антифрод</h1><p class="page-sub">Автоматичні сигнали: накрутка відгуків, масові скасування й неявки, зловживання промокодами, фальшиві точки. Рішення ухвалює модератор.</p>
+    <section class="kpis" aria-label="Ризики">
+      <div class="kpi hero"><span class="label">Відкриті сигнали</span><span class="value">${all.length}</span><span class="kpi-note">високий ризик: ${all.filter((x) => x.level === 'high').length}</span></div>
+      ${Object.entries(FRAUD_KIND).map(([k, v]) => `<div class="kpi"><span class="label">${v}</span><span class="value">${all.filter((x) => x.kind === k).length}</span></div>`).join('')}
+    </section>
+    <div class="filters"><div class="seg" role="group" aria-label="Тип сигналів">
+      <button data-action="fraud-filter" data-f="all" aria-pressed="${ui.fraud === 'all'}">Усі · ${all.length}</button>
+      ${Object.entries(FRAUD_KIND).map(([k, v]) => `<button data-action="fraud-filter" data-f="${k}" aria-pressed="${ui.fraud === k}">${v} · ${all.filter((x) => x.kind === k).length}</button>`).join('')}
+    </div>
+    <div class="row"><button class="btn" data-action="fraud-demo">Згенерувати демо-сигнали</button>
+      ${fraudDemoOn() ? '<button class="btn" data-action="fraud-demo-clear">Очистити демо</button>' : ''}</div></div>
+    <div class="stack" style="gap:12px">${list.length ? list.map(fraudCard).join('') : `<div class="empty-state">${icon('shield', 32)}<h2>Підозрілого не знайдено</h2><p>Сигнали зʼявляться, якщо, наприклад, точка отримає кілька однакових відгуків за добу.</p></div>`}</div>
+    ${blocked.length ? `<h2 class="biz-h2">Обмежені профілі</h2><ul class="special-list">${blocked.map(([k, x]) => `<li><span><b>${esc(k === 'device' ? 'Клієнт цього пристрою (демо)' : k.replace('tel:', '+'))}</b><small>${fmtTime(x.at)} · ${esc(x.reason)}</small></span>
+      <button class="btn" data-action="fraud-unblock" data-client="${esc(k)}">Зняти обмеження</button></li>`).join('')}</ul>` : ''}
+    <p class="fine">Правила: сплеск ≥3 відгуків на точку за добу, однаковий текст, телефон відгуку = телефон точки чи працівника, ≥3 скасувань чи неявок клієнта за 14 днів, ≥30% неявок у точці, промокод «перше замовлення» на те саме авто з різних телефонів, дублікати телефону, адреси, IBAN чи коду юрособи, демпінг і нова точка без документів.</p>`;
+}
+
+// Демо-сигнали: вигадані відгуки, скасування й заявка «точки-двійника», позначені demoFraud.
+const fraudDemoOn = () => reviews.some((r) => r.demoFraud) || bookings.some((b) => b.demoFraud) || PLACES.some((p) => p.demoFraud);
+function fraudDemo() {
+  fraudDemoClear(true);
+  const now = Date.now();
+  const d = isoDate(new Date());
+  const mk = (patch) => ({ id: uid(), services: ['Експрес-мийка кузова'], total: 250, paid: 250, minutes: 20, time: '12:00', car: 'Легкове', cls: 0, source: 'demo', demoFraud: true, createdAt: now - DAY, ...patch });
+  const text = 'Найкраща мийка в місті, всім раджу!!!';
+  for (let i = 0; i < 4; i++) {
+    reviews.push({ id: uid(), placeId: 'chysto', stars: 5, text: i < 3 ? text : 'Супер, дуже швидко', services: 'Експрес-мийка кузова', date: d, at: now - (4 - i) * 40 * 60000, clientKey: `tel:38067000001${i}`, demoFraud: true });
+  }
+  const self = mk({ placeId: 'keramika', clientName: 'Вигаданий клієнт', clientPhone: '+380 44 000 00 09', state: 'completed', date: addDays(d, -2), completedAt: now - 2 * DAY });
+  bookings.push(self);
+  reviews.push({ id: uid(), placeId: 'keramika', bookingId: self.id, stars: 5, text: 'Ідеально, рекомендую', services: 'Експрес-мийка кузова', date: addDays(d, -1), at: now - DAY, demoFraud: true });
+  ['blysk', 'koleso', 'motor', 'aqua24'].forEach((pid, i) => bookings.push(mk({ placeId: pid, clientName: 'Вигаданий Скасувальник', clientPhone: '+380 67 000 00 99', state: 'cancelled', refundTo: 'balance', refund: 250, placeAmount: 0, date: addDays(d, -i - 1) })));
+  for (let i = 0; i < 5; i++) bookings.push(mk({ placeId: 'avtodoktor', clientName: `Вигаданий клієнт ${i + 1}`, clientPhone: `+380 63 000 00 2${i}`, state: i < 3 ? 'noshow' : 'completed', placeAmount: 250, date: addDays(d, -i - 1) }));
+  for (let i = 0; i < 3; i++) bookings.push(mk({ placeId: 'blysk', clientPhone: `+380 93 000 00 3${i}`, plate: 'AA0000AA', promo: { code: 'PERSHA30', amount: 75 }, paid: 175, state: 'completed', date: addDays(d, -i - 1) }));
+  const twin = PLACES.find((x) => x.id === 'blysk');
+  addCustomPlace({
+    id: 'p_demo_twin', custom: true, demoFraud: true, name: 'Автомийка «Блиск Плюс» (демо)', cats: ['wash'], district: twin.district, address: 'вул. Велика Васильківська, 45а',
+    phone: twin.phone, boxes: 2, hours: [8, 22], lat: twin.lat + 0.0002, lng: twin.lng + 0.0002, tags: [], createdAt: now,
+    services: twin.services.map((x) => ({ ...x, price: x.price.map((v) => Math.round(v * 0.35)) })),
+  });
+  savePartner('p_demo_twin', { status: 'pending', demoFraud: true, company: { type: 'tov', name: 'ТОВ «Вигадана»', code: '12345678', email: 'demo@example.com', phone: twin.phone }, payout: { iban: 'UA213223130000026007233566001', holder: 'ТОВ «Вигадана»', code: '12345678' }, history: [{ at: now, by: 'partner', status: 'pending', note: 'Заявку надіслано на перевірку' }] });
+  save();
+}
+function fraudDemoClear(silent) {
+  reviews = reviews.filter((r) => !r.demoFraud);
+  bookings = bookings.filter((b) => !b.demoFraud);
+  store.set('places.custom', store.get('places.custom', []).filter((p) => !p.demoFraud));
+  const i = PLACES.findIndex((p) => p.demoFraud);
+  if (i >= 0) PLACES.splice(i, 1);
+  const parts = store.get('partners', {});
+  delete parts.p_demo_twin;
+  store.set('partners', parts);
+  save();
+  if (!silent) toast('Демо-сигнали очищено');
+}
+
+// ---------- маркетинг і вартість залучення ----------
+
+// Кампанія: канал, бюджет і промокод чи посилання ?c=ID. Нові клієнти — ті, для кого запис за кампанією
+// перший. CAC = (бюджет + знижки промокоду) / нові клієнти. LTV — дохід CARCAR з клієнта за рік:
+// середній чек × комісія × очікувана кількість замовлень на рік (налаштування нижче).
+const M_CHANNELS = ['Instagram', 'Facebook', 'Google Ads', 'TikTok', 'Telegram-канали', 'Партнери (АЗС, СТО)', 'Офлайн', 'Інше'];
+const campaigns = () => store.get('admin.campaigns', []);
+const mSettings = () => ({ ordersPerYear: 6, ...store.get('admin.settings', {}) });
+
+function campaignStats(c) {
+  const rate = store.get('admin.settings', {}).commission ?? PAYMENT.commission;
+  const real = bookings.filter((b) => isCarcar(b) && !b.source && (b.campaign === c.id || (c.code && b.promo?.code === c.code && !b.promo.returned))
+    && !(b.state === 'cancelled' && b.refundTo === 'balance'))
+    .map((b) => ({ amount: price(b), promo: b.promo && !b.promo.returned ? b.promo.amount : 0, newClient: !!b.firstOrder, done: b.state === 'completed' }));
+  const rows = [...real, ...store.get('admin.campaignDemo', []).filter((x) => x.c === c.id)];
+  const visits = events().filter((e) => e.t === 'campaign_visit' && (e.c === c.id || (!e.c && c.code && e.code === c.code))).length;
+  const orders = rows.length;
+  const newClients = rows.filter((x) => x.newClient).length;
+  const gmv = rows.reduce((a, x) => a + x.amount, 0);
+  const promo = rows.reduce((a, x) => a + x.promo, 0);
+  const cost = (c.spend || 0) + promo;
+  const avg = orders ? gmv / orders : 0;
+  const ltv = avg * rate * mSettings().ordersPerYear;
+  const cac = newClients ? cost / newClients : null;
+  const romi = cost ? ((newClients * ltv - cost) / cost) * 100 : null;
+  const payback = cac !== null && ltv ? cac / (ltv / 12) : null;
+  const verdict = cac === null ? ['Ще немає нових клієнтів', 'muted'] : cac <= ltv / 3 ? ['Окупається', 'ok'] : cac <= ltv ? ['На межі', 'warn'] : ['Збиткова', 'bad'];
+  return { visits, orders, newClients, gmv, promo, cost, avg, ltv, cac, romi, payback, verdict, revenue: gmv * rate - promo };
+}
+
+const campaignLink = (c) => `${location.origin}${location.pathname.replace(/[^/]*$/, '')}index.html?c=${encodeURIComponent(c.id)}${c.code ? `&promo=${encodeURIComponent(c.code)}` : ''}`;
+
+function viewMarketing() {
+  const list = campaigns().map((c) => ({ c, s: campaignStats(c) }));
+  const tot = list.reduce((a, { s }) => ({ cost: a.cost + s.cost, n: a.n + s.newClients, gmv: a.gmv + s.gmv, promo: a.promo + s.promo, orders: a.orders + s.orders }), { cost: 0, n: 0, gmv: 0, promo: 0, orders: 0 });
+  const cac = tot.n ? tot.cost / tot.n : null;
+  const ltv = tot.orders ? (tot.gmv / tot.orders) * (store.get('admin.settings', {}).commission ?? PAYMENT.commission) * mSettings().ordersPerYear : 0;
+  const fmtM = (v) => (v === null ? '—' : uah(Math.round(v)));
+  return `<h1>Маркетинг і CAC</h1><p class="page-sub">Кампанії CARCAR з бюджетом і промокодом: скільки коштує новий клієнт і коли він окупається.</p>
+    <section class="kpis" aria-label="Підсумки маркетингу">
+      <div class="kpi hero"><span class="label">CAC — вартість нового клієнта</span><span class="value">${fmtM(cac)}</span><span class="kpi-note">бюджет + знижки / нові клієнти</span></div>
+      <div class="kpi"><span class="label">Нові клієнти</span><span class="value">${tot.n}</span></div>
+      <div class="kpi"><span class="label">Витрати</span><span class="value">${uah(Math.round(tot.cost))}</span><span class="kpi-note">з них знижки ${uah(tot.promo)}</span></div>
+      <div class="kpi"><span class="label">LTV клієнта за рік</span><span class="value">${ltv ? uah(Math.round(ltv)) : '—'}</span><span class="kpi-note">${cac && ltv ? `LTV/CAC = ${(ltv / cac).toLocaleString('uk-UA', { maximumFractionDigits: 1 })}` : 'дохід CARCAR з клієнта'}</span></div>
+    </section>
+    <div class="filters"><span></span><div class="row"><button class="btn" data-action="mkt-demo">Згенерувати демо-кампанії</button>
+      ${campaigns().some((c) => c.demo) ? '<button class="btn" data-action="mkt-demo-clear">Очистити демо</button>' : ''}</div></div>
+    ${list.length ? `<div class="table-wrap" tabindex="0" role="region" aria-label="Кампанії"><table class="t">
+      <thead><tr><th>Кампанія</th><th class="num">Переходи</th><th class="num">Замовлення</th><th class="num">Нові клієнти</th><th class="num">Витрати</th><th class="num">CAC</th><th class="num">ROMI</th><th class="num">Окупність</th><th>Висновок</th></tr></thead>
+      <tbody>${list.map(({ c, s }) => `<tr><td><b>${esc(c.name)}</b><small>${esc(c.channel)}${c.code ? ` · ${esc(c.code)}` : ' · без промокоду'}${c.demo ? ' · демо' : ''}</small></td>
+        <td class="num">${s.visits}</td><td class="num">${s.orders}</td><td class="num">${s.newClients}</td>
+        <td class="num">${uah(Math.round(s.cost))}<small>бюджет ${uah(c.spend || 0)}</small></td><td class="num">${fmtM(s.cac)}</td>
+        <td class="num">${s.romi === null ? '—' : `${s.romi > 0 ? '+' : s.romi < 0 ? '−' : ''}${Math.abs(Math.round(s.romi))}%`}</td>
+        <td class="num">${s.payback === null ? '—' : `${s.payback.toLocaleString('uk-UA', { maximumFractionDigits: 1 })} міс`}</td>
+        <td><span class="pill ${s.verdict[1]}">${s.verdict[0]}</span></td></tr>`).join('')}</tbody>
+    </table></div>
+    <div class="grid-2" style="margin-top:16px">
+      <section class="panel" aria-labelledby="h-cac"><h2 id="h-cac">CAC за кампаніями</h2>
+        ${hbars(list.filter(({ s }) => s.cac !== null).map(({ c, s }) => ({ name: c.name, value: Math.round(s.cac) })), (v) => uah(v))}
+        <p class="fine">LTV різний для кожної кампанії, бо залежить від її середнього чека: у середньому ${ltv ? uah(Math.round(ltv)) : '— (ще немає даних)'}. Добре, коли CAC утричі менший за LTV.</p></section>
+      <section class="panel" aria-labelledby="h-funnel-c"><h2 id="h-funnel-c">Воронка кампаній</h2>
+        ${list.map(({ c, s }) => `<div class="mini-funnel"><b>${esc(c.name)}</b><span>${s.visits} переходів → ${s.orders} замовлень → ${s.newClients} нових</span>
+          <span class="track"><span class="fill" style="width:${s.visits ? Math.max(2, (s.newClients / s.visits) * 100) : 0}%"></span></span></div>`).join('')}</section>
+    </div>
+    <h2 class="biz-h2">Посилання й бюджет</h2>
+    <ul class="special-list camp-list">${list.map(({ c }) => `<li><span><b>${esc(c.name)}</b><small class="link-text">${esc(campaignLink(c))}</small></span>
+      <form class="inline-form spend-form" data-id="${c.id}"><label class="field"><span>Бюджет, ₴</span><input name="spend" type="number" min="0" value="${c.spend || 0}"></label><button class="btn" type="submit">Оновити</button></form>
+      <button class="btn" data-action="mkt-copy" data-id="${c.id}">${icon('copy', 16)}Посилання</button></li>`).join('')}</ul>`
+    : `<div class="empty-state">${icon('chart', 32)}<h2>Кампаній ще немає</h2><p>Створіть кампанію нижче або згенеруйте демо, щоб побачити розрахунок CAC.</p></div>`}
+    <div class="grid-2" style="margin-top:16px">
+      <form id="campaign-form" class="panel stack" aria-labelledby="h-new-c" style="gap:12px">
+        <h2 id="h-new-c">Нова кампанія</h2>
+        <div class="form-grid">
+          <label class="field"><span>Назва</span><input name="name" required maxlength="60" placeholder="Наприклад, Instagram: перша мийка" autocomplete="off"></label>
+          <label class="field"><span>Канал</span><select name="channel">${M_CHANNELS.map((x) => `<option>${x}</option>`).join('')}</select></label>
+          <label class="field"><span>Промокод</span><select name="code"><option value="">Без промокоду — лише посилання</option>${promosAll().filter((x) => x.active !== false).map((x) => `<option value="${esc(x.code)}">${esc(x.code)} · ${esc(x.title)}</option>`).join('')}</select></label>
+          <label class="field"><span>Бюджет, ₴</span><input name="spend" type="number" min="0" required value="0"></label>
+          <label class="field"><span>Початок</span><input name="start" type="date" value="${today()}"></label>
+          <label class="field"><span>Кінець</span><input name="end" type="date"></label>
+        </div>
+        <button class="btn primary" type="submit" style="align-self:flex-start">Створити кампанію</button>
+        <p class="fine">Після створення скопіюйте посилання для реклами: клієнт, що перейшов за ним, отримає промокод автоматично, а його записи 30 днів зараховуються кампанії. Новий промокод створіть у розділі «Промокоди».</p>
+      </form>
+      <form id="ltv-form" class="panel stack" aria-labelledby="h-ltv" style="gap:12px">
+        <h2 id="h-ltv">Припущення для LTV</h2>
+        <label class="field"><span>Замовлень одного клієнта за рік</span><input name="ordersPerYear" type="number" min="1" max="52" step="0.5" value="${mSettings().ordersPerYear}"></label>
+        <p class="fine" style="margin:0">LTV = середній чек кампанії × комісія CARCAR × замовлень на рік. Мийка — 6–12 разів на рік, шиномонтаж — 2, СТО — 2–3.</p>
+        <button class="btn" type="submit" style="align-self:flex-start">Зберегти</button>
+      </form>
+    </div>`;
+}
+
+// Демо-кампанії з вигаданими замовленнями — щоб показати розрахунок без реального трафіку.
+function marketingDemo() {
+  marketingDemoClear(true);
+  const now = Date.now();
+  const defs = [
+    ['Instagram: перша мийка', 'Instagram', 'PERSHA30', 12000, 900, 0.09, 0.85, 320],
+    ['Google Ads: шиномонтаж восени', 'Google Ads', null, 18000, 1400, 0.05, 0.7, 1050],
+    ['TikTok: детейлінг', 'TikTok', null, 60000, 2600, 0.008, 0.9, 6500],
+    ['Партнери: шиномонтаж на АЗС', 'Партнери (АЗС, СТО)', null, 2000, 300, 0.12, 0.8, 1050],
+  ];
+  const list = [];
+  const rows = [];
+  const evs = [];
+  defs.forEach(([name, channel, code, spend, visits, conv, newShare, avg], k) => {
+    const id = `demo${k + 1}`;
+    list.push({ id, name, channel, code, spend, start: isoDate(new Date(now - 30 * DAY)), end: null, demo: true, createdAt: now });
+    let seed = hash(id);
+    const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 2 ** 32; };
+    for (let i = 0; i < visits; i++) {
+      const at = now - rnd() * 30 * DAY;
+      evs.push({ t: 'campaign_visit', at, c: id, code, demo: true });
+      if (rnd() < conv) {
+        const amount = Math.round((avg * (0.7 + rnd() * 0.6)) / 10) * 10;
+        const promo = code ? Math.min(300, Math.round(amount * 0.3)) : 0;
+        rows.push({ c: id, at, amount, promo, newClient: rnd() < newShare, done: true });
+      }
+    }
+  });
+  store.set('admin.campaigns', [...campaigns(), ...list]);
+  store.set('admin.campaignDemo', rows);
+  store.set('analytics', [...events(), ...evs].sort((a, b) => a.at - b.at).slice(-5000));
+}
+function marketingDemoClear(silent) {
+  store.set('admin.campaigns', campaigns().filter((c) => !c.demo));
+  store.set('admin.campaignDemo', []);
+  store.set('analytics', events().filter((e) => !(e.demo && e.t === 'campaign_visit')));
+  if (!silent) toast('Демо-кампанії очищено');
 }
 
 // ---------- комісії й виплати ----------
@@ -2735,8 +3377,11 @@ const NAV = [
   ['places', 'Точки', 'shield'],
   ['reviews', 'Відгуки', 'star'],
   ['disputes', 'Спори', 'scale'],
+  ['support', 'Підтримка', 'chat'],
+  ['fraud', 'Антифрод', 'shield'],
   ['commission', 'Комісії й виплати', 'cash'],
   ['promos', 'Промокоди', 'gift'],
+  ['marketing', 'Маркетинг і CAC', 'chart'],
 ];
 
 function route() {
@@ -2744,7 +3389,7 @@ function route() {
   charts = {};
   const [, page = '', arg] = location.hash.replace(/^#/, '').split('/');
   const q = queues();
-  const count = { places: q.places, reviews: q.reviews, disputes: q.disputes };
+  const count = { places: q.places, reviews: q.reviews, disputes: q.disputes, support: q.support, fraud: q.fraud };
   $('#nav').innerHTML = NAV.map(([id, label, ic]) => `<a href="#/${id}" ${page === id ? 'aria-current="page"' : ''}>${icon(ic, 20)}${label}
     ${count[id] ? `<span class="count" aria-label="чекають рішення: ${count[id]}">${count[id]}</span>` : ''}</a>`).join('');
   const view = $('#view');
@@ -2755,8 +3400,13 @@ function route() {
   else if (page === 'commission') view.innerHTML = viewCommission();
   else if (page === 'stats') view.innerHTML = viewStats();
   else if (page === 'promos') view.innerHTML = viewPromos();
+  else if (page === 'support') view.innerHTML = viewSupport(arg);
+  else if (page === 'fraud') view.innerHTML = viewFraud();
+  else if (page === 'marketing') view.innerHTML = viewMarketing();
   else view.innerHTML = '<p>Сторінку не знайдено.</p>';
   mountCharts();
+  enterView(view, `${page}/${arg ?? ''}` !== ui.lastView);
+  ui.lastView = `${page}/${arg ?? ''}`;
 }
 
 function rerender() {
@@ -2788,6 +3438,53 @@ document.addEventListener('click', (e) => {
     toast(list.find((x) => x.code === id).active ? `Промокод ${id} увімкнено` : `Промокод ${id} вимкнено`);
   }
   else if (action === 'place-filter') { ui.places = el.dataset.f; rerender(); }
+  else if (action === 'support-filter') { ui.support = el.dataset.f; rerender(); }
+  else if (action === 'fraud-filter') { ui.fraud = el.dataset.f; rerender(); }
+  else if (action === 'fraud-demo') { fraudDemo(); rerender(); toast('Додано вигадані підозрілі відгуки, скасування й заявку точки-двійника'); }
+  else if (action === 'fraud-demo-clear') { fraudDemoClear(); rerender(); }
+  else if (action.startsWith('fraud-') && el.dataset.key !== undefined || action === 'fraud-unblock') {
+    const st = fraudState();
+    const key = el.dataset.key;
+    let msg = 'Сигнал позначено як «не порушення»';
+    if (action === 'fraud-hide') {
+      const ids = el.dataset.ids.split(',');
+      for (const r of reviews) if (ids.includes(r.id)) r.hidden = { reason: 'Підозра на накрутку', at: Date.now() };
+      save();
+      msg = ids.length > 1 ? `Приховано відгуків: ${ids.length}` : 'Відгук приховано';
+    } else if (action === 'fraud-block') {
+      for (const k of el.dataset.client.split(',')) st.blocked[k] = { at: Date.now(), reason: 'Антифрод: масові скасування чи зловживання промокодами' };
+      msg = 'Онлайн-запис для профілю обмежено';
+    } else if (action === 'fraud-unblock') {
+      delete st.blocked[el.dataset.client];
+      msg = 'Обмеження знято';
+    } else if (action === 'fraud-suspend') {
+      const pt = partnerOf(el.dataset.place);
+      const status = pt.status === 'approved' ? 'suspended' : 'rejected';
+      savePartner(el.dataset.place, { status, history: [...pt.history, { at: Date.now(), by: 'admin', status, note: 'Антифрод: підозра на фальшиву точку' }] });
+      msg = status === 'suspended' ? 'Точку призупинено: клієнти її не бачать' : 'Заявку точки відхилено';
+    }
+    if (key) st.dismissed[key] = Date.now();
+    saveFraud(st);
+    rerender();
+    toast(msg);
+  }
+  else if (action === 'mkt-demo') { marketingDemo(); rerender(); toast('Додано 4 демо-кампанії з вигаданими переходами й замовленнями'); }
+  else if (action === 'mkt-demo-clear') { marketingDemoClear(); rerender(); }
+  else if (action === 'mkt-copy') {
+    const url = campaignLink(campaigns().find((c) => c.id === id));
+    navigator.clipboard?.writeText(url).then(() => toast('Посилання скопійовано'), () => toast(url));
+  }
+  else if (action === 'tpl') { const ta = $('#admin-reply textarea'); ta.value = REPLY_TEMPLATES[Number(el.dataset.i)]; ta.focus(); }
+  else if (action === 'ticket-close') { setTicket(id, { status: 'closed' }); rerender(); toast('Звернення закрито'); }
+  else if (action === 'escalate') {
+    const t = ticketsAll().find((x) => x.id === id);
+    const b = bookings.find((x) => x.id === t.bookingId);
+    Object.assign(b, { state: 'dispute', disputeReason: t.messages.find((m) => m.from !== 'admin')?.text ?? 'Звернення в підтримку', ticketId: b.ticketId ?? t.id });
+    save();
+    ticketReply(t.id, 'admin', 'Ми відкрили спір за цим записом: гроші заморожено, доки модератор не ухвалить рішення.', 'open');
+    rerender();
+    toast('Спір відкрито, гроші заморожено');
+  }
   else if (action === 'review-filter') { ui.reviews = el.dataset.f; rerender(); }
   else if (action === 'review-restore') {
     delete reviews.find((r) => r.id === id).hidden;
@@ -2806,6 +3503,29 @@ document.addEventListener('submit', (e) => {
   e.preventDefault();
   const d = new FormData(f);
   if (f.id === 'moderate-form') moderate(f.dataset.id, e.submitter?.value, d.get('note').trim());
+  else if (f.id === 'campaign-form') {
+    const name = d.get('name').trim();
+    const id = name.toLowerCase().replace(/[^a-z0-9а-яіїєґ]+/gi, '-').replace(/^-|-$/g, '').slice(0, 24) || uid();
+    store.set('admin.campaigns', [...campaigns(), { id: campaigns().some((c) => c.id === id) ? `${id}-${uid().slice(0, 3)}` : id, name, channel: d.get('channel'), code: d.get('code') || null,
+      spend: Number(d.get('spend')) || 0, start: d.get('start') || today(), end: d.get('end') || null, createdAt: Date.now() }]);
+    rerender();
+    toast(`Кампанію «${name}» створено — скопіюйте посилання для реклами`);
+  }
+  else if (f.matches('.spend-form')) {
+    store.set('admin.campaigns', campaigns().map((c) => (c.id === f.dataset.id ? { ...c, spend: Number(d.get('spend')) || 0 } : c)));
+    rerender();
+    toast('Бюджет оновлено');
+  }
+  else if (f.id === 'ltv-form') {
+    store.set('admin.settings', { ...store.get('admin.settings', {}), ordersPerYear: Number(d.get('ordersPerYear')) || 6 });
+    rerender();
+    toast('Припущення збережено');
+  }
+  else if (f.id === 'admin-reply') {
+    ticketReply(f.dataset.id, 'admin', d.get('text').trim(), d.get('status'));
+    rerender();
+    toast(d.get('status') === 'closed' ? 'Відповідь надіслано, звернення закрито' : 'Відповідь надіслано');
+  }
   else if (f.id === 'promo-form') {
     const code = d.get('code').trim().toUpperCase();
     if (promosAll().some((x) => x.code === code)) { toast(`Промокод ${code} уже існує`); return; }
@@ -2847,6 +3567,7 @@ document.addEventListener('submit', (e) => {
     if (to === 'split' && !(part > 0 && part < price(b))) { toast(`Сума точці має бути від 1 до ${price(b) - 1} ₴`); return; }
     resolveDispute(b, part, d.get('note').trim());
     save();
+    notifyResolution(b, `Рішення за спором: ${to === 'client' ? 'усю суму повернено вам на баланс CARCAR' : to === 'place' ? 'оплату передано точці' : `точці ${uah(part)}, решту повернено клієнту на баланс CARCAR`}.${d.get('note').trim() ? ` ${d.get('note').trim()}` : ''}`);
     rerender();
     toast(to === 'client' ? 'Гроші повернено клієнту на баланс' : to === 'place' ? 'Гроші передано точці' : `Точці ${uah(part)}, решту повернено клієнту`);
   }

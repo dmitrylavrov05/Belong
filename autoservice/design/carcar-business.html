@@ -661,6 +661,66 @@ label.item { cursor: pointer; padding: 10px 14px; }
 .bk-chat .quick { display: flex; flex-wrap: wrap; gap: 6px; }
 .bk-chat .quick .chip { font-size: 13px; padding: 6px 10px; min-height: 34px; }
 .thread .msg.sys { justify-self: center; background: transparent; border: 1px dashed var(--line); font-size: 13px; color: var(--muted); }
+.pill-s { font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 999px; background: var(--soft); white-space: nowrap; }
+.pill-s.warn { background: var(--warn-soft); color: var(--warn); }
+.pill-s.ok { background: var(--ok-soft); color: var(--ok); }
+.pill-s.muted { color: var(--muted); }
+.ticket.unread { border-color: var(--accent); }
+.help-link { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+
+/* ---------- рух і глибина ----------
+   Анімації вмикаються лише для тих, хто не просив зменшити рух (prefers-reduced-motion). */
+:root { --ease: cubic-bezier(.2, .8, .2, 1); --shadow-1: 0 1px 2px rgba(16, 21, 28, .05), 0 3px 10px rgba(16, 21, 28, .04); --shadow-2: 0 10px 28px rgba(16, 21, 28, .12); }
+@media (prefers-color-scheme: dark) { :root { --shadow-1: 0 1px 2px rgba(0, 0, 0, .4); --shadow-2: 0 10px 28px rgba(0, 0, 0, .5); } }
+.card, .bk, .panel, .kpi { box-shadow: var(--shadow-1); }
+.tabs { background: color-mix(in srgb, var(--bg) 86%, transparent); backdrop-filter: saturate(1.6) blur(14px); -webkit-backdrop-filter: saturate(1.6) blur(14px); }
+.promo-banner { background: linear-gradient(120deg, var(--ok-soft), var(--soft)); }
+.btn, .chip, .slot, .day, .seg-mini button, .seg button, .radio-row label, .parts label { transition: transform .14s var(--ease), background-color .2s, border-color .2s, color .2s, box-shadow .2s; }
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes cc-view { from { opacity: 0; transform: translateY(10px); } }
+  @keyframes cc-rise { from { opacity: 0; transform: translateY(14px) scale(.985); } }
+  @keyframes cc-fade { from { opacity: 0; } }
+  @keyframes cc-sheet { from { transform: translateY(100%); } }
+  @keyframes cc-drawer { from { transform: translateX(40px); opacity: 0; } }
+  @keyframes cc-pop { 0% { transform: scale(.4); opacity: 0; } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
+  @keyframes cc-bounce { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-4px); } }
+  @keyframes cc-glow { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); } 100% { box-shadow: 0 0 0 14px transparent; } }
+  @keyframes cc-grow-x { from { transform: scaleX(0); } }
+  @keyframes cc-grow-y { from { transform: scaleY(0); } }
+  @keyframes cc-drop { from { transform: translateY(-14px); opacity: 0; } }
+  @keyframes cc-shimmer { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+
+  .view-enter { animation: cc-view .3s var(--ease) both; }
+  .view-enter > *, .view-enter .stack > *, .view-enter .kpis > *, .view-enter .grid-2 > * { animation: cc-rise .42s var(--ease) both; }
+  .view-enter > :nth-child(2), .view-enter .stack > :nth-child(2), .view-enter .kpis > :nth-child(2), .view-enter .grid-2 > :nth-child(2) { animation-delay: 40ms; }
+  .view-enter > :nth-child(3), .view-enter .stack > :nth-child(3), .view-enter .kpis > :nth-child(3) { animation-delay: 80ms; }
+  .view-enter > :nth-child(4), .view-enter .stack > :nth-child(4), .view-enter .kpis > :nth-child(4) { animation-delay: 120ms; }
+  .view-enter > :nth-child(5), .view-enter .stack > :nth-child(5) { animation-delay: 160ms; }
+  .view-enter > :nth-child(6), .view-enter .stack > :nth-child(6) { animation-delay: 200ms; }
+  .view-enter > :nth-child(n+7), .view-enter .stack > :nth-child(n+7) { animation-delay: 240ms; }
+
+  .btn:active:not(:disabled), .chip:active, .slot:active:not(:disabled), .day:active:not(:disabled) { transform: scale(.96); }
+  .slot[aria-pressed="true"], .day[aria-pressed="true"], .chip[aria-pressed="true"] { animation: cc-pop .3s var(--ease); }
+  .sheet { animation: cc-sheet .34s var(--ease) both; }
+  .sheet-dim, .drawer-dim { animation: cc-fade .22s both; }
+  .drawer { animation: cc-drawer .3s var(--ease) both; }
+  .tab-count:not([hidden]), .count, .tabs a[data-badge] .tab-ic::after { animation: cc-pop .4s var(--ease) both; }
+  .tabs a[aria-current="page"] .tab-ic { animation: cc-bounce .45s var(--ease); }
+  .bk.hl { animation: cc-glow 1.2s var(--ease) 2; }
+  .hbars .fill, .mini-funnel .fill, .bars .bar span, .track .fill { transform-origin: left; animation: cc-grow-x .7s var(--ease) both; }
+  svg .s1, svg .s2 { transform-box: fill-box; transform-origin: bottom; animation: cc-grow-y .6s var(--ease) both; }
+  .pin-shape { animation: cc-drop .4s var(--ease) both; }
+  .thread .msg { animation: cc-rise .3s var(--ease) both; }
+  .notice.ok .ic, .ok-text .ic { animation: cc-pop .5s var(--ease) both; }
+  .bk-chat, .estimate, .sub-form, #wait-form { animation: cc-rise .3s var(--ease) both; }
+
+  @media (hover: hover) {
+    a.card:hover, .link-card:hover, .hot-card:hover, article.card:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); }
+    a.card, .link-card, .hot-card, article.card { transition: transform .2s var(--ease), box-shadow .2s var(--ease), border-color .2s; }
+    .btn.primary:hover { box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 35%, transparent); }
+  }
+}
 </style>
   <style>
 /* Панель для бізнесу CARCAR: десктоп-перший макет поверх токенів і компонентів styles.css. */
@@ -1070,6 +1130,26 @@ table.t tr.off td { opacity: .55; }
 .chat-list li.unread { border-color: var(--accent); }
 .chat-list li > span small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .est-row .select { width: 100%; min-width: 0; height: 40px; }
+
+/* Підтримка, антифрод, маркетинг */
+.pill.bad { background: var(--danger-soft, #fdecea); color: var(--danger); }
+.ticket-list li.unread, tr.unread td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+.ticket-open { border-top: 1px solid var(--line); padding-top: 12px; }
+.quick { display: flex; flex-wrap: wrap; gap: 6px; }
+.quick .chip { font-size: 13px; padding: 6px 10px; min-height: 34px; }
+.fraud-card { border-left: 4px solid var(--warn); }
+.fraud-card.high { border-left-color: var(--danger); }
+.fraud-lines { margin: 0; padding-left: 18px; font-size: 14px; display: grid; gap: 4px; }
+.fraud-lines .stars { margin-right: 4px; }
+.mini-funnel { display: grid; gap: 4px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.mini-funnel:first-of-type { border-top: 0; }
+.mini-funnel span { color: var(--muted); }
+.mini-funnel .track { height: 8px; border-radius: 4px; background: var(--soft); overflow: hidden; }
+.mini-funnel .fill { display: block; height: 100%; background: var(--series-1); border-radius: 4px; }
+.link-text { overflow-wrap: anywhere; }
+.spend-form { align-items: flex-end; }
+.spend-form .field input { width: 110px; }
+.camp-list li { flex-wrap: wrap; } .camp-list li > span { flex-basis: 100%; }
 </style>
 </head>
 <body class="biz">
@@ -1846,6 +1926,107 @@ function ratingFor(placeId, reviews) {
   const dist = [1, 2, 3, 4, 5].map((n) => list.filter((r) => r.stars === n).length);
   const avg = list.length ? list.reduce((a, r) => a + r.stars, 0) / list.length : 0;
   return { avg, count: list.length, dist };
+}
+
+// ---------- підтримка CARCAR ----------
+
+// Звернення клієнтів і точок у підтримку. Повʼязане із записом (bookingId) звернення модератор
+// бачить поруч зі спором і може перевести в спір прямо зі звернення.
+// status: new — ще не відповіли, open — у роботі, waiting — чекаємо відповіді автора, closed — закрито.
+const TICKET_TOPICS = {
+  booking: 'Запис і перенесення', payment: 'Оплата й повернення', quality: 'Якість послуги', dispute: 'Спір щодо замовлення',
+  payout: 'Виплати й комісія', review: 'Відгуки', account: 'Акаунт і дані', fraud: 'Підозра на шахрайство', other: 'Інше',
+};
+const CLIENT_TOPICS = ['booking', 'payment', 'quality', 'dispute', 'account', 'fraud', 'other'];
+const PLACE_TOPICS = ['payout', 'booking', 'dispute', 'review', 'account', 'fraud', 'other'];
+const TICKET_STATUS = { new: ['Нове', 'warn'], open: ['У роботі', 'carcar'], waiting: ['Чекаємо відповіді', 'muted'], closed: ['Закрито', 'ok'] };
+// Термінові теми — гроші й шахрайство: відповідь за 2 години, решта — за добу.
+const URGENT = ['payment', 'dispute', 'fraud', 'payout'];
+const slaHours = (t) => (t.priority === 'high' ? 2 : 24);
+
+const ticketsAll = () => store.get('support', []);
+const saveTickets = (list) => store.set('support', list);
+
+function openTicket({ from, placeId = null, bookingId = null, topic, text, clientName = '', clientPhone = '', clientKey = null }) {
+  const list = ticketsAll();
+  const t = {
+    id: uid(), no: 1000 + list.length + 1, from, placeId, bookingId, topic, clientName, clientPhone, clientKey,
+    priority: URGENT.includes(topic) ? 'high' : 'normal', status: 'new',
+    messages: [{ from, text, at: Date.now() }], createdAt: Date.now(), updatedAt: Date.now(), unreadAdmin: true, unreadUser: false,
+  };
+  saveTickets([...list, t]);
+  return t;
+}
+
+// Повідомлення у зверненні. Відповідь CARCAR чекає реакції автора, відповідь автора повертає звернення в роботу.
+function ticketReply(id, from, text, status) {
+  const list = ticketsAll();
+  const t = list.find((x) => x.id === id);
+  if (!t) return null;
+  t.messages.push({ from, text, at: Date.now() });
+  t.updatedAt = Date.now();
+  if (from === 'admin') {
+    t.firstReplyAt ??= Date.now();
+    t.status = status ?? 'waiting';
+    t.unreadUser = true;
+    t.unreadAdmin = false;
+  } else {
+    t.status = t.status === 'new' ? 'new' : 'open';
+    t.unreadAdmin = true;
+  }
+  saveTickets(list);
+  return t;
+}
+
+function setTicket(id, patch) {
+  const list = ticketsAll();
+  const t = list.find((x) => x.id === id);
+  if (t) Object.assign(t, patch, { updatedAt: Date.now() });
+  saveTickets(list);
+  return t;
+}
+
+// Прострочено, якщо CARCAR ще не відповів у межах SLA.
+const ticketOverdue = (t, now = Date.now()) => t.status === 'new' && now - t.createdAt > slaHours(t) * HOUR;
+
+// ---------- антифрод: обмеження ----------
+
+// Клієнти, яким CARCAR обмежив онлайн-запис після перевірки (ключ — tel:… або device).
+const fraudState = () => ({ dismissed: {}, blocked: {}, ...store.get('admin.fraud', {}) });
+const saveFraud = (s) => store.set('admin.fraud', s);
+const isBlocked = (keys) => keys.some((k) => k && fraudState().blocked[k]);
+
+// ---------- рух ----------
+
+// Поява сторінки й «набігання» чисел у показниках — лише при переході на інший екран
+// і якщо людина не просила зменшити анімацію.
+const calm = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+function enterView(view, changed) {
+  if (!changed || calm()) return;
+  view.classList.remove('view-enter');
+  void view.offsetWidth; // перезапуск анімації
+  view.classList.add('view-enter');
+  clearTimeout(enterView.t);
+  enterView.t = setTimeout(() => view.classList.remove('view-enter'), 900);
+  for (const el of view.querySelectorAll('.kpi .value, .tile b, .sheet-total b')) countUp(el);
+}
+
+function countUp(el) {
+  const text = el.textContent;
+  const m = text.match(/\d[\d\s  ]*(?:,\d+)?/);
+  if (!m) return;
+  const dec = m[0].includes(',') ? m[0].split(',')[1].length : 0;
+  const to = parseFloat(m[0].replace(/[\s  ]/g, '').replace(',', '.'));
+  if (!(to > 0)) return;
+  const start = performance.now();
+  const step = (now) => {
+    if (!el.isConnected) return;
+    const k = Math.min(1, (now - start) / 650);
+    const v = to * (1 - (1 - k) ** 3);
+    el.textContent = k < 1 ? text.replace(m[0], v.toLocaleString('uk-UA', { minimumFractionDigits: dec, maximumFractionDigits: dec })) : text;
+    if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 }
 
 // Спільна логіка застосунку клієнта й панелі бізнесу для щоденної роботи точки:
@@ -3830,7 +4011,7 @@ function me() {
 }
 // Що бачить кожна роль. Власник — усе; 'assign' — право призначати майстрів.
 const ACCESS = {
-  admin: ['', 'schedule', 'queue', 'clients', 'requests', 'tires', 'services', 'deals', 'passes', 'mailings', 'reviews', 'stock', 'settings', 'import', 'assign', 'offer'],
+  admin: ['', 'schedule', 'queue', 'clients', 'requests', 'support', 'tires', 'services', 'deals', 'passes', 'mailings', 'reviews', 'stock', 'settings', 'import', 'assign', 'offer'],
   master: ['schedule', 'queue', 'tires', 'earnings'],
 };
 const can = (page) => (me().role === 'owner' ? page !== 'earnings' : ACCESS[me().role].includes(page));
@@ -4683,6 +4864,12 @@ function bookingDrawer(id) {
         <p class="fine">Клієнт підтвердить виконання в застосунку — тоді гроші заморозяться на ${PAYMENT.freezeHours} год і стануть доступні до виведення.</p>
       </form>
       ${started ? `<button class="btn text-danger" data-action="carcar-noshow" data-id="${b.id}">Клієнт не приїхав</button>` : ''}`;
+  } else if (b.state === 'dispute') {
+    const t = ticketsAll().find((x) => x.bookingId === b.id && x.from === 'place');
+    actions = `<p class="notice warn"><b>Клієнт відкрив спір</b>«${esc(b.disputeReason ?? '')}». Гроші заморожені, доки модератор CARCAR не вирішить.</p>
+      ${t ? `<a class="btn" href="#/support/${t.id}" data-action="close-drawer-nav">Ваше пояснення: звернення №${t.no}</a>` : `<form class="stack" id="dispute-note" data-id="${b.id}" style="gap:8px">
+        <label class="field"><span>Пояснення для модератора</span><textarea name="text" rows="3" required maxlength="1000" placeholder="Що було зроблено, фото, домовленості з клієнтом"></textarea></label>
+        <button class="btn" type="submit" style="align-self:flex-start">Надіслати модератору</button></form>`}`;
   } else if (b.state === 'done') {
     actions = `<p class="notice">Чекаємо підтвердження клієнта. Якщо він не відповість, замовлення підтвердиться автоматично ${fmtTime(b.doneAt + PAYMENT.autoReleaseHours * HOUR)}.</p>
       <button class="btn" data-action="remind" data-id="${b.id}">${icon('chat', 18)}Нагадати клієнту</button>
@@ -4781,6 +4968,41 @@ function bizChat(b, text) {
   bookingDrawer(b.id);
   $('#bk-chat-form input')?.focus();
   toast('Повідомлення надіслано клієнту');
+}
+
+// ---------- підтримка CARCAR ----------
+
+const placeTickets = () => ticketsAll().filter((t) => t.placeId === ui.place && t.from === 'place').sort((a, b) => b.updatedAt - a.updatedAt);
+
+function viewSupport(openId) {
+  const list = placeTickets();
+  const sel = list.find((t) => t.id === openId);
+  if (sel?.unreadUser) setTicket(sel.id, { unreadUser: false });
+  const recent = own().filter(isCarcar).sort((a, b) => bookingStart(b) - bookingStart(a)).slice(0, 20);
+  return `<h1>Підтримка CARCAR</h1><p class="page-sub">Питання про виплати, комісію, спори й відгуки. Термінові питання про гроші розглядаємо до 2 годин, решту — протягом доби.</p>
+    <div class="grid-2">
+    <section class="panel stack" aria-labelledby="h-tickets" style="gap:10px">
+      <h2 id="h-tickets">Звернення</h2>
+      ${list.length ? `<ul class="special-list ticket-list">${list.map((t) => {
+        const [label, cls] = TICKET_STATUS[t.status];
+        return `<li${t.unreadUser ? ' class="unread"' : ''}><span><b>№${t.no} · ${TICKET_TOPICS[t.topic]}</b><small>${esc(t.messages.at(-1).text)}</small></span>
+          <span class="pill ${cls}">${t.unreadUser ? 'Нова відповідь' : label}</span><a class="btn" href="#/support/${t.id}">Відкрити</a></li>`;
+      }).join('')}</ul>` : '<p class="muted" style="margin:0">Звернень ще не було.</p>'}
+      ${sel ? `<article class="ticket-open stack" aria-label="Звернення №${sel.no}" style="gap:10px">
+        <div class="head"><b>№${sel.no} · ${TICKET_TOPICS[sel.topic]}</b><span class="pill ${TICKET_STATUS[sel.status][1]}">${TICKET_STATUS[sel.status][0]}</span></div>
+        <ol class="thread">${sel.messages.map((m) => `<li class="msg ${m.from === 'place' ? 'client' : 'biz'}"><span class="who">${m.from === 'admin' ? 'Підтримка CARCAR' : 'Ви'} · ${fmtTime(m.at)}</span>${esc(m.text)}</li>`).join('')}</ol>
+        <form class="inline-form" id="ticket-reply" data-id="${sel.id}"><label class="field"><span>Відповідь підтримці</span><input name="text" required maxlength="800" autocomplete="off"></label>
+          <button class="btn primary" type="submit">Надіслати</button></form></article>` : ''}
+    </section>
+    <form id="ticket-form" class="panel stack" aria-labelledby="h-new-ticket" style="gap:12px">
+      <h2 id="h-new-ticket">Нове звернення</h2>
+      <label class="field"><span>Тема</span><select name="topic">${PLACE_TOPICS.map((k) => `<option value="${k}">${TICKET_TOPICS[k]}</option>`).join('')}</select></label>
+      <label class="field"><span>Запис (необовʼязково)</span><select name="booking"><option value="">Не стосується запису</option>
+        ${recent.map((b) => `<option value="${b.id}">${dayLabel(b.date, { day: 'numeric', month: 'short' })} ${b.time} · ${esc(clientName(b))} · ${STATUS[b.state][0]}</option>`).join('')}</select></label>
+      <label class="field"><span>Опишіть питання</span><textarea name="text" rows="4" required maxlength="1000"></textarea></label>
+      <button class="btn primary" type="submit" style="align-self:flex-start">Надіслати</button>
+    </form>
+    </div>`;
 }
 
 // Вільні початки для нового запису: бокс вільний, якщо записів, що перетинаються, менше, ніж боксів.
@@ -5091,7 +5313,7 @@ const NAV = [
   ['Продажі', [['services', 'Послуги й ціни', 'list'], ['deals', 'Гарячі вікна', 'bolt'], ['passes', 'Абонементи й сертифікати', 'gift'],
     ['mailings', 'Розсилки', 'share'], ['reviews', 'Відгуки', 'star']]],
   ['Гроші', [['finance', 'Фінанси', 'card'], ['expenses', 'Витрати', 'cash'], ['stock', 'Склад', 'drop'], ['staff', 'Персонал', 'users'], ['earnings', 'Мій заробіток', 'cash']]],
-  ['Точка', [['settings', 'Профіль точки', 'settings'], ['import', 'Імпорт даних', 'upload'], ['connect', 'Підключення', 'shield']]],
+  ['Точка', [['settings', 'Профіль точки', 'settings'], ['import', 'Імпорт даних', 'upload'], ['connect', 'Підключення', 'shield'], ['support', 'Підтримка CARCAR', 'info']]],
 ];
 
 function renderChrome(page) {
@@ -5101,6 +5323,7 @@ function renderChrome(page) {
     reviews: [unanswered, 'без відповіді'], requests: [openReq, 'чекають відповіді'], stock: [lowStock().length, 'закінчується'],
     tires: [tiresOf(ui.place).filter((t) => tireDue(t) && !t.remindedAt).length, 'пора нагадати'],
     queue: [queueOf(ui.place).filter((q) => q.status === 'waiting').length, 'у черзі'],
+    support: [placeTickets().filter((t) => t.unreadUser).length, 'нові відповіді'],
   };
   const link = ([id, label, ic]) => `<a href="#/${id}" ${page === id ? 'aria-current="page"' : ''}>${icon(ic, 20)}${label}
     ${badge[id]?.[0] ? `<span class="count" aria-label="${badge[id][1]}: ${badge[id][0]}">${badge[id][0]}</span>` : ''}
@@ -5159,6 +5382,7 @@ function route() {
   else if (page === 'offer') view.innerHTML = viewOffer();
   else if (page === 'reviews') view.innerHTML = viewReviews();
   else if (page === 'settings') view.innerHTML = viewSettings();
+  else if (page === 'support') view.innerHTML = viewSupport(arg);
   else view.innerHTML = '<p>Сторінку не знайдено.</p>';
   // Поки точку не підключено, нагадуємо про це на кожному екрані, крім самого підключення.
   const st = partnerOf(ui.place).status;
@@ -5167,6 +5391,8 @@ function route() {
       <a href="#/connect">${st === 'draft' || st === 'changes' || st === 'rejected' ? 'Завершити підключення' : 'Деталі підключення'}</a></span></p>`);
   }
   mountCharts();
+  enterView(view, `${page}/${arg ?? ''}/${ui.place}` !== ui.lastView);
+  ui.lastView = `${page}/${arg ?? ''}/${ui.place}`;
 }
 
 function rerenderKeepScroll() {
@@ -5561,6 +5787,23 @@ document.addEventListener('submit', async (e) => {
   const f = e.target;
   e.preventDefault();
   if (f.id === 'connect-form') { saveConnect(e.submitter?.value ?? 'save'); return; }
+  if (f.id === 'ticket-form' || f.id === 'ticket-reply' || f.id === 'dispute-note') {
+    const d = new FormData(f);
+    const text = d.get('text').trim();
+    if (!text) return;
+    if (f.id === 'ticket-reply') {
+      ticketReply(f.dataset.id, 'place', text);
+      rerenderKeepScroll();
+      toast('Повідомлення надіслано в підтримку');
+      return;
+    }
+    const b = bookings.find((x) => x.id === (f.id === 'dispute-note' ? f.dataset.id : d.get('booking')));
+    const t = openTicket({ from: 'place', placeId: ui.place, bookingId: b?.id ?? null, topic: f.id === 'dispute-note' ? 'dispute' : d.get('topic'), text, clientName: b ? clientName(b) : '' });
+    if (f.id === 'dispute-note') { closeDrawer(); }
+    location.hash = `#/support/${t.id}`;
+    toast(`Звернення №${t.no} надіслано в CARCAR`);
+    return;
+  }
   if (f.id === 'bk-chat-form') {
     const text = new FormData(f).get('text').trim();
     if (text) bizChat(bookings.find((x) => x.id === f.dataset.id), text);
