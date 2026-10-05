@@ -208,8 +208,13 @@ test('фінанси: замовлення через CARCAR, заморожув
   await page.getByRole('button', { name: 'Експорт CSV' }).click();
   expect((await download).suggestedFilename()).toBe('carcar-finance-koleso.csv');
 
+  await expect(page.getByRole('link', { name: 'Вказати реквізити для виплат' })).toBeVisible();
+  await page.evaluate(() => localStorage.setItem('carcar.partners', JSON.stringify({
+    koleso: { status: 'approved', payout: { iban: 'UA223052990000026001234567890', holder: 'ФОП Тест', code: '1234567899', verified: true } },
+  })));
+  await page.reload();
   page.once('dialog', (d) => d.accept());
-  await page.getByRole('button', { name: 'Вивести 837 ₴ на картку' }).click();
+  await page.getByRole('button', { name: 'Вивести 837 ₴ на рахунок UA…7890' }).click();
   await expect(page.getByRole('region', { name: 'Виплати' }).locator('tbody tr', { hasText: '837 ₴' })).toBeVisible();
 
   // У звіті про прибутки замовлення — дохід через CARCAR, комісія 7% — витрата.

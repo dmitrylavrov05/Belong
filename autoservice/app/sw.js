@@ -1,9 +1,9 @@
 // Кеш для роботи без мережі: застосунок відкривається, навіть якщо зник інтернет
 // (зокрема під час відключень світла).
-const CACHE = 'carcar-v10';
+const CACHE = 'carcar-v11';
 const FILES = [
   './', 'index.html', 'styles.css', 'app.js', 'core.js', 'data.js', 'icon.svg', 'manifest.webmanifest',
-  'business.html', 'business.css', 'business.js',
+  'business.html', 'business.css', 'business.js', 'charts.js', 'partners.js', 'admin.html', 'admin.js',
   'fonts/onest-cyrillic.woff2', 'fonts/onest-cyrillic-ext.woff2', 'fonts/onest-latin.woff2',
 ];
 

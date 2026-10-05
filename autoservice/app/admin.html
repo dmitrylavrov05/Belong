@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Адмінка CARCAR</title>
+  <meta name="description" content="Модерація точок, відгуків і спорів, комісії й зведена статистика CARCAR.">
+  <meta name="theme-color" content="#1e3a5f">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="preload" href="fonts/onest-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="business.css">
+</head>
+<body class="biz admin">
+  <div class="biz-shell">
+    <aside class="biz-side">
+      <a class="brand" href="#/" aria-label="Адмінка CARCAR, огляд"><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#1e3a5f"/><path d="M15 10.5a6 6 0 1 0 0 11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/><path d="M24 10.5a6 6 0 1 0 0 11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".6"/></svg><span><span class="c1">CAR</span><span class="c2">CAR</span><small>адмінка</small></span></a>
+      <nav class="biz-nav" id="nav" aria-label="Розділи адмінки"></nav>
+      <a class="to-app" id="to-biz" href="business.html"></a>
+    </aside>
+    <div class="biz-main">
+      <header class="biz-top">
+        <span class="admin-badge" id="admin-badge"></span>
+        <span class="spacer"></span>
+        <a class="btn" href="index.html">Застосунок клієнта</a>
+      </header>
+      <main id="view" tabindex="-1"></main>
+    </div>
+  </div>
+  <div id="drawer-root"></div>
+  <div class="tip" id="tip" hidden></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="admin.js"></script>
+</body>
+</html>

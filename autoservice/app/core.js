@@ -193,9 +193,23 @@ export async function shrinkPhoto(file) {
 
 // Точка може змінити в панелі для бізнесу телефон, години, кількість боксів і прайс.
 // Зміни зберігаються в 'biz.places' і накладаються на дані з data.js в обох застосунках.
-for (const p of PLACES) Object.assign(p, { basePhone: p.phone, baseHours: p.hours, baseBoxes: p.boxes, baseServices: p.services, baseCats: p.cats });
+const withBase = (p) => Object.assign(p, { basePhone: p.phone, baseHours: p.hours, baseBoxes: p.boxes, baseServices: p.services, baseCats: p.cats });
+PLACES.forEach(withBase);
+
+// Нові точки, зареєстровані в панелі через «Підключення». Клієнти бачать їх лише після схвалення CARCAR.
+function loadCustomPlaces() {
+  for (const p of store.get('places.custom', [])) {
+    if (!PLACES.some((x) => x.id === p.id)) PLACES.push(withBase({ ...p }));
+  }
+}
+
+export function addCustomPlace(p) {
+  store.set('places.custom', [...store.get('places.custom', []), p]);
+  applyOverrides();
+}
 
 export function applyOverrides() {
+  loadCustomPlaces();
   const all = store.get('biz.places', {});
   for (const p of PLACES) {
     const o = all[p.id] || {};
@@ -218,6 +232,61 @@ export function saveOverride(placeId, patch) {
 }
 
 applyOverrides();
+
+// ---------- підключення точок і модерація ----------
+
+// Статус точки в CARCAR. Демо-точки з data.js уже підключені; нові починають з чернетки.
+// Дані підключення (юрособа, документи, реквізити, оферта) і рішення модератора — у 'partners'.
+export const PARTNER_STATUS = {
+  draft: ['Чернетка', 'muted'], pending: ['На перевірці', 'warn'], changes: ['Потрібні виправлення', 'warn'],
+  approved: ['Підключено', 'ok'], rejected: ['Відхилено', 'muted'], suspended: ['Призупинено', 'muted'],
+};
+
+export function partnerOf(placeId) {
+  const p = PLACES.find((x) => x.id === placeId);
+  return { status: p?.custom ? 'draft' : 'approved', demo: !p?.custom, history: [], ...store.get('partners', {})[placeId] };
+}
+
+export function savePartner(placeId, patch) {
+  const all = store.get('partners', {});
+  all[placeId] = { ...partnerOf(placeId), ...patch };
+  store.set('partners', all);
+  return all[placeId];
+}
+
+// Клієнти бачать і можуть записатися лише до підключених точок.
+export const isListed = (p) => partnerOf(p.id).status === 'approved';
+
+// Виводити гроші можна лише на перевірені реквізити.
+export const payoutReady = (placeId) => !!partnerOf(placeId).payout?.verified && partnerOf(placeId).status !== 'rejected';
+export const maskIban = (iban) => `UA…${String(iban).slice(-4)}`;
+
+// Комісія CARCAR: індивідуальна для точки або загальна з адмінки, інакше — з data.js.
+export const commissionFor = (placeId) => partnerOf(placeId).commission ?? store.get('admin.settings', {}).commission ?? PAYMENT.commission;
+
+// Гроші клієнту на баланс CARCAR (повернення за спором чи скасуванням з будь-якого екрана).
+export function creditClient(amount, text) {
+  const w = { bonus: 0, money: 0, history: [], ...store.get('wallet', {}) };
+  w.money += amount;
+  w.history.unshift({ amount, text, at: Date.now(), kind: 'money' });
+  store.set('wallet', w);
+}
+
+// Рішення за спором: placePart — скільки отримує точка (0 — усе клієнту, повна ціна — усе точці).
+export function resolveDispute(b, placePart, note = '') {
+  const full = price(b);
+  const toPlace = Math.max(0, Math.min(full, Math.round(placePart)));
+  const name = PLACES.find((x) => x.id === b.placeId)?.name ?? '';
+  b.resolution = { placePart: toPlace, note, at: Date.now() };
+  if (toPlace === full) {
+    complete(b);
+    b.unfreezeAt = Date.now(); // модератор уже перевірив замовлення
+    return;
+  }
+  const refund = Math.min(b.paid, full - toPlace);
+  Object.assign(b, { state: 'refunded', refund, placeAmount: toPlace, refundTo: 'balance' });
+  if (refund) creditClient(refund, `Повернення за спором: ${name}`);
+}
 
 // ---------- персональні послуги й витрати ----------
 
@@ -278,7 +347,7 @@ export const isFrozen = (b) => b.state === 'completed' && Date.now() < (b.unfree
 export function placeShare(b) {
   if (!isCarcar(b)) return 0;
   if (b.state === 'completed') return price(b);
-  if (b.state === 'cancelled' || b.state === 'noshow') return b.placeAmount ?? 0;
+  if (b.state === 'cancelled' || b.state === 'noshow' || b.state === 'refunded') return b.placeAmount ?? 0;
   return 0;
 }
 
@@ -307,8 +376,11 @@ export function settleAll(bookings) {
 
 // ---------- рейтинг ----------
 
+// Відгуки, приховані модератором CARCAR, не впливають на рейтинг і не показуються клієнтам.
+export const visibleReviews = (reviews) => reviews.filter((r) => !r.hidden);
+
 export function ratingFor(placeId, reviews) {
-  const list = reviews.filter((r) => r.placeId === placeId);
+  const list = visibleReviews(reviews).filter((r) => r.placeId === placeId);
   const dist = [1, 2, 3, 4, 5].map((n) => list.filter((r) => r.stars === n).length);
   const avg = list.length ? list.reduce((a, r) => a + r.stars, 0) / list.length : 0;
   return { avg, count: list.length, dist };

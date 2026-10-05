@@ -1,4 +1,4 @@
-// Збирає застосунок клієнта й панель для бізнесу в окремі HTML-файли без зовнішніх залежностей:
+// Збирає застосунок клієнта, панель для бізнесу й адмінку CARCAR в окремі HTML-файли без зовнішніх залежностей:
 // стилі, шрифти, дані й логіка всередині. Такі файли зручно завантажити в Claude Design
 // або відкрити просто з диска.
 // node scripts/bundle.mjs [тека для результату, типово design]
@@ -19,8 +19,8 @@ const inlineFonts = (css) => css.replace(/url\("(fonts\/[\w-]+\.woff2)"\)/g, (m,
 
 const icon = `data:image/svg+xml,${encodeURIComponent(app('icon.svg').trim())}`;
 
-function bundle({ html, script, out }) {
-  const code = ['data.js', 'core.js', script].map((f) => stripModule(app(f)))
+function bundle({ html, script, out, modules = [] }) {
+  const code = ['data.js', 'core.js', ...modules, script].map((f) => stripModule(app(f)))
     .join('\n')
     // Service worker потрібен лише для встановленого застосунку, в одному файлі він не працює.
     .replace(/\nif \('serviceWorker' in navigator[\s\S]*?\n}\n/, '\n');
@@ -40,4 +40,5 @@ function bundle({ html, script, out }) {
 }
 
 bundle({ html: 'index.html', script: 'app.js', out: 'carcar-prototype.html' });
-bundle({ html: 'business.html', script: 'business.js', out: 'carcar-business.html' });
+bundle({ html: 'business.html', script: 'business.js', out: 'carcar-business.html', modules: ['charts.js', 'partners.js'] });
+bundle({ html: 'admin.html', script: 'admin.js', out: 'carcar-admin.html', modules: ['charts.js', 'partners.js'] });

@@ -2,7 +2,7 @@ import { CITY, CATEGORIES, CAR_CLASSES, PLACES, PAYMENT, MAINTENANCE, REFERRAL }
 import {
   store, icon, esc, uah, pad, hhmm, toMin, isoDate, parseDate, uid, placeById, plural, duration, dayLabel, rating, tel,
   hoursFor, scheduleOf, inBreak, rangeText, WEEKDAY_NAMES, weekdayOf, phoneKey, offersOf, offerAsService, isOpenNow, hoursText, bookingStart, fmtTime, fmtDate, km, serviceCat, catById, shrinkPhoto,
-  applyOverrides, ACTIVE, BLOCKING, HOUR, isCarcar, price, complete, isFrozen, placeShare, balanceFor, settleAll, ratingFor,
+  applyOverrides, isListed, payoutReady, maskIban, commissionFor, resolveDispute, visibleReviews, ACTIVE, BLOCKING, HOUR, isCarcar, price, complete, isFrozen, placeShare, balanceFor, settleAll, ratingFor,
 } from './core.js';
 
 // ---------- сховище (лише на цьому пристрої) ----------
@@ -49,6 +49,8 @@ function minPrice(place, cat, cls) {
 // ---------- рейтинг з відгуків ----------
 
 const ratingOf = (placeId) => ratingFor(placeId, reviews);
+const partnerIban = (placeId) => maskIban(store.get('partners', {})[placeId]?.payout?.iban ?? '');
+const pctText = (k) => `${(k * 100).toLocaleString('uk-UA', { maximumFractionDigits: 1 })}%`;
 
 const reviewsWord = (n) => plural(n, 'відгук', 'відгуки', 'відгуків');
 
@@ -272,6 +274,7 @@ function seasonBanner() {
 function filteredPlaces() {
   const q = ui.q.trim().toLowerCase();
   const list = PLACES.filter((p) => {
+    if (!isListed(p)) return false;
     if (ui.cat !== 'all' && !p.cats.includes(ui.cat)) return false;
     if (ui.openNow && !isOpenNow(p)) return false;
     if (ui.favOnly && !favs.has(p.id)) return false;
@@ -404,7 +407,7 @@ function viewPlace(id) {
   const open = isOpenNow(p);
   const maps = `${CITY.mapsSearch}${encodeURIComponent(`${CITY.name}, ${p.address}`)}`;
   const groups = CATEGORIES.map((c) => [c, p.services.filter((s) => serviceCat(s) === c.id)]).filter(([, s]) => s.length);
-  const list = reviews.filter((r) => r.placeId === p.id).sort((a, b) => b.at - a.at);
+  const list = visibleReviews(reviews).filter((r) => r.placeId === p.id).sort((a, b) => b.at - a.at);
   const cats = p.cats.map(catById);
   return `<div class="topbar">${back('#/', 'Усі місця')}${favButton(p, false)}</div>
     <h1>${esc(p.name)}</h1>
@@ -449,7 +452,8 @@ function viewPlace(id) {
     <p class="small muted">Залишити відгук можна лише після завершеного замовлення через CARCAR, тому кожен відгук — від реального клієнта.</p>
     <div class="stack">${list.map(reviewItem).join('')}</div>
     <div class="dock-space"></div>
-    <div class="dock"><a class="btn primary block" href="#/book/${p.id}">Записатися онлайн</a></div>`;
+    <div class="dock">${isListed(p) ? `<a class="btn primary block" href="#/book/${p.id}">Записатися онлайн</a>`
+      : '<p class="notice" style="margin:0">Точка зараз не приймає онлайн-записи в CARCAR.</p>'}</div>`;
 }
 
 // ---------- запити до точки ----------
@@ -515,6 +519,7 @@ function draftClass() {
 function viewBook(id) {
   const p = placeById(id);
   if (!p) return viewNotFound();
+  if (!isListed(p)) return `${back(`#/place/${p.id}`, esc(p.name))}<h1>Запис недоступний</h1><p class="muted">Точка зараз не приймає онлайн-записи в CARCAR.</p>`;
   if (!draft || draft.placeId !== id) {
     draft = { placeId: id, services: new Set(), date: firstOpenDay(p), time: null, carId: cars[0]?.id ?? null };
   }
@@ -828,7 +833,8 @@ function viewPartner() {
   const active = own.filter((b) => ACTIVE.includes(b.state));
   const rest = own.filter((b) => !ACTIVE.includes(b.state)).reverse();
   const bal = balanceOf(p.id);
-  const fee = Math.round(bal.available * PAYMENT.commission);
+  const fee = Math.round(bal.available * commissionFor(p.id));
+  const ready = payoutReady(p.id);
   const history = payouts.filter((x) => x.placeId === p.id).reverse();
   const disputes = bookings.filter((b) => b.state === 'dispute').length;
   return `<h1>Кабінет точки</h1>
@@ -842,11 +848,12 @@ function viewPartner() {
         <div class="tile ok"><span>Доступно до виведення</span><b>${uah(bal.available)}</b></div>
         <div class="tile"><span>Заморожено</span><b>${uah(bal.frozen)}</b></div>
       </div>
-      <button class="btn primary block" data-action="payout" ${bal.available > 0 ? '' : 'disabled'}>
-        ${icon('card', 20)}${bal.available > 0 ? `Вивести ${uah(bal.available - fee)} на картку` : 'Немає коштів для виведення'}
-      </button>
+      ${ready ? `<button class="btn primary block" data-action="payout" ${bal.available > 0 ? '' : 'disabled'}>
+        ${icon('card', 20)}${bal.available > 0 ? `Вивести ${uah(bal.available - fee)} на рахунок ${partnerIban(p.id)}` : 'Немає коштів для виведення'}
+      </button>` : `<a class="btn block" href="business.html#/connect">${icon('card', 20)}Вказати реквізити для виплат</a>
+      <p class="fine">Виплати йдуть на рахунок ФОП чи ТОВ. Після перевірки реквізитів CARCAR виведення стане доступним.</p>`}
       <p class="fine">Гроші за замовлення заморожені, доки клієнт не підтвердить виконання, і ще ${PAYMENT.freezeHours} год після цього.${bal.next ? ` Найближче розморожування: ${uah(price(bal.next))} — ${fmtTime(bal.next.unfreezeAt)}.` : ''}
-        Комісія сервісу ${Math.round(PAYMENT.commission * 100)}% утримується лише під час виведення${bal.available > 0 ? `: ${uah(fee)}` : ''}. Для клієнтів комісії немає.</p>
+        Комісія сервісу ${pctText(commissionFor(p.id))} утримується лише під час виведення${bal.available > 0 ? `: ${uah(fee)}` : ''}. Для клієнтів комісії немає.</p>
     </section>
     <a class="card link-card" href="business.html#/requests" style="margin-top:12px">${icon('chat', 22)}<span>Запити клієнтів
       <small class="small muted" style="display:block;font-weight:400">Клієнти пишуть, якщо не знайшли потрібну послугу</small></span>
@@ -858,7 +865,8 @@ function viewPartner() {
     ${history.length ? `<h2>Виплати</h2><div class="card">${history.map((x) => `<div class="head small">
         <span>${fmtTime(x.at)}</span><span>${uah(x.net)} <span class="muted">(комісія ${uah(x.fee)})</span></span></div>`).join('')}</div>` : ''}
     <h2>Для модератора</h2>
-    <a class="card link-card" href="#/disputes">${icon('scale', 22)}<span>Модерація спорів</span>
+    <a class="card link-card" href="admin.html">${icon('shield', 22)}<span>Адмінка CARCAR<small class="small muted" style="display:block;font-weight:400">Підключення точок, відгуки, спори, комісії й статистика</small></span>${icon('chevR', 18)}</a>
+    <a class="card link-card" href="#/disputes" style="margin-top:8px">${icon('scale', 22)}<span>Модерація спорів</span>
       ${disputes ? `<span class="count">${disputes}</span>` : ''}${icon('chevR', 18)}</a>
     <p class="note">Демо: записи, баланс і виплати зберігаються на цьому пристрої, тож клієнта й точку можна перевірити на одному телефоні.</p>`;
 }
@@ -1147,15 +1155,13 @@ const bookingActions = {
     location.hash = '#/partner';
   },
   'resolve-client'(b) {
-    Object.assign(b, { state: 'refunded', refund: b.paid, placeAmount: 0, refundTo: 'balance' });
-    addMoney(b.paid, `Повернення за спором: ${placeById(b.placeId)?.name ?? ''}`);
+    resolveDispute(b, 0);
+    wallet = { ...wallet, ...store.get('wallet', {}) };
     returnBonus(b, 'повернення за спором');
     toast('Гроші повернено клієнту');
   },
   'resolve-place'(b) {
-    // Модератор уже перевірив замовлення, тож гроші доступні точці одразу.
-    complete(b);
-    b.unfreezeAt = Date.now();
+    resolveDispute(b, price(b));
     toast('Гроші передано точці');
   },
 };
@@ -1258,12 +1264,13 @@ document.addEventListener('click', (e) => {
     toast(`Вам нараховано ${uah(REFERRAL.bonus)}`);
   } else if (action === 'payout') {
     const { available } = balanceOf(ui.partner);
-    const fee = Math.round(available * PAYMENT.commission);
-    if (!confirm(`Вивести ${uah(available)}? Комісія ${uah(fee)}, на картку надійде ${uah(available - fee)}.`)) return;
-    payouts.push({ id: uid(), placeId: ui.partner, gross: available, fee, net: available - fee, at: Date.now() });
+    const fee = Math.round(available * commissionFor(ui.partner));
+    const iban = partnerIban(ui.partner);
+    if (!confirm(`Вивести ${uah(available)}? Комісія ${uah(fee)}, на рахунок ${iban} надійде ${uah(available - fee)}.`)) return;
+    payouts.push({ id: uid(), placeId: ui.partner, gross: available, fee, net: available - fee, at: Date.now(), iban });
     save();
     route();
-    toast('Виплату відправлено на картку');
+    toast(`Виплату відправлено на рахунок ${iban}`);
   } else if (action === 'money-out') {
     if (!confirm(`Вивести ${uah(wallet.money)} на картку? Гроші надійдуть протягом 1–3 банківських днів.`)) return;
     addMoney(-wallet.money, 'Виведено на картку');
@@ -1422,6 +1429,7 @@ window.addEventListener('storage', (e) => {
   payouts = store.get('payouts', []);
   reviews = store.get('reviews', []);
   requests = store.get('requests', []);
+  wallet = { bonus: 0, money: 0, history: [], ...store.get('wallet', {}) };
   applyOverrides();
   if (!draft?.paying) route();
 });

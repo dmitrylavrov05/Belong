@@ -152,9 +152,16 @@ test('клієнт підтверджує кнопкою, гроші замор�
   await expect(balance).toContainText('Доступно до виведення900 ₴');
   await expect(balance).toContainText('Заморожено0 ₴');
 
-  // 7% від 900 ₴ = 63 ₴, на картку 837 ₴.
+  // Без перевірених реквізитів вивести не можна.
+  await expect(page.getByRole('link', { name: 'Вказати реквізити для виплат' })).toBeVisible();
+  await page.evaluate(() => localStorage.setItem('carcar.partners', JSON.stringify({
+    koleso: { status: 'approved', payout: { iban: 'UA223052990000026001234567890', holder: 'ФОП Тест', code: '1234567899', verified: true } },
+  })));
+  await page.reload();
+
+  // 7% від 900 ₴ = 63 ₴, на рахунок 837 ₴.
   page.once('dialog', (d) => { expect(d.message()).toContain('Комісія 63 ₴'); d.accept(); });
-  await page.getByRole('button', { name: 'Вивести 837 ₴ на картку' }).click();
+  await page.getByRole('button', { name: 'Вивести 837 ₴ на рахунок UA…7890' }).click();
   await expect(page.getByRole('heading', { name: 'Виплати' })).toBeVisible();
   await expect(page.getByText('837 ₴ (комісія 63 ₴)')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Немає коштів для виведення' })).toBeDisabled();
@@ -546,7 +553,7 @@ test('файли для дизайну в design/ зібрано з поточн
   test.skip(test.info().project.name !== 'desktop', 'достатньо однієї перевірки');
   const dir = mkdtempSync(join(tmpdir(), 'carcar-'));
   execFileSync('node', ['scripts/bundle.mjs', dir]);
-  for (const f of ['carcar-prototype.html', 'carcar-business.html']) {
+  for (const f of ['carcar-prototype.html', 'carcar-business.html', 'carcar-admin.html']) {
     expect(readFileSync(`design/${f}`, 'utf8') === readFileSync(join(dir, f), 'utf8'), `${f}: запустіть npm run bundle`).toBe(true);
   }
 });
