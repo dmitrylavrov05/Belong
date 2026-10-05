@@ -16,7 +16,10 @@ let payouts = store.get('payouts', []);
 // Відгуки клієнтів: лише по завершених замовленнях, один на замовлення.
 let reviews = store.get('reviews', []);
 // «Приведи друга»: бонусний рахунок, власний код і хто запросив цього користувача.
-let wallet = store.get('wallet', { bonus: 0, history: [] });
+// money — баланс CARCAR: повернення за скасовані записи, ним можна оплатити наступне замовлення.
+let wallet = { bonus: 0, money: 0, history: [], ...store.get('wallet', {}) };
+// Запити до точок: «не знайшов послугу» — листування з точкою.
+let requests = store.get('requests', []);
 let referral = store.get('referral', null) ?? { code: newRefCode(), friends: [] };
 store.set('referral', referral);
 
@@ -173,6 +176,23 @@ function addBonus(amount, text) {
   saveReferral();
 }
 
+function addMoney(amount, text) {
+  wallet.money += amount;
+  wallet.history.unshift({ amount, text, at: Date.now(), kind: 'money' });
+  saveReferral();
+}
+
+const cancelWindow = () => duration(Math.round(PAYMENT.freeCancelHours * 60));
+
+// Баланс CARCAR: повернення за скасовані записи. Списується під час оплати, можна вивести на картку.
+const moneyCard = () => (wallet.money > 0 || wallet.history.some((h) => h.kind === 'money') ? `<section class="card balance-card" aria-label="Баланс CARCAR">
+    <div class="head"><span>Баланс CARCAR</span><b class="bonus-sum">${uah(wallet.money)}</b></div>
+    <p class="fine">Сюди повертаються гроші за вчасно скасовані записи. Баланс списується автоматично під час наступної оплати, або його можна вивести на картку.</p>
+    ${wallet.money > 0 ? `<button class="btn" data-action="money-out">${icon('card', 18)}Вивести ${uah(wallet.money)} на картку</button>` : ''}
+    <ul class="ledger">${wallet.history.filter((h) => h.kind === 'money').slice(0, 5).map((h) => `<li><span>${esc(h.text)}<small>${fmtTime(h.at)}</small></span>
+      <b class="${h.amount > 0 ? 'plus' : ''}">${h.amount > 0 ? '+' : '−'}${uah(Math.abs(h.amount))}</b></li>`).join('')}</ul>
+  </section>` : '');
+
 const inviteLink = () => `${location.origin}${location.pathname}?ref=${referral.code}`;
 
 // Скільки бонусу можна списати із замовлення на суму total.
@@ -223,7 +243,7 @@ function viewInvite() {
     <section class="card" aria-label="Бонусний рахунок">
       <div class="head"><span>Доступно</span><b class="bonus-sum">${uah(wallet.bonus)}</b></div>
       <p class="fine">Бонус списується автоматично під час оплати: до ${uah(REFERRAL.bonus)} з одного замовлення від ${uah(REFERRAL.minOrder)}. Точка отримує повну ціну. Вивести бонус на картку не можна.</p>
-      ${wallet.history.length ? `<ul class="ledger">${wallet.history.map((h) => `<li><span>${esc(h.text)}<small>${fmtTime(h.at)}</small></span>
+      ${wallet.history.some((h) => h.kind !== 'money') ? `<ul class="ledger">${wallet.history.filter((h) => h.kind !== 'money').map((h) => `<li><span>${esc(h.text)}<small>${fmtTime(h.at)}</small></span>
         <b class="${h.amount > 0 ? 'plus' : ''}">${h.amount > 0 ? '+' : '−'}${uah(Math.abs(h.amount))}</b></li>`).join('')}</ul>` : ''}
     </section>
     <h2>Запрошені друзі</h2>
@@ -421,6 +441,7 @@ function viewPlace(id) {
           <span class="price">${uah(s.price[ui.cls])}</span>
         </div>`).join('')}
       </div>`).join('')}
+    ${askBlock(p)}
     <h2 class="big" id="hours">Графік роботи</h2>
     ${scheduleBlock(p)}
     <h2 class="big" id="reviews">Рейтинг і відгуки</h2>
@@ -429,6 +450,59 @@ function viewPlace(id) {
     <div class="stack">${list.map(reviewItem).join('')}</div>
     <div class="dock-space"></div>
     <div class="dock"><a class="btn primary block" href="#/book/${p.id}">Записатися онлайн</a></div>`;
+}
+
+// ---------- запити до точки ----------
+
+// Клієнт не знайшов послугу — пише точці. Точка відповідає в панелі й може додати послугу
+// до прайсу або зробити її персональною для цього клієнта (за телефоном).
+const saveRequests = () => store.set('requests', requests);
+const requestsOf = (placeId) => requests.filter((r) => r.placeId === placeId).sort((a, b) => b.at - a.at);
+const reqStatus = (r) => (r.closed ? ['', 'Запит закрито'] : r.service ? ['go', 'Послугу додано']
+  : r.messages.at(-1).from === 'biz' ? ['go', 'Точка відповіла'] : ['', 'Чекає відповіді точки']);
+
+const thread = (r) => `<ol class="thread">${r.messages.map((m) => `<li class="msg ${m.from}"><span class="who">${m.from === 'biz' ? 'Точка' : 'Ви'} · ${fmtTime(m.at)}</span>${esc(m.text)}</li>`).join('')}</ol>`;
+
+function askBlock(p) {
+  const list = requestsOf(p.id);
+  return `<section class="ask" id="ask" aria-labelledby="h-ask">
+    <h2 class="big" id="h-ask">Не знайшли потрібну послугу?</h2>
+    <p class="small muted" style="margin:-6px 0 0">Напишіть точці, що потрібно зробити. Вона може додати послугу до прайсу або підготувати персональну ціну для вас — відповідь зʼявиться тут.</p>
+    ${list.map((r) => {
+      const [cls, label] = reqStatus(r);
+      return `<article class="card req">
+        <div class="head"><span class="bk-status ${cls}">${label}</span>${r.unreadClient ? '<span class="badge personal">Нове</span>' : ''}</div>
+        ${thread(r)}
+        ${r.service ? `<div class="notice ok">${icon('checkCircle', 22)}<div><b>${esc(r.service.name)} — ${uah(r.service.price)}</b>${r.service.personal ? 'Персональна послуга для вас — вона вже є в записі.' : 'Послугу додано до прайсу точки.'}</div></div>
+          <a class="btn primary" href="#/book/${p.id}">Записатися</a>` : ''}
+        ${r.closed ? '' : `<form class="req-reply inline-form" data-id="${r.id}"><label class="field"><span>Відповісти точці</span><input name="text" required maxlength="500" autocomplete="off"></label>
+          <button class="btn" type="submit">Надіслати</button></form>`}
+      </article>`;
+    }).join('')}
+    <form id="askform" class="card stack" data-place="${p.id}">
+      <label class="field"><span>Що потрібно зробити?</span><textarea name="text" rows="3" required maxlength="600" placeholder="Наприклад, зняти захист картера або помити дах автобудинку"></textarea></label>
+      <div class="grid2 pf">
+        <label class="field"><span>Ваше імʼя</span><input name="name" required autocomplete="name" value="${esc(profile.name)}"></label>
+        <label class="field"><span>Ваш телефон</span><input name="phone" type="tel" required autocomplete="tel" placeholder="+380" value="${esc(profile.phone)}"></label>
+      </div>
+      <button class="btn primary block" type="submit">${icon('chat', 18)}Надіслати точці</button>
+      <p class="fine">Точка побачить запит, імʼя й телефон у своїй панелі. Персональну ціну ви побачите за цим телефоном.</p>
+    </form>
+  </section>`;
+}
+
+// Запити на сторінці «Мої записи»: де відповіли й куди повернутися.
+function requestsCard() {
+  if (!requests.length) return '';
+  const list = [...requests].sort((a, b) => (b.messages.at(-1).at) - (a.messages.at(-1).at)).slice(0, 5);
+  return `<h2>Запити до точок</h2>
+    <div class="stack" style="gap:8px">${list.map((r) => {
+      const p = placeById(r.placeId);
+      const [cls, label] = reqStatus(r);
+      return `<a class="card link-card" href="#/place/${r.placeId}/ask">${icon('chat', 22)}<span>${esc(p?.name ?? 'Точка')}
+        <small class="small muted" style="display:block;font-weight:400"><span class="bk-status ${cls}" style="display:inline">${label}</span> · ${esc(r.messages.at(-1).text.length > 60 ? `${r.messages.at(-1).text.slice(0, 60).trimEnd()}…` : r.messages.at(-1).text)}</small></span>
+        ${r.unreadClient ? '<span class="count" aria-label="нова відповідь">1</span>' : ''}${icon('chevR', 18)}</a>`;
+    }).join('')}</div>`;
 }
 
 // ---------- запис і оплата ----------
@@ -457,6 +531,7 @@ function renderBook() {
   const minutes = chosen.reduce((a, s) => a + s.min, 0);
   const total = chosen.reduce((a, s) => a + s.price[cls], 0);
   const bonus = draft.useBonus !== false ? bonusFor(total) : 0;
+  const fromBal = draft.useMoney !== false ? Math.min(wallet.money, total - bonus) : 0;
   const slots = minutes ? slotsFor(p, draft.date, minutes) : [];
   if (draft.time && !slots.some((s) => s.time === draft.time && !s.busy)) draft.time = null;
   const free = slots.filter((s) => !s.busy);
@@ -480,6 +555,7 @@ function renderBook() {
         <span class="price">${uah(s.price[cls])}</span>
       </label>`).join('')}
     </div>
+    <p class="small" style="margin:10px 0 0"><a href="#/place/${p.id}/ask">Не знайшли потрібну послугу? Напишіть точці</a></p>
 
     <h2>3. День і час</h2>
     <div class="days" role="group" aria-label="День">
@@ -504,18 +580,20 @@ function renderBook() {
     ${draft.paying ? `<div class="sheet-dim" data-action="unpay"></div>
     <div class="sheet summary" role="dialog" aria-modal="true" aria-label="Оплата">
       <div class="handle"></div>
-      <div class="sheet-total"><span>До сплати</span><b>${uah(total - bonus)}</b></div>
+      <div class="sheet-total"><span>До сплати${fromBal ? ' карткою' : ''}</span><b>${uah(total - bonus - fromBal)}</b></div>
       ${wallet.bonus ? (bonusFor(total)
         ? `<label class="bonus-line"><input class="check" type="checkbox" id="usebonus" ${draft.useBonus !== false ? 'checked' : ''}>
             <span>Бонус «Приведи друга»<small>Вартість ${uah(total)}, точка отримає повну суму</small></span><b>−${uah(bonusFor(total))}</b></label>`
         : `<p class="small muted" style="margin:0">Бонус ${uah(wallet.bonus)} діє для замовлень від ${uah(REFERRAL.minOrder)}.</p>`) : ''}
+      ${wallet.money > 0 ? `<label class="bonus-line"><input class="check" type="checkbox" id="usemoney" ${draft.useMoney !== false ? 'checked' : ''}>
+            <span>Баланс CARCAR<small>Доступно ${uah(wallet.money)}</small></span><b>−${uah(Math.min(wallet.money, total - bonus))}</b></label>` : ''}
       <ul class="perks">
         <li><span class="perk-ic ok">${icon('shield', 20)}</span>Гроші утримуються, доки роботу не виконано</li>
         <li><span class="perk-ic">${icon('cash', 20)}</span>Комісія для клієнта — 0 ₴</li>
-        <li><span class="perk-ic">${icon('undo', 20)}</span>Безкоштовне скасування за ${PAYMENT.freeCancelHours} год до візиту</li>
+        <li><span class="perk-ic">${icon('undo', 20)}</span>Скасування до ${cancelWindow()} до візиту — уся сума повертається на баланс CARCAR</li>
       </ul>
       <div class="stack" style="gap:8px">
-        <button class="btn primary block" data-action="pay">${icon('card', 20)}Оплатити ${uah(total - bonus)}</button>
+        <button class="btn primary block" data-action="pay">${icon('card', 20)}${total - bonus - fromBal > 0 ? `Оплатити ${uah(total - bonus - fromBal)}` : 'Оплатити з балансу'}</button>
         <button class="btn block" data-action="unpay">Назад</button>
       </div>
       <div class="grid2 pf">
@@ -541,12 +619,14 @@ function confirmBooking() {
   store.set('profile', profile);
   const total = chosen.reduce((a, s) => a + s.price[cls], 0);
   const bonus = draft.useBonus !== false ? bonusFor(total) : 0;
+  const fromBal = draft.useMoney !== false ? Math.min(wallet.money, total - bonus) : 0;
   const b = {
     id: uid(),
     placeId: p.id,
     services: chosen.map((s) => s.name),
     total,
     paid: total - bonus,
+    fromBalance: fromBal,
     bonus,
     minutes: chosen.reduce((a, s) => a + s.min, 0),
     date: draft.date,
@@ -564,6 +644,7 @@ function confirmBooking() {
   bookings.push(b);
   save();
   if (bonus) addBonus(-bonus, `Списано на замовлення: ${p.name}`);
+  if (fromBal) addMoney(-fromBal, `Оплата замовлення: ${p.name}`);
   draft = null;
   location.hash = `#/bookings/${b.id}`;
   toast('Оплачено, ви записані');
@@ -581,10 +662,11 @@ function settle() {
 
 const balanceOf = (placeId) => balanceFor(placeId, bookings, payouts);
 
+// До дедлайну — повне повернення на баланс CARCAR; пізніше оплата зараховується точці за послугу.
 function cancelTerms(b) {
-  const free = bookingStart(b) - Date.now() >= PAYMENT.freeCancelHours * HOUR;
-  const placeAmount = free ? 0 : Math.round(b.paid * PAYMENT.lateCancelShare);
-  return { free, placeAmount, refund: b.paid - placeAmount };
+  const deadline = bookingStart(b).getTime() - PAYMENT.freeCancelHours * HOUR;
+  const free = Date.now() <= deadline;
+  return { free, deadline, placeAmount: free ? 0 : price(b), refund: free ? b.paid : 0 };
 }
 
 function steps(b) {
@@ -673,11 +755,11 @@ function bookingCard(b, highlight) {
       <div class="grid2">
         <button class="btn" data-action="ics" data-id="${b.id}">${icon('calendar', 18)}У календар</button>
         ${p ? `<a class="btn" href="${tel(p)}">${icon('phone', 18)}Зателефонувати</a>` : ''}
-        <button class="btn text-danger full" data-action="cancel" data-id="${b.id}">Скасувати</button>
+        <button class="btn text-danger full" data-action="cancel" data-id="${b.id}">${t.free ? 'Скасувати' : 'Скасувати без повернення'}</button>
       </div>
       <p class="terms">${t.free
-        ? `Безкоштовне скасування до ${fmtTime(bookingStart(b) - PAYMENT.freeCancelHours * HOUR)}.`
-        : `Пізнє скасування: повернемо ${uah(t.refund)}, ${uah(t.placeAmount)} отримає точка.`}</p>`}`;
+        ? `Безкоштовне скасування до ${fmtTime(t.deadline)} — усю суму ${uah(b.paid)} повернемо на баланс CARCAR. Пізніше оплата зараховується точці за послугу.`
+        : `Скасувати з поверненням можна було до ${fmtTime(t.deadline)}. Тепер оплата зараховується точці за послугу, навіть якщо ви не приїдете.`}</p>`}`;
   } else if (b.state === 'done') {
     body = `<div class="lines tight">
         <div class="il strong">${when}</div>
@@ -698,7 +780,9 @@ function bookingCard(b, highlight) {
     }
     body += reviewBlock(b);
   } else {
-    body += `<p class="small muted" style="margin:0">Повернено ${uah(b.refund ?? b.paid)} на картку${b.bonusReturned ? ` і ${uah(b.bonus)} на бонусний рахунок` : ''}${b.placeAmount ? `, ${uah(b.placeAmount)} отримала точка` : ''}.</p>`;
+    body += b.refund || b.state === 'refunded' || !b.placeAmount
+      ? `<p class="small muted" style="margin:0">Повернено ${uah(b.refund ?? b.paid)} ${b.refundTo === 'balance' ? 'на баланс CARCAR' : 'на картку'}${b.bonusReturned ? ` і ${uah(b.bonus)} на бонусний рахунок` : ''}${b.placeAmount ? `, ${uah(b.placeAmount)} отримала точка` : ''}.</p>`
+      : `<p class="small muted" style="margin:0">${b.state === 'noshow' ? 'Ви не приїхали' : `Запис скасовано пізніше ніж за ${cancelWindow()}`} — оплату ${uah(b.placeAmount)} зараховано точці за послугу.</p>`;
   }
   return `<article class="bk${highlight ? ' hl' : ''}" id="b-${b.id}">
     ${cardHead(b, esc(p?.name ?? 'Сервіс'))}
@@ -714,9 +798,11 @@ function viewBookings(highlightId) {
   const active = sorted.filter((b) => ACTIVE.includes(b.state));
   const rest = sorted.filter((b) => !ACTIVE.includes(b.state)).reverse();
   if (!list.length) {
-    return `<h1>Мої записи</h1>${empty('calendar', 'Записів поки немає.', '<a class="btn primary" href="#/">Знайти мийку або сервіс</a>')}${inviteCard()}`;
+    return `<h1>Мої записи</h1>${empty('calendar', 'Записів поки немає.', '<a class="btn primary" href="#/">Знайти мийку або сервіс</a>')}${moneyCard()}${requestsCard()}${inviteCard()}`;
   }
   return `<h1>Мої записи</h1>
+    ${moneyCard()}
+    ${requestsCard()}
     ${inviteCard()}
     <h2>Активні</h2>
     <div class="stack">${active.length ? active.map((b) => bookingCard(b, b.id === highlightId)).join('') : '<p class="muted">Немає активних записів.</p>'}</div>
@@ -762,6 +848,9 @@ function viewPartner() {
       <p class="fine">Гроші за замовлення заморожені, доки клієнт не підтвердить виконання, і ще ${PAYMENT.freezeHours} год після цього.${bal.next ? ` Найближче розморожування: ${uah(price(bal.next))} — ${fmtTime(bal.next.unfreezeAt)}.` : ''}
         Комісія сервісу ${Math.round(PAYMENT.commission * 100)}% утримується лише під час виведення${bal.available > 0 ? `: ${uah(fee)}` : ''}. Для клієнтів комісії немає.</p>
     </section>
+    <a class="card link-card" href="business.html#/requests" style="margin-top:12px">${icon('chat', 22)}<span>Запити клієнтів
+      <small class="small muted" style="display:block;font-weight:400">Клієнти пишуть, якщо не знайшли потрібну послугу</small></span>
+      ${requests.filter((r) => r.placeId === p.id && r.unreadBiz).length ? `<span class="count">${requests.filter((r) => r.placeId === p.id && r.unreadBiz).length}</span>` : ''}${icon('chevR', 18)}</a>
     <a class="card link-card" href="#/place/${p.id}" style="margin-top:12px">${icon('star', 22)}<span>Сторінка точки й відгуки<small class="small muted" style="display:block;font-weight:400">${ratingOf(p.id).count ? `Рейтинг ${rating(ratingOf(p.id).avg)} · ${ratingOf(p.id).count} ${reviewsWord(ratingOf(p.id).count)}` : 'Ще немає відгуків'}</small></span>${icon('chevR', 18)}</a>
     <h2>Активні записи</h2>
     <div class="stack">${active.length ? active.map(partnerRow).join('') : '<p class="muted">Активних записів немає.</p>'}</div>
@@ -1010,11 +1099,17 @@ function returnBonus(b, why) {
 const bookingActions = {
   cancel(b) {
     const t = cancelTerms(b);
-    const msg = t.free ? `Скасувати запис? Повернемо ${uah(t.refund)}.` : `Скасувати запис? Повернемо ${uah(t.refund)}, ${uah(t.placeAmount)} отримає точка за пізнє скасування.`;
+    const msg = t.free
+      ? `Скасувати запис? Повернемо ${uah(t.refund)} на баланс CARCAR.`
+      : `До візиту менше ${cancelWindow()}, тому оплата ${uah(t.placeAmount)} зарахується точці за послугу — повернення не буде. Скасувати запис?`;
     if (!confirm(msg)) return false;
     Object.assign(b, { state: 'cancelled', refund: t.refund, placeAmount: t.placeAmount });
-    returnBonus(b, 'скасоване замовлення');
-    toast('Запис скасовано');
+    if (t.free) {
+      b.refundTo = 'balance';
+      if (t.refund) addMoney(t.refund, `Повернення: ${placeById(b.placeId)?.name ?? 'скасований запис'}`);
+      returnBonus(b, 'скасоване замовлення');
+    }
+    toast(t.free ? `Запис скасовано, ${uah(t.refund)} повернено на баланс` : 'Запис скасовано, оплату зараховано точці');
   },
   'extra-ok'(b) {
     b.paid += b.extra.amount;
@@ -1046,13 +1141,14 @@ const bookingActions = {
     toast('Запит на доплату надіслано клієнту');
   },
   noshow(b) {
-    const placeAmount = Math.round(b.paid * PAYMENT.noShowShare);
-    if (!confirm(`Позначити неявку? Точка отримає ${uah(placeAmount)}, решту повернемо клієнту.`)) return false;
-    Object.assign(b, { state: 'noshow', placeAmount, refund: b.paid - placeAmount });
+    const placeAmount = Math.round(price(b) * PAYMENT.noShowShare);
+    if (!confirm(`Позначити неявку? Клієнт не скасував запис вчасно, тож точка отримає оплату ${uah(placeAmount)}.`)) return false;
+    Object.assign(b, { state: 'noshow', placeAmount, refund: price(b) - placeAmount });
     location.hash = '#/partner';
   },
   'resolve-client'(b) {
-    Object.assign(b, { state: 'refunded', refund: b.paid, placeAmount: 0 });
+    Object.assign(b, { state: 'refunded', refund: b.paid, placeAmount: 0, refundTo: 'balance' });
+    addMoney(b.paid, `Повернення за спором: ${placeById(b.placeId)?.name ?? ''}`);
     returnBonus(b, 'повернення за спором');
     toast('Гроші повернено клієнту');
   },
@@ -1067,12 +1163,12 @@ const bookingActions = {
 // ---------- роутер і події ----------
 
 function route() {
-  const [, page = '', arg] = location.hash.replace(/^#/, '').split('/');
+  const [, page = '', arg, sub] = location.hash.replace(/^#/, '').split('/');
   const view = $('#view');
   const tab = page === 'disputes' ? 'partner' : page === 'invite' ? '' : ['bookings', 'garage', 'partner'].includes(page) ? page : 'catalog';
   settle();
   // Крапка на вкладці «Мої записи», коли машина готова або точка просить доплату.
-  const ready = mine().some((b) => b.state === 'done' || b.extra);
+  const ready = mine().some((b) => b.state === 'done' || b.extra) || requests.some((r) => r.unreadClient);
   document.querySelector('.tabs a[data-tab="bookings"]').toggleAttribute('data-badge', ready);
   document.querySelectorAll('.tabs a').forEach((a) => {
     if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page');
@@ -1089,7 +1185,12 @@ function route() {
   else if (page === 'invite') view.innerHTML = viewInvite();
   else view.innerHTML = viewNotFound();
 
-  const target = arg && page === 'bookings' ? $(`#b-${arg}`) : null;
+  // Клієнт відкрив сторінку точки — відповіді на його запити прочитані.
+  if (page === 'place' && requests.some((r) => r.placeId === arg && r.unreadClient)) {
+    for (const r of requests) if (r.placeId === arg) r.unreadClient = false;
+    saveRequests();
+  }
+  const target = arg && page === 'bookings' ? $(`#b-${arg}`) : sub === 'ask' ? $('#ask') : null;
   if (target) target.scrollIntoView({ block: 'center' });
   else window.scrollTo(0, 0);
 }
@@ -1163,6 +1264,11 @@ document.addEventListener('click', (e) => {
     save();
     route();
     toast('Виплату відправлено на картку');
+  } else if (action === 'money-out') {
+    if (!confirm(`Вивести ${uah(wallet.money)} на картку? Гроші надійдуть протягом 1–3 банківських днів.`)) return;
+    addMoney(-wallet.money, 'Виведено на картку');
+    route();
+    toast('Гроші відправлено на картку');
   } else if (bookingActions[action]) {
     const b = bookings.find((x) => x.id === id);
     if (b && bookingActions[action](b) !== false) { save(); route(); }
@@ -1193,10 +1299,10 @@ document.addEventListener('change', (e) => {
   } else if (t.id === 'car') {
     draft.carId = t.value;
     renderBook();
-  } else if (t.id === 'usebonus') {
-    draft.useBonus = t.checked;
+  } else if (t.id === 'usebonus' || t.id === 'usemoney') {
+    draft[t.id === 'usebonus' ? 'useBonus' : 'useMoney'] = t.checked;
     renderBook();
-    $('#usebonus')?.focus();
+    $(`#${t.id}`)?.focus();
   } else if (t.id === 'bookcls' || t.id === 'cls') {
     ui.cls = Number(t.value);
     store.set('cls', ui.cls);
@@ -1236,6 +1342,28 @@ document.addEventListener('submit', (e) => {
     save();
     route();
     toast('Дякуємо за відгук!');
+    return;
+  }
+  if (e.target.id === 'askform' || e.target.matches('.req-reply')) {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const msg = { from: 'client', text: f.get('text').trim(), at: Date.now() };
+    if (e.target.id === 'askform') {
+      profile = { name: f.get('name').trim(), phone: f.get('phone').trim() };
+      store.set('profile', profile);
+      requests.push({
+        id: uid(), placeId: e.target.dataset.place, clientName: profile.name, clientPhone: profile.phone,
+        car: cars[0] ? carLabel(cars[0]) : '', cls: cars[0]?.cls ?? ui.cls, messages: [msg], at: msg.at, unreadBiz: true,
+      });
+    } else {
+      const r = requests.find((x) => x.id === e.target.dataset.id);
+      r.messages.push(msg);
+      r.unreadBiz = true;
+    }
+    saveRequests();
+    route();
+    $('#ask')?.scrollIntoView({ block: 'start' });
+    toast('Повідомлення надіслано точці');
     return;
   }
   if (e.target.id === 'profileform') {
@@ -1293,6 +1421,7 @@ window.addEventListener('storage', (e) => {
   bookings = store.get('bookings', []);
   payouts = store.get('payouts', []);
   reviews = store.get('reviews', []);
+  requests = store.get('requests', []);
   applyOverrides();
   if (!draft?.paying) route();
 });

@@ -488,6 +488,15 @@ label.item { cursor: pointer; padding: 10px 14px; }
   transition: opacity .2s, transform .2s;
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* запити до точки */
+.ask { display: grid; gap: 12px; }
+.ask .req { display: grid; gap: 10px; }
+.thread { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.thread .msg { max-width: 88%; padding: 9px 12px; border-radius: 14px; font-size: 15px; line-height: 1.4; background: var(--soft); white-space: pre-wrap; overflow-wrap: anywhere; }
+.thread .msg.client { justify-self: end; background: var(--accent-soft); border-bottom-right-radius: 4px; }
+.thread .msg.biz { justify-self: start; border-bottom-left-radius: 4px; }
+.thread .who { display: block; font-size: 12px; color: var(--muted); margin-bottom: 2px; white-space: normal; }
 </style>
   <style>
 /* Панель для бізнесу CARCAR: десктоп-перший макет поверх токенів і компонентів styles.css. */
@@ -1022,9 +1031,10 @@ const PAYMENT = {
   commission: 0.07, // частка, яку платформа утримує з точки під час виведення
   autoReleaseHours: 24, // якщо клієнт мовчить після «Машина готова», замовлення підтверджується саме
   freezeHours: 48, // скільки годин гроші за підтверджене замовлення заморожені, перш ніж їх можна вивести
-  freeCancelHours: 2, // безкоштовне скасування не пізніше ніж за N годин
-  lateCancelShare: 0.5, // частка точці при пізньому скасуванні
-  noShowShare: 0.5, // частка точці, якщо клієнт не приїхав
+  // Скасувати без втрат можна не пізніше ніж за N годин: уся сума повертається на баланс CARCAR.
+  // Пізніше (або якщо клієнт не приїхав) оплата зараховується точці як оплата послуги.
+  freeCancelHours: 1.5,
+  noShowShare: 1, // частка точці, якщо клієнт не приїхав або скасував пізно
 };
 
 // Нагадування сервісної книжки.
@@ -1363,7 +1373,7 @@ function ratingFor(placeId, reviews) {
 
 // ---------- дані ----------
 
-let bookings, payouts, reviews, crm, offers, expenses;
+let bookings, payouts, reviews, crm, offers, expenses, requests;
 
 function load() {
   bookings = store.get('bookings', []);
@@ -1373,6 +1383,7 @@ function load() {
   crm = store.get('biz.clients', {});
   offers = store.get('biz.offers', []); // персональні послуги й ціни
   expenses = store.get('biz.expenses', []); // витрати: разові й щомісячні
+  requests = store.get('requests', []); // запити клієнтів «не знайшов послугу»
   applyOverrides();
   if (settleAll(bookings)) save();
 }
@@ -1384,11 +1395,12 @@ function save() {
   store.set('biz.clients', crm);
   store.set('biz.offers', offers);
   store.set('biz.expenses', expenses);
+  store.set('requests', requests);
 }
 
 load();
 
-const ui = { place: store.get('partner', null), period: 30, finPeriod: 30, expPeriod: 30, clients: 'all', q: '', sort: 'last', svcDraft: null, imp: { type: 'clients', text: '', rows: null, map: {}, result: null } };
+const ui = { place: store.get('partner', null), reqFilter: 'open', period: 30, finPeriod: 30, expPeriod: 30, clients: 'all', q: '', sort: 'last', svcDraft: null, imp: { type: 'clients', text: '', rows: null, map: {}, result: null } };
 if (!placeById(ui.place)) ui.place = PLACES[0].id;
 
 const place = () => placeById(ui.place);
@@ -2580,6 +2592,66 @@ function loadImportText(text) {
   document.getElementById('h-imp3')?.scrollIntoView({ block: 'start' });
 }
 
+// ---------- запити клієнтів ----------
+
+const REQ_STATUS = { new: ['Новий', 'warn'], answered: ['Відповіли', 'carcar'], added: ['Послугу додано', 'ok'], closed: ['Закрито', 'muted'] };
+const reqState = (r) => (r.closed ? 'closed' : r.service ? 'added' : r.messages.at(-1).from === 'client' ? 'new' : 'answered');
+const ownRequests = () => requests.filter((r) => r.placeId === ui.place).sort((a, b) => b.messages.at(-1).at - a.messages.at(-1).at);
+
+function viewRequests() {
+  const all = ownRequests();
+  const list = all.filter((r) => (ui.reqFilter === 'open' ? !r.closed && !r.service : true));
+  // Точка відкрила розділ — нові повідомлення прочитані.
+  if (all.some((r) => r.unreadBiz)) { for (const r of all) r.unreadBiz = false; save(); }
+  return `<h1>Запити клієнтів</h1>
+    <p class="page-sub">Клієнти пишуть, якщо не знайшли потрібну послугу. Додайте її до прайсу або зробіть персональною — клієнт побачить відповідь у застосунку.</p>
+    <div class="filters"><div class="seg" role="group" aria-label="Які запити показати">
+      <button data-action="req-filter" data-f="open" aria-pressed="${ui.reqFilter === 'open'}">Відкриті · ${all.filter((r) => !r.closed && !r.service).length}</button>
+      <button data-action="req-filter" data-f="all" aria-pressed="${ui.reqFilter === 'all'}">Усі · ${all.length}</button>
+    </div></div>
+    <div class="stack" style="gap:12px">
+    ${list.length ? list.map((r) => {
+      const [label, cls] = REQ_STATUS[reqState(r)];
+      const key = phoneKey(r.clientPhone);
+      return `<article class="panel stack req" style="gap:10px" aria-label="Запит від ${esc(r.clientName || 'клієнта')}">
+        <div class="head"><div><b>${esc(r.clientName || 'Клієнт')}</b>
+          <small class="muted" style="display:block">${r.clientPhone ? `<a href="tel:${esc(r.clientPhone.replace(/[^+\d]/g, ''))}">${esc(r.clientPhone)}</a>` : ''}${r.car ? ` · ${esc(r.car)}` : ''} · ${fmtTime(r.at)}</small></div>
+          <span class="pill ${cls}">${label}</span></div>
+        <ol class="thread">${r.messages.map((m) => `<li class="msg ${m.from === 'biz' ? 'client' : 'biz'}"><span class="who">${m.from === 'biz' ? 'Ви' : 'Клієнт'} · ${fmtTime(m.at)}</span>${esc(m.text)}</li>`).join('')}</ol>
+        ${r.closed ? '' : `<form class="req-answer inline-form" data-id="${r.id}"><label class="field"><span>Відповідь клієнту</span><input name="text" required maxlength="500" autocomplete="off" placeholder="Наприклад, так, робимо — 40 хвилин"></label>
+          <button class="btn" type="submit">Відповісти</button></form>
+        <div class="row">
+          <button class="btn primary" data-action="req-service" data-id="${r.id}">${icon('plus', 18)}Додати послугу</button>
+          ${key && clientsList().some((c) => c.key === key) ? `<a class="btn" href="#/clients/${encodeURIComponent(key)}">Картка клієнта</a>` : ''}
+          <button class="btn" data-action="req-close" data-id="${r.id}">Закрити запит</button>
+        </div>`}
+      </article>`;
+    }).join('') : `<div class="empty-state">${icon('chat', 32)}<h2>${all.length ? 'Відкритих запитів немає' : 'Запитів ще немає'}</h2>
+      <p>Клієнт може написати зі сторінки точки в застосунку, якщо не знайшов потрібної послуги.</p></div>`}
+    </div>`;
+}
+
+function reqServiceDrawer(id) {
+  const r = requests.find((x) => x.id === id);
+  const p = place();
+  const canPersonal = !!phoneKey(r.clientPhone);
+  openDrawer('Додати послугу', `<form class="stack" id="req-service-form" data-id="${id}" style="gap:14px">
+    <p class="small muted" style="margin:0">Запит: «${esc(r.messages[0].text)}»</p>
+    <label class="field"><span>Назва послуги</span><input name="name" required maxlength="80" autocomplete="off"></label>
+    <div class="form-grid">
+      <label class="field"><span>Ціна, ₴</span><input name="price" type="number" min="1" step="1" required></label>
+      <label class="field"><span>Тривалість, хв</span><input name="min" type="number" min="5" step="5" value="30" required></label>
+      <label class="field full"><span>Категорія</span><select name="cat">${CATEGORIES.map((c) => `<option value="${c.id}" ${c.id === p.cats[0] ? 'selected' : ''}>${c.name}</option>`).join('')}</select></label>
+    </div>
+    <fieldset class="radio-row"><legend>Для кого</legend>
+      <label><input type="radio" name="scope" value="all" checked> Для всіх — у прайс</label>
+      <label><input type="radio" name="scope" value="personal" ${canPersonal ? '' : 'disabled'}> Лише для цього клієнта</label></fieldset>
+    <p class="fine">${canPersonal ? 'Персональну послугу бачить лише цей клієнт — за своїм телефоном.' : 'Клієнт не залишив телефону, тож персональну послугу зробити не можна.'} У прайсі ціна однакова для всіх класів авто — змінити її можна в «Послугах і цінах».</p>
+    <label class="field"><span>Повідомлення клієнту</span><input name="note" maxlength="200" placeholder="Необовʼязково" autocomplete="off"></label>
+    <button class="btn primary" type="submit">Додати й повідомити клієнта</button>
+  </form>`);
+}
+
 // ---------- відгуки ----------
 
 const stars = (n) => `<span class="stars" role="img" aria-label="Оцінка ${rating(n)} з 5">${[1, 2, 3, 4, 5]
@@ -2962,11 +3034,14 @@ const NAV = [
   ['settings', 'Профіль точки', 'settings'],
   ['import', 'Імпорт даних', 'upload'],
 ];
+NAV.splice(3, 0, ['requests', 'Запити клієнтів', 'chat']);
 
 function renderChrome(page) {
   const unanswered = reviews.filter((r) => r.placeId === ui.place && !r.reply).length;
+  const openReq = requests.filter((r) => r.placeId === ui.place && reqState(r) === 'new').length;
   $('#nav').innerHTML = NAV.map(([id, label, ic]) => `<a href="#/${id}" ${page === id ? 'aria-current="page"' : ''}>${icon(ic, 20)}${label}
-    ${id === 'reviews' && unanswered ? `<span class="count" aria-label="без відповіді: ${unanswered}">${unanswered}</span>` : ''}</a>`).join('');
+    ${id === 'reviews' && unanswered ? `<span class="count" aria-label="без відповіді: ${unanswered}">${unanswered}</span>` : ''}
+    ${id === 'requests' && openReq ? `<span class="count" aria-label="чекають відповіді: ${openReq}">${openReq}</span>` : ''}</a>`).join('');
   $('#place').innerHTML = PLACES.map((p) => `<option value="${p.id}" ${p.id === ui.place ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
 }
 
@@ -2984,6 +3059,7 @@ function route() {
   else if (page === 'finance') view.innerHTML = viewFinance();
   else if (page === 'expenses') view.innerHTML = viewExpenses();
   else if (page === 'import') view.innerHTML = viewImport();
+  else if (page === 'requests') view.innerHTML = viewRequests();
   else if (page === 'reviews') view.innerHTML = viewReviews();
   else if (page === 'settings') view.innerHTML = viewSettings();
   else view.innerHTML = '<p>Сторінку не знайдено.</p>';
@@ -3049,9 +3125,9 @@ document.addEventListener('click', (e) => {
     toast(action === 'crm-noshow' ? 'Позначено неявку' : 'Запис скасовано');
   } else if (action === 'carcar-noshow') {
     const b = bookings.find((x) => x.id === id);
-    const placeAmount = Math.round(b.paid * PAYMENT.noShowShare);
-    if (!confirm(`Позначити неявку? Точка отримає ${uah(placeAmount)}, решту повернемо клієнту.`)) return;
-    Object.assign(b, { state: 'noshow', placeAmount, refund: b.paid - placeAmount });
+    const placeAmount = Math.round(price(b) * PAYMENT.noShowShare);
+    if (!confirm(`Позначити неявку? Клієнт не скасував запис вчасно, тож оплата ${uah(placeAmount)} зараховується точці.`)) return;
+    Object.assign(b, { state: 'noshow', placeAmount, refund: price(b) - placeAmount });
     save();
     closeDrawer();
     rerenderKeepScroll();
@@ -3130,6 +3206,16 @@ document.addEventListener('click', (e) => {
     downloadCsv(`carcar-import-${ui.imp.type}.csv`, IMPORT_TEMPLATES[ui.imp.type]);
   } else if (action === 'imp-cancel') { Object.assign(ui.imp, { rows: null, text: '' }); rerenderKeepScroll(); }
   else if (action === 'imp-run') runImport();
+  else if (action === 'req-filter') { ui.reqFilter = el.dataset.f; rerenderKeepScroll(); }
+  else if (action === 'req-service') reqServiceDrawer(id);
+  else if (action === 'req-close') {
+    if (!confirm('Закрити запит? Клієнт побачить, що його закрито.')) return;
+    const r = requests.find((x) => x.id === id);
+    Object.assign(r, { closed: true, unreadClient: true });
+    save();
+    rerenderKeepScroll();
+    toast('Запит закрито');
+  }
   else if (action === 'settings-reset') {
     const all = store.get('biz.places', {});
     if (all[ui.place]) { delete all[ui.place].phone; delete all[ui.place].hours; delete all[ui.place].boxes; delete all[ui.place].schedule; }
@@ -3348,6 +3434,34 @@ document.addEventListener('submit', async (e) => {
     closeDrawer();
     rerenderKeepScroll();
     toast(d.get('recurring') ? 'Щомісячну витрату додано' : 'Витрату додано');
+  } else if (f.matches('.req-answer')) {
+    const r = requests.find((x) => x.id === f.dataset.id);
+    r.messages.push({ from: 'biz', text: new FormData(f).get('text').trim(), at: Date.now() });
+    r.unreadClient = true;
+    save();
+    rerenderKeepScroll();
+    toast('Відповідь надіслано клієнту');
+  } else if (f.id === 'req-service-form') {
+    const d = new FormData(f);
+    const r = requests.find((x) => x.id === f.dataset.id);
+    const svc = { name: d.get('name').trim(), price: Math.round(Number(d.get('price'))), min: Math.round(Number(d.get('min'))), cat: d.get('cat') };
+    const personal = d.get('scope') === 'personal';
+    if (personal) {
+      const key = phoneKey(r.clientPhone);
+      offers.push({ id: uid(), placeId: ui.place, clientKey: key, ...svc, note: 'За вашим запитом', base: null, active: true, createdAt: Date.now() });
+      // Клієнт зʼявляється в CRM, щоб персональну послугу було видно в його картці.
+      if (!clientsList().some((c) => c.key === key)) setMeta(key, { name: r.clientName, phone: r.clientPhone, cars: r.car ? [r.car] : [], source: 'request' });
+    } else {
+      const p = place();
+      saveOverride(ui.place, { services: [...p.allServices, { id: `c_${uid()}`, ...svc, price: [svc.price, svc.price, svc.price] }] });
+    }
+    const note = d.get('note').trim();
+    r.messages.push({ from: 'biz', text: `Додали послугу «${svc.name}» — ${uah(svc.price)}${personal ? ', персонально для вас' : ''}. Можна записатися в застосунку.${note ? ` ${note}` : ''}`, at: Date.now() });
+    Object.assign(r, { service: { ...svc, personal }, unreadClient: true });
+    save();
+    closeDrawer();
+    rerenderKeepScroll();
+    toast(personal ? 'Персональну послугу додано — клієнт отримав відповідь' : 'Послугу додано до прайсу — клієнт отримав відповідь');
   } else if (f.id === 'imp-paste') {
     ui.imp.text = new FormData(f).get('text');
     loadImportText(ui.imp.text);

@@ -271,24 +271,67 @@ test('рейтинг точки складається з відгуків пі�
   await expect(page.getByRole('link', { name: /Сторінка точки й відгуки/ })).toContainText('Рейтинг 4,5 · 2 відгуки');
 });
 
-test('пізнє скасування й неявка: частина грошей іде точці', async ({ page }) => {
-  // Запис на сьогодні 11:00 о 10:00 — менше ніж за 2 години.
+test('пізніше ніж за 1,5 год до візиту скасування й неявка — оплата точці', async ({ page }) => {
+  // Запис на сьогодні 11:00 о 10:00 — менше ніж за 1,5 години.
   await page.goto('/#/book/koleso');
   await page.getByLabel(/Сезонне перевзування/).check();
-  await page.locator('.slot:not([disabled])').first().click();
+  await page.locator('.slot[data-time="11:00"]').click();
   await page.locator('[data-action="confirm"]').click();
   await page.getByRole('button', { name: 'Оплатити 900 ₴' }).click();
-  await expect(page.locator('article').first()).toContainText('Пізнє скасування: повернемо 450 ₴');
+  await expect(page.locator('article').first()).toContainText('Тепер оплата зараховується точці за послугу');
   page.once('dialog', (d) => d.accept());
-  await page.getByRole('button', { name: 'Скасувати' }).click();
-  await expect(page.locator('article').first()).toContainText('Повернено 450 ₴ на картку, 450 ₴ отримала точка');
+  await page.getByRole('button', { name: 'Скасувати без повернення' }).click();
+  await expect(page.locator('article').first()).toContainText('оплату 900 ₴ зараховано точці за послугу');
+  await expect(page.getByRole('region', { name: 'Баланс CARCAR' })).toHaveCount(0);
 
   await bookTomorrow(page);
   await page.clock.setFixedTime(new Date(2026, 9, 5, 22, 0));
   await openJob(page, 'Шиномонтаж «Колесо»');
   page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Клієнт не приїхав' }).click();
-  await expect(page.getByRole('region', { name: 'Баланс' })).toContainText('Доступно до виведення900 ₴');
+  await expect(page.getByRole('region', { name: 'Баланс' })).toContainText('Доступно до виведення1 800 ₴');
+  await page.goto('/#/bookings');
+  await expect(page.locator('article', { hasText: 'Неявка' })).toContainText('Ви не приїхали — оплату 900 ₴ зараховано точці');
+});
+
+test('скасування за 1,5 год і раніше: уся сума на баланс CARCAR, ним можна оплатити й вивести', async ({ page }) => {
+  // О 10:00 запис на 11:30 — рівно за 1,5 години, ще можна скасувати з поверненням.
+  await page.goto('/#/book/koleso');
+  await page.getByLabel(/Сезонне перевзування/).check();
+  await page.locator('.slot[data-time="11:30"]').click();
+  await page.locator('[data-action="confirm"]').click();
+  await expect(page.locator('.summary')).toContainText('Скасування до 1 год 30 хв до візиту');
+  await page.getByRole('button', { name: 'Оплатити 900 ₴' }).click();
+  await expect(page.locator('article').first()).toContainText('Безкоштовне скасування до 4 жовтня о 10:00');
+  page.once('dialog', (d) => d.accept());
+  await page.getByRole('button', { name: 'Скасувати', exact: true }).click();
+  await expect(page.locator('#toast')).toHaveText('Запис скасовано, 900 ₴ повернено на баланс');
+  await expect(page.locator('article', { hasText: 'Скасовано' })).toContainText('Повернено 900 ₴ на баланс CARCAR');
+  const balance = page.getByRole('region', { name: 'Баланс CARCAR' });
+  await expect(balance.locator('.bonus-sum')).toHaveText('900 ₴');
+
+  // Наступне замовлення: баланс списується, доплата карткою — лише різниця.
+  await page.goto('/#/book/koleso');
+  await page.getByLabel(/Сезонне перевзування/).check();
+  await page.getByLabel(/Балансування/).check();
+  await page.getByRole('button', { name: /Завтра/ }).click();
+  await page.locator('.slot:not([disabled])').first().click();
+  await page.locator('[data-action="confirm"]').click();
+  await expect(page.locator('.summary')).toContainText('До сплати карткою');
+  await page.getByLabel(/Баланс CARCAR/).uncheck();
+  await expect(page.getByRole('button', { name: 'Оплатити 1 300 ₴' })).toBeVisible();
+  await page.getByLabel(/Баланс CARCAR/).check();
+  await page.getByRole('button', { name: 'Оплатити 400 ₴' }).click();
+  await expect(balance.locator('.bonus-sum')).toHaveText('0 ₴');
+
+  // Скасовуємо й виводимо повернення на картку.
+  page.once('dialog', (d) => d.accept());
+  await page.locator('article', { hasText: 'гроші утримуються' }).getByRole('button', { name: 'Скасувати', exact: true }).click();
+  await expect(balance.locator('.bonus-sum')).toHaveText('1 300 ₴');
+  page.once('dialog', (d) => d.accept());
+  await balance.getByRole('button', { name: 'Вивести 1 300 ₴ на картку' }).click();
+  await expect(balance.locator('.bonus-sum')).toHaveText('0 ₴');
+  await expect(balance).toContainText('Виведено на картку');
 });
 
 test.describe('поруч зі мною', () => {
@@ -378,7 +421,7 @@ test.describe('приведи друга', () => {
 
     page.once('dialog', (d) => d.accept());
     await page.getByRole('button', { name: 'Скасувати' }).click();
-    await expect(page.locator('article').first()).toContainText('Повернено 650 ₴ на картку і 150 ₴ на бонусний рахунок');
+    await expect(page.locator('article').first()).toContainText('Повернено 650 ₴ на баланс CARCAR і 150 ₴ на бонусний рахунок');
     await page.goto('/#/invite');
     await expect(page.locator('.bonus-sum')).toHaveText('150 ₴');
   });

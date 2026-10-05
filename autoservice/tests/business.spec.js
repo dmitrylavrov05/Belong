@@ -219,7 +219,7 @@ test('фінанси: замовлення через CARCAR, заморожув
   await expect(report.locator('tfoot tr', { hasText: 'Прибуток' })).toContainText('837 ₴');
 });
 
-for (const path of ['#/', '#/schedule', '#/clients', '#/services', '#/finance', '#/expenses', '#/reviews', '#/settings', '#/import']) {
+for (const path of ['#/', '#/schedule', '#/clients', '#/requests', '#/services', '#/finance', '#/expenses', '#/reviews', '#/settings', '#/import']) {
   test(`панель: доступність і верстка ${path}`, async ({ page }) => {
     await fillDemo(page);
     await page.goto(`${PANEL}${path}`);
@@ -474,4 +474,65 @@ test('нагадування клієнту підтвердити викона�
   await page.getByRole('button', { name: 'Усе добре' }).click();
   await page.goto(`${PANEL}#/finance`);
   await expect(page.locator('tbody tr', { hasText: 'Сезонне перевзування' })).toContainText('Заморожено');
+});
+
+test('клієнт не знайшов послугу: пише точці, точка відповідає й додає послугу', async ({ page }) => {
+  await page.goto('/#/book/koleso');
+  await page.getByRole('link', { name: 'Не знайшли потрібну послугу? Напишіть точці' }).click();
+  await expect(page).toHaveURL(/#\/place\/koleso\/ask/);
+  const ask = page.locator('#askform');
+  await ask.getByLabel('Що потрібно зробити?').fill('Чи можете відрихтувати диск R17?');
+  await ask.getByLabel('Ваше імʼя').fill('Андрій Запит');
+  await ask.getByLabel('Ваш телефон').fill('063 555 44 33');
+  await ask.getByRole('button', { name: 'Надіслати точці' }).click();
+  await expect(page.locator('#toast')).toHaveText('Повідомлення надіслано точці');
+  await expect(page.locator('.req')).toContainText('Чекає відповіді точки');
+
+  // Точка бачить запит у панелі з лічильником і відповідає.
+  await page.goto(PANEL);
+  await selectPlace(page, 'Шиномонтаж «Колесо»');
+  await expect(page.locator('#nav').getByRole('link', { name: /Запити клієнтів/ })).toContainText('1');
+  await page.locator('#nav').getByRole('link', { name: /Запити клієнтів/ }).click();
+  const req = page.locator('article.req', { hasText: 'Андрій Запит' });
+  await expect(req).toContainText('Чи можете відрихтувати диск R17?');
+  await expect(req).toContainText('Новий');
+  await req.getByLabel('Відповідь клієнту').fill('Так, робимо, близько години');
+  await req.getByRole('button', { name: 'Відповісти' }).click();
+  await expect(req).toContainText('Відповіли');
+
+  // Додає персональну послугу саме для цього клієнта.
+  await req.getByRole('button', { name: 'Додати послугу' }).click();
+  const drawer = page.getByRole('dialog');
+  await drawer.getByLabel('Назва послуги').fill('Рихтування литого диска R17');
+  await drawer.getByLabel('Ціна, ₴').fill('650');
+  await drawer.getByLabel('Тривалість, хв').fill('60');
+  await drawer.getByLabel('Лише для цього клієнта').check();
+  await drawer.getByRole('button', { name: 'Додати й повідомити клієнта' }).click();
+  await expect(page.locator('#toast')).toHaveText('Персональну послугу додано — клієнт отримав відповідь');
+  await expect(page.locator('article.req')).toHaveCount(0);
+  await page.getByRole('button', { name: /Усі · 1/ }).click();
+  await expect(page.locator('article.req')).toContainText('Послугу додано');
+
+  // Клієнт бачить відповідь у «Мої записи» й персональну послугу на сторінці точки.
+  await page.goto('/#/bookings');
+  await expect(page.locator('.tabs a[data-tab="bookings"]')).toHaveAttribute('data-badge', '');
+  await page.getByRole('link', { name: /Шиномонтаж «Колесо».*Послугу додано/ }).click();
+  await expect(page.locator('.req .thread')).toContainText('Так, робимо, близько години');
+  await expect(page.locator('.req')).toContainText('Рихтування литого диска R17 — 650 ₴');
+  await expect(page.locator('.personal-list')).toContainText('Рихтування литого диска R17');
+  await page.locator('.req').getByRole('link', { name: 'Записатися' }).click();
+  await expect(page.getByLabel(/Рихтування литого диска R17/)).toBeVisible();
+
+  // Послуга для всіх потрапляє в загальний прайс.
+  await page.goto('/#/place/blysk');
+  await page.locator('#askform').getByLabel('Що потрібно зробити?').fill('Мийка даху автобудинку');
+  await page.locator('#askform').getByRole('button', { name: 'Надіслати точці' }).click();
+  await page.goto(`${PANEL}#/requests`);
+  await selectPlace(page, 'Автомийка «Блиск»');
+  await page.getByRole('button', { name: 'Додати послугу' }).click();
+  await drawer.getByLabel('Назва послуги').fill('Мийка автобудинку');
+  await drawer.getByLabel('Ціна, ₴').fill('1500');
+  await drawer.getByRole('button', { name: 'Додати й повідомити клієнта' }).click();
+  await page.goto('/#/place/blysk');
+  await expect(page.locator('.item', { hasText: 'Мийка автобудинку' })).toContainText('1 500 ₴');
 });
