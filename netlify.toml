@@ -1,0 +1,4 @@
+# Netlify: публікуємо застосунок CARCAR (статичні файли, без збірки).
+[build]
+  publish = "autoservice/app"
+  command = ""
