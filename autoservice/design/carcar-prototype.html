@@ -624,6 +624,44 @@ label.item { cursor: pointer; padding: 10px 14px; }
 .visit-bar { margin-top: 0; }
 .tab-count { position: absolute; top: -6px; left: 14px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 2px solid var(--bg); box-sizing: content-box; }
 .tab-count[hidden] { display: none; }
+
+/* Виїзд до клієнта, перенесення, чат за записом, кошторис, промокоди й оплата частинами */
+.ok-text, .bad-text { display: inline-flex; align-items: center; gap: 6px; }
+.ok-text { color: var(--ok); }
+.bad-text { color: var(--danger); }
+.badge.mobile { background: var(--soft); color: var(--text); }
+.mobile-card { flex-direction: row; align-items: flex-start; gap: 12px; margin-top: 14px; }
+.mobile-card > .ic { flex: none; color: var(--accent); margin-top: 2px; }
+.mobile-card b { display: block; margin-bottom: 2px; }
+.mode-seg { margin-top: 2px; }
+.mode-seg button { font-size: 14px; min-height: 40px; padding: 6px 14px; }
+.map.pick-map { height: 260px; cursor: crosshair; }
+.pick-dot { position: absolute; left: 0; top: 0; width: 22px; height: 22px; margin: -22px 0 0 -11px; border-radius: 50% 50% 50% 0; transform-origin: 0 0; background: var(--accent); border: 3px solid #fff; rotate: -45deg; box-shadow: 0 2px 6px rgba(0, 0, 0, .3); }
+.promo-banner .banner-ic { background: var(--ok-soft); color: var(--ok); }
+.promo-line { cursor: default; }
+.promo-line .perk-ic { flex: none; }
+.promo-form { align-items: flex-end; }
+.parts { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+.parts legend { font-size: 14px; font-weight: 600; padding: 0 4px; }
+.parts label { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; cursor: pointer; font-size: 14px; }
+.parts label:has(input:checked) { border-color: var(--navy); background: var(--soft); font-weight: 600; }
+.parts small { display: block; font-size: 12px; color: var(--muted); font-weight: 400; }
+.parts .fine { grid-column: 1 / -1; margin: 0; }
+.estimate { gap: 10px; }
+.estimate summary { display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; }
+.est-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.est-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 15px; }
+.est-item:first-child { border-top: 0; }
+.est-item .name { flex: 1; min-width: 0; }
+.est-item .name small { display: block; font-size: 12px; color: var(--muted); }
+.est-item b { white-space: nowrap; }
+.est-item.off .name, .est-item.off b { color: var(--muted); text-decoration: line-through; }
+.chat-toggle { justify-content: flex-start; }
+.chat-toggle .count { margin-left: auto; }
+.bk-chat { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--line); padding-top: 12px; }
+.bk-chat .quick { display: flex; flex-wrap: wrap; gap: 6px; }
+.bk-chat .quick .chip { font-size: 13px; padding: 6px 10px; min-height: 34px; }
+.thread .msg.sys { justify-self: center; background: transparent; border: 1px dashed var(--line); font-size: 13px; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -713,6 +751,8 @@ const pick = (catalog, ids, k = 1) =>
 
 // hours: [відкриття, закриття] у годинах; null — цілодобово.
 // lat, lng — приблизні координати для сортування «Поруч» (демо).
+// mobile — «Виїзд до вас»: радіус у км від точки, вартість виїзду, кількість бригад
+// і послуги, які можна виконати на місці в клієнта.
 const PLACES = [
   {
     id: 'blysk',
@@ -741,6 +781,7 @@ const PLACES = [
     boxes: 6,
     tags: ['Цілодобово', 'Самообслуговування'],
     services: pick(WASH, ['express', 'complex', 'inside', 'engine'], 0.9),
+    mobile: { radiusKm: 12, fee: 250, crews: 2, services: ['express', 'complex', 'inside'] },
   },
   {
     id: 'koleso',
@@ -755,6 +796,7 @@ const PLACES = [
     boxes: 3,
     tags: ['Зберігання шин', 'Шини в наявності'],
     services: pick(TIRES, ['change', 'balance', 'repair', 'storage', 'rolling']),
+    mobile: { radiusKm: 15, fee: 300, crews: 1, services: ['change', 'repair'] },
   },
   {
     id: 'shynservis',
@@ -852,6 +894,9 @@ const PAYMENT = {
   // Пізніше (або якщо клієнт не приїхав) оплата зараховується точці як оплата послуги.
   freeCancelHours: 1.5,
   noShowShare: 1, // частка точці, якщо клієнт не приїхав або скасував пізно
+  // Оплата частинами для дорогих послуг: клієнт платить рівними частинами без переплати,
+  // точка отримує всю суму одразу від банку-партнера (комісію банку в прототипі не враховано).
+  installments: { minTotal: 3000, parts: [3, 4, 6] },
 };
 
 // Нагадування сервісної книжки.
@@ -1109,7 +1154,7 @@ async function shrinkPhoto(file) {
 
 // Точка може змінити в панелі для бізнесу телефон, години, кількість боксів і прайс.
 // Зміни зберігаються в 'biz.places' і накладаються на дані з data.js в обох застосунках.
-const withBase = (p) => Object.assign(p, { basePhone: p.phone, baseHours: p.hours, baseBoxes: p.boxes, baseServices: p.services, baseCats: p.cats });
+const withBase = (p) => Object.assign(p, { basePhone: p.phone, baseHours: p.hours, baseBoxes: p.boxes, baseServices: p.services, baseCats: p.cats, baseMobile: p.mobile ?? null });
 PLACES.forEach(withBase);
 
 // Нові точки, зареєстровані в панелі через «Підключення». Клієнти бачать їх лише після схвалення CARCAR.
@@ -1133,6 +1178,7 @@ function applyOverrides() {
     p.hours = o.hours !== undefined ? o.hours : p.baseHours;
     p.boxes = o.boxes ?? p.baseBoxes;
     p.schedule = o.schedule ?? null;
+    p.mobile = o.mobile !== undefined ? o.mobile : p.baseMobile;
     p.allServices = o.services ?? p.baseServices;
     p.services = p.allServices.filter((s) => !s.off);
     // Категорії точки — ті, у яких є хоч одна активна послуга (точка могла додати нову).
@@ -1277,8 +1323,51 @@ const BLOCKING = [...ACTIVE, 'booked'];
 // Запис через CARCAR (оплата в застосунку) чи внесений точкою вручну (оплата на місці).
 const isCarcar = (b) => (b.channel ?? 'carcar') === 'carcar';
 
-// Повна ціна замовлення: те, що заплатив клієнт, плюс бонус, який доплачує CARCAR.
-const price = (b) => b.paid + (b.bonus || 0);
+// Повна ціна замовлення: те, що заплатив клієнт, плюс бонус і промокод, які доплачує CARCAR.
+const price = (b) => b.paid + (b.bonus || 0) + (b.promo && !b.promo.returned ? b.promo.amount : 0);
+
+// ---------- виїзні послуги ----------
+
+// Виїзна бригада зайнята ще MOBILE_ROAD хвилин після роботи — дорога до наступного клієнта.
+// Бокси й бригади — окремі потужності: виїзний запис не займає бокс, а запис у точці — бригаду.
+const MOBILE_ROAD = 30;
+const mobileOn = (p) => !!p?.mobile?.services?.length && p.mobile.crews > 0;
+const spanOf = (b) => [toMin(b.time), toMin(b.time) + b.minutes + (b.mobile ? MOBILE_ROAD : 0)];
+const laneCap = (p, mobile) => (mobile ? p.mobile?.crews ?? 0 : p.boxes);
+const sameLane = (b, mobile) => !!b.mobile === !!mobile;
+
+// ---------- промокоди платформи ----------
+
+// Промокоди й акції CARCAR. Знижку оплачує платформа: точка отримує повну ціну, як із бонусом.
+// kind: pct — відсоток (max — не більше ₴), sum — фіксована сума. cats — на які категорії діє (порожньо — на всі).
+// firstOnly — лише на перше замовлення в цих категоріях; auto — застосовується сам, без введення коду.
+const PROMO_DEFAULTS = [
+  { id: 'persha30', code: 'PERSHA30', title: 'Перша мийка −30%', kind: 'pct', value: 30, max: 300, minOrder: 0, cats: ['wash'], firstOnly: true, auto: true, active: true, until: null, limit: null },
+];
+const promosAll = () => store.get('admin.promos', null) ?? PROMO_DEFAULTS;
+const savePromos = (list) => store.set('admin.promos', list);
+const promoUses = (code, bookings) => bookings.filter((b) => b.promo?.code === code && !b.promo.returned);
+const promoText = (pr) => (pr.kind === 'pct' ? `−${pr.value}%${pr.max ? ` (до ${uah(pr.max)})` : ''}` : `−${uah(pr.value)}`);
+
+// Чи діє промокод на замовлення: items — [{cat, price}] обраних послуг (ціни вже зі знижками точки),
+// mine — записи цього клієнта. Повертає { ok, amount } або { ok: false, why }.
+function promoCheck(pr, { place, items, mine, all }) {
+  const today = isoDate(new Date());
+  if (!pr || pr.active === false) return { ok: false, why: 'Промокод не діє' };
+  if (pr.until && pr.until < today) return { ok: false, why: 'Строк дії промокоду минув' };
+  if (pr.limit && promoUses(pr.code, all).length >= pr.limit) return { ok: false, why: 'Промокод уже використали максимальну кількість разів' };
+  const inCats = (c) => !pr.cats?.length || pr.cats.includes(c);
+  if (!place.cats.some(inCats)) return { ok: false, why: `Промокод діє лише на: ${pr.cats.map((c) => CATEGORIES.find((x) => x.id === c)?.name.toLowerCase()).join(', ')}` };
+  const base = items.filter((x) => inCats(x.cat)).reduce((a, x) => a + x.price, 0);
+  if (!base) return { ok: false, why: 'Промокод не діє на обрані послуги' };
+  if (pr.minOrder && base < pr.minOrder) return { ok: false, why: `Промокод діє на замовлення від ${uah(pr.minOrder)}` };
+  if (mine.some((b) => b.promo?.code === pr.code && !b.promo.returned)) return { ok: false, why: 'Ви вже скористалися цим промокодом' };
+  if (pr.firstOnly && mine.some((b) => !(b.state === 'cancelled' && b.refundTo === 'balance') && PLACES.find((x) => x.id === b.placeId)?.cats.some(inCats))) {
+    return { ok: false, why: 'Промокод діє лише на перше замовлення' };
+  }
+  const amount = pr.kind === 'pct' ? Math.min(pr.max || Infinity, Math.round((base * pr.value) / 100)) : Math.min(pr.value, base);
+  return { ok: true, amount };
+}
 
 // Клієнт підтвердив (або мовчав після «Машина готова»): замовлення завершене,
 // гроші точці заморожені ще на freezeHours, щоб клієнт встиг відкрити спір.
@@ -1371,19 +1460,47 @@ const telegramLink = (phone) => `https://t.me/+${String(phone).replace(/\D/g, ''
 
 // ---------- вільний час ----------
 
-// Вільні початки на дату: у робочі години, не в перерву, не в минулому й поки є вільний бокс.
-function openStarts(place, date, minutes, bookings, { lead = scheduleOf(place).lead, skip } = {}) {
+// Вільні початки на дату: у робочі години, не в перерву, не в минулому й поки є вільний бокс
+// (для виїзного запису — вільна бригада з урахуванням дороги). skip — запис, який переносять.
+function openStarts(place, date, minutes, bookings, { lead = scheduleOf(place).lead, skip, mobile = false } = {}) {
   const h = hoursFor(place, date);
   if (!h) return [];
-  const spans = bookings.filter((b) => b.placeId === place.id && b.date === date && BLOCKING.includes(b.state) && b !== skip)
-    .map((b) => [toMin(b.time), toMin(b.time) + b.minutes]);
+  const spans = bookings.filter((b) => b.placeId === place.id && b.date === date && BLOCKING.includes(b.state) && b !== skip && sameLane(b, mobile))
+    .map(spanOf);
+  const need = minutes + (mobile ? MOBILE_ROAD : 0);
+  const cap = laneCap(place, mobile);
   const min = date === opsToday() ? opsNow() + lead : -1;
   const out = [];
   for (let t = h[0]; t + minutes <= h[1]; t += 30) {
     if (t < min || inBreak(place, t, minutes)) continue;
-    if (spans.filter(([s, e]) => t < e && t + minutes > s).length < place.boxes) out.push(hhmm(t));
+    if (spans.filter(([s, e]) => t < e && t + need > s).length < cap) out.push(hhmm(t));
   }
   return out;
+}
+
+// ---------- чат за записом ----------
+
+// Переписка клієнта й точки про конкретний оплачений візит: «приїду з причепом», «можна раніше?».
+// from: client, biz або sys (подія: перенесення, кошторис). Непрочитане позначаємо для іншої сторони.
+function chatPost(b, from, text, notify = from === 'client' ? 'biz' : 'client') {
+  b.chat = [...(b.chat ?? []), { from, text, at: Date.now() }];
+  if (notify === 'biz' || notify === 'both') b.chatUnreadBiz = true;
+  if (notify === 'client' || notify === 'both') b.chatUnreadClient = true;
+}
+const CLIENT_QUICK = ['Можна приїхати раніше?', 'Приїду з причепом', 'Залишу ключі адміністратору', 'Потрібен чек для компанії'];
+const BIZ_QUICK = ['Так, чекаємо', 'Можна на 30 хв раніше', 'На жаль, ні — лише у ваш час', 'Майстер передзвонить'];
+
+// ---------- кошторис і гарантія ----------
+
+// Кошторис СТО: роботи й запчастини з цінами; клієнт погоджує кожен пункт окремо.
+// warranty — гарантія в місяцях від дня виконання.
+const ITEM_KIND = { work: 'Робота', part: 'Запчастина' };
+const itemSum = (x) => Math.round(x.qty * x.price);
+const estimateTotal = (items, status) => items.filter((x) => !status || x.status === status).reduce((a, x) => a + itemSum(x), 0);
+function warrantyUntil(iso, months) {
+  const d = parseDate(iso);
+  d.setMonth(d.getMonth() + months);
+  return isoDate(d);
 }
 
 // ---------- гарячі вікна ----------
@@ -1636,6 +1753,13 @@ const mapMerc = (lat, lng, z) => {
 const MAP_ORIGIN = mapMerc(MAP_BOX.maxLat, MAP_BOX.minLng, MAP_Z0);
 const mapProject = (lat, lng) => { const [x, y] = mapMerc(lat, lng, MAP_Z0); return [x - MAP_ORIGIN[0], y - MAP_ORIGIN[1]]; };
 const [MAP_W, MAP_H] = mapProject(MAP_BOX.minLat, MAP_BOX.maxLng);
+// Зворотна проєкція: точка карти → широта й довгота (для вибору адреси на карті).
+const mapUnproject = (x, y) => {
+  const size = MAP_TILE * 2 ** MAP_Z0;
+  const mx = (x + MAP_ORIGIN[0]) / size;
+  const my = (y + MAP_ORIGIN[1]) / size;
+  return { lat: (Math.atan(Math.sinh(Math.PI * (1 - 2 * my))) * 180) / Math.PI, lng: mx * 360 - 180 };
+};
 const TILE_URL = (z, x, y) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
 
 // Спрощена межа міста й русло Дніпра (широта, довгота) — для схеми.
@@ -1653,7 +1777,8 @@ let mapResize = null;
 
 // Малює карту в el і повертає { setPins, draw }. opts: places — [{ id, lat, lng, html, label, cls }],
 // pos — {lat, lng} користувача, state — стан між перемальовуваннями (x, y, z, sel, layer),
-// onSelect(id), onLayer(layer) — щоб застосунок запамʼятав вибір шару.
+// onSelect(id), onLayer(layer) — щоб застосунок запамʼятав вибір шару;
+// onPick(lat, lng) — дотик до порожнього місця карти (вибір адреси), pick — уже обрана точка.
 function mountMap(el, opts) {
   const st = opts.state;
   const W = () => el.clientWidth;
@@ -1768,7 +1893,8 @@ function mountMap(el, opts) {
     places = list;
     layer.innerHTML = list.map((p) => `<button type="button" class="pin ${p.cls}${p.id === st.sel ? ' sel' : ''}" data-pin="${p.id}" data-xy="${mapProject(p.lat, p.lng).join(',')}"
       aria-label="${p.label}" aria-pressed="${p.id === st.sel}">${p.html}</button>`).join('')
-      + (opts.pos ? `<span class="me-dot" data-xy="${mapProject(opts.pos.lat, opts.pos.lng).join(',')}" role="img" aria-label="Ви тут"></span>` : '');
+      + (opts.pos ? `<span class="me-dot" data-xy="${mapProject(opts.pos.lat, opts.pos.lng).join(',')}" role="img" aria-label="Ви тут"></span>` : '')
+      + (opts.pick ? `<span class="pick-dot" data-xy="${mapProject(opts.pick.lat, opts.pick.lng).join(',')}" role="img" aria-label="Обрана адреса"></span>` : '');
     draw();
   }
 
@@ -1834,7 +1960,15 @@ function mountMap(el, opts) {
         x.classList.toggle('sel', x === pin);
         x.setAttribute('aria-pressed', x === pin);
       }
-      opts.onSelect(st.sel);
+      opts.onSelect?.(st.sel);
+      return;
+    }
+    if (opts.onPick && moved < 6 && !e.target.closest('.map-attr')) {
+      const r = el.getBoundingClientRect();
+      const pt = mapUnproject(st.x + (e.clientX - r.left - W() / 2) / st.z, st.y + (e.clientY - r.top - H() / 2) / st.z);
+      opts.pick = pt;
+      setPins(places);
+      opts.onPick(pt.lat, pt.lng);
     }
   });
   // Клавіатура: стрілки зсувають, + і − масштабують.
@@ -2002,7 +2136,8 @@ function setSort(value) {
 // Вільні вікна за графіком точки, крок 30 хвилин. Вікно зайняте, якщо до нього менше
 // мінімального часу запису, воно потрапляє на перерву, у клієнта тут уже є свій запис
 // або на цей час не лишилося вільних боксів за журналом точки (записи CARCAR і з CRM).
-function slotsFor(place, date, minutes) {
+// Для виїзду рахуємо вільні бригади з урахуванням дороги; skip — запис, який переносять.
+function slotsFor(place, date, minutes, { skip = null, mobile = false } = {}) {
   const hours = hoursFor(place, date);
   if (!hours) return [];
   const [open, close] = hours;
@@ -2010,18 +2145,18 @@ function slotsFor(place, date, minutes) {
   const now = new Date();
   const today = date === isoDate(now);
   const nowMin = now.getHours() * 60 + now.getMinutes();
-  const span = (b) => [toMin(b.time), toMin(b.time) + b.minutes];
-  const atPlace = bookings.filter((b) => b.placeId === place.id && b.date === date);
-  const own = atPlace.filter((b) => !b.source && ACTIVE.includes(b.state)).map(span);
-  const all = atPlace.filter((b) => BLOCKING.includes(b.state)).map(span);
+  const atPlace = bookings.filter((b) => b.placeId === place.id && b.date === date && b !== skip);
+  const own = atPlace.filter((b) => !b.source && ACTIVE.includes(b.state)).map((b) => [toMin(b.time), toMin(b.time) + b.minutes]);
+  const all = atPlace.filter((b) => BLOCKING.includes(b.state) && sameLane(b, mobile)).map(spanOf);
+  const need = minutes + (mobile ? MOBILE_ROAD : 0);
   const slots = [];
   for (let t = open; t + minutes <= close; t += 30) {
-    const overlaps = (list) => list.filter(([s, e]) => t < e && t + minutes > s).length;
+    const overlaps = (list, len) => list.filter(([s, e]) => t < e && t + len > s).length;
     const busy =
       (today && t < nowMin + lead) ||
       inBreak(place, t, minutes) ||
-      overlaps(own) > 0 ||
-      overlaps(all) >= place.boxes;
+      overlaps(own, minutes) > 0 ||
+      overlaps(all, need) >= laneCap(place, mobile);
     slots.push({ time: hhmm(t), busy });
   }
   return slots;
@@ -2171,6 +2306,7 @@ function filteredPlaces() {
   const list = PLACES.filter((p) => {
     if (!isListed(p)) return false;
     if (ui.blackout && !worksInBlackout(p)) return false;
+    if (ui.mobileOnly && !mobileOn(p)) return false;
     if (ui.cat !== 'all' && !p.cats.includes(ui.cat)) return false;
     if (ui.openNow && !isOpenNow(p)) return false;
     if (ui.favOnly && !favs.has(p.id)) return false;
@@ -2210,6 +2346,7 @@ function placeCard(p) {
         <span class="badge ${open ? 'open' : 'closed'}">${open ? 'Відчинено' : 'Зачинено'} · ${hoursText(p)}</span>
         <span class="badge">від ${uah(minPrice(p, ui.cat, ui.cls))}</span>
         ${powerBadge(p)}
+        ${mobileOn(p) ? `<span class="badge mobile">${icon('carSide', 13)}Виїзд до вас</span>` : ''}
         ${dealsOf(p.id).length ? `<span class="badge deal">${icon('bolt', 13)}−${Math.max(...dealsOf(p.id).map((d) => d.pct))}% у гарячі вікна</span>` : ''}
       </div>
     </a>
@@ -2238,6 +2375,22 @@ function hotBlock() {
       <span class="small muted">вільно з ${free[0]}${d.services?.length ? ` · ${d.services.length} ${plural(d.services.length, 'послуга', 'послуги', 'послуг')}` : ' · усі послуги'}</span>
     </a>`).join('')}</div>
   </section>`;
+}
+
+// ---------- промокоди CARCAR ----------
+
+const promoFor = (pr, place, items) => promoCheck(pr, { place, items, mine: mine(), all: bookings });
+const ALL_CATS = CATEGORIES.map((c) => c.id);
+
+// Акція, яка діє для цього клієнта автоматично (наприклад, перша мийка), — банер на головній.
+function promoBanner() {
+  const pr = promosAll().find((x) => x.auto && promoFor(x, { cats: x.cats?.length ? x.cats : ALL_CATS }, [{ cat: x.cats?.[0] ?? 'wash', price: 1e6 }]).ok);
+  if (!pr) return '';
+  const one = pr.cats?.length === 1 ? pr.cats[0] : null;
+  return `<a class="banner promo-banner" href="#/" ${one ? `data-action="cat" data-cat="${one}"` : ''}>
+    <span class="banner-ic">${icon('gift', 22)}</span>
+    <span><b>${esc(pr.title)}</b><span class="small">Знижка ${promoText(pr)} застосується сама під час оплати. Код ${esc(pr.code)}, оплачує CARCAR</span></span>
+    ${icon('chevR', 18)}</a>`;
 }
 
 // ---------- анонімна статистика ----------
@@ -2309,6 +2462,7 @@ function viewCatalog() {
       ${chip('Усі', 'data-action="cat" data-cat="all"', ui.cat === 'all')}
       ${CATEGORIES.map((c) => chip(`${icon(c.icon, 16)}${c.name}`, `data-action="cat" data-cat="${c.id}"`, ui.cat === c.id)).join('')}
       ${chip('Відчинено зараз', 'data-action="toggle" data-key="openNow"', ui.openNow)}
+      ${chip(`${icon('carSide', 16)}Виїзд до вас`, 'data-action="toggle" data-key="mobileOnly"', !!ui.mobileOnly)}
       ${chip(`${icon('bolt', 16)}Працює при відключеннях`, 'data-action="toggle" data-key="blackout"', !!ui.blackout)}
       ${chip(`${icon('heart', 16)}Обране`, 'data-action="toggle" data-key="favOnly"', ui.favOnly)}
     </div>
@@ -2331,6 +2485,7 @@ function viewCatalog() {
       </span>
     </div>
     ${hotBlock()}
+    ${promoBanner()}
     ${wallet.bonus ? `<a class="bonus-banner" href="#/invite">${icon('gift', 20)}<span>У вас ${uah(wallet.bonus)} бонусу — спишеться під час оплати замовлення від ${uah(REFERRAL.minOrder)}</span></a>` : ''}
     <div id="list" class="stack"></div>
     <div style="margin-top:14px">${inviteCard()}</div>
@@ -2418,6 +2573,9 @@ function viewPlace(id) {
       <div class="list personal-list" style="margin-top:10px">${personalFor(p).map((s) => `<div class="item">
         <span class="name"><span class="badge personal">Для вас</span> ${esc(s.name)}<small>${duration(s.min)}${s.note ? ` · ${esc(s.note)}` : ''}</small></span>
         <span class="price">${uah(s.price[0])}</span></div>`).join('')}</div>` : ''}
+    ${mobileOn(p) ? `<section class="card mobile-card" aria-label="Виїзд до вас">${icon('carSide', 22)}<div><b>Виїзд до вас</b>
+      <span class="small">${esc(p.mobile.services.map((id) => p.services.find((x) => x.id === id)?.name).filter(Boolean).join(', '))} — у вашому дворі чи біля офісу,
+      у радіусі ${p.mobile.radiusKm} км від точки. Виїзд +${uah(p.mobile.fee)}.</span></div></section>` : ''}
     ${queueBlock(p)}
     ${dealsCard(p)}
     <h2 class="big" id="services">Послуги та ціни</h2>
@@ -2564,7 +2722,7 @@ function askBlock(p) {
 function requestsCard() {
   if (!requests.length) return '';
   const list = [...requests].sort((a, b) => (b.messages.at(-1).at) - (a.messages.at(-1).at)).slice(0, 5);
-  return `<h2>Чати з точками</h2>
+  return `<h2>Запити про послуги</h2>
     <div class="stack" style="gap:8px">${list.map((r) => {
       const p = placeById(r.placeId);
       const [cls, label] = reqStatus(r);
@@ -2618,15 +2776,30 @@ function waitlistBlock(p, minutes, chosen) {
 }
 
 // Розрахунок вартості запису: знижка гарячого вікна, абонемент чи сертифікат, бонус і баланс CARCAR.
+// Послуги для обраного формату: у точці — увесь прайс, на виїзді — лише ті, що точка робить у клієнта.
+const mobileMode = () => draft?.mode === 'mobile' && mobileOn(placeById(draft.placeId));
+const bookableIn = (p) => (mobileMode() ? p.services.filter((s) => p.mobile.services.includes(s.id)) : bookable(p));
+
+// Адреса виїзду: чи вказана, чи позначена на карті й чи в радіусі точки.
+function addrCheck(p) {
+  const a = draft.addr ?? {};
+  if (!a.text?.trim()) return { ok: false, why: 'Вкажіть адресу, куди приїхати' };
+  if (a.lat == null) return { ok: false, why: 'Позначте місце на карті' };
+  const d = distanceKm(p, a);
+  if (d > p.mobile.radiusKm) return { ok: false, km: d, why: `Адреса за ${fmtDist(d)} від точки — виїзд лише в радіусі ${p.mobile.radiusKm} км` };
+  return { ok: true, km: d };
+}
+
 function quote(p) {
   const cls = draftClass();
-  const list = bookable(p);
+  const list = bookableIn(p);
   const chosen = list.filter((s) => draft.services.has(s.id));
   const minutes = chosen.reduce((a, s) => a + s.min, 0);
   const deal = draft.time ? dealAt(p.id, draft.date, draft.time) : null;
   const priceOf = (s) => (!s.personal && dealCovers(deal, s.id) ? dealPrice(s.price[cls], deal.pct) : s.price[cls]);
-  const listTotal = chosen.reduce((a, s) => a + s.price[cls], 0);
-  const total = chosen.reduce((a, s) => a + priceOf(s), 0);
+  const fee = mobileMode() && chosen.length ? p.mobile.fee : 0;
+  const listTotal = chosen.reduce((a, s) => a + s.price[cls], 0) + fee;
+  const total = chosen.reduce((a, s) => a + priceOf(s), 0) + fee;
   const subs = usableSubs(p.id, myKeys(), chosen.map((s) => s.id));
   let use = null;
   let covered = 0;
@@ -2639,17 +2812,36 @@ function quote(p) {
     const c = findCert(p.id, draft.cert);
     if (c && passActive(c)) { covered = Math.min(c.balance, total); use = { kind: 'cert', soldId: c.id, name: c.name, left: c.balance }; }
   }
-  const rest = total - covered;
+  // Промокод CARCAR: введений клієнтом або акція, що діє автоматично; '' — клієнт відмовився.
+  const items = chosen.map((s) => ({ cat: serviceCat(s), price: priceOf(s) }));
+  let promo = null;
+  let promoErr = null;
+  if (chosen.length && draft.promo !== '') {
+    const pr = draft.promo ? promosAll().find((x) => x.code === draft.promo) : promosAll().find((x) => x.auto && promoFor(x, p, items).ok);
+    const r = pr ? promoFor(pr, p, items) : draft.promo ? { ok: false, why: 'Такого промокоду немає' } : null;
+    if (r?.ok) promo = { code: pr.code, title: pr.title, amount: Math.min(r.amount, total - covered) };
+    else if (draft.promo) promoErr = r.why;
+  }
+  const rest = total - covered - (promo?.amount ?? 0);
   const bonus = draft.useBonus !== false ? bonusFor(rest) : 0;
   const fromBal = draft.useMoney !== false ? Math.min(wallet.money, rest - bonus) : 0;
-  return { cls, list, chosen, minutes, deal: total < listTotal ? deal : null, listTotal, total, subs, covered, use, rest, bonus, fromBal, card: rest - bonus - fromBal };
+  const card = rest - bonus - fromBal;
+  // Оплата частинами — лише для дорогих послуг і лише карткою.
+  const canParts = card >= PAYMENT.installments.minTotal;
+  const parts = canParts && PAYMENT.installments.parts.includes(draft.parts) ? draft.parts : 0;
+  const monthly = parts ? Math.ceil(card / parts) : 0;
+  return {
+    cls, list, chosen, minutes, deal: total < listTotal ? deal : null, listTotal, total, fee, subs, covered, use, promo, promoErr, rest, bonus, fromBal, card,
+    canParts, parts, installments: parts ? { n: parts, monthly, first: card - monthly * (parts - 1) } : null,
+  };
 }
 
 function renderBook() {
   const p = placeById(draft.placeId);
   const q = quote(p);
   const { cls, list, chosen, minutes, total, bonus, fromBal } = q;
-  const slots = minutes ? slotsFor(p, draft.date, minutes) : [];
+  const slots = minutes ? slotsFor(p, draft.date, minutes, { mobile: mobileMode() }) : [];
+  const where = mobileMode() ? addrCheck(p) : { ok: true };
   if (!draft.time && draft.wantTime && slots.some((s) => s.time === draft.wantTime && !s.busy)) { draft.time = draft.wantTime; draft.wantTime = null; return renderBook(); }
   if (draft.time && !slots.some((s) => s.time === draft.time && !s.busy)) { draft.time = null; return renderBook(); }
   const free = slots.filter((s) => !s.busy);
@@ -2664,6 +2856,19 @@ function renderBook() {
           ${CAR_CLASSES.map((c, i) => `<option value="${i}" ${i === cls ? 'selected' : ''}>${c}</option>`).join('')}
         </select></label>
         <p class="small muted">Додайте авто в <a href="#/garage">гараж</a>, щоб не обирати клас щоразу.</p>`}
+
+    ${mobileOn(p) ? `<h2>Де</h2>
+      <div class="seg-mini mode-seg" role="group" aria-label="Де виконати послугу">
+        <button data-action="mode" data-mode="place" aria-pressed="${!mobileMode()}">${icon('pin', 16)}У точці</button>
+        <button data-action="mode" data-mode="mobile" aria-pressed="${mobileMode()}">${icon('carSide', 16)}Виїзд до мене</button>
+      </div>
+      ${mobileMode() ? `<div class="stack mobile-where" style="gap:10px;margin-top:10px">
+        <label class="field"><span>Адреса</span><input id="addr" autocomplete="street-address" placeholder="Вулиця, будинок, підʼїзд чи паркінг" value="${esc(draft.addr?.text ?? '')}"></label>
+        <div class="map pick-map" id="pick-map" tabindex="0" role="region" aria-label="Карта: натисніть, щоб позначити місце авто"></div>
+        <div class="row"><button class="btn small-btn" data-action="addr-here">${icon('pin', 16)}Я зараз тут</button>
+          <span class="small ${where.ok ? 'ok-text' : 'muted'}" id="addr-note">${where.ok ? `${icon('checkCircle', 16)}${fmtDist(where.km)} від точки — приїдемо` : esc(where.why)}</span></div>
+        <p class="fine">Виїзд +${uah(p.mobile.fee)} · радіус ${p.mobile.radiusKm} км · потрібне місце, де можна стати з обладнанням. ${p.cats.includes('wash') ? 'Мийка безконтактна, з власною водою.' : 'Майстер привезе обладнання для монтажу й балансування.'}</p>
+      </div>` : ''}` : ''}
 
     <h2>2. Послуги</h2>
     <div class="list">
@@ -2708,6 +2913,14 @@ function renderBook() {
     <div class="sheet summary" role="dialog" aria-modal="true" aria-label="Оплата">
       <div class="handle"></div>
       <div class="sheet-total"><span>До сплати${fromBal ? ' карткою' : ''}</span><b>${uah(q.card)}</b></div>
+      ${q.fee ? `<p class="small" style="margin:0">${icon('carSide', 14)} Виїзд до вас: ${uah(q.fee)} · ${esc(draft.addr.text)}</p>` : ''}
+      ${q.promo ? `<div class="bonus-line promo-line"><span class="perk-ic ok">${icon('gift', 18)}</span>
+            <span>Промокод ${esc(q.promo.code)}<small>${esc(q.promo.title)} · оплачує CARCAR, точка отримає повну суму</small></span>
+            <b>−${uah(q.promo.amount)}</b><button class="link-btn" data-action="promo-off">Прибрати</button></div>`
+        : `<div class="inline-form promo-form">
+            <label class="field"><span>Промокод CARCAR</span><input id="promo-code" autocomplete="off" value="${esc(draft.promo || '')}"></label>
+            <button class="btn" data-action="promo-apply">Застосувати</button></div>
+          ${q.promoErr ? `<p class="small bad-text" style="margin:0" role="alert">${esc(q.promoErr)}</p>` : ''}`}
       ${q.deal ? `<p class="small" style="margin:0">${icon('bolt', 14)} Гаряче вікно −${q.deal.pct}%: ${uah(q.listTotal)} → ${uah(total)}</p>` : ''}
       ${q.subs.length ? `<label class="bonus-line"><input class="check" type="checkbox" id="usesub" ${draft.useSub !== false ? 'checked' : ''}>
             <span>${esc(q.subs[0].name)}<small>Списати 1 візит, лишилось ${passLeft(q.subs[0])}</small></span><b>${q.use?.kind === 'sub' ? `−${uah(q.covered)}` : ''}</b></label>` : ''}
@@ -2720,13 +2933,19 @@ function renderBook() {
         : `<p class="small muted" style="margin:0">Бонус ${uah(wallet.bonus)} діє для замовлень від ${uah(REFERRAL.minOrder)}.</p>`) : ''}
       ${wallet.money > 0 ? `<label class="bonus-line"><input class="check" type="checkbox" id="usemoney" ${draft.useMoney !== false ? 'checked' : ''}>
             <span>Баланс CARCAR<small>Доступно ${uah(wallet.money)}</small></span><b>−${uah(Math.min(wallet.money, q.rest - bonus))}</b></label>` : ''}
+      ${q.canParts ? `<fieldset class="parts">
+        <legend>Оплата частинами</legend>
+        <label><input type="radio" name="parts" value="0" ${q.parts ? '' : 'checked'}><span>Одразу<small>${uah(q.card)}</small></span></label>
+        ${PAYMENT.installments.parts.map((n) => `<label><input type="radio" name="parts" value="${n}" ${q.parts === n ? 'checked' : ''}><span>${n} платежі<small>по ${uah(Math.ceil(q.card / n))}/міс</small></span></label>`).join('')}
+        <p class="fine">Без переплати для вас: точка отримує всю суму одразу від банку-партнера, решту частин спишемо з картки щомісяця. Демо: справжньої розстрочки не оформлюємо.</p>
+      </fieldset>` : ''}
       <ul class="perks">
         <li><span class="perk-ic ok">${icon('shield', 20)}</span>Гроші утримуються, доки роботу не виконано</li>
         <li><span class="perk-ic">${icon('cash', 20)}</span>Комісія для клієнта — 0 ₴</li>
         <li><span class="perk-ic">${icon('undo', 20)}</span>Скасування до ${cancelWindow()} до візиту — уся сума повертається на баланс CARCAR</li>
       </ul>
       <div class="stack" style="gap:8px">
-        <button class="btn primary block" data-action="pay">${icon('card', 20)}${q.card > 0 ? `Оплатити ${uah(q.card)}` : fromBal ? 'Оплатити з балансу' : q.covered ? 'Записатися' : `Оплатити ${uah(0)}`}</button>
+        <button class="btn primary block" data-action="pay">${icon('card', 20)}${q.installments ? `Оплатити першу частину ${uah(q.installments.first)}` : q.card > 0 ? `Оплатити ${uah(q.card)}` : fromBal ? 'Оплатити з балансу' : q.covered ? 'Записатися' : `Оплатити ${uah(0)}`}</button>
         <button class="btn block" data-action="unpay">Назад</button>
       </div>
       <div class="grid2 pf">
@@ -2736,12 +2955,48 @@ function renderBook() {
       <label class="check-row small"><input class="check" type="checkbox" id="pf-optin" ${(draft.pfOptIn ?? profile.optIn) ? 'checked' : ''}><span>Отримувати пропозиції цієї точки у Viber чи Telegram</span></label>
       <p class="demo">Імʼя й телефон бачить лише точка — щоб звʼязатися й показувати вам персональні ціни. Демо-оплата: гроші не списуються.</p>
     </div>` : `<div class="dock summary">
-      <div class="total"><span>${chosen.length ? `${chosen.length} ${plural(chosen.length, 'послуга', 'послуги', 'послуг')} · ${duration(minutes)}` : 'Нічого не обрано'}</span><span>${q.deal ? `<s class="muted">${uah(q.listTotal)}</s> ` : ''}${uah(total - q.covered)}</span></div>
+      <div class="total"><span>${chosen.length ? `${chosen.length} ${plural(chosen.length, 'послуга', 'послуги', 'послуг')} · ${duration(minutes)}${q.fee ? ' · виїзд' : ''}` : 'Нічого не обрано'}</span><span>${q.deal || q.promo ? `<s class="muted">${uah(q.listTotal)}</s> ` : ''}${uah(q.rest)}</span></div>
       ${q.deal ? `<p class="save-pill">${icon('bolt', 14)}${q.deal.days ? 'Щасливі години' : 'Гаряче вікно'} −${q.deal.pct}%: ви економите ${uah(q.listTotal - total)}</p>` : ''}
-      <button class="btn primary block" data-action="confirm" ${chosen.length && draft.time ? '' : 'disabled'}>
-        ${draft.time ? `Записатися на ${dayLabel(draft.date, { day: 'numeric', month: 'long' })}, ${draft.time}` : 'Оберіть час'}
+      ${q.promo ? `<p class="save-pill">${icon('gift', 14)}${esc(q.promo.title)}: −${uah(q.promo.amount)} за промокодом ${esc(q.promo.code)}</p>` : ''}
+      ${q.canParts && !q.promo && !q.deal ? `<p class="small muted" style="margin:0 0 8px">Можна оплатити частинами: від ${uah(Math.ceil(q.card / Math.max(...PAYMENT.installments.parts)))}/міс</p>` : ''}
+      <button class="btn primary block" data-action="confirm" ${chosen.length && draft.time && where.ok ? '' : 'disabled'}>
+        ${!where.ok && chosen.length && draft.time ? esc(where.why) : draft.time ? `Записатися на ${dayLabel(draft.date, { day: 'numeric', month: 'long' })}, ${draft.time}` : 'Оберіть час'}
       </button>
     </div>`}`;
+  if (mobileMode()) mountPickMap(p);
+}
+
+// Карта для вибору місця виїзду: точка, радіус виїзду не малюємо — перевіряємо відстань.
+const pickState = {};
+function mountPickMap(p) {
+  const el = $('#pick-map');
+  if (!el) return;
+  if (pickState.place !== p.id) Object.assign(pickState, { place: p.id, x: undefined, y: undefined, z: undefined, layer: mapState.layer });
+  mountMap(el, {
+    places: [{ id: p.id, lat: p.lat, lng: p.lng, cls: `c-${p.cats[0]}`, html: `<span class="pin-shape">${icon(catById(p.cats[0]).icon, 16)}</span>`, label: esc(p.name) }],
+    pos: ui.pos, pick: draft.addr?.lat != null ? draft.addr : null, state: pickState, onLayer: (l) => store.set('mapLayer', l),
+    onPick: (lat, lng) => {
+      draft.addr = { ...draft.addr, text: $('#addr')?.value ?? draft.addr?.text ?? '', lat, lng };
+      updateWhere(p);
+    },
+  });
+}
+
+// Оновлюємо лише підпис і кнопку, щоб карта не перемальовувалась під пальцем.
+function updateWhere(p) {
+  const w = addrCheck(p);
+  const note = $('#addr-note');
+  if (note) {
+    note.className = `small ${w.ok ? 'ok-text' : 'muted'}`;
+    note.innerHTML = w.ok ? `${icon('checkCircle', 16)}${fmtDist(w.km)} від точки — приїдемо` : esc(w.why);
+  }
+  const btn = $('[data-action="confirm"]');
+  if (btn) {
+    const q = quote(p);
+    const ready = q.chosen.length && draft.time;
+    btn.disabled = !(ready && w.ok);
+    btn.textContent = !w.ok && ready ? w.why : draft.time ? `Записатися на ${dayLabel(draft.date, { day: 'numeric', month: 'long' })}, ${draft.time}` : 'Оберіть час';
+  }
 }
 
 function confirmBooking() {
@@ -2752,6 +3007,7 @@ function confirmBooking() {
   store.set('profile', profile);
   const q = quote(p);
   const { cls, chosen, total, bonus, fromBal } = q;
+  if (mobileMode() && !addrCheck(p).ok) { toast(addrCheck(p).why); return; }
   const id = uid();
   const passUse = q.use ? { ...redeemPass(p.id, q.use.soldId, q.covered, id), kind: q.use.kind } : null;
   const b = {
@@ -2777,6 +3033,9 @@ function confirmBooking() {
     clientName: profile.name,
     clientPhone: profile.phone,
     personal: chosen.filter((x) => x.personal).map((x) => x.id),
+    mobile: mobileMode() ? { address: draft.addr.text.trim(), lat: draft.addr.lat, lng: draft.addr.lng, fee: q.fee, km: Math.round(addrCheck(p).km * 10) / 10 } : null,
+    promo: q.promo ? { code: q.promo.code, amount: q.promo.amount } : null,
+    installments: q.installments ? { ...q.installments, card: q.card } : null,
     state: 'paid',
     createdAt: Date.now(),
   };
@@ -2786,8 +3045,9 @@ function confirmBooking() {
   if (fromBal) addMoney(-fromBal, `Оплата замовлення: ${p.name}`);
   draft = null;
   location.hash = `#/bookings/${b.id}`;
-  track('paid', { placeId: p.id, amount: total, deal: !!q.deal, pass: q.use?.kind ?? null, bonus: !!bonus, balance: !!fromBal, leadH: Math.round((bookingStart(b) - Date.now()) / HOUR) });
-  toast('Оплачено, ви записані');
+  track('paid', { placeId: p.id, amount: total, deal: !!q.deal, pass: q.use?.kind ?? null, bonus: !!bonus, balance: !!fromBal, leadH: Math.round((bookingStart(b) - Date.now()) / HOUR),
+    promo: q.promo?.code ?? null, mobile: !!b.mobile, parts: q.parts || 0 });
+  toast(q.installments ? `Оплачено першу частину, ви записані` : 'Оплачено, ви записані');
 }
 
 // ---------- оплата й утримання коштів ----------
@@ -2873,9 +3133,12 @@ function bookingCard(b, highlight) {
   const lines = `<div class="lines">
       <div class="il strong">${icon('calendar', 18)}${when}</div>
       <div class="il">${icon('carSide', 18)}${esc(b.car)}</div>
-      ${p ? `<div class="il">${icon('pin', 18)}${esc(p.address)}</div>` : ''}
+      ${b.mobile ? `<div class="il">${icon('carSide', 18)}Виїзд до вас: ${esc(b.mobile.address)}</div>` : p ? `<div class="il">${icon('pin', 18)}${esc(p.address)}</div>` : ''}
       <div class="svc">${b.services.map(esc).join(', ')}</div>
+      ${b.moves?.length ? `<div class="il muted">${icon('repeat', 18)}Перенесено з ${dayLabel(b.moves.at(-1).date, { day: 'numeric', month: 'long' })}, ${b.moves.at(-1).time}</div>` : ''}
       ${b.bonus ? `<div class="il">${icon('gift', 18)}Оплачено ${uah(b.paid)} + бонус ${uah(b.bonus)}</div>` : ''}
+      ${b.promo && !b.promo.returned ? `<div class="il">${icon('gift', 18)}Промокод ${esc(b.promo.code)}: −${uah(b.promo.amount)}</div>` : ''}
+      ${b.installments ? `<div class="il">${icon('card', 18)}Частинами: ${b.installments.n} платежі, перший ${uah(b.installments.first)}, далі по ${uah(b.installments.monthly)}/міс</div>` : ''}
     </div>`;
   let body = lines;
   const started = bookingStart(b) <= new Date();
@@ -2897,12 +3160,13 @@ function bookingCard(b, highlight) {
         ${p ? `<a class="btn" href="${tel(p)}">${icon('phone', 18)}Зателефонувати</a>` : ''}`
       : `<div class="notice ic-row">${icon('shield', 18)}Гроші утримуються, доки ви не підтвердите виконання. Після візиту тут зʼявиться кнопка «Підтвердити виконання».</div>
       <div class="grid2">
+        ${t.free ? `<a class="btn" href="#/move/${b.id}">${icon('calendar', 18)}Перенести</a>` : ''}
         <button class="btn" data-action="ics" data-id="${b.id}">${icon('calendar', 18)}У календар</button>
-        ${p ? `<a class="btn" href="${tel(p)}">${icon('phone', 18)}Зателефонувати</a>` : ''}
+        ${p ? `<a class="btn${t.free ? ' full' : ''}" href="${tel(p)}">${icon('phone', 18)}Зателефонувати</a>` : ''}
         <button class="btn text-danger full" data-action="cancel" data-id="${b.id}">${t.free ? 'Скасувати' : 'Скасувати без повернення'}</button>
       </div>
       <p class="terms">${t.free
-        ? `Безкоштовне скасування до ${fmtTime(t.deadline)} — усю суму ${uah(b.paid)} повернемо на баланс CARCAR. Пізніше оплата зараховується точці за послугу.`
+        ? `Перенести на інший час або скасувати безкоштовно можна до ${fmtTime(t.deadline)}. Під час скасування всю суму ${uah(b.paid)} повернемо на баланс CARCAR, пізніше оплата зараховується точці за послугу.`
         : `Скасувати з поверненням можна було до ${fmtTime(t.deadline)}. Тепер оплата зараховується точці за послугу, навіть якщо ви не приїдете.`}</p>`}`;
   } else if (b.state === 'done') {
     body = `<div class="lines tight">
@@ -2933,12 +3197,146 @@ function bookingCard(b, highlight) {
     ${b.state === 'paid' ? visitBar(b) : ''}
     ${steps(b)}
     ${body}
+    ${estimateBlock(b)}
     ${intakeBlock(b)}
+    ${chatBlock(b)}
     ${!ACTIVE.includes(b.state) && p ? `<div class="grid2">
       <a class="btn" href="#/book/${p.id}" data-action="repeat" data-id="${b.id}">${icon('repeat', 18)}Повторити запис</a>
       ${p.cats.includes('wash') && !b.subId ? `<button class="btn" data-action="sub-open" data-id="${b.id}">${icon('calendar', 18)}Зробити регулярним</button>` : ''}
     </div>${ui.subFor === b.id ? subForm(b) : ''}` : ''}
   </article>`;
+}
+
+// ---------- кошторис і гарантія ----------
+
+// Кошторис від СТО: клієнт погоджує пункти окремо й доплачує лише за погоджене.
+function estimateBlock(b) {
+  const e = b.estimate;
+  if (!e) return '';
+  const row = (x, form) => `<li class="est-item${x.status === 'declined' ? ' off' : ''}">
+    ${form ? `<input class="check" type="checkbox" name="item" value="${x.id}" checked aria-label="${esc(x.name)}">` : x.status === 'approved' ? `<span class="ok-text">${icon('check', 16)}</span>` : `<span class="muted">${icon('x', 16)}</span>`}
+    <span class="name">${esc(x.name)}<small>${ITEM_KIND[x.kind]}${x.qty !== 1 ? ` · ${x.qty} × ${uah(x.price)}` : ''}${x.warranty ? ` · гарантія ${x.warranty} міс` : ''}</small></span>
+    <b>${uah(itemSum(x))}</b></li>`;
+  if (e.state === 'sent' && b.state === 'paid') {
+    const sum = estimateTotal(e.items);
+    return `<form class="estimate card stack" data-id="${b.id}" aria-label="Кошторис від точки">
+      <div class="head"><b>${icon('wrench', 18)} Кошторис від майстра</b><span class="small muted">${fmtTime(e.at)}</span></div>
+      ${e.note ? `<p class="small" style="margin:0">${esc(e.note)}</p>` : ''}
+      <ul class="est-list">${e.items.map((x) => row(x, true)).join('')}</ul>
+      <button class="btn primary block est-pay" type="submit">Погодити обрані й доплатити ${uah(sum)}</button>
+      <button class="btn block" type="button" data-action="est-decline" data-id="${b.id}">Відхилити все</button>
+      <p class="fine">Зніміть позначку з того, що не потрібно, — ці роботи точка не виконуватиме. Доплата утримується так само, як основна оплата, до підтвердження виконання. Гарантія на роботи зʼявиться в сервісній книжці авто.</p>
+    </form>`;
+  }
+  const ok = estimateTotal(e.items, 'approved');
+  return `<details class="estimate card"><summary>${icon('wrench', 18)}Кошторис: ${e.state === 'sent' ? 'чекає відповіді' : ok ? `погоджено на ${uah(ok)}` : 'відхилено'}</summary>
+    <ul class="est-list">${e.items.map((x) => row(x, false)).join('')}</ul></details>`;
+}
+
+// Гарантії з погоджених кошторисів: від дня виконання на вказану кількість місяців.
+function warrantiesOf(car) {
+  return bookings.filter((b) => b.carId === car.id && b.state === 'completed' && b.estimate)
+    .flatMap((b) => b.estimate.items.filter((x) => x.status === 'approved' && x.warranty).map((x) => {
+      const from = isoDate(new Date(b.completedAt ?? bookingStart(b)));
+      return { name: x.name, place: placeById(b.placeId)?.name ?? '', from, until: warrantyUntil(from, x.warranty), months: x.warranty };
+    })).sort((a, c) => (a.until < c.until ? 1 : -1));
+}
+
+// ---------- чат за записом ----------
+
+function chatBlock(b) {
+  if (!ACTIVE.includes(b.state) && !b.chat?.length) return '';
+  const open = ui.chatFor === b.id;
+  const n = b.chat?.length ?? 0;
+  const head = `<button class="btn chat-toggle${b.chatUnreadClient ? ' unread' : ''}" data-action="chat-open" data-id="${b.id}" aria-expanded="${open}">${icon('chat', 18)}${open ? 'Згорнути чат' : `Чат з точкою${n ? ` · ${n}` : ''}`}${b.chatUnreadClient && !open ? '<span class="count">нове</span>' : ''}</button>`;
+  if (!open) return head;
+  return `${head}<section class="bk-chat" aria-label="Чат з точкою про цей запис">
+    ${n ? `<ol class="thread">${b.chat.map((m) => `<li class="msg ${m.from}"><span class="who">${m.from === 'biz' ? 'Точка' : m.from === 'sys' ? 'CARCAR' : 'Ви'} · ${fmtTime(m.at)}</span>${esc(m.text)}</li>`).join('')}</ol>`
+      : '<p class="small muted" style="margin:0">Напишіть точці про цей візит: приїдете з причепом, хочете раніше чи потрібен чек.</p>'}
+    ${ACTIVE.includes(b.state) ? `<div class="quick" role="group" aria-label="Швидкі повідомлення">${CLIENT_QUICK.map((t) => `<button class="chip" data-action="chat-quick" data-id="${b.id}" data-text="${esc(t)}">${esc(t)}</button>`).join('')}</div>
+    <form class="chat-form inline-form" data-id="${b.id}"><label class="field"><span>Повідомлення точці</span><input name="text" required maxlength="500" autocomplete="off"></label>
+      <button class="btn primary" type="submit">Надіслати</button></form>` : ''}
+  </section>`;
+}
+
+function sendChat(b, text) {
+  chatPost(b, 'client', text);
+  save();
+  route();
+  $(`#b-${b.id} .chat-form input`)?.focus();
+  track('chat', { placeId: b.placeId });
+  toast('Повідомлення надіслано точці');
+}
+
+// Чати за записами в «Повідомленнях»: останнє повідомлення й позначка нового.
+function bookingChatsCard() {
+  const list = mine().filter((b) => b.chat?.length).sort((a, c) => c.chat.at(-1).at - a.chat.at(-1).at).slice(0, 8);
+  if (!list.length) return '';
+  return `<h2>Чати за записами</h2><div class="stack" style="gap:8px">${list.map((b) => {
+    const last = b.chat.at(-1);
+    return `<a class="card link-card" href="#/bookings/${b.id}/chat">${icon('chat', 22)}<span>${esc(placeById(b.placeId)?.name ?? 'Точка')} · ${dayLabel(b.date, { day: 'numeric', month: 'short' })}, ${b.time}
+      <small class="small muted" style="display:block;font-weight:400">${last.from === 'biz' ? 'Точка: ' : last.from === 'client' ? 'Ви: ' : ''}${esc(last.text.length > 70 ? `${last.text.slice(0, 70).trimEnd()}…` : last.text)}</small></span>
+      ${b.chatUnreadClient ? '<span class="count" aria-label="нове повідомлення">1</span>' : ''}${icon('chevR', 18)}</a>`;
+  }).join('')}</div>`;
+}
+
+// ---------- перенесення запису ----------
+
+// Перенести можна до кінця безкоштовного скасування: оплата, знижки й бонуси лишаються як були.
+const MOVE_LIMIT = 3;
+let move = null; // { id, date, time }
+
+function viewMove(id) {
+  const b = mine().find((x) => x.id === id);
+  if (!b || b.state !== 'paid') return viewNotFound();
+  const p = placeById(b.placeId);
+  const t = cancelTerms(b);
+  const head = `${back(`#/bookings/${b.id}`, 'Мої записи')}<h1>Перенести запис</h1>
+    <p class="lead">${esc(p.name)} · ${esc(b.services.join(', '))}<br>Зараз: ${dayLabel(b.date, { weekday: 'short', day: 'numeric', month: 'long' })}, ${b.time}</p>`;
+  if (!t.free) return `${head}<p class="notice warn">Перенести можна було до ${fmtTime(t.deadline)}. Напишіть точці в чаті запису — можливо, вона знайде інший час.</p>`;
+  if ((b.moves?.length ?? 0) >= MOVE_LIMIT) return `${head}<p class="notice warn">Запис уже переносили ${MOVE_LIMIT} рази. Напишіть точці в чаті запису або скасуйте його безкоштовно до ${fmtTime(t.deadline)}.</p>`;
+  if (move?.id !== id) move = { id, date: b.date, time: null };
+  return `${head}<p class="notice ok ic-row">${icon('shield', 18)}Оплата ${uah(b.paid)} не скасовується й не списується вдруге — змінюється лише час. Ціна лишається тією самою.</p>
+    <div id="move"></div>`;
+}
+
+function renderMove() {
+  const b = bookings.find((x) => x.id === move.id);
+  const p = placeById(b.placeId);
+  const slots = slotsFor(p, move.date, b.minutes, { skip: b, mobile: !!b.mobile });
+  if (move.time && !slots.some((x) => x.time === move.time && !x.busy)) move.time = null;
+  const same = (time) => move.date === b.date && time === b.time;
+  $('#move').innerHTML = `<h2>Новий день</h2>
+    <div class="days" role="group" aria-label="День">${bookingDays(p).map((d, i) => {
+      const date = parseDate(d);
+      const wd = i === 0 ? 'Сьогодні' : i === 1 ? 'Завтра' : date.toLocaleDateString('uk-UA', { weekday: 'short' });
+      const closed = !hoursFor(p, d);
+      return `<button class="day${closed ? ' closed' : ''}" data-action="move-day" data-date="${d}" aria-pressed="${d === move.date}" ${closed ? `disabled aria-label="${wd}, ${date.getDate()}, вихідний"` : ''}>
+        <span>${wd}</span><b>${date.getDate()}</b><span>${closed ? 'вихідний' : date.toLocaleDateString('uk-UA', { month: 'short' })}</span></button>`;
+    }).join('')}</div>
+    <h2>Новий час</h2>
+    ${slots.some((x) => !x.busy) ? `<div class="slots" role="group" aria-label="Час">${slots.map((x) => `<button class="slot" data-action="move-time" data-time="${x.time}"
+      ${x.busy || same(x.time) ? `disabled aria-label="${x.time}, ${same(x.time) ? 'ваш поточний час' : 'зайнято'}"` : ''} aria-pressed="${x.time === move.time}">${x.time}${same(x.time) ? '<small>зараз</small>' : ''}</button>`).join('')}</div>`
+      : '<p class="muted">На цей день вільного часу немає. Оберіть інший день.</p>'}
+    <div class="dock-space"></div>
+    <div class="dock"><button class="btn primary block" data-action="move-confirm" ${move.time ? '' : 'disabled'}>${move.time ? `Перенести на ${dayLabel(move.date, { day: 'numeric', month: 'long' })}, ${move.time}` : 'Оберіть новий час'}</button></div>`;
+}
+
+function confirmMove() {
+  const b = bookings.find((x) => x.id === move.id);
+  if (!cancelTerms(b).free) { toast('Час для перенесення минув'); route(); return; }
+  const from = `${dayLabel(b.date, { day: 'numeric', month: 'long' })}, ${b.time}`;
+  const to = `${dayLabel(move.date, { day: 'numeric', month: 'long' })}, ${move.time}`;
+  b.moves = [...(b.moves ?? []), { date: b.date, time: b.time, at: Date.now() }];
+  Object.assign(b, { date: move.date, time: move.time });
+  // Нагадування й «Їду» стосувалися старого часу.
+  for (const k of ['remindDay', 'remind2h', 'eta', 'late', 'etaAt']) delete b[k];
+  chatPost(b, 'sys', `Клієнт переніс запис з ${from} на ${to}`, 'biz');
+  move = null;
+  save();
+  track('move', { placeId: b.placeId });
+  location.hash = `#/bookings/${b.id}`;
+  toast(`Запис перенесено на ${to}. Оплата збережена`);
 }
 
 // ---------- нагадування про візит ----------
@@ -3107,6 +3505,7 @@ function viewInbox() {
     ${waits.length ? `<h2>Лист очікування</h2><div class="stack" style="gap:8px">${waits.map((w) => `<div class="card head" style="align-items:center">
       <span><b>${esc(placeById(w.placeId)?.name ?? '')}</b><small class="small muted" style="display:block">${dayLabel(w.date, { day: 'numeric', month: 'long' })}, ${hhmm(w.from)}–${hhmm(w.to)} · ${esc(w.services.join(', '))}</small></span>
       <button class="btn" data-action="wait-cancel" data-id="${w.id}">Вийти</button></div>`).join('')}</div>` : ''}
+    ${bookingChatsCard()}
     ${requestsCard()}
     <h2>Сповіщення</h2>
     ${list.length ? `<div class="stack" style="gap:8px">${list.map((m) => `<article class="card msg-card${m.read ? '' : ' unread'}">
@@ -3121,7 +3520,7 @@ function viewInbox() {
 
 // Лічильник на вкладці «Повідомлення»: непрочитані сповіщення й нові відповіді точок у чатах.
 function updateInboxBadge() {
-  const unread = inboxFor(myKeys()).filter((m) => !m.read).length + requests.filter((r) => r.unreadClient).length;
+  const unread = inboxFor(myKeys()).filter((m) => !m.read).length + requests.filter((r) => r.unreadClient).length + mine().filter((b) => b.chatUnreadClient).length;
   const count = $('#inbox-tab .tab-count');
   count.textContent = unread > 9 ? '9+' : unread;
   count.hidden = !unread;
@@ -3286,7 +3685,7 @@ function viewDisputes() {
 function historyOf(car) {
   const fromApp = bookings
     .filter((b) => b.carId === car.id && b.state === 'completed')
-    .map((b) => ({ date: b.date, km: b.km, text: b.services.join(', '), cost: price(b), place: placeById(b.placeId)?.name, photos: b.photos, note: b.note }));
+    .map((b) => ({ date: b.date, km: b.km, text: [...b.services, ...(b.estimate?.items ?? []).filter((x) => x.status === 'approved').map((x) => x.name)].join(', '), cost: price(b), place: placeById(b.placeId)?.name, photos: b.photos, note: b.note }));
   return [...fromApp, ...(car.log ?? [])].sort((x, y) => (x.date < y.date ? 1 : -1));
 }
 
@@ -3401,6 +3800,11 @@ function viewCar(id) {
         <input name="km" type="number" inputmode="numeric" min="0" value="${currentKm(c) || ''}" autocomplete="off"></label>
       <button class="btn" type="submit">Оновити</button>
     </form>
+    ${warrantiesOf(c).length ? `<h2>Гарантії</h2><div class="stack" style="gap:8px">${warrantiesOf(c).map((w) => {
+      const live = w.until >= isoDate(new Date());
+      return `<div class="reminder ${live ? 'ok' : ''}">${icon('shield', 20)}<div><b>${esc(w.name)}</b><span class="small">${esc(w.place)} · ${w.months} міс з ${fmtDate(w.from)} · ${live ? `діє до ${fmtDate(w.until)}` : `закінчилась ${fmtDate(w.until)}`}</span></div></div>`;
+    }).join('')}</div>
+    <p class="small muted">Якщо щось зламалося за гарантією — напишіть точці або відкрийте <a href="#/bookings">запис</a>; акт і кошторис збережені тут.</p>` : ''}
     <h2>Історія обслуговування</h2>
     <div class="card history">
       ${history.length ? history.map((h) => `<div class="log-item">
@@ -3480,8 +3884,9 @@ const bookingActions = {
       b.refundTo = 'balance';
       if (t.refund) addMoney(t.refund, `Повернення: ${placeById(b.placeId)?.name ?? 'скасований запис'}`);
       returnBonus(b, 'скасоване замовлення');
-      // Візит абонемента чи сума сертифіката повертаються.
+      // Візит абонемента чи сума сертифіката повертаються, промокодом можна скористатися знову.
       if (b.passUse) { restorePass(b.placeId, b.passUse); b.passUse = null; }
+      if (b.promo) b.promo.returned = true;
     }
     toast(t.free ? `Запис скасовано, ${uah(t.refund)} повернено на баланс` : 'Запис скасовано, оплату зараховано точці');
   },
@@ -3490,6 +3895,13 @@ const bookingActions = {
     b.services.push(`Доплата: ${b.extra.reason}`);
     delete b.extra;
     toast('Доплату оплачено');
+  },
+  'est-decline'(b) {
+    if (!confirm('Відхилити весь кошторис? Точка виконає лише те, що ви вже оплатили.')) return false;
+    for (const x of b.estimate.items) x.status = 'declined';
+    Object.assign(b.estimate, { state: 'answered', answeredAt: Date.now() });
+    chatPost(b, 'sys', 'Клієнт відхилив кошторис', 'biz');
+    toast('Кошторис відхилено');
   },
   'extra-no'(b) {
     delete b.extra;
@@ -3537,14 +3949,14 @@ const bookingActions = {
 function route() {
   const [, page = '', arg, sub, extra] = location.hash.replace(/^#/, '').split('/');
   const view = $('#view');
-  const tab = ['partner', 'disputes', 'invite'].includes(page) ? '' : ['bookings', 'garage', 'inbox'].includes(page) ? page : 'catalog';
+  const tab = ['partner', 'disputes', 'invite'].includes(page) ? '' : page === 'move' ? 'bookings' : ['bookings', 'garage', 'inbox'].includes(page) ? page : 'catalog';
   settle();
   // Хтось скасував запис — можливо, звільнився час для листа очікування.
   checkWaitlist(bookings);
   runSubscriptions();
   visitReminders();
   // Крапка на вкладці «Мої записи», коли машина готова, точка просить доплату чи підтвердити акт.
-  const ready = mine().some((b) => b.state === 'done' || b.extra || (b.intake && !b.intake.ack));
+  const ready = mine().some((b) => b.state === 'done' || b.extra || (b.intake && !b.intake.ack) || b.chatUnreadClient || (b.estimate?.state === 'sent' && b.state === 'paid'));
   document.querySelector('.tabs a[data-tab="bookings"]').toggleAttribute('data-badge', ready);
 
   document.querySelectorAll('.tabs a').forEach((a) => {
@@ -3558,7 +3970,13 @@ function route() {
   else if (page === 'place') view.innerHTML = viewPlace(arg);
   else if (page === 'book') { view.innerHTML = viewBook(arg, sub, extra); if ($('#book')) renderBook(); }
   else if (page === 'inbox') view.innerHTML = viewInbox();
-  else if (page === 'bookings') view.innerHTML = viewBookings(arg);
+  else if (page === 'bookings') {
+    // Відкрили чат запису: його повідомлення прочитані.
+    if (sub === 'chat') ui.chatFor = arg;
+    const open = bookings.find((b) => b.id === ui.chatFor && b.chatUnreadClient);
+    if (open) { open.chatUnreadClient = false; save(); }
+    view.innerHTML = viewBookings(arg);
+  } else if (page === 'move') { view.innerHTML = viewMove(arg); if ($('#move')) renderMove(); }
   else if (page === 'garage') view.innerHTML = arg ? viewCar(arg) : viewGarage();
   else if (page === 'partner') view.innerHTML = arg ? viewPartnerJob(arg) : viewPartner();
   else if (page === 'disputes') view.innerHTML = viewDisputes();
@@ -3714,7 +4132,8 @@ document.addEventListener('click', (e) => {
     const services = new Set(bookable(p).filter((s) => b.services.includes(s.name)).map((s) => s.id));
     const minutes = bookable(p).filter((s) => services.has(s.id)).reduce((a, s) => a + s.min, 0);
     const [date, time] = repeatSlot(p, minutes, b.time);
-    draft = { placeId: p.id, services, date, time, carId: b.carId && cars.some((c) => c.id === b.carId) ? b.carId : cars[0]?.id ?? null, paying: !!time };
+    draft = { placeId: p.id, services, date, time, carId: b.carId && cars.some((c) => c.id === b.carId) ? b.carId : cars[0]?.id ?? null, paying: !!time,
+      mode: b.mobile && mobileOn(p) ? 'mobile' : 'place', addr: b.mobile ? { text: b.mobile.address, lat: b.mobile.lat, lng: b.mobile.lng } : null };
     track('repeat', { placeId: p.id });
     if (time) setTimeout(() => toast(`Той самий запис: ${dayLabel(date, { weekday: 'short', day: 'numeric', month: 'long' })} о ${time} — лишилось оплатити`), 0);
   } else if (action === 'plate-check') {
@@ -3764,6 +4183,42 @@ document.addEventListener('click', (e) => {
     store.set('subscriptions', list);
     route();
     toast(action === 'sub-del' ? 'Регулярний запис видалено' : x.status === 'paused' ? 'Регулярний запис на паузі' : 'Регулярний запис відновлено');
+  } else if (action === 'move-day' || action === 'move-time') {
+    if (action === 'move-day') { move.date = el.dataset.date; move.time = null; } else move.time = el.dataset.time;
+    renderMove();
+    $(action === 'move-day' ? `[data-action="move-day"][data-date="${move.date}"]` : '[data-action="move-confirm"]')?.focus();
+  } else if (action === 'move-confirm') {
+    confirmMove();
+  } else if (action === 'chat-open') {
+    ui.chatFor = ui.chatFor === id ? null : id;
+    const b = bookings.find((x) => x.id === id);
+    if (b.chatUnreadClient) { b.chatUnreadClient = false; save(); }
+    route();
+    $(`#b-${id}`)?.scrollIntoView({ block: 'start' });
+    $(`#b-${id} .chat-form input`)?.focus();
+  } else if (action === 'chat-quick') {
+    sendChat(bookings.find((x) => x.id === id), el.dataset.text);
+  } else if (action === 'mode') {
+    draft.mode = el.dataset.mode;
+    draft.paying = false;
+    renderBook();
+    $(`[data-action="mode"][data-mode="${draft.mode}"]`)?.focus();
+  } else if (action === 'addr-here') {
+    if (!navigator.geolocation) { toast('Не вдалося визначити місце — позначте його на карті'); return; }
+    navigator.geolocation.getCurrentPosition((pos) => {
+      draft.addr = { ...draft.addr, text: $('#addr')?.value || draft.addr?.text || 'Моє місцезнаходження', lat: pos.coords.latitude, lng: pos.coords.longitude };
+      renderBook();
+    }, () => toast('Не вдалося визначити місце — позначте його на карті'), { timeout: 8000 });
+  } else if (action === 'promo-apply') {
+    draft.promo = $('#promo-code').value.trim().toUpperCase() || '';
+    renderBook();
+    const q = quote(placeById(draft.placeId));
+    if (q.promo) toast(`Промокод застосовано: −${uah(q.promo.amount)}`);
+    $(q.promo ? '[data-action="pay"]' : '#promo-code')?.focus();
+  } else if (action === 'promo-off') {
+    draft.promo = '';
+    renderBook();
+    $('#promo-code')?.focus();
   } else if (action === 'delcar') {
     if (!confirm('Видалити авто разом із сервісною книжкою?')) return;
     cars = cars.filter((c) => c.id !== id);
@@ -3786,6 +4241,17 @@ document.addEventListener('change', (e) => {
     if (t.checked) draft.cert = null;
     renderBook();
     $('#usesub')?.focus();
+  } else if (t.name === 'parts') {
+    draft.parts = Number(t.value);
+    renderBook();
+    $(`input[name="parts"][value="${t.value}"]`)?.focus();
+  } else if (t.name === 'item' && t.closest('.estimate')) {
+    const form = t.closest('.estimate');
+    const b = bookings.find((x) => x.id === form.dataset.id);
+    const ids = new Set([...form.querySelectorAll('input[name="item"]:checked')].map((x) => x.value));
+    const sum = estimateTotal(b.estimate.items.filter((x) => ids.has(x.id)));
+    t.closest('.est-item').classList.toggle('off', !t.checked);
+    form.querySelector('.est-pay').textContent = sum ? `Погодити обрані й доплатити ${uah(sum)}` : 'Нічого не обрано — відхилити все';
   } else if (t.id === 'pf-optin') {
     draft.pfOptIn = t.checked;
   } else if (t.id === 'usebonus' || t.id === 'usemoney') {
@@ -3818,12 +4284,35 @@ document.addEventListener('input', (e) => {
   }
   if (e.target.id === 'pf-name') draft.pfName = e.target.value;
   if (e.target.id === 'pf-phone') draft.pfPhone = e.target.value;
+  if (e.target.id === 'addr') { draft.addr = { ...draft.addr, text: e.target.value }; updateWhere(placeById(draft.placeId)); }
 });
 
 document.addEventListener('submit', async (e) => {
   if (e.target.matches('.ready-form')) {
     e.preventDefault();
     finishJob(e.target);
+    return;
+  }
+  if (e.target.matches('.chat-form')) {
+    e.preventDefault();
+    const text = new FormData(e.target).get('text').trim();
+    if (text) sendChat(bookings.find((x) => x.id === e.target.dataset.id), text);
+    return;
+  }
+  if (e.target.matches('.estimate')) {
+    e.preventDefault();
+    const b = bookings.find((x) => x.id === e.target.dataset.id);
+    const ids = new Set(new FormData(e.target).getAll('item'));
+    for (const x of b.estimate.items) x.status = ids.has(x.id) ? 'approved' : 'declined';
+    const sum = estimateTotal(b.estimate.items, 'approved');
+    if (sum && !confirm(`Доплатити ${uah(sum)} карткою за погоджені пункти?`)) { for (const x of b.estimate.items) x.status = 'pending'; return; }
+    b.paid += sum;
+    Object.assign(b.estimate, { state: 'answered', answeredAt: Date.now(), approved: sum });
+    chatPost(b, 'sys', sum ? `Клієнт погодив кошторис: ${ids.size} з ${b.estimate.items.length} пунктів на ${uah(sum)}, доплату внесено` : 'Клієнт відхилив кошторис', 'biz');
+    save();
+    route();
+    track('estimate', { placeId: b.placeId, approved: sum });
+    toast(sum ? `Кошторис погоджено, доплачено ${uah(sum)}` : 'Кошторис відхилено');
     return;
   }
   if (e.target.matches('.sub-form')) {

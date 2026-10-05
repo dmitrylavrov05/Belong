@@ -623,6 +623,44 @@ label.item { cursor: pointer; padding: 10px 14px; }
 .visit-bar { margin-top: 0; }
 .tab-count { position: absolute; top: -6px; left: 14px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 2px solid var(--bg); box-sizing: content-box; }
 .tab-count[hidden] { display: none; }
+
+/* Виїзд до клієнта, перенесення, чат за записом, кошторис, промокоди й оплата частинами */
+.ok-text, .bad-text { display: inline-flex; align-items: center; gap: 6px; }
+.ok-text { color: var(--ok); }
+.bad-text { color: var(--danger); }
+.badge.mobile { background: var(--soft); color: var(--text); }
+.mobile-card { flex-direction: row; align-items: flex-start; gap: 12px; margin-top: 14px; }
+.mobile-card > .ic { flex: none; color: var(--accent); margin-top: 2px; }
+.mobile-card b { display: block; margin-bottom: 2px; }
+.mode-seg { margin-top: 2px; }
+.mode-seg button { font-size: 14px; min-height: 40px; padding: 6px 14px; }
+.map.pick-map { height: 260px; cursor: crosshair; }
+.pick-dot { position: absolute; left: 0; top: 0; width: 22px; height: 22px; margin: -22px 0 0 -11px; border-radius: 50% 50% 50% 0; transform-origin: 0 0; background: var(--accent); border: 3px solid #fff; rotate: -45deg; box-shadow: 0 2px 6px rgba(0, 0, 0, .3); }
+.promo-banner .banner-ic { background: var(--ok-soft); color: var(--ok); }
+.promo-line { cursor: default; }
+.promo-line .perk-ic { flex: none; }
+.promo-form { align-items: flex-end; }
+.parts { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+.parts legend { font-size: 14px; font-weight: 600; padding: 0 4px; }
+.parts label { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; cursor: pointer; font-size: 14px; }
+.parts label:has(input:checked) { border-color: var(--navy); background: var(--soft); font-weight: 600; }
+.parts small { display: block; font-size: 12px; color: var(--muted); font-weight: 400; }
+.parts .fine { grid-column: 1 / -1; margin: 0; }
+.estimate { gap: 10px; }
+.estimate summary { display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; }
+.est-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.est-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 15px; }
+.est-item:first-child { border-top: 0; }
+.est-item .name { flex: 1; min-width: 0; }
+.est-item .name small { display: block; font-size: 12px; color: var(--muted); }
+.est-item b { white-space: nowrap; }
+.est-item.off .name, .est-item.off b { color: var(--muted); text-decoration: line-through; }
+.chat-toggle { justify-content: flex-start; }
+.chat-toggle .count { margin-left: auto; }
+.bk-chat { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--line); padding-top: 12px; }
+.bk-chat .quick { display: flex; flex-wrap: wrap; gap: 6px; }
+.bk-chat .quick .chip { font-size: 13px; padding: 6px 10px; min-height: 34px; }
+.thread .msg.sys { justify-self: center; background: transparent; border: 1px dashed var(--line); font-size: 13px; color: var(--muted); }
 </style>
   <style>
 /* Панель для бізнесу CARCAR: десктоп-перший макет поверх токенів і компонентів styles.css. */
@@ -765,7 +803,7 @@ details.table-view summary { cursor: pointer; color: var(--navy); font-weight: 6
 
 /* ---------- таблиці ---------- */
 
-.table-wrap { overflow-x: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 16px; }
+.table-wrap { position: relative; overflow-x: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 16px; }
 table.t { width: 100%; border-collapse: collapse; font-size: 14px; }
 table.t th { text-align: left; font-weight: 600; color: var(--muted); font-size: 13px; padding: 10px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; background: var(--bg); }
 table.t td { padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
@@ -1020,6 +1058,18 @@ table.t tr.off td { opacity: .55; }
   .funnel li { grid-template-columns: 1fr auto; }
   .funnel .f-track { grid-column: 1 / -1; grid-row: 2; }
 }
+
+/* Виїзд, кошторис і чат за записом */
+.sched-col-head.mobile { color: var(--text); background: var(--soft); }
+.sched-col.mobile { background-color: var(--soft); }
+.est-row { display: grid; grid-template-columns: 120px 1fr 70px 100px 120px; gap: 6px; border: 0; padding: 0; margin: 0; }
+.est-row legend { font-size: 13px; color: var(--muted); padding: 0; margin-bottom: 4px; }
+.est-row input { min-height: 40px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: 14px; min-width: 0; }
+@media (max-width: 640px) { .est-row { grid-template-columns: 1fr 1fr; } .est-row [name="name"] { grid-column: 1 / -1; } }
+.estimate-box { border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.chat-list li.unread { border-color: var(--accent); }
+.chat-list li > span small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.est-row .select { width: 100%; min-width: 0; height: 40px; }
 </style>
 </head>
 <body class="biz admin">
@@ -1115,6 +1165,8 @@ const pick = (catalog, ids, k = 1) =>
 
 // hours: [відкриття, закриття] у годинах; null — цілодобово.
 // lat, lng — приблизні координати для сортування «Поруч» (демо).
+// mobile — «Виїзд до вас»: радіус у км від точки, вартість виїзду, кількість бригад
+// і послуги, які можна виконати на місці в клієнта.
 const PLACES = [
   {
     id: 'blysk',
@@ -1143,6 +1195,7 @@ const PLACES = [
     boxes: 6,
     tags: ['Цілодобово', 'Самообслуговування'],
     services: pick(WASH, ['express', 'complex', 'inside', 'engine'], 0.9),
+    mobile: { radiusKm: 12, fee: 250, crews: 2, services: ['express', 'complex', 'inside'] },
   },
   {
     id: 'koleso',
@@ -1157,6 +1210,7 @@ const PLACES = [
     boxes: 3,
     tags: ['Зберігання шин', 'Шини в наявності'],
     services: pick(TIRES, ['change', 'balance', 'repair', 'storage', 'rolling']),
+    mobile: { radiusKm: 15, fee: 300, crews: 1, services: ['change', 'repair'] },
   },
   {
     id: 'shynservis',
@@ -1254,6 +1308,9 @@ const PAYMENT = {
   // Пізніше (або якщо клієнт не приїхав) оплата зараховується точці як оплата послуги.
   freeCancelHours: 1.5,
   noShowShare: 1, // частка точці, якщо клієнт не приїхав або скасував пізно
+  // Оплата частинами для дорогих послуг: клієнт платить рівними частинами без переплати,
+  // точка отримує всю суму одразу від банку-партнера (комісію банку в прототипі не враховано).
+  installments: { minTotal: 3000, parts: [3, 4, 6] },
 };
 
 // Нагадування сервісної книжки.
@@ -1511,7 +1568,7 @@ async function shrinkPhoto(file) {
 
 // Точка може змінити в панелі для бізнесу телефон, години, кількість боксів і прайс.
 // Зміни зберігаються в 'biz.places' і накладаються на дані з data.js в обох застосунках.
-const withBase = (p) => Object.assign(p, { basePhone: p.phone, baseHours: p.hours, baseBoxes: p.boxes, baseServices: p.services, baseCats: p.cats });
+const withBase = (p) => Object.assign(p, { basePhone: p.phone, baseHours: p.hours, baseBoxes: p.boxes, baseServices: p.services, baseCats: p.cats, baseMobile: p.mobile ?? null });
 PLACES.forEach(withBase);
 
 // Нові точки, зареєстровані в панелі через «Підключення». Клієнти бачать їх лише після схвалення CARCAR.
@@ -1535,6 +1592,7 @@ function applyOverrides() {
     p.hours = o.hours !== undefined ? o.hours : p.baseHours;
     p.boxes = o.boxes ?? p.baseBoxes;
     p.schedule = o.schedule ?? null;
+    p.mobile = o.mobile !== undefined ? o.mobile : p.baseMobile;
     p.allServices = o.services ?? p.baseServices;
     p.services = p.allServices.filter((s) => !s.off);
     // Категорії точки — ті, у яких є хоч одна активна послуга (точка могла додати нову).
@@ -1679,8 +1737,51 @@ const BLOCKING = [...ACTIVE, 'booked'];
 // Запис через CARCAR (оплата в застосунку) чи внесений точкою вручну (оплата на місці).
 const isCarcar = (b) => (b.channel ?? 'carcar') === 'carcar';
 
-// Повна ціна замовлення: те, що заплатив клієнт, плюс бонус, який доплачує CARCAR.
-const price = (b) => b.paid + (b.bonus || 0);
+// Повна ціна замовлення: те, що заплатив клієнт, плюс бонус і промокод, які доплачує CARCAR.
+const price = (b) => b.paid + (b.bonus || 0) + (b.promo && !b.promo.returned ? b.promo.amount : 0);
+
+// ---------- виїзні послуги ----------
+
+// Виїзна бригада зайнята ще MOBILE_ROAD хвилин після роботи — дорога до наступного клієнта.
+// Бокси й бригади — окремі потужності: виїзний запис не займає бокс, а запис у точці — бригаду.
+const MOBILE_ROAD = 30;
+const mobileOn = (p) => !!p?.mobile?.services?.length && p.mobile.crews > 0;
+const spanOf = (b) => [toMin(b.time), toMin(b.time) + b.minutes + (b.mobile ? MOBILE_ROAD : 0)];
+const laneCap = (p, mobile) => (mobile ? p.mobile?.crews ?? 0 : p.boxes);
+const sameLane = (b, mobile) => !!b.mobile === !!mobile;
+
+// ---------- промокоди платформи ----------
+
+// Промокоди й акції CARCAR. Знижку оплачує платформа: точка отримує повну ціну, як із бонусом.
+// kind: pct — відсоток (max — не більше ₴), sum — фіксована сума. cats — на які категорії діє (порожньо — на всі).
+// firstOnly — лише на перше замовлення в цих категоріях; auto — застосовується сам, без введення коду.
+const PROMO_DEFAULTS = [
+  { id: 'persha30', code: 'PERSHA30', title: 'Перша мийка −30%', kind: 'pct', value: 30, max: 300, minOrder: 0, cats: ['wash'], firstOnly: true, auto: true, active: true, until: null, limit: null },
+];
+const promosAll = () => store.get('admin.promos', null) ?? PROMO_DEFAULTS;
+const savePromos = (list) => store.set('admin.promos', list);
+const promoUses = (code, bookings) => bookings.filter((b) => b.promo?.code === code && !b.promo.returned);
+const promoText = (pr) => (pr.kind === 'pct' ? `−${pr.value}%${pr.max ? ` (до ${uah(pr.max)})` : ''}` : `−${uah(pr.value)}`);
+
+// Чи діє промокод на замовлення: items — [{cat, price}] обраних послуг (ціни вже зі знижками точки),
+// mine — записи цього клієнта. Повертає { ok, amount } або { ok: false, why }.
+function promoCheck(pr, { place, items, mine, all }) {
+  const today = isoDate(new Date());
+  if (!pr || pr.active === false) return { ok: false, why: 'Промокод не діє' };
+  if (pr.until && pr.until < today) return { ok: false, why: 'Строк дії промокоду минув' };
+  if (pr.limit && promoUses(pr.code, all).length >= pr.limit) return { ok: false, why: 'Промокод уже використали максимальну кількість разів' };
+  const inCats = (c) => !pr.cats?.length || pr.cats.includes(c);
+  if (!place.cats.some(inCats)) return { ok: false, why: `Промокод діє лише на: ${pr.cats.map((c) => CATEGORIES.find((x) => x.id === c)?.name.toLowerCase()).join(', ')}` };
+  const base = items.filter((x) => inCats(x.cat)).reduce((a, x) => a + x.price, 0);
+  if (!base) return { ok: false, why: 'Промокод не діє на обрані послуги' };
+  if (pr.minOrder && base < pr.minOrder) return { ok: false, why: `Промокод діє на замовлення від ${uah(pr.minOrder)}` };
+  if (mine.some((b) => b.promo?.code === pr.code && !b.promo.returned)) return { ok: false, why: 'Ви вже скористалися цим промокодом' };
+  if (pr.firstOnly && mine.some((b) => !(b.state === 'cancelled' && b.refundTo === 'balance') && PLACES.find((x) => x.id === b.placeId)?.cats.some(inCats))) {
+    return { ok: false, why: 'Промокод діє лише на перше замовлення' };
+  }
+  const amount = pr.kind === 'pct' ? Math.min(pr.max || Infinity, Math.round((base * pr.value) / 100)) : Math.min(pr.value, base);
+  return { ok: true, amount };
+}
 
 // Клієнт підтвердив (або мовчав після «Машина готова»): замовлення завершене,
 // гроші точці заморожені ще на freezeHours, щоб клієнт встиг відкрити спір.
@@ -2372,6 +2473,56 @@ function viewCommission() {
     </table></div>`;
 }
 
+// ---------- промокоди й акції ----------
+
+// Промокоди оплачує CARCAR: клієнт платить менше, точка отримує повну ціну.
+function viewPromos() {
+  const list = promosAll();
+  const rows = list.map((pr) => {
+    const used = promoUses(pr.code, bookings);
+    const cost = used.reduce((a, b) => a + b.promo.amount, 0);
+    const expired = pr.until && pr.until < isoDate(new Date());
+    const st = pr.active === false ? ['Вимкнено', 'muted'] : expired ? ['Закінчився', 'muted'] : pr.limit && used.length >= pr.limit ? ['Ліміт вичерпано', 'muted'] : ['Діє', 'ok'];
+    return { pr, used, cost, st };
+  });
+  const total = rows.reduce((a, r) => a + r.cost, 0);
+  return `<h1>Промокоди й акції</h1><p class="page-sub">Знижку за промокодом оплачує CARCAR — точка отримує повну ціну, як із бонусом «Приведи друга».</p>
+    <section class="kpis" aria-label="Підсумки промокодів">
+      <div class="kpi hero"><span class="label">Витрати на промокоди</span><span class="value">${uah(total)}</span>
+        <span class="kpi-note">${rows.reduce((a, r) => a + r.used.length, 0)} ${plural(rows.reduce((a, r) => a + r.used.length, 0), 'замовлення', 'замовлення', 'замовлень')} зі знижкою</span></div>
+      <div class="kpi"><span class="label">Активних</span><span class="value">${rows.filter((r) => r.st[1] === 'ok').length}</span></div>
+      <div class="kpi"><span class="label">Середня знижка</span><span class="value">${rows.some((r) => r.used.length) ? uah(Math.round(total / rows.reduce((a, r) => a + r.used.length, 0))) : '—'}</span></div>
+    </section>
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Промокоди" style="margin-top:16px"><table class="t">
+      <thead><tr><th>Код</th><th>Акція</th><th>Умови</th><th class="num">Використано</th><th class="num">Витрати</th><th>Статус</th><th><span class="sr-only">Дія</span></th></tr></thead>
+      <tbody>${rows.map(({ pr, used, cost, st }) => `<tr><td><b class="code">${esc(pr.code)}</b></td><td>${esc(pr.title)}</td>
+        <td class="small">${promoText(pr)}${pr.cats?.length ? ` · ${pr.cats.map((c) => catById(c).name.toLowerCase()).join(', ')}` : ' · усі послуги'}${pr.firstOnly ? ' · перше замовлення' : ''}${pr.minOrder ? ` · від ${uah(pr.minOrder)}` : ''}${pr.auto ? ' · автоматично' : ''}${pr.until ? ` · до ${fmtDate(pr.until)}` : ''}</td>
+        <td class="num">${used.length}${pr.limit ? ` з ${pr.limit}` : ''}</td><td class="num">${uah(cost)}</td>
+        <td><span class="pill ${st[1]}">${st[0]}</span></td>
+        <td><button class="btn" data-action="promo-toggle" data-id="${esc(pr.code)}">${pr.active === false ? 'Увімкнути' : 'Вимкнути'}</button></td></tr>`).join('')}</tbody>
+    </table></div>
+    <section class="panel stack" aria-labelledby="h-new-promo" style="gap:12px;margin-top:16px">
+      <h2 id="h-new-promo">Новий промокод</h2>
+      <form id="promo-form" class="stack" style="gap:12px">
+        <div class="form-grid">
+          <label class="field"><span>Код</span><input name="code" required maxlength="20" pattern="[A-Za-z0-9]{3,20}" placeholder="Наприклад, SHYNY15" autocomplete="off"></label>
+          <label class="field"><span>Назва акції для клієнтів</span><input name="title" required maxlength="60" placeholder="Наприклад, −15% на перевзування" autocomplete="off"></label>
+          <label class="field"><span>Тип знижки</span><select name="kind"><option value="pct">Відсоток</option><option value="sum">Сума, ₴</option></select></label>
+          <label class="field"><span>Розмір знижки</span><input name="value" type="number" min="1" required></label>
+          <label class="field"><span>Не більше, ₴ (для відсотка)</span><input name="max" type="number" min="0"></label>
+          <label class="field"><span>Замовлення від, ₴</span><input name="minOrder" type="number" min="0"></label>
+          <label class="field"><span>Ліміт використань</span><input name="limit" type="number" min="1" placeholder="без ліміту"></label>
+          <label class="field"><span>Діє до</span><input name="until" type="date" min="${isoDate(new Date())}"></label>
+        </div>
+        <fieldset class="radio-row"><legend>Категорії</legend>${CATEGORIES.map((c) => `<label><input type="checkbox" name="cats" value="${c.id}"> ${c.name}</label>`).join('')}</fieldset>
+        <label class="check-row"><input class="check" type="checkbox" name="firstOnly"><span>Лише на перше замовлення в цих категоріях</span></label>
+        <label class="check-row"><input class="check" type="checkbox" name="auto"><span>Застосовувати автоматично, без введення коду</span></label>
+        <button class="btn primary" type="submit" style="align-self:flex-start">Створити промокод</button>
+        <p class="fine">Без обраних категорій промокод діє на всі послуги. Кожен клієнт може скористатися промокодом один раз; після безкоштовного скасування запису — знову.</p>
+      </form>
+    </section>`;
+}
+
 // ---------- статистика застосунку ----------
 
 // Анонімні події застосунку клієнта (див. track в app.js) і записи — за обраний період.
@@ -2415,7 +2566,9 @@ function viewStats() {
   // Як платять клієнти.
   const paidApp = app.filter((b) => b.state !== 'cancelled' || b.placeAmount);
   const pays = [
-    { name: 'Лише карткою', value: paidApp.filter((b) => !b.bonus && !b.fromBalance && !b.covered).length },
+    { name: 'Лише карткою', value: paidApp.filter((b) => !b.bonus && !b.fromBalance && !b.covered && !b.promo).length },
+    { name: 'З промокодом CARCAR', value: paidApp.filter((b) => b.promo).length },
+    { name: 'Частинами', value: paidApp.filter((b) => b.installments).length },
     { name: 'З бонусом «Приведи друга»', value: paidApp.filter((b) => b.bonus).length },
     { name: 'З балансу CARCAR', value: paidApp.filter((b) => b.fromBalance).length },
     { name: 'За абонементом', value: paidApp.filter((b) => b.passUse?.kind === 'sub').length },
@@ -2583,6 +2736,7 @@ const NAV = [
   ['reviews', 'Відгуки', 'star'],
   ['disputes', 'Спори', 'scale'],
   ['commission', 'Комісії й виплати', 'cash'],
+  ['promos', 'Промокоди', 'gift'],
 ];
 
 function route() {
@@ -2600,6 +2754,7 @@ function route() {
   else if (page === 'disputes') view.innerHTML = viewDisputes();
   else if (page === 'commission') view.innerHTML = viewCommission();
   else if (page === 'stats') view.innerHTML = viewStats();
+  else if (page === 'promos') view.innerHTML = viewPromos();
   else view.innerHTML = '<p>Сторінку не знайдено.</p>';
   mountCharts();
 }
@@ -2626,6 +2781,12 @@ document.addEventListener('click', (e) => {
     rerender();
     toast('Демо-активність очищено');
   }
+  else if (action === 'promo-toggle') {
+    const list = promosAll().map((x) => (x.code === id ? { ...x, active: x.active === false } : x));
+    savePromos(list);
+    rerender();
+    toast(list.find((x) => x.code === id).active ? `Промокод ${id} увімкнено` : `Промокод ${id} вимкнено`);
+  }
   else if (action === 'place-filter') { ui.places = el.dataset.f; rerender(); }
   else if (action === 'review-filter') { ui.reviews = el.dataset.f; rerender(); }
   else if (action === 'review-restore') {
@@ -2645,6 +2806,19 @@ document.addEventListener('submit', (e) => {
   e.preventDefault();
   const d = new FormData(f);
   if (f.id === 'moderate-form') moderate(f.dataset.id, e.submitter?.value, d.get('note').trim());
+  else if (f.id === 'promo-form') {
+    const code = d.get('code').trim().toUpperCase();
+    if (promosAll().some((x) => x.code === code)) { toast(`Промокод ${code} уже існує`); return; }
+    const kind = d.get('kind');
+    const value = Number(d.get('value'));
+    if (kind === 'pct' && value > 90) { toast('Знижка у відсотках — не більше 90%'); return; }
+    savePromos([...promosAll(), {
+      id: code.toLowerCase(), code, title: d.get('title').trim(), kind, value, max: Number(d.get('max')) || null, minOrder: Number(d.get('minOrder')) || 0,
+      cats: d.getAll('cats'), firstOnly: !!d.get('firstOnly'), auto: !!d.get('auto'), active: true, until: d.get('until') || null, limit: Number(d.get('limit')) || null, createdAt: Date.now(),
+    }]);
+    rerender();
+    toast(`Промокод ${code} створено`);
+  }
   else if (f.id === 'commission-form') {
     const v = d.get('pct');
     savePartner(f.dataset.id, { commission: v === '' ? undefined : Math.max(0, Number(v)) / 100 });

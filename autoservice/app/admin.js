@@ -5,7 +5,7 @@ import { CATEGORIES, PLACES, PAYMENT } from './data.js';
 import {
   store, icon, esc, uah, pad, isoDate, parseDate, plural, dayLabel, rating, fmtTime, fmtDate, catById, WEEKDAYS, bookingStart, HOUR,
   PARTNER_STATUS, partnerOf, savePartner, commissionFor, isCarcar, price, placeShare, isFrozen,
-  ratingFor, visibleReviews, ACTIVE, resolveDispute, settleAll, applyOverrides,
+  ratingFor, visibleReviews, ACTIVE, resolveDispute, settleAll, applyOverrides, promosAll, savePromos, promoUses, promoText,
 } from './core.js';
 import { ENTITY, TAX, DOCS, OFFER, codeValid, ibanValid, ibanBank, formatIban, missingSteps } from './partners.js';
 import { drawColumns, legend, tableView, hbars, hideTip } from './charts.js';
@@ -407,6 +407,56 @@ function viewCommission() {
     </table></div>`;
 }
 
+// ---------- промокоди й акції ----------
+
+// Промокоди оплачує CARCAR: клієнт платить менше, точка отримує повну ціну.
+function viewPromos() {
+  const list = promosAll();
+  const rows = list.map((pr) => {
+    const used = promoUses(pr.code, bookings);
+    const cost = used.reduce((a, b) => a + b.promo.amount, 0);
+    const expired = pr.until && pr.until < isoDate(new Date());
+    const st = pr.active === false ? ['Вимкнено', 'muted'] : expired ? ['Закінчився', 'muted'] : pr.limit && used.length >= pr.limit ? ['Ліміт вичерпано', 'muted'] : ['Діє', 'ok'];
+    return { pr, used, cost, st };
+  });
+  const total = rows.reduce((a, r) => a + r.cost, 0);
+  return `<h1>Промокоди й акції</h1><p class="page-sub">Знижку за промокодом оплачує CARCAR — точка отримує повну ціну, як із бонусом «Приведи друга».</p>
+    <section class="kpis" aria-label="Підсумки промокодів">
+      <div class="kpi hero"><span class="label">Витрати на промокоди</span><span class="value">${uah(total)}</span>
+        <span class="kpi-note">${rows.reduce((a, r) => a + r.used.length, 0)} ${plural(rows.reduce((a, r) => a + r.used.length, 0), 'замовлення', 'замовлення', 'замовлень')} зі знижкою</span></div>
+      <div class="kpi"><span class="label">Активних</span><span class="value">${rows.filter((r) => r.st[1] === 'ok').length}</span></div>
+      <div class="kpi"><span class="label">Середня знижка</span><span class="value">${rows.some((r) => r.used.length) ? uah(Math.round(total / rows.reduce((a, r) => a + r.used.length, 0))) : '—'}</span></div>
+    </section>
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Промокоди" style="margin-top:16px"><table class="t">
+      <thead><tr><th>Код</th><th>Акція</th><th>Умови</th><th class="num">Використано</th><th class="num">Витрати</th><th>Статус</th><th><span class="sr-only">Дія</span></th></tr></thead>
+      <tbody>${rows.map(({ pr, used, cost, st }) => `<tr><td><b class="code">${esc(pr.code)}</b></td><td>${esc(pr.title)}</td>
+        <td class="small">${promoText(pr)}${pr.cats?.length ? ` · ${pr.cats.map((c) => catById(c).name.toLowerCase()).join(', ')}` : ' · усі послуги'}${pr.firstOnly ? ' · перше замовлення' : ''}${pr.minOrder ? ` · від ${uah(pr.minOrder)}` : ''}${pr.auto ? ' · автоматично' : ''}${pr.until ? ` · до ${fmtDate(pr.until)}` : ''}</td>
+        <td class="num">${used.length}${pr.limit ? ` з ${pr.limit}` : ''}</td><td class="num">${uah(cost)}</td>
+        <td><span class="pill ${st[1]}">${st[0]}</span></td>
+        <td><button class="btn" data-action="promo-toggle" data-id="${esc(pr.code)}">${pr.active === false ? 'Увімкнути' : 'Вимкнути'}</button></td></tr>`).join('')}</tbody>
+    </table></div>
+    <section class="panel stack" aria-labelledby="h-new-promo" style="gap:12px;margin-top:16px">
+      <h2 id="h-new-promo">Новий промокод</h2>
+      <form id="promo-form" class="stack" style="gap:12px">
+        <div class="form-grid">
+          <label class="field"><span>Код</span><input name="code" required maxlength="20" pattern="[A-Za-z0-9]{3,20}" placeholder="Наприклад, SHYNY15" autocomplete="off"></label>
+          <label class="field"><span>Назва акції для клієнтів</span><input name="title" required maxlength="60" placeholder="Наприклад, −15% на перевзування" autocomplete="off"></label>
+          <label class="field"><span>Тип знижки</span><select name="kind"><option value="pct">Відсоток</option><option value="sum">Сума, ₴</option></select></label>
+          <label class="field"><span>Розмір знижки</span><input name="value" type="number" min="1" required></label>
+          <label class="field"><span>Не більше, ₴ (для відсотка)</span><input name="max" type="number" min="0"></label>
+          <label class="field"><span>Замовлення від, ₴</span><input name="minOrder" type="number" min="0"></label>
+          <label class="field"><span>Ліміт використань</span><input name="limit" type="number" min="1" placeholder="без ліміту"></label>
+          <label class="field"><span>Діє до</span><input name="until" type="date" min="${isoDate(new Date())}"></label>
+        </div>
+        <fieldset class="radio-row"><legend>Категорії</legend>${CATEGORIES.map((c) => `<label><input type="checkbox" name="cats" value="${c.id}"> ${c.name}</label>`).join('')}</fieldset>
+        <label class="check-row"><input class="check" type="checkbox" name="firstOnly"><span>Лише на перше замовлення в цих категоріях</span></label>
+        <label class="check-row"><input class="check" type="checkbox" name="auto"><span>Застосовувати автоматично, без введення коду</span></label>
+        <button class="btn primary" type="submit" style="align-self:flex-start">Створити промокод</button>
+        <p class="fine">Без обраних категорій промокод діє на всі послуги. Кожен клієнт може скористатися промокодом один раз; після безкоштовного скасування запису — знову.</p>
+      </form>
+    </section>`;
+}
+
 // ---------- статистика застосунку ----------
 
 // Анонімні події застосунку клієнта (див. track в app.js) і записи — за обраний період.
@@ -450,7 +500,9 @@ function viewStats() {
   // Як платять клієнти.
   const paidApp = app.filter((b) => b.state !== 'cancelled' || b.placeAmount);
   const pays = [
-    { name: 'Лише карткою', value: paidApp.filter((b) => !b.bonus && !b.fromBalance && !b.covered).length },
+    { name: 'Лише карткою', value: paidApp.filter((b) => !b.bonus && !b.fromBalance && !b.covered && !b.promo).length },
+    { name: 'З промокодом CARCAR', value: paidApp.filter((b) => b.promo).length },
+    { name: 'Частинами', value: paidApp.filter((b) => b.installments).length },
     { name: 'З бонусом «Приведи друга»', value: paidApp.filter((b) => b.bonus).length },
     { name: 'З балансу CARCAR', value: paidApp.filter((b) => b.fromBalance).length },
     { name: 'За абонементом', value: paidApp.filter((b) => b.passUse?.kind === 'sub').length },
@@ -618,6 +670,7 @@ const NAV = [
   ['reviews', 'Відгуки', 'star'],
   ['disputes', 'Спори', 'scale'],
   ['commission', 'Комісії й виплати', 'cash'],
+  ['promos', 'Промокоди', 'gift'],
 ];
 
 function route() {
@@ -635,6 +688,7 @@ function route() {
   else if (page === 'disputes') view.innerHTML = viewDisputes();
   else if (page === 'commission') view.innerHTML = viewCommission();
   else if (page === 'stats') view.innerHTML = viewStats();
+  else if (page === 'promos') view.innerHTML = viewPromos();
   else view.innerHTML = '<p>Сторінку не знайдено.</p>';
   mountCharts();
 }
@@ -661,6 +715,12 @@ document.addEventListener('click', (e) => {
     rerender();
     toast('Демо-активність очищено');
   }
+  else if (action === 'promo-toggle') {
+    const list = promosAll().map((x) => (x.code === id ? { ...x, active: x.active === false } : x));
+    savePromos(list);
+    rerender();
+    toast(list.find((x) => x.code === id).active ? `Промокод ${id} увімкнено` : `Промокод ${id} вимкнено`);
+  }
   else if (action === 'place-filter') { ui.places = el.dataset.f; rerender(); }
   else if (action === 'review-filter') { ui.reviews = el.dataset.f; rerender(); }
   else if (action === 'review-restore') {
@@ -680,6 +740,19 @@ document.addEventListener('submit', (e) => {
   e.preventDefault();
   const d = new FormData(f);
   if (f.id === 'moderate-form') moderate(f.dataset.id, e.submitter?.value, d.get('note').trim());
+  else if (f.id === 'promo-form') {
+    const code = d.get('code').trim().toUpperCase();
+    if (promosAll().some((x) => x.code === code)) { toast(`Промокод ${code} уже існує`); return; }
+    const kind = d.get('kind');
+    const value = Number(d.get('value'));
+    if (kind === 'pct' && value > 90) { toast('Знижка у відсотках — не більше 90%'); return; }
+    savePromos([...promosAll(), {
+      id: code.toLowerCase(), code, title: d.get('title').trim(), kind, value, max: Number(d.get('max')) || null, minOrder: Number(d.get('minOrder')) || 0,
+      cats: d.getAll('cats'), firstOnly: !!d.get('firstOnly'), auto: !!d.get('auto'), active: true, until: d.get('until') || null, limit: Number(d.get('limit')) || null, createdAt: Date.now(),
+    }]);
+    rerender();
+    toast(`Промокод ${code} створено`);
+  }
   else if (f.id === 'commission-form') {
     const v = d.get('pct');
     savePartner(f.dataset.id, { commission: v === '' ? undefined : Math.max(0, Number(v)) / 100 });

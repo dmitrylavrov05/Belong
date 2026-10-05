@@ -309,7 +309,7 @@ test('скасування за 1,5 год і раніше: уся сума на
   await page.locator('[data-action="confirm"]').click();
   await expect(page.locator('.summary')).toContainText('Скасування до 1 год 30 хв до візиту');
   await page.getByRole('button', { name: 'Оплатити 900 ₴' }).click();
-  await expect(page.locator('article').first()).toContainText('Безкоштовне скасування до 4 жовтня о 10:00');
+  await expect(page.locator('article').first()).toContainText('Перенести на інший час або скасувати безкоштовно можна до 4 жовтня о 10:00');
   page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Скасувати', exact: true }).click();
   await expect(page.locator('#toast')).toHaveText('Запис скасовано, 900 ₴ повернено на баланс');
@@ -407,6 +407,8 @@ test.describe('приведи друга', () => {
   });
 
   test('бонус лише від 300 ₴, його можна не використовувати, а при скасуванні він повертається', async ({ page }) => {
+    // Без акції «Перша мийка» — тут перевіряємо лише бонус.
+    await page.addInitScript(() => localStorage.getItem('carcar.admin.promos') ?? localStorage.setItem('carcar.admin.promos', '[]'));
     await page.goto('/?ref=CARTEST2');
     await page.goto('/#/book/blysk');
     await page.getByLabel(/Експрес-мийка/).check();

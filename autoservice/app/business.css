@@ -138,7 +138,7 @@ details.table-view summary { cursor: pointer; color: var(--navy); font-weight: 6
 
 /* ---------- таблиці ---------- */
 
-.table-wrap { overflow-x: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 16px; }
+.table-wrap { position: relative; overflow-x: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 16px; }
 table.t { width: 100%; border-collapse: collapse; font-size: 14px; }
 table.t th { text-align: left; font-weight: 600; color: var(--muted); font-size: 13px; padding: 10px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; background: var(--bg); }
 table.t td { padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
@@ -393,3 +393,15 @@ table.t tr.off td { opacity: .55; }
   .funnel li { grid-template-columns: 1fr auto; }
   .funnel .f-track { grid-column: 1 / -1; grid-row: 2; }
 }
+
+/* Виїзд, кошторис і чат за записом */
+.sched-col-head.mobile { color: var(--text); background: var(--soft); }
+.sched-col.mobile { background-color: var(--soft); }
+.est-row { display: grid; grid-template-columns: 120px 1fr 70px 100px 120px; gap: 6px; border: 0; padding: 0; margin: 0; }
+.est-row legend { font-size: 13px; color: var(--muted); padding: 0; margin-bottom: 4px; }
+.est-row input { min-height: 40px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: 14px; min-width: 0; }
+@media (max-width: 640px) { .est-row { grid-template-columns: 1fr 1fr; } .est-row [name="name"] { grid-column: 1 / -1; } }
+.estimate-box { border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.chat-list li.unread { border-color: var(--accent); }
+.chat-list li > span small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.est-row .select { width: 100%; min-width: 0; height: 40px; }

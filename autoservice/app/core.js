@@ -239,7 +239,7 @@ export async function shrinkPhoto(file) {
 
 // Точка може змінити в панелі для бізнесу телефон, години, кількість боксів і прайс.
 // Зміни зберігаються в 'biz.places' і накладаються на дані з data.js в обох застосунках.
-const withBase = (p) => Object.assign(p, { basePhone: p.phone, baseHours: p.hours, baseBoxes: p.boxes, baseServices: p.services, baseCats: p.cats });
+const withBase = (p) => Object.assign(p, { basePhone: p.phone, baseHours: p.hours, baseBoxes: p.boxes, baseServices: p.services, baseCats: p.cats, baseMobile: p.mobile ?? null });
 PLACES.forEach(withBase);
 
 // Нові точки, зареєстровані в панелі через «Підключення». Клієнти бачать їх лише після схвалення CARCAR.
@@ -263,6 +263,7 @@ export function applyOverrides() {
     p.hours = o.hours !== undefined ? o.hours : p.baseHours;
     p.boxes = o.boxes ?? p.baseBoxes;
     p.schedule = o.schedule ?? null;
+    p.mobile = o.mobile !== undefined ? o.mobile : p.baseMobile;
     p.allServices = o.services ?? p.baseServices;
     p.services = p.allServices.filter((s) => !s.off);
     // Категорії точки — ті, у яких є хоч одна активна послуга (точка могла додати нову).
@@ -407,8 +408,51 @@ export const BLOCKING = [...ACTIVE, 'booked'];
 // Запис через CARCAR (оплата в застосунку) чи внесений точкою вручну (оплата на місці).
 export const isCarcar = (b) => (b.channel ?? 'carcar') === 'carcar';
 
-// Повна ціна замовлення: те, що заплатив клієнт, плюс бонус, який доплачує CARCAR.
-export const price = (b) => b.paid + (b.bonus || 0);
+// Повна ціна замовлення: те, що заплатив клієнт, плюс бонус і промокод, які доплачує CARCAR.
+export const price = (b) => b.paid + (b.bonus || 0) + (b.promo && !b.promo.returned ? b.promo.amount : 0);
+
+// ---------- виїзні послуги ----------
+
+// Виїзна бригада зайнята ще MOBILE_ROAD хвилин після роботи — дорога до наступного клієнта.
+// Бокси й бригади — окремі потужності: виїзний запис не займає бокс, а запис у точці — бригаду.
+export const MOBILE_ROAD = 30;
+export const mobileOn = (p) => !!p?.mobile?.services?.length && p.mobile.crews > 0;
+export const spanOf = (b) => [toMin(b.time), toMin(b.time) + b.minutes + (b.mobile ? MOBILE_ROAD : 0)];
+export const laneCap = (p, mobile) => (mobile ? p.mobile?.crews ?? 0 : p.boxes);
+export const sameLane = (b, mobile) => !!b.mobile === !!mobile;
+
+// ---------- промокоди платформи ----------
+
+// Промокоди й акції CARCAR. Знижку оплачує платформа: точка отримує повну ціну, як із бонусом.
+// kind: pct — відсоток (max — не більше ₴), sum — фіксована сума. cats — на які категорії діє (порожньо — на всі).
+// firstOnly — лише на перше замовлення в цих категоріях; auto — застосовується сам, без введення коду.
+export const PROMO_DEFAULTS = [
+  { id: 'persha30', code: 'PERSHA30', title: 'Перша мийка −30%', kind: 'pct', value: 30, max: 300, minOrder: 0, cats: ['wash'], firstOnly: true, auto: true, active: true, until: null, limit: null },
+];
+export const promosAll = () => store.get('admin.promos', null) ?? PROMO_DEFAULTS;
+export const savePromos = (list) => store.set('admin.promos', list);
+export const promoUses = (code, bookings) => bookings.filter((b) => b.promo?.code === code && !b.promo.returned);
+export const promoText = (pr) => (pr.kind === 'pct' ? `−${pr.value}%${pr.max ? ` (до ${uah(pr.max)})` : ''}` : `−${uah(pr.value)}`);
+
+// Чи діє промокод на замовлення: items — [{cat, price}] обраних послуг (ціни вже зі знижками точки),
+// mine — записи цього клієнта. Повертає { ok, amount } або { ok: false, why }.
+export function promoCheck(pr, { place, items, mine, all }) {
+  const today = isoDate(new Date());
+  if (!pr || pr.active === false) return { ok: false, why: 'Промокод не діє' };
+  if (pr.until && pr.until < today) return { ok: false, why: 'Строк дії промокоду минув' };
+  if (pr.limit && promoUses(pr.code, all).length >= pr.limit) return { ok: false, why: 'Промокод уже використали максимальну кількість разів' };
+  const inCats = (c) => !pr.cats?.length || pr.cats.includes(c);
+  if (!place.cats.some(inCats)) return { ok: false, why: `Промокод діє лише на: ${pr.cats.map((c) => CATEGORIES.find((x) => x.id === c)?.name.toLowerCase()).join(', ')}` };
+  const base = items.filter((x) => inCats(x.cat)).reduce((a, x) => a + x.price, 0);
+  if (!base) return { ok: false, why: 'Промокод не діє на обрані послуги' };
+  if (pr.minOrder && base < pr.minOrder) return { ok: false, why: `Промокод діє на замовлення від ${uah(pr.minOrder)}` };
+  if (mine.some((b) => b.promo?.code === pr.code && !b.promo.returned)) return { ok: false, why: 'Ви вже скористалися цим промокодом' };
+  if (pr.firstOnly && mine.some((b) => !(b.state === 'cancelled' && b.refundTo === 'balance') && PLACES.find((x) => x.id === b.placeId)?.cats.some(inCats))) {
+    return { ok: false, why: 'Промокод діє лише на перше замовлення' };
+  }
+  const amount = pr.kind === 'pct' ? Math.min(pr.max || Infinity, Math.round((base * pr.value) / 100)) : Math.min(pr.value, base);
+  return { ok: true, amount };
+}
 
 // Клієнт підтвердив (або мовчав після «Машина готова»): замовлення завершене,
 // гроші точці заморожені ще на freezeHours, щоб клієнт встиг відкрити спір.

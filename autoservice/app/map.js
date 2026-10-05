@@ -16,6 +16,13 @@ const mapMerc = (lat, lng, z) => {
 const MAP_ORIGIN = mapMerc(MAP_BOX.maxLat, MAP_BOX.minLng, MAP_Z0);
 export const mapProject = (lat, lng) => { const [x, y] = mapMerc(lat, lng, MAP_Z0); return [x - MAP_ORIGIN[0], y - MAP_ORIGIN[1]]; };
 const [MAP_W, MAP_H] = mapProject(MAP_BOX.minLat, MAP_BOX.maxLng);
+// Зворотна проєкція: точка карти → широта й довгота (для вибору адреси на карті).
+export const mapUnproject = (x, y) => {
+  const size = MAP_TILE * 2 ** MAP_Z0;
+  const mx = (x + MAP_ORIGIN[0]) / size;
+  const my = (y + MAP_ORIGIN[1]) / size;
+  return { lat: (Math.atan(Math.sinh(Math.PI * (1 - 2 * my))) * 180) / Math.PI, lng: mx * 360 - 180 };
+};
 export const TILE_URL = (z, x, y) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
 
 // Спрощена межа міста й русло Дніпра (широта, довгота) — для схеми.
@@ -33,7 +40,8 @@ let mapResize = null;
 
 // Малює карту в el і повертає { setPins, draw }. opts: places — [{ id, lat, lng, html, label, cls }],
 // pos — {lat, lng} користувача, state — стан між перемальовуваннями (x, y, z, sel, layer),
-// onSelect(id), onLayer(layer) — щоб застосунок запамʼятав вибір шару.
+// onSelect(id), onLayer(layer) — щоб застосунок запамʼятав вибір шару;
+// onPick(lat, lng) — дотик до порожнього місця карти (вибір адреси), pick — уже обрана точка.
 export function mountMap(el, opts) {
   const st = opts.state;
   const W = () => el.clientWidth;
@@ -148,7 +156,8 @@ export function mountMap(el, opts) {
     places = list;
     layer.innerHTML = list.map((p) => `<button type="button" class="pin ${p.cls}${p.id === st.sel ? ' sel' : ''}" data-pin="${p.id}" data-xy="${mapProject(p.lat, p.lng).join(',')}"
       aria-label="${p.label}" aria-pressed="${p.id === st.sel}">${p.html}</button>`).join('')
-      + (opts.pos ? `<span class="me-dot" data-xy="${mapProject(opts.pos.lat, opts.pos.lng).join(',')}" role="img" aria-label="Ви тут"></span>` : '');
+      + (opts.pos ? `<span class="me-dot" data-xy="${mapProject(opts.pos.lat, opts.pos.lng).join(',')}" role="img" aria-label="Ви тут"></span>` : '')
+      + (opts.pick ? `<span class="pick-dot" data-xy="${mapProject(opts.pick.lat, opts.pick.lng).join(',')}" role="img" aria-label="Обрана адреса"></span>` : '');
     draw();
   }
 
@@ -214,7 +223,15 @@ export function mountMap(el, opts) {
         x.classList.toggle('sel', x === pin);
         x.setAttribute('aria-pressed', x === pin);
       }
-      opts.onSelect(st.sel);
+      opts.onSelect?.(st.sel);
+      return;
+    }
+    if (opts.onPick && moved < 6 && !e.target.closest('.map-attr')) {
+      const r = el.getBoundingClientRect();
+      const pt = mapUnproject(st.x + (e.clientX - r.left - W() / 2) / st.z, st.y + (e.clientY - r.top - H() / 2) / st.z);
+      opts.pick = pt;
+      setPins(places);
+      opts.onPick(pt.lat, pt.lng);
     }
   });
   // Клавіатура: стрілки зсувають, + і − масштабують.

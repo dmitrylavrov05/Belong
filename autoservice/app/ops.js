@@ -4,6 +4,7 @@
 import { PLACES } from './data.js';
 import {
   store, uid, isoDate, parseDate, hhmm, toMin, plural, hoursFor, scheduleOf, inBreak, BLOCKING, phoneKey, isListed, weekdayOf,
+  spanOf, laneCap, sameLane, MOBILE_ROAD,
 } from './core.js';
 
 const opsToday = () => isoDate(new Date());
@@ -37,19 +38,47 @@ export const telegramLink = (phone) => `https://t.me/+${String(phone).replace(/\
 
 // ---------- вільний час ----------
 
-// Вільні початки на дату: у робочі години, не в перерву, не в минулому й поки є вільний бокс.
-export function openStarts(place, date, minutes, bookings, { lead = scheduleOf(place).lead, skip } = {}) {
+// Вільні початки на дату: у робочі години, не в перерву, не в минулому й поки є вільний бокс
+// (для виїзного запису — вільна бригада з урахуванням дороги). skip — запис, який переносять.
+export function openStarts(place, date, minutes, bookings, { lead = scheduleOf(place).lead, skip, mobile = false } = {}) {
   const h = hoursFor(place, date);
   if (!h) return [];
-  const spans = bookings.filter((b) => b.placeId === place.id && b.date === date && BLOCKING.includes(b.state) && b !== skip)
-    .map((b) => [toMin(b.time), toMin(b.time) + b.minutes]);
+  const spans = bookings.filter((b) => b.placeId === place.id && b.date === date && BLOCKING.includes(b.state) && b !== skip && sameLane(b, mobile))
+    .map(spanOf);
+  const need = minutes + (mobile ? MOBILE_ROAD : 0);
+  const cap = laneCap(place, mobile);
   const min = date === opsToday() ? opsNow() + lead : -1;
   const out = [];
   for (let t = h[0]; t + minutes <= h[1]; t += 30) {
     if (t < min || inBreak(place, t, minutes)) continue;
-    if (spans.filter(([s, e]) => t < e && t + minutes > s).length < place.boxes) out.push(hhmm(t));
+    if (spans.filter(([s, e]) => t < e && t + need > s).length < cap) out.push(hhmm(t));
   }
   return out;
+}
+
+// ---------- чат за записом ----------
+
+// Переписка клієнта й точки про конкретний оплачений візит: «приїду з причепом», «можна раніше?».
+// from: client, biz або sys (подія: перенесення, кошторис). Непрочитане позначаємо для іншої сторони.
+export function chatPost(b, from, text, notify = from === 'client' ? 'biz' : 'client') {
+  b.chat = [...(b.chat ?? []), { from, text, at: Date.now() }];
+  if (notify === 'biz' || notify === 'both') b.chatUnreadBiz = true;
+  if (notify === 'client' || notify === 'both') b.chatUnreadClient = true;
+}
+export const CLIENT_QUICK = ['Можна приїхати раніше?', 'Приїду з причепом', 'Залишу ключі адміністратору', 'Потрібен чек для компанії'];
+export const BIZ_QUICK = ['Так, чекаємо', 'Можна на 30 хв раніше', 'На жаль, ні — лише у ваш час', 'Майстер передзвонить'];
+
+// ---------- кошторис і гарантія ----------
+
+// Кошторис СТО: роботи й запчастини з цінами; клієнт погоджує кожен пункт окремо.
+// warranty — гарантія в місяцях від дня виконання.
+export const ITEM_KIND = { work: 'Робота', part: 'Запчастина' };
+export const itemSum = (x) => Math.round(x.qty * x.price);
+export const estimateTotal = (items, status) => items.filter((x) => !status || x.status === status).reduce((a, x) => a + itemSum(x), 0);
+export function warrantyUntil(iso, months) {
+  const d = parseDate(iso);
+  d.setMonth(d.getMonth() + months);
+  return isoDate(d);
 }
 
 // ---------- гарячі вікна ----------

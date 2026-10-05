@@ -6,6 +6,8 @@ const TILE = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQV
 
 test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(new Date(2026, 9, 4, 10, 0));
+  // Акцію «Перша мийка −30%» перевіряє features.spec.js — тут ціни без неї.
+  await page.addInitScript(() => localStorage.getItem('carcar.admin.promos') ?? localStorage.setItem('carcar.admin.promos', '[]'));
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
@@ -157,7 +159,7 @@ test('перевірка авто за номером: регіон, марка,
 
   await f.getByLabel('Держномер').fill('AA1234BB');
   await f.getByRole('button', { name: 'Перевірити' }).click();
-  await f.getByRole('button', { name: 'Зберегти' }).click();
+  await f.getByRole('button', { name: 'Зберегти', exact: true }).click();
   await expect(page.locator('.car-card')).toContainText('AA1234BB · 2019');
 });
 

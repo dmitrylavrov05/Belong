@@ -71,6 +71,8 @@ const pick = (catalog, ids, k = 1) =>
 
 // hours: [відкриття, закриття] у годинах; null — цілодобово.
 // lat, lng — приблизні координати для сортування «Поруч» (демо).
+// mobile — «Виїзд до вас»: радіус у км від точки, вартість виїзду, кількість бригад
+// і послуги, які можна виконати на місці в клієнта.
 export const PLACES = [
   {
     id: 'blysk',
@@ -99,6 +101,7 @@ export const PLACES = [
     boxes: 6,
     tags: ['Цілодобово', 'Самообслуговування'],
     services: pick(WASH, ['express', 'complex', 'inside', 'engine'], 0.9),
+    mobile: { radiusKm: 12, fee: 250, crews: 2, services: ['express', 'complex', 'inside'] },
   },
   {
     id: 'koleso',
@@ -113,6 +116,7 @@ export const PLACES = [
     boxes: 3,
     tags: ['Зберігання шин', 'Шини в наявності'],
     services: pick(TIRES, ['change', 'balance', 'repair', 'storage', 'rolling']),
+    mobile: { radiusKm: 15, fee: 300, crews: 1, services: ['change', 'repair'] },
   },
   {
     id: 'shynservis',
@@ -210,6 +214,9 @@ export const PAYMENT = {
   // Пізніше (або якщо клієнт не приїхав) оплата зараховується точці як оплата послуги.
   freeCancelHours: 1.5,
   noShowShare: 1, // частка точці, якщо клієнт не приїхав або скасував пізно
+  // Оплата частинами для дорогих послуг: клієнт платить рівними частинами без переплати,
+  // точка отримує всю суму одразу від банку-партнера (комісію банку в прототипі не враховано).
+  installments: { minTotal: 3000, parts: [3, 4, 6] },
 };
 
 // Нагадування сервісної книжки.

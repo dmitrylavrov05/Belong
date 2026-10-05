@@ -350,7 +350,7 @@ test('акт приймання з фото: точка фіксує стан, �
 test('лист очікування: час звільнився — клієнту приходить сповіщення й можна записатися', async ({ page }) => {
   await panel(page, '#/settings');
   await page.getByLabel('Кількість боксів').fill('1');
-  await page.getByRole('button', { name: 'Зберегти' }).click();
+  await page.getByRole('button', { name: 'Зберегти', exact: true }).click();
   await page.goto(`${PANEL}#/schedule`);
   await crmBooking(page, { name: 'Займає Бокс', phone: '+380 50 000 00 31', date: '2026-10-05', time: '10:00' });
 

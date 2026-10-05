@@ -77,7 +77,7 @@ test('запис із журналу займає час у застосунку
   await page.goto(`${PANEL}#/settings`);
   await selectPlace(page, 'Шиномонтаж «Колесо»');
   await page.getByLabel('Кількість боксів').fill('1');
-  await page.getByRole('button', { name: 'Зберегти' }).click();
+  await page.getByRole('button', { name: 'Зберегти', exact: true }).click();
   await expect(page.locator('#toast')).toHaveText('Профіль збережено');
 
   await page.goto(`${PANEL}#/schedule`);
@@ -263,7 +263,7 @@ test('графік: вихідний, перерва, особлива дата 
   await form.getByLabel('Початок перерви').selectOption('13:00');
   await form.getByLabel('Кінець перерви').selectOption('14:00');
   await form.getByLabel('Запис наперед').selectOption({ label: 'на 7 днів' });
-  await form.getByRole('button', { name: 'Зберегти' }).click();
+  await form.getByRole('button', { name: 'Зберегти', exact: true }).click();
   await expect(page.locator('#toast')).toHaveText('Профіль збережено');
 
   // Вівторок, 6 жовтня, — санітарний день.
