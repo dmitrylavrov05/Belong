@@ -51,16 +51,17 @@ test('запис від вибору послуги до скасування', 
   await expect(page.getByRole('heading', { name: 'Автомийка «Хвиля»' })).toBeVisible();
   await page.getByRole('link', { name: 'Записатися онлайн' }).click();
 
-  const confirm = page.locator('[data-action="confirm"]');
-  await expect(confirm).toBeDisabled();
+  await expect(page.locator('[data-action="to-time"]')).toBeDisabled();
   await page.getByLabel(/Комплекс преміум/).check();
   await page.getByLabel(/Чистка й кондиціонер шкіри/).check();
   await expect(page.locator('.summary')).toContainText('1 300 ₴');
 
+  await page.locator('[data-action="to-time"]').click();
   await page.getByRole('button', { name: /Завтра/ }).click();
   const slot = page.locator('.slot:not([disabled])').first();
   const time = await slot.textContent();
   await slot.click();
+  const confirm = page.locator('[data-action="confirm"]');
   await expect(confirm).toBeEnabled();
   await confirm.click();
   await expect(page.locator('.summary')).toContainText('Комісія для клієнта — 0 ₴');
@@ -76,6 +77,7 @@ test('запис від вибору послуги до скасування', 
   // Зайнятий мною час більше не пропонується.
   await page.goto('/#/book/hvylia');
   await page.getByLabel(/Комплекс преміум/).check();
+  await page.locator('[data-action="to-time"]').click();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await expect(page.locator(`.slot[data-time="${time.trim()}"]`)).toBeDisabled();
 
@@ -107,6 +109,7 @@ test('авто з гаража задає ціни під час запису', 
 async function bookTomorrow(page) {
   await page.goto('/#/book/hvylia');
   await page.getByLabel(/Комплекс преміум/).check();
+  await page.locator('[data-action="to-time"]').click();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await page.locator('.slot:not([disabled])').first().click();
   await page.locator('[data-action="confirm"]').click();
@@ -288,6 +291,7 @@ test('пізніше ніж за 1,5 год до візиту скасуванн
   // Запис на сьогодні 11:00 о 10:00 — менше ніж за 1,5 години.
   await page.goto('/#/book/hvylia');
   await page.getByLabel(/Комплекс преміум/).check();
+  await page.locator('[data-action="to-time"]').click();
   await page.locator('.slot[data-time="11:00"]').click();
   await page.locator('[data-action="confirm"]').click();
   await page.getByRole('button', { name: 'Оплатити 900 ₴' }).click();
@@ -311,6 +315,7 @@ test('скасування за 1,5 год і раніше: уся сума на
   // О 10:00 запис на 11:30 — рівно за 1,5 години, ще можна скасувати з поверненням.
   await page.goto('/#/book/hvylia');
   await page.getByLabel(/Комплекс преміум/).check();
+  await page.locator('[data-action="to-time"]').click();
   await page.locator('.slot[data-time="11:30"]').click();
   await page.locator('[data-action="confirm"]').click();
   await expect(page.locator('.summary')).toContainText('Скасування до 1 год 30 хв до візиту');
@@ -327,6 +332,7 @@ test('скасування за 1,5 год і раніше: уся сума на
   await page.goto('/#/book/hvylia');
   await page.getByLabel(/Комплекс преміум/).check();
   await page.getByLabel(/Чистка й кондиціонер шкіри/).check();
+  await page.locator('[data-action="to-time"]').click();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await page.locator('.slot:not([disabled])').first().click();
   await page.locator('[data-action="confirm"]').click();
@@ -392,6 +398,7 @@ test.describe('приведи друга', () => {
 
     await page.goto('/#/book/hvylia');
     await page.getByLabel(/Комплекс преміум/).check();
+    await page.locator('[data-action="to-time"]').click();
     await page.getByRole('button', { name: /Завтра/ }).click();
     await page.locator('.slot:not([disabled])').first().click();
     await page.locator('[data-action="confirm"]').click();
@@ -418,25 +425,28 @@ test.describe('приведи друга', () => {
     await page.goto('/?ref=CARTEST2');
     await page.goto('/#/book/blysk');
     await page.getByLabel(/Експрес-мийка/).check();
+    await page.locator('[data-action="to-time"]').click();
     await page.getByRole('button', { name: /Завтра/ }).click();
     await page.locator('.slot:not([disabled])').first().click();
     await page.locator('[data-action="confirm"]').click();
     await expect(page.locator('.summary')).toContainText('Бонус 150 ₴ діє для замовлень від 300 ₴');
     await expect(page.getByRole('button', { name: 'Оплатити 250 ₴' })).toBeVisible();
     await page.getByRole('button', { name: 'Назад' }).click();
+    await page.locator('[data-action="step-back"]').click();
 
     await page.getByLabel(/Комплекс: кузов/).check();
+    await page.locator('[data-action="to-time"]').click();
     await page.locator('.slot:not([disabled])').first().click();
     await page.locator('[data-action="confirm"]').click();
-    await expect(page.getByRole('button', { name: 'Оплатити 650 ₴' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Оплатити 400 ₴' })).toBeVisible();
     await page.getByLabel(/Бонус «Приведи друга»/).uncheck();
-    await expect(page.getByRole('button', { name: 'Оплатити 800 ₴' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Оплатити 550 ₴' })).toBeVisible();
     await page.getByLabel(/Бонус «Приведи друга»/).check();
-    await page.getByRole('button', { name: 'Оплатити 650 ₴' }).click();
+    await page.getByRole('button', { name: 'Оплатити 400 ₴' }).click();
 
     page.once('dialog', (d) => d.accept());
     await page.getByRole('button', { name: 'Скасувати' }).click();
-    await expect(page.locator('article').first()).toContainText('Повернено 650 ₴ на баланс CARCAR і 150 ₴ на бонусний рахунок');
+    await expect(page.locator('article').first()).toContainText('Повернено 400 ₴ на баланс CARCAR і 150 ₴ на бонусний рахунок');
     await page.goto('/#/invite');
     await expect(page.locator('.bonus-sum')).toHaveText('150 ₴');
   });

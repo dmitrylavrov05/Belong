@@ -25,6 +25,7 @@ const PANEL = '/business.html';
 async function bookToday(page, time = '11:00') {
   await page.goto('/#/book/hvylia');
   await page.getByLabel(/Комплекс преміум/).check();
+  await page.locator('[data-action="to-time"]').click();
   await page.locator(`.slot[data-time="${time}"]`).click();
   await page.locator('[data-action="confirm"]').click();
   await page.getByRole('button', { name: 'Оплатити 900 ₴' }).click();
@@ -171,6 +172,7 @@ test('маркетинг: кампанія з посиланням і промо
   await page.goto(link.replace(/^https?:\/\/[^/]+/, ''));
   await page.goto('/#/book/blysk');
   await page.getByLabel(/Експрес-мийка/).check();
+  await page.locator('[data-action="to-time"]').click();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await page.locator('.slot[data-time="10:00"]').click();
   await page.locator('[data-action="confirm"]').click();

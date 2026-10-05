@@ -170,6 +170,7 @@ test('абонемент і сертифікат: продаж, списання
   await expect(page.locator('#toast')).toHaveText('Абонемент куплено — спишеться під час запису');
   await page.goto('/#/book/blysk');
   await page.getByLabel(/Експрес-мийка кузова/).check();
+  await page.locator('[data-action="to-time"]').click();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await page.locator('.slot:not([disabled])').first().click();
   await page.locator('[data-action="confirm"]').click();
@@ -188,6 +189,7 @@ test('абонемент і сертифікат: продаж, списання
   // Сертифікатом оплачують комплекс: 550 ₴ із 1000.
   await page.goto('/#/book/blysk');
   await page.getByLabel(/Комплекс: кузов \+ салон/).check();
+  await page.locator('[data-action="to-time"]').click();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await page.locator('.slot:not([disabled])').first().click();
   await page.locator('[data-action="confirm"]').click();
@@ -241,6 +243,7 @@ test('гаряче вікно −20%: клієнт бачить пропозиц
   await hot.click();
   await expect(page).toHaveURL(/#\/book\/hvylia\/2026-10-05\/14:00/);
   await page.getByLabel(/Комплекс преміум/).check();
+  await page.locator('[data-action="to-time"]').click();
   await expect(page.locator('.slot[data-time="14:00"]')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.slot[data-time="15:00"]')).toContainText('−20%');
   await expect(page.locator('.slot[data-time="10:00"]')).not.toContainText('−20%');
@@ -299,6 +302,7 @@ test('жива черга: клієнт бачить авто попереду, 
 test('акт приймання з фото: точка фіксує стан, клієнт підтверджує', async ({ page }) => {
   await page.goto('/#/book/hvylia');
   await page.getByLabel(/Комплекс преміум/).check();
+  await page.locator('[data-action="to-time"]').click();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await page.locator('.slot:not([disabled])').first().click();
   await page.locator('[data-action="confirm"]').click();
@@ -337,6 +341,7 @@ test('лист очікування: час звільнився — клієн�
   await setProfilePhone(page, '+380675556677');
   await page.goto('/#/book/hvylia');
   await page.getByLabel(/Комплекс преміум/).check();
+  await page.locator('[data-action="to-time"]').click();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await expect(page.locator('.slot[data-time="10:00"]')).toBeDisabled();
   await page.getByRole('button', { name: 'Немає зручного часу? Повідомимо, якщо звільниться' }).click();
@@ -357,6 +362,7 @@ test('лист очікування: час звільнився — клієн�
   await expect(page.locator('.msg-card')).toContainText('Автомийка «Хвиля»: звільнився час 5 жовтня о 10:00');
   await page.getByRole('link', { name: 'Записатися' }).click();
   await page.getByLabel(/Комплекс преміум/).check();
+  await page.locator('[data-action="to-time"]').click();
   await expect(page.locator('.slot[data-time="10:00"]')).toHaveAttribute('aria-pressed', 'true');
 });
 

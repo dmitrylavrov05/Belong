@@ -90,6 +90,7 @@ test('щасливі години: точка ставить щотижневу 
   await page.goto('/#/book/hvylia');
   await page.getByLabel(/Комплекс преміум/).check();
   // Сьогодні неділя — знижки немає; завтра понеділок — є.
+  await page.locator('[data-action="to-time"]').click();
   await expect(page.locator('.slot.hot')).toHaveCount(0);
   const monday = page.getByRole('button', { name: /Завтра, 5, є знижка до 15%/ });
   await expect(monday).toContainText('−15%');
@@ -121,6 +122,7 @@ test('статистика застосунку: воронка з реальн�
   await page.goto('/#/place/hvylia');
   await page.goto('/#/book/hvylia');
   await page.getByLabel(/Комплекс преміум/).check();
+  await page.locator('[data-action="to-time"]').click();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await page.locator('.slot:not([disabled])').first().click();
   await page.locator('[data-action="confirm"]').click();

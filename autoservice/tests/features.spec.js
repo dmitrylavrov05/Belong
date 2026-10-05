@@ -30,6 +30,7 @@ const money = (s) => new RegExp(s.replace(/ /g, '\\s'));
 async function book(page, { place = 'hvylia', service = /Комплекс преміум/, time = '10:00', pay = 'Оплатити 900 ₴' } = {}) {
   await page.goto(`/#/book/${place}`);
   await page.getByLabel(service).check();
+  await page.locator('[data-action="to-time"]').click();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await page.locator(`.slot[data-time="${time}"]`).click();
   await page.locator('[data-action="confirm"]').click();
@@ -63,6 +64,7 @@ test('перенесення: новий час без скасування оп
   // Старий час звільнився, новий зайнятий.
   await page.goto('/#/book/hvylia');
   await page.getByLabel(/Комплекс преміум/).check();
+  await page.locator('[data-action="to-time"]').click();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await expect(page.locator('.slot[data-time="10:00"]')).toBeEnabled();
   await expect(page.locator('.slot[data-time="14:00"]')).toBeDisabled();
@@ -77,6 +79,7 @@ test('перенесення: новий час без скасування оп
 test('перенесення недоступне пізніше ніж за 1,5 год до візиту', async ({ page }) => {
   await page.goto('/#/book/hvylia');
   await page.getByLabel(/Комплекс преміум/).check();
+  await page.locator('[data-action="to-time"]').click();
   await page.locator('.slot[data-time="11:00"]').click();
   await page.locator('[data-action="confirm"]').click();
   await page.getByRole('button', { name: 'Оплатити 900 ₴' }).click();
@@ -190,18 +193,20 @@ test('виїзд до вас: мийка біля дому з адресою н�
   await page.getByRole('button', { name: 'Виїзд до мене' }).click();
   await expect(page.getByLabel(/Мийка двигуна/)).toHaveCount(0);
   await page.getByLabel(/Експрес-мийка/).check();
-  await page.getByRole('button', { name: /Завтра/ }).click();
-  await page.locator('.slot[data-time="10:00"]').click();
-  await expect(page.locator('[data-action="confirm"]')).toBeDisabled();
-  await expect(page.locator('[data-action="confirm"]')).toHaveText('Вкажіть адресу, куди приїхати');
+  // Без адреси далі не пустить.
+  await expect(page.locator('[data-action="to-time"]')).toBeDisabled();
+  await expect(page.locator('[data-action="to-time"]')).toHaveText('Вкажіть адресу, куди приїхати');
   await page.getByLabel('Адреса').fill('вул. Героїв полку «Азов», 10, паркінг біля підʼїзду 2');
-  await expect(page.locator('[data-action="confirm"]')).toHaveText('Позначте місце на карті');
+  await expect(page.locator('[data-action="to-time"]')).toHaveText('Позначте місце на карті');
   const map = page.getByRole('region', { name: /Карта: натисніть/ });
   const box = await map.boundingBox();
   await page.mouse.click(box.x + box.width / 2 + 20, box.y + box.height / 2 + 20);
   await expect(page.locator('#addr-note')).toContainText('від точки — приїдемо');
   await expect(map.getByRole('img', { name: 'Обрана адреса' })).toBeVisible();
   await expect(page.locator('.dock .total')).toContainText('· виїзд');
+  await page.locator('[data-action="to-time"]').click();
+  await page.getByRole('button', { name: /Завтра/ }).click();
+  await page.locator('.slot[data-time="10:00"]').click();
   // 230 ₴ за мийку + 250 ₴ виїзд.
   await page.locator('[data-action="confirm"]').click();
   await expect(page.locator('.sheet')).toContainText('Виїзд до вас: 250 ₴');
@@ -225,9 +230,15 @@ test('виїзд до вас: мийка біля дому з адресою н�
   await mf.getByRole('button', { name: 'Зберегти виїзд' }).click();
   await page.goto('/#/book/aqua24');
   await page.getByLabel(/Експрес-мийка/).check();
+  await page.locator('[data-action="to-time"]').click();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await expect(page.locator('.slot[data-time="10:30"]')).toBeEnabled();
+  await page.locator('[data-action="step-back"]').click();
   await page.getByRole('button', { name: 'Виїзд до мене' }).click();
+  await page.getByLabel('Адреса').fill('вул. Тестова, 1');
+  const box2 = await page.locator('#pick-map').boundingBox();
+  await page.mouse.click(box2.x + box2.width / 2, box2.y + box2.height / 2);
+  await page.locator('[data-action="to-time"]').click();
   await expect(page.locator('.slot[data-time="10:00"]')).toBeDisabled();
   await expect(page.locator('.slot[data-time="10:30"]')).toBeDisabled();
   await expect(page.locator('.slot[data-time="11:00"]')).toBeEnabled();
@@ -243,6 +254,7 @@ test('виїзд до вас: мийка біля дому з адресою н�
 test('оплата частинами для дорогого детейлінгу: перший платіж, точка отримує всю суму', async ({ page }) => {
   await page.goto('/#/book/hlyanets');
   await page.getByLabel(/Керамічне покриття/).check();
+  await page.locator('[data-action="to-time"]').click();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await page.locator('.slot[data-time="10:00"]').click();
   await expect(page.locator('.dock')).toContainText(money('Можна оплатити частинами: від 1 500 ₴/міс'));
@@ -263,6 +275,7 @@ test('оплата частинами для дорогого детейлінг
   // Дешеві послуги частинами не оплачуються.
   await page.goto('/#/book/hlyanets');
   await page.getByLabel(/Полірування фар/).check();
+  await page.locator('[data-action="to-time"]').click();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await page.locator('.slot[data-time="16:00"]').click();
   await page.locator('[data-action="confirm"]').click();
@@ -277,6 +290,7 @@ test('промокоди: «Перша мийка −30%» сама, свій к
 
   await page.goto('/#/book/blysk');
   await page.getByLabel(/Експрес-мийка/).check();
+  await page.locator('[data-action="to-time"]').click();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await page.locator('.slot[data-time="10:00"]').click();
   await expect(page.locator('.save-pill')).toContainText('Перша мийка −30%: −75 ₴ за промокодом PERSHA30');
@@ -294,6 +308,7 @@ test('промокоди: «Перша мийка −30%» сама, свій к
   // Другий раз — без знижки й з поясненням, якщо ввести код вручну.
   await page.goto('/#/book/blysk');
   await page.getByLabel(/Експрес-мийка/).check();
+  await page.locator('[data-action="to-time"]').click();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await page.locator('.slot[data-time="12:00"]').click();
   await page.locator('[data-action="confirm"]').click();
@@ -315,6 +330,7 @@ test('промокоди: «Перша мийка −30%» сама, свій к
 
   await page.goto('/#/book/hvylia');
   await page.getByLabel(/Комплекс преміум/).check();
+  await page.locator('[data-action="to-time"]').click();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await page.locator('.slot[data-time="10:00"]').click();
   await page.locator('[data-action="confirm"]').click();
@@ -334,6 +350,7 @@ test('промокоди: «Перша мийка −30%» сама, свій к
   await expect(page.locator('tr', { hasText: 'CHYSTO15' })).toContainText('Вимкнено');
   await page.goto('/#/book/hvylia');
   await page.getByLabel(/Комплекс преміум/).check();
+  await page.locator('[data-action="to-time"]').click();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await page.locator('.slot[data-time="10:00"]').click();
   await page.locator('[data-action="confirm"]').click();
@@ -366,12 +383,14 @@ const PAGES = {
     await page.getByLabel('Адреса').fill('вул. Тестова, 1');
     const box = await page.locator('#pick-map').boundingBox();
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await page.locator('[data-action="to-time"]').click();
     await page.getByRole('button', { name: /Завтра/ }).click();
     await page.locator('.slot[data-time="10:00"]').click();
   },
   'оплата частинами': async (page) => {
     await page.goto('/#/book/hlyanets');
     await page.getByLabel(/Керамічне покриття/).check();
+    await page.locator('[data-action="to-time"]').click();
     await page.getByRole('button', { name: /Завтра/ }).click();
     await page.locator('.slot[data-time="10:00"]').click();
     await page.locator('[data-action="confirm"]').click();

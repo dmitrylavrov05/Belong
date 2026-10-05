@@ -80,6 +80,8 @@ export const ICONS = {
   copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/>',
   chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
   users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  map: '<path d="M9 4.5 3.5 6.5v13l5.5-2 6 2 5.5-2v-13l-5.5 2z"/><path d="M9 4.5v13M15 6.5v13"/>',
   list: '<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>',
   settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M2.5 12h3M18.5 12h3M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1"/>',
   bell: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
@@ -339,7 +341,7 @@ export const offersOf = (placeId, clientKey) =>
   store.get('biz.offers', []).filter((o) => o.placeId === placeId && o.active !== false && (!clientKey || o.clientKey === clientKey));
 
 // Персональну послугу подаємо так само, як звичайну: одна ціна для всіх класів авто.
-export const offerAsService = (o) => ({ id: `offer:${o.id}`, name: o.name, min: o.min, price: [o.price, o.price, o.price], cat: o.cat, personal: true, note: o.note });
+export const offerAsService = (o) => ({ id: `offer:${o.id}`, name: o.name, min: o.min, price: [o.price, o.price, o.price], cat: o.cat, personal: true, main: true, note: o.note });
 
 export const EXPENSE_CATS = ['Хімія й витратні матеріали', 'Запчастини', 'Зарплата', 'Оренда', 'Комунальні послуги', 'Реклама', 'Податки', 'Обладнання й ремонт', 'Інше'];
 export const PAY_METHODS = { cash: 'Готівка', card: 'Картка', account: 'Рахунок' };

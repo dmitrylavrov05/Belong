@@ -168,6 +168,7 @@ test('скарга точки на відгук: модератор прихов
     await page.clock.setFixedTime(new Date(2026, 9, 4, 10, 0));
     await page.goto('/#/book/hvylia');
     await page.getByLabel(/Комплекс преміум/).check();
+    await page.locator('[data-action="to-time"]').click();
     await page.getByRole('button', { name: /Завтра/ }).click();
     await page.locator('.slot:not([disabled])').first().click();
     await page.locator('[data-action="confirm"]').click();
@@ -208,6 +209,7 @@ test('скарга точки на відгук: модератор прихов
 test('спір: модератор ділить суму, клієнт отримує решту на баланс', async ({ page }) => {
   await page.goto('/#/book/hvylia');
   await page.getByLabel(/Комплекс преміум/).check();
+  await page.locator('[data-action="to-time"]').click();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await page.locator('.slot:not([disabled])').first().click();
   await page.locator('[data-action="confirm"]').click();

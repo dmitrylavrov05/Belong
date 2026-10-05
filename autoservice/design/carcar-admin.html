@@ -673,7 +673,7 @@ label.item { cursor: pointer; padding: 10px 14px; }
 :root { --ease: cubic-bezier(.2, .8, .2, 1); --shadow-1: 0 1px 2px rgba(16, 21, 28, .05), 0 3px 10px rgba(16, 21, 28, .04); --shadow-2: 0 10px 28px rgba(16, 21, 28, .12); }
 @media (prefers-color-scheme: dark) { :root { --shadow-1: 0 1px 2px rgba(0, 0, 0, .4); --shadow-2: 0 10px 28px rgba(0, 0, 0, .5); } }
 .card, .bk, .panel, .kpi { box-shadow: var(--shadow-1); }
-.tabs { background: color-mix(in srgb, var(--bg) 86%, transparent); backdrop-filter: saturate(1.6) blur(14px); -webkit-backdrop-filter: saturate(1.6) blur(14px); }
+.tabs { background: var(--bg); }
 .promo-banner { background: linear-gradient(120deg, var(--ok-soft), var(--soft)); }
 .btn, .chip, .slot, .day, .seg-mini button, .seg button, .radio-row label, .parts label { transition: transform .14s var(--ease), background-color .2s, border-color .2s, color .2s, box-shadow .2s; }
 
@@ -734,6 +734,111 @@ label.item { cursor: pointer; padding: 10px 14px; }
 .fold[open] > :last-child { margin-bottom: 16px; }
 .fold .form-box { margin: 0 12px 12px; }
 .promo-banner { margin-bottom: 12px; }
+
+/* ---------- каталог: пошук із перемикачем вигляду й картки-обкладинки ---------- */
+.search-row { display: flex; gap: 10px; align-items: center; margin-top: 14px; }
+.search-row .search { flex: 1; }
+.view-toggle { display: inline-flex; gap: 2px; padding: 3px; border-radius: 14px; background: var(--soft); flex: none; }
+.view-toggle button { width: 42px; height: 42px; border: 0; border-radius: 11px; background: transparent; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
+.view-toggle button[aria-pressed="true"] { background: var(--bg); color: var(--accent); box-shadow: var(--shadow-1); }
+.pcard { position: relative; border-radius: 22px; overflow: hidden; background: #1f2937; box-shadow: var(--shadow-2); isolation: isolate; }
+.pc-cover { position: relative; aspect-ratio: 16 / 10; }
+.pcard .pc-cover::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(0, 0, 0, .28) 0%, rgba(0, 0, 0, 0) 32%, rgba(0, 0, 0, .15) 50%, rgba(0, 0, 0, .78) 100%); }
+.pc-slides { display: flex; height: 100%; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }
+.pc-slides::-webkit-scrollbar { display: none; }
+.pc-slide { flex: 0 0 100%; scroll-snap-align: start; }
+.pc-slide svg { display: block; width: 100%; height: 100%; }
+.pc-dots { position: absolute; right: 16px; bottom: 16px; z-index: 2; display: flex; gap: 5px; pointer-events: none; }
+.pc-dots i { width: 6px; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .55); transition: width .25s, background .25s; }
+.pc-dots i.on { width: 16px; background: #fff; }
+.pc-top { position: absolute; left: 12px; top: 12px; right: 56px; z-index: 2; display: flex; flex-wrap: wrap; gap: 6px; pointer-events: none; }
+.pc-top .badge { background: rgba(255, 255, 255, .92); color: #10151c; backdrop-filter: blur(6px); }
+.pc-top .badge.deal { background: var(--accent); color: var(--on-accent, #fff); }
+.pcard > .fav { position: absolute; top: 8px; right: 8px; margin: 0; z-index: 3; color: #fff; filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .5)); }
+.pcard > .fav[aria-pressed="true"] { color: #ff8a7a; }
+.pc-info { position: absolute; left: 16px; right: 70px; bottom: 14px; z-index: 2; display: flex; flex-direction: column; gap: 3px; color: #fff; pointer-events: none; text-shadow: 0 1px 3px rgba(0, 0, 0, .45); }
+.pc-info .pc-title { margin: 0 0 2px; font-size: 21px; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 8px; }
+.pc-rate { display: inline-flex; align-items: center; gap: 3px; font-size: 14px; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: rgba(0, 0, 0, .35); }
+.pc-rate .ic { color: #ffc24b; }
+.pc-line { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500; }
+.pc-line .ic { flex: none; opacity: .95; }
+.pc-line .badge.dist { background: rgba(0, 0, 0, .35); color: #fff; padding: 0 6px; font-size: 13px; }
+#list.stack { gap: 14px; }
+.pc-cover.hero { border-radius: 22px; overflow: hidden; margin: 6px 0 14px; box-shadow: var(--shadow-2); }
+#map-card .pcard { margin-top: 10px; }
+
+/* ---------- запис: основна послуга, додаткові, крок часу, чек ---------- */
+.book-car { margin-top: 4px; }
+.car-chip { display: inline-flex; align-items: center; gap: 8px; padding: 0 6px 0 14px; height: 44px; border-radius: 999px; background: var(--soft); color: var(--text); }
+.car-chip select { border: 0; background: transparent; font: inherit; font-weight: 700; font-size: 15px; color: var(--text); padding-right: 6px; max-width: 70vw; }
+.mode-seg { margin-top: 14px; }
+.sec-h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 22px 0 10px; }
+.sec-h h2 { margin: 0; font-size: 22px; }
+.sec-h span { font-size: 13px; color: var(--muted); }
+.svc-cards { display: grid; gap: 10px; }
+.svc-card { display: grid; gap: 8px; padding: 14px 16px; border-radius: 18px; border: 1.5px solid var(--line); background: var(--bg); box-shadow: var(--shadow-1); cursor: pointer; transition: border-color .2s, background-color .2s, transform .15s; }
+.svc-card:focus-within { outline: 3px solid var(--accent); outline-offset: 2px; }
+.svc-card.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--bg)); }
+.svc-name { font-size: 17px; font-weight: 700; }
+.svc-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.svc-tags span { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--soft); color: var(--muted); }
+.svc-foot { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; color: var(--muted); }
+.svc-foot b { font-size: 19px; color: var(--text); }
+.svc-card.on .svc-foot b { color: var(--accent); }
+.grp-h { margin: 16px 0 8px; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.svc-extra .price { color: var(--muted); font-weight: 600; }
+.book-dock { border-radius: 22px 22px 0 0; border-top: 0; box-shadow: 0 -10px 30px rgb(16 24 40 / 10%); }
+.book-dock .total { align-items: flex-start; }
+.book-dock .total > span { display: flex; flex-direction: column; gap: 4px; }
+.book-dock .total b { font-size: 24px; font-weight: 800; }
+.dur-chip { align-self: flex-start; font-size: 12px; font-weight: 500; color: var(--muted); padding: 2px 9px; border-radius: 999px; background: var(--soft); }
+.step-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 10px; }
+.step-head h2 { margin: 0; font-size: 19px; flex: 1; text-align: center; padding-right: 44px; }
+.step-head .icon-btn { width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--soft); color: var(--text); display: grid; place-items: center; cursor: pointer; }
+.step-note { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: var(--accent); }
+.day { height: 78px; position: relative; }
+.load { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--line); margin-top: 3px; }
+.load.high { background: #2fbf71; } .load.mid { background: #f59e0b; } .load.low { background: #e5484d; } .load.none { background: var(--line); }
+.load-legend { display: flex; justify-content: center; gap: 14px; margin: 10px 0 0; font-size: 12px; color: var(--muted); }
+.load-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.load-legend .load { margin: 0; }
+.date-h { margin: 18px 0 2px; font-size: 19px; }
+.date-h::first-letter { text-transform: uppercase; }
+.slots { grid-template-columns: repeat(3, 1fr); }
+.slot { height: 48px; border-radius: 14px; box-shadow: var(--shadow-1); }
+
+.pay-screen.sheet { position: static; max-width: none; margin: 0; padding: 0; border-radius: 0; box-shadow: none; background: transparent; }
+.receipt { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 18px 16px 26px; background: #fffdf7; border-radius: 18px 18px 0 0; color: #10151c;
+  -webkit-mask: linear-gradient(#000 0 0) top / 100% calc(100% - 10px) no-repeat, radial-gradient(circle 6px at 8px 100%, transparent 98%, #000) bottom / 16px 10px repeat-x;
+          mask: linear-gradient(#000 0 0) top / 100% calc(100% - 10px) no-repeat, radial-gradient(circle 6px at 8px 100%, transparent 98%, #000) bottom / 16px 10px repeat-x; }
+.receipt .muted, .receipt .fine, .receipt .sheet-total span { color: #5e6878; }
+.rc-place { font-size: 19px; }
+.rc-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13px; color: #5e6878; }
+.rc-meta .ic { color: #2563eb; }
+.rc-car { display: inline-flex; align-items: center; gap: 6px; margin-left: 12px; }
+.rc-lines { list-style: none; margin: 8px 0 4px; padding: 0; display: grid; gap: 8px; font-size: 15px; }
+.rc-lines li { display: flex; align-items: baseline; gap: 6px; }
+.rc-lines li span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.rc-lines i { flex: 1; border-bottom: 2px dotted #cfd5de; transform: translateY(-4px); min-width: 16px; }
+.rc-lines li span:last-child { white-space: nowrap; color: #3b4452; }
+.methods { border: 0; margin: 0; padding: 4px; display: grid; gap: 4px; border-radius: 18px; background: var(--bg); box-shadow: var(--shadow-1); }
+.methods legend { font-size: 14px; font-weight: 700; padding: 0 0 6px; }
+.method { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 14px; border: 1.5px solid transparent; cursor: pointer; font-size: 15px; }
+.method small { display: block; font-size: 12px; color: var(--muted); }
+.method.on { border-color: #e9d96a; background: color-mix(in srgb, #fff7c2 55%, var(--bg)); }
+.method:focus-within { outline: 3px solid var(--accent); outline-offset: 1px; }
+.m-ic { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--soft); color: var(--text); font-weight: 800; flex: none; }
+.m-ic.gpay { background: #fff; border: 1px solid var(--line); color: #4285f4; font-family: Arial, sans-serif; }
+.m-ic.card { background: #e7f86b; color: #10151c; }
+.pay-screen > * + * { margin-top: 14px; }
+.pay-dock .btn.gpay { background: #10151c; border-color: #10151c; color: #fff; }
+.g-mark { font-family: Arial, sans-serif; font-weight: 800; font-size: 20px; background: conic-gradient(from -45deg, #ea4335 0 25%, #fbbc05 0 50%, #34a853 0 75%, #4285f4 0); -webkit-background-clip: text; background-clip: text; color: transparent; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .receipt { background: #1b2230; color: #e8ecf2; } :root:not([data-theme="light"]) .receipt .rc-lines li span:last-child { color: #c9d1dc; } }
+/* Невидимий перемикач на всю картку: натиск будь-де по картці обирає її. */
+.svc-card, .method { position: relative; }
+.cover-input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; z-index: 1; appearance: none; }
+#book[data-step] { margin-top: 4px; }
+#view > h1 + #book .step-head { margin-top: -4px; }
 </style>
   <style>
 /* Панель для бізнесу CARCAR: десктоп-перший макет поверх токенів і компонентів styles.css. */
@@ -1205,27 +1310,28 @@ const CATEGORIES = [
 const CAR_CLASSES = ['Легкове', 'Кросовер', 'Позашляховик / мінівен'];
 
 const WASH = {
-  express: { name: 'Експрес-мийка кузова', min: 20, price: [250, 300, 350] },
-  complex: { name: 'Комплекс: кузов + салон', min: 60, price: [550, 650, 750] },
-  inside: { name: 'Прибирання салону пилососом', min: 25, price: [200, 250, 300] },
-  wax: { name: 'Віск і полірування', min: 40, price: [400, 500, 600] },
-  engine: { name: 'Мийка двигуна', min: 30, price: [400, 450, 500] },
-  dry: { name: 'Хімчистка салону', min: 240, price: [3500, 4200, 5000] },
-  premium: { name: 'Комплекс преміум: кузов, салон, віск', min: 50, price: [900, 1100, 1400] },
-  leather: { name: 'Чистка й кондиціонер шкіри', min: 30, price: [400, 500, 600] },
-  tireshine: { name: 'Чорніння шин', min: 20, price: [200, 200, 250] },
-  seats: { name: 'Хімчистка сидінь', min: 60, price: [600, 700, 900] },
-  underbody: { name: 'Мийка днища й арок', min: 30, price: [500, 600, 700] },
-  antirain: { name: 'Антидощ на всі скла', min: 45, price: [700, 800, 1000] },
-  nanowax: { name: 'Нановіск кузова', min: 40, price: [900, 1000, 1200] },
-  trunk: { name: 'Прибирання багажника', min: 30, price: [300, 350, 400] },
-  aroma: { name: 'Ароматизація салону', min: 20, price: [150, 150, 200] },
-  polish: { name: 'Полірування кузова', min: 180, price: [3500, 4200, 5000] },
-  ceramic: { name: 'Керамічне покриття кузова', min: 360, price: [9000, 11000, 13000] },
-  deepclean: { name: 'Глибока хімчистка салону з розбиранням', min: 300, price: [4000, 4800, 5600] },
-  headlights: { name: 'Полірування фар', min: 60, price: [600, 600, 700] },
+  express: { name: 'Експрес-мийка кузова', min: 20, price: [250, 300, 350], main: true, tags: ['кузов', 'активна піна', 'сушіння'] },
+  complex: { name: 'Комплекс: кузов + салон', min: 60, price: [550, 650, 750], main: true, tags: ['кузов', 'салон пилососом', 'скло'] },
+  inside: { name: 'Прибирання салону пилососом', min: 25, price: [200, 250, 300], group: 'Салон' },
+  wax: { name: 'Віск і полірування', min: 40, price: [400, 500, 600], group: 'Кузов' },
+  engine: { name: 'Мийка двигуна', min: 30, price: [400, 450, 500], group: 'Двигун' },
+  dry: { name: 'Хімчистка салону', min: 240, price: [3500, 4200, 5000], main: true, tags: ['сидіння', 'стеля', 'килимки'] },
+  premium: { name: 'Комплекс преміум: кузов, салон, віск', min: 50, price: [900, 1100, 1400], main: true, tags: ['кузов', 'салон', 'віск', 'чорніння шин'] },
+  leather: { name: 'Чистка й кондиціонер шкіри', min: 30, price: [400, 500, 600], group: 'Салон' },
+  tireshine: { name: 'Чорніння шин', min: 20, price: [200, 200, 250], group: 'Диски й шини' },
+  seats: { name: 'Хімчистка сидінь', min: 60, price: [600, 700, 900], group: 'Салон' },
+  underbody: { name: 'Мийка днища й арок', min: 30, price: [500, 600, 700], group: 'Кузов' },
+  antirain: { name: 'Антидощ на всі скла', min: 45, price: [700, 800, 1000], group: 'Скло' },
+  nanowax: { name: 'Нановіск кузова', min: 40, price: [900, 1000, 1200], group: 'Кузов' },
+  trunk: { name: 'Прибирання багажника', min: 30, price: [300, 350, 400], group: 'Салон' },
+  aroma: { name: 'Ароматизація салону', min: 20, price: [150, 150, 200], group: 'Салон' },
+  polish: { name: 'Полірування кузова', min: 180, price: [3500, 4200, 5000], main: true, tags: ['абразивне полірування', 'захисний віск'] },
+  ceramic: { name: 'Керамічне покриття кузова', min: 360, price: [9000, 11000, 13000], main: true, tags: ['підготовка кузова', '2 шари кераміки', 'гарантія'] },
+  deepclean: { name: 'Глибока хімчистка салону з розбиранням', min: 300, price: [4000, 4800, 5600], main: true, tags: ['розбирання салону', 'хімчистка', 'озонування'] },
+  headlights: { name: 'Полірування фар', min: 60, price: [600, 600, 700], group: 'Кузов' },
 };
 
+// main — основна мийка (клієнт обирає одну), tags — що входить; решта — додаткові послуги з групою.
 // Каталог послуг: нова точка стартує з повного прайсу мийки й редагує його.
 const SERVICE_TEMPLATES = { wash: WASH };
 
@@ -1483,6 +1589,8 @@ const ICONS = {
   copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/>',
   chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
   users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  map: '<path d="M9 4.5 3.5 6.5v13l5.5-2 6 2 5.5-2v-13l-5.5 2z"/><path d="M9 4.5v13M15 6.5v13"/>',
   list: '<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>',
   settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M2.5 12h3M18.5 12h3M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1"/>',
   bell: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
@@ -1742,7 +1850,7 @@ const offersOf = (placeId, clientKey) =>
   store.get('biz.offers', []).filter((o) => o.placeId === placeId && o.active !== false && (!clientKey || o.clientKey === clientKey));
 
 // Персональну послугу подаємо так само, як звичайну: одна ціна для всіх класів авто.
-const offerAsService = (o) => ({ id: `offer:${o.id}`, name: o.name, min: o.min, price: [o.price, o.price, o.price], cat: o.cat, personal: true, note: o.note });
+const offerAsService = (o) => ({ id: `offer:${o.id}`, name: o.name, min: o.min, price: [o.price, o.price, o.price], cat: o.cat, personal: true, main: true, note: o.note });
 
 const EXPENSE_CATS = ['Хімія й витратні матеріали', 'Запчастини', 'Зарплата', 'Оренда', 'Комунальні послуги', 'Реклама', 'Податки', 'Обладнання й ремонт', 'Інше'];
 const PAY_METHODS = { cash: 'Готівка', card: 'Картка', account: 'Рахунок' };

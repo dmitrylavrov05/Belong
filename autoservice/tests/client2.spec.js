@@ -29,6 +29,7 @@ const PANEL = '/business.html';
 async function book(page, { place = 'hvylia', service = /Комплекс преміум/, day = /Завтра/, time = '10:00', price = '900 ₴' } = {}) {
   await page.goto(`/#/book/${place}`);
   await page.getByLabel(service).check();
+  await page.locator('[data-action="to-time"]').click();
   if (day) await page.getByRole('button', { name: day }).click();
   await page.locator(`.slot[data-time="${time}"]`).click();
   await page.locator('[data-action="confirm"]').click();
@@ -69,8 +70,8 @@ test('повтор запису в один дотик: ті самі послу
 
   await page.getByRole('link', { name: 'Повторити запис' }).click();
   await expect(page.locator('#toast')).toContainText('о 10:00 — лишилось оплатити');
-  await expect(page.getByRole('dialog', { name: 'Оплата' })).toBeVisible();
-  await expect(page.getByLabel(/Комплекс преміум/)).toBeChecked();
+  await expect(page.getByRole('region', { name: 'Оплата' })).toBeVisible();
+  await expect(page.locator('.rc-lines')).toContainText('Комплекс преміум');
   // Гроші за скасований запис уже на балансі CARCAR — ним і оплачуємо.
   await page.getByRole('button', { name: 'Оплатити з балансу' }).click();
   await expect(page.locator('article').first()).toContainText('10:00');

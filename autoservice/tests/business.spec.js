@@ -94,6 +94,7 @@ test('запис із журналу займає час у застосунку
 
   await page.goto('/#/book/hvylia');
   await page.getByLabel(/Комплекс преміум/).check();
+  await page.locator('[data-action="to-time"]').click();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await expect(page.locator('.slot[data-time="10:00"]')).toBeDisabled();
   await expect(page.locator('.slot[data-time="09:30"]')).toBeDisabled();
@@ -160,6 +161,7 @@ test('відповідь на відгук видно на сторінці то
   // Клієнт записується, підтверджує виконання й залишає відгук.
   await page.goto('/#/book/hvylia');
   await page.getByLabel(/Комплекс преміум/).check();
+  await page.locator('[data-action="to-time"]').click();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await page.locator('.slot:not([disabled])').first().click();
   await page.locator('[data-action="confirm"]').click();
@@ -184,6 +186,7 @@ test('відповідь на відгук видно на сторінці то
 test('фінанси: замовлення через CARCAR, заморожування, виплата й експорт', async ({ page }) => {
   await page.goto('/#/book/hvylia');
   await page.getByLabel(/Комплекс преміум/).check();
+  await page.locator('[data-action="to-time"]').click();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await page.locator('.slot:not([disabled])').first().click();
   await page.locator('[data-action="confirm"]').click();
@@ -284,6 +287,7 @@ test('графік: вихідний, перерва, особлива дата 
 
   await page.goto('/#/book/hvylia');
   await page.getByLabel(/Комплекс преміум/).check();
+  await page.locator('[data-action="to-time"]').click();
   await expect(page.getByRole('button', { name: /Завтра/ })).toBeDisabled();
   await expect(page.locator('.day[data-date="2026-10-06"]')).toBeDisabled();
   await expect(page.locator('.day[data-date="2026-10-06"]')).toContainText('вихідний');
@@ -338,6 +342,7 @@ test('персональна послуга з індивідуальною ці
   await expect(page.locator('.personal-list')).toContainText('700 ₴');
   await page.goto('/#/book/hvylia');
   await page.getByLabel(/Для вас.*Комплекс преміум/).check();
+  await page.locator('[data-action="to-time"]').click();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await page.locator('.slot:not([disabled])').first().click();
   await page.locator('[data-action="confirm"]').click();
@@ -462,6 +467,7 @@ test('витрати й звіт про прибутки: разові й щом
 test('нагадування клієнту підтвердити виконання', async ({ page }) => {
   await page.goto('/#/book/hvylia');
   await page.getByLabel(/Комплекс преміум/).check();
+  await page.locator('[data-action="to-time"]').click();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await page.locator('.slot:not([disabled])').first().click();
   await page.locator('[data-action="confirm"]').click();
