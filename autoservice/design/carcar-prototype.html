@@ -107,7 +107,7 @@ svg.ic { flex: none; display: block; }
 .brand:hover { color: var(--text); }
 .brand .c1 { color: var(--accent); }
 .brand .c2 { color: var(--navy); margin-left: -8px; }
-.city { display: inline-flex; align-items: center; gap: 4px; font-size: 15px; color: var(--muted); }
+.city { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: 15px; color: var(--muted); }
 
 main { max-width: 720px; margin: 0 auto; padding: 0 16px; outline: none; }
 
@@ -498,12 +498,45 @@ label.item { cursor: pointer; padding: 10px 14px; }
 .thread .msg.client { justify-self: end; background: var(--accent-soft); border-bottom-right-radius: 4px; }
 .thread .msg.biz { justify-self: start; border-bottom-left-radius: 4px; }
 .thread .who { display: block; font-size: 12px; color: var(--muted); margin-bottom: 2px; white-space: normal; }
+
+/* повідомлення, гарячі вікна, черга, абонементи, акт приймання */
+.inbox-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; color: var(--text); margin-left: 4px; }
+.inbox-btn:hover { background: var(--soft); }
+.inbox-btn .count { position: absolute; top: 4px; right: 2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.badge.deal { background: var(--accent-soft); color: var(--text); }
+.badge.power .ic, .badge.deal .ic { flex: none; }
+.hot { margin-top: 14px; }
+.hot-title { display: flex; align-items: center; gap: 6px; font-size: 17px; margin: 0 0 8px; }
+.hot-title .ic { color: var(--accent); }
+.hot-row { display: flex; gap: 10px; overflow-x: auto; margin: 0 -16px; padding: 2px 16px 6px; scrollbar-width: none; }
+.hot-row::-webkit-scrollbar { display: none; }
+.hot-card { flex: 0 0 210px; display: flex; flex-direction: column; gap: 3px; text-decoration: none; color: var(--text); }
+.hot-pct { align-self: flex-start; background: var(--accent); color: #fff; font-weight: 800; font-size: 14px; padding: 2px 8px; border-radius: 999px; margin-bottom: 4px; }
+.slot { display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; }
+.slot small { font-size: 11px; font-weight: 700; color: var(--accent); }
+.slot.hot { border-color: var(--accent); }
+.slot[aria-pressed="true"] small { color: var(--on-navy); }
+.deal-note { display: flex; gap: 10px; align-items: flex-start; background: var(--accent-soft); margin-top: 14px; }
+.deal-note > .ic { color: var(--accent); flex: none; margin-top: 2px; }
+.queue-card { margin-top: 14px; display: grid; gap: 10px; }
+.queue-card h2 { display: flex; align-items: center; gap: 8px; margin: 0; }
+.link-btn { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
+.cert-line { align-items: flex-end; }
+.intake-card { margin-top: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.intake-card summary { cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.msg-card.unread { border-color: var(--accent); }
+.pass-item .btn { flex: none; }
+.code { font-family: ui-monospace, monospace; letter-spacing: .5px; }
+.notice > .ic { flex: none; }
+
+[hidden] { display: none !important; }
 </style>
 </head>
 <body>
   <header class="top">
     <a class="brand" href="#/" aria-label="CARCAR, на головну"><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#c8402b"/><path d="M15 10.5a6 6 0 1 0 0 11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/><path d="M24 10.5a6 6 0 1 0 0 11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".6"/></svg><span class="c1">CAR</span><span class="c2">CAR</span></a>
     <span class="city" id="city"></span>
+    <a class="inbox-btn" id="inbox-btn" href="#/inbox" aria-label="Повідомлення"></a>
   </header>
   <main id="view" tabindex="-1"></main>
   <nav class="tabs" aria-label="Розділи">
@@ -746,7 +779,24 @@ const REFERRAL = {
 // Спільна логіка застосунку клієнта (app.js) і панелі для бізнесу (business.js):
 // сховище, форматування, іконки, гроші, рейтинг і налаштування точок із CRM.
 
+// peek — для частого читання без змін: розбираємо JSON лише тоді, коли значення змінилося.
+// Повернений обʼєкт спільний — не змінюйте його, для змін є get/set.
+const peeked = new Map();
 const store = {
+  peek(key, fallback) {
+    let raw = null;
+    try { raw = localStorage.getItem(`carcar.${key}`); } catch { /* приватний режим */ }
+    if (raw === null) return fallback;
+    const hit = peeked.get(key);
+    if (hit?.raw === raw) return hit.value;
+    try {
+      const value = JSON.parse(raw);
+      peeked.set(key, { raw, value });
+      return value;
+    } catch {
+      return fallback;
+    }
+  },
   get(key, fallback) {
     try {
       const raw = localStorage.getItem(`carcar.${key}`);
@@ -809,6 +859,7 @@ const ICONS = {
   users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>',
   list: '<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>',
   settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M2.5 12h3M18.5 12h3M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1"/>',
+  bell: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
   upload: '<path d="M12 20V9M7 14l5-5 5 5M5 4h14"/>',
   download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
   x: '<path d="M6 6l12 12M18 6 6 18"/>',
@@ -885,9 +936,37 @@ function inBreak(place, t, minutes) {
   return !!b && t < b[1] && t + minutes > b[0];
 }
 
+// ---------- світло: статус від самої точки ----------
+
+// Точка в панелі відмічає, чи є світло, чи працює від генератора, чи стоїть без світла.
+// Позначка свіжа 12 годин — далі клієнти бачать лише, чи є в точки генератор.
+const POWER = {
+  grid: ['Світло є', 'ok'],
+  generator: ['Немає світла — працюємо від генератора', 'ok'],
+  closed: ['Немає світла — не працюємо', 'muted'],
+};
+const POWER_FRESH_HOURS = 12;
+function powerOf(placeId, now = Date.now()) {
+  const pw = store.peek('biz.power', {})[placeId];
+  return pw && now - pw.at < POWER_FRESH_HOURS * 3600000 ? pw : null;
+}
+function setPower(placeId, state) {
+  const all = store.get('biz.power', {});
+  all[placeId] = { state, at: Date.now() };
+  store.set('biz.power', all);
+}
+const hasGenerator = (p) => p.tags.some((t) => /генератор/i.test(t));
+// Чи працює точка під час відключень: свіжа позначка точки важливіша за опис.
+function worksInBlackout(p) {
+  const pw = powerOf(p.id);
+  if (pw) return pw.state !== 'closed';
+  return hasGenerator(p);
+}
+
 function isOpenNow(place, now = new Date()) {
   const h = hoursFor(place, isoDate(now));
   if (!h) return false;
+  if (powerOf(place.id, now.getTime())?.state === 'closed') return false;
   const m = now.getHours() * 60 + now.getMinutes();
   return m >= h[0] && m < h[1] && !inBreak(place, m, 1);
 }
@@ -1047,8 +1126,37 @@ const PAY_METHODS = { cash: 'Готівка', card: 'Картка', account: 'Р
 
 // Витрати точки за проміжком дат: разові плюс щомісячні, розгорнуті на кожен місяць до кінця проміжку
 // (або до дати зупинки). Розгорнуті записи мають id «шаблон@дата».
+// ---------- персонал і зарплата ----------
+
+const ROLES = { owner: 'Власник', admin: 'Адміністратор', master: 'Майстер' };
+const staffOf = (placeId) => store.peek('biz.staff', {})[placeId] ?? [];
+
+// База для відсотка майстра — вартість робіт: оплата клієнта, бонус і покрите абонементом чи сертифікатом.
+const workBase = (b) => (isCarcar(b) ? price(b) : b.paid) + (b.covered || 0);
+
+// Зарплата майстрів — відсоток від виконаних робіт, одним рядком на майстра за день.
+// Ці витрати не зберігаються окремо: їх завжди перераховано з виконаних записів.
+function salaryExpenses(placeId, from, to) {
+  const staff = staffOf(placeId);
+  const map = new Map();
+  for (const b of store.peek('bookings', [])) {
+    if (b.placeId !== placeId || b.state !== 'completed' || !b.masterId || b.date < from || b.date > to) continue;
+    const m = staff.find((x) => x.id === b.masterId);
+    if (!m?.pct) continue;
+    const k = `${b.date}|${m.id}`;
+    const e = map.get(k) ?? { id: `salary:${m.id}:${b.date}`, placeId, date: b.date, cat: 'Зарплата', method: 'card', amount: 0, works: 0, auto: 'salary', masterId: m.id };
+    e.amount += (workBase(b) * m.pct) / 100;
+    e.works++;
+    map.set(k, e);
+  }
+  return [...map.values()].map((e) => {
+    const m = staff.find((x) => x.id === e.masterId);
+    return { ...e, amount: Math.round(e.amount), note: `${m.name}: ${e.works} ${plural(e.works, 'робота', 'роботи', 'робіт')} × ${m.pct}%` };
+  });
+}
+
 function expensesIn(placeId, from, to) {
-  const out = [];
+  const out = [...salaryExpenses(placeId, from, to)];
   for (const e of store.get('biz.expenses', []).filter((x) => x.placeId === placeId)) {
     if (!e.recurring) {
       if (e.date >= from && e.date <= to) out.push(e);
@@ -1103,7 +1211,12 @@ function balanceFor(placeId, bookings, payouts) {
   const withdrawn = payouts.filter((x) => x.placeId === placeId).reduce((a, x) => a + x.gross, 0);
   const frozen = own.filter((b) => ACTIVE.includes(b.state) || isFrozen(b)).reduce((a, b) => a + price(b), 0);
   const next = own.filter(isFrozen).sort((a, b) => a.unfreezeAt - b.unfreezeAt)[0];
-  return { available: earned - withdrawn, frozen, next, withdrawn };
+  // Абонементи й сертифікати, куплені в застосунку: гроші точці через ті самі 48 годин.
+  const sales = (store.peek('biz.passes', {})[placeId]?.sold ?? []).filter((x) => x.source === 'carcar');
+  const ripe = (x) => Date.now() >= x.soldAt + PAYMENT.freezeHours * HOUR;
+  const passEarned = sales.filter(ripe).reduce((a, x) => a + x.price, 0);
+  const passFrozen = sales.filter((x) => !ripe(x)).reduce((a, x) => a + x.price, 0);
+  return { available: earned + passEarned - withdrawn, frozen: frozen + passFrozen, next, withdrawn };
 }
 
 // Якщо клієнт мовчить після «Машина готова», замовлення підтверджується саме.
@@ -1130,6 +1243,263 @@ function ratingFor(placeId, reviews) {
   return { avg, count: list.length, dist };
 }
 
+// Спільна логіка застосунку клієнта й панелі бізнесу для щоденної роботи точки:
+// гарячі вікна зі знижкою, жива черга, лист очікування, абонементи й сертифікати,
+// шинний готель і повідомлення клієнтам (розсилки, нагадування).
+
+const opsToday = () => isoDate(new Date());
+const opsNow = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
+const opsPlace = (id) => PLACES.find((p) => p.id === id);
+
+// ---------- повідомлення клієнтам ----------
+
+// Вхідні клієнта в застосунку: розсилки точок, нагадування шинного готелю, лист очікування.
+// clientKey — tel:… або car:…, як у CRM. channel — viber, telegram або app.
+const CHANNELS = { viber: 'Viber', telegram: 'Telegram', app: 'Застосунок CARCAR' };
+
+function sendMessages(list) {
+  const all = store.get('messages', []);
+  for (const m of list) all.push({ id: uid(), at: Date.now(), read: false, ...m });
+  store.set('messages', all);
+}
+
+const inboxFor = (keys) => store.peek('messages', []).filter((m) => keys.includes(m.clientKey)).sort((a, b) => b.at - a.at);
+
+function markRead(keys) {
+  const all = store.get('messages', []);
+  let changed = false;
+  for (const m of all) if (keys.includes(m.clientKey) && !m.read) { m.read = true; changed = true; }
+  if (changed) store.set('messages', all);
+}
+
+// Посилання, щоб написати клієнту вручну з телефона точки.
+const viberLink = (phone) => `viber://chat?number=${encodeURIComponent(`+${String(phone).replace(/\D/g, '').replace(/^0/, '380')}`)}`;
+const telegramLink = (phone) => `https://t.me/+${String(phone).replace(/\D/g, '').replace(/^0/, '380')}`;
+
+// ---------- вільний час ----------
+
+// Вільні початки на дату: у робочі години, не в перерву, не в минулому й поки є вільний бокс.
+function openStarts(place, date, minutes, bookings, { lead = scheduleOf(place).lead, skip } = {}) {
+  const h = hoursFor(place, date);
+  if (!h) return [];
+  const spans = bookings.filter((b) => b.placeId === place.id && b.date === date && BLOCKING.includes(b.state) && b !== skip)
+    .map((b) => [toMin(b.time), toMin(b.time) + b.minutes]);
+  const min = date === opsToday() ? opsNow() + lead : -1;
+  const out = [];
+  for (let t = h[0]; t + minutes <= h[1]; t += 30) {
+    if (t < min || inBreak(place, t, minutes)) continue;
+    if (spans.filter(([s, e]) => t < e && t + minutes > s).length < place.boxes) out.push(hhmm(t));
+  }
+  return out;
+}
+
+// ---------- гарячі вікна ----------
+
+// Точка ставить знижку на час, де мало записів. Знижка діє на запис, що починається у вікні.
+const dealsOf = (placeId) => (store.peek('biz.deals', {})[placeId] ?? []).filter((d) => d.active !== false && d.date >= opsToday());
+
+function dealAt(placeId, date, time) {
+  const t = toMin(time);
+  return dealsOf(placeId).filter((d) => d.date === date && t >= d.from && t < d.to).sort((a, b) => b.pct - a.pct)[0] ?? null;
+}
+
+const dealPrice = (price, pct) => Math.round((price * (100 - pct)) / 100 / 10) * 10;
+// Чи діє знижка на послугу: на всі послуги або лише на обрані точкою.
+const dealCovers = (deal, serviceId) => !!deal && (!deal.services?.length || deal.services.includes(serviceId));
+
+// Гарячі пропозиції для каталогу: сьогоднішні й завтрашні вікна, у яких ще є вільний час.
+function hotDeals(bookings) {
+  const out = [];
+  for (const p of PLACES.filter(isListed)) {
+    for (const d of dealsOf(p.id)) {
+      const minMin = Math.min(...p.services.map((s) => s.min));
+      const free = openStarts(p, d.date, minMin, bookings).filter((x) => toMin(x) >= d.from && toMin(x) < d.to);
+      if (free.length) out.push({ place: p, deal: d, free });
+    }
+  }
+  return out.sort((a, b) => (a.deal.date + opsPad(a.deal.from)).localeCompare(b.deal.date + opsPad(b.deal.from)));
+}
+const opsPad = (n) => String(n).padStart(4, '0');
+
+// ---------- жива черга ----------
+
+// Черга на сьогодні: авто, що чекають, і ті, що вже в боксі.
+function queueOf(placeId) {
+  const day = opsToday();
+  return (store.peek('biz.queue', {})[placeId] ?? []).filter((q) => q.day === day);
+}
+const queueEnabled = (p) => store.peek('biz.queueOn', {})[p.id] ?? p.cats[0] === 'wash';
+
+function saveQueue(placeId, list) {
+  const all = store.get('biz.queue', {});
+  all[placeId] = list;
+  store.set('biz.queue', all);
+}
+
+// Оцінка: хто коли потрапить у бокс. Авто в роботі займають бокс до кінця; записи на сьогодні
+// мають пріоритет, якщо машина з черги не встигне до їхнього початку. Повертає час для кожного
+// з тих, хто чекає, і для нового авто тривалістю minutes.
+function queueEstimate(place, bookings, minutes = 30) {
+  const now = opsNow();
+  const list = queueOf(place.id);
+  const free = Array(place.boxes).fill(now);
+  const working = list.filter((q) => q.status === 'working');
+  for (const q of working) {
+    const i = free.indexOf(Math.min(...free));
+    free[i] = Math.max(now, toMin(q.startedTime) + q.minutes);
+  }
+  const day = opsToday();
+  const books = bookings.filter((b) => b.placeId === place.id && b.date === day && BLOCKING.includes(b.state))
+    .map((b) => [toMin(b.time), b.minutes]).filter(([s, m]) => s + m > now).sort((a, b) => a[0] - b[0]);
+  // Записи, що вже йдуть, займають бокс до кінця.
+  while (books.length && books[0][0] <= now) {
+    const [s, m] = books.shift();
+    const i = free.indexOf(Math.min(...free));
+    free[i] = Math.max(free[i], s + m);
+  }
+  const waiting = list.filter((q) => q.status === 'waiting').sort((a, b) => a.joinedAt - b.joinedAt);
+  const eta = new Map();
+  const take = (dur) => {
+    for (;;) {
+      const i = free.indexOf(Math.min(...free));
+      const t = free[i];
+      if (books.length && books[0][0] < t + dur) {
+        const [s, m] = books.shift();
+        free[i] = Math.max(t, s) + m;
+        continue;
+      }
+      free[i] = t + dur;
+      return t;
+    }
+  };
+  for (const q of waiting) eta.set(q.id, take(q.minutes));
+  const next = take(minutes);
+  return { ahead: waiting.length, working: working.length, eta, waitMin: Math.max(0, next - now) };
+}
+
+// ---------- лист очікування ----------
+
+// Клієнт просить повідомити, якщо на дату звільниться час у вказаному проміжку.
+// Перевіряємо щоразу, коли хтось скасовує запис чи відкриває застосунок або панель.
+function checkWaitlist(bookings) {
+  const list = store.get('waitlist', []);
+  const sent = [];
+  for (const w of list) {
+    if (w.status !== 'active') continue;
+    if (w.date < opsToday()) { w.status = 'expired'; continue; }
+    const p = opsPlace(w.placeId);
+    if (!p) continue;
+    const slot = openStarts(p, w.date, w.minutes, bookings).find((t) => toMin(t) >= w.from && toMin(t) + w.minutes <= w.to);
+    if (!slot) continue;
+    Object.assign(w, { status: 'notified', notifiedAt: Date.now(), slot });
+    sent.push({
+      placeId: p.id, clientKey: w.clientKey, channel: 'app', kind: 'waitlist',
+      text: `${p.name}: звільнився час ${parseDate(w.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })} о ${slot}. Встигніть записатися!`,
+      link: `#/book/${p.id}/${w.date}/${slot}`,
+    });
+  }
+  if (sent.length || list.some((w) => w.status === 'expired')) store.set('waitlist', list);
+  if (sent.length) sendMessages(sent);
+  return sent.length;
+}
+
+// ---------- абонементи й сертифікати ----------
+
+const PASS_KIND = { sub: 'Абонемент', cert: 'Подарунковий сертифікат' };
+const passesOf = (placeId) => ({ plans: [], sold: [], ...store.peek('biz.passes', {})[placeId] });
+
+function savePasses(placeId, patch) {
+  const all = store.get('biz.passes', {});
+  all[placeId] = { ...passesOf(placeId), ...patch };
+  store.set('biz.passes', all);
+}
+
+function passCode() {
+  const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const part = () => Array.from({ length: 4 }, () => abc[Math.floor(Math.random() * abc.length)]).join('');
+  return `CC-${part()}-${part()}`;
+}
+
+// Продаж абонемента чи сертифіката: точка отримує гроші одразу (через CARCAR — після 48 год).
+function sellPass(placeId, plan, buyer) {
+  const valid = new Date();
+  valid.setDate(valid.getDate() + (plan.validDays ?? (plan.kind === 'sub' ? 30 : 365)));
+  const sold = {
+    id: uid(), planId: plan.id, kind: plan.kind, name: plan.name, price: plan.price, code: passCode(),
+    services: plan.services ?? [], visitsLeft: plan.kind === 'sub' ? plan.visits : null, visits: plan.visits ?? null,
+    balance: plan.kind === 'cert' ? plan.amount ?? plan.price : null, validUntil: isoDate(valid), soldAt: Date.now(),
+    history: [], ...buyer,
+  };
+  savePasses(placeId, { sold: [...passesOf(placeId).sold, sold] });
+  return sold;
+}
+
+const passActive = (s) => s.validUntil >= opsToday() && (s.kind === 'sub' ? s.visitsLeft > 0 : s.balance > 0);
+const passLeft = (s) => (s.kind === 'sub' ? `${s.visitsLeft} з ${s.visits} ${plural(s.visits, 'візиту', 'візитів', 'візитів')}` : `${s.balance.toLocaleString('uk-UA')} ₴`);
+
+// Абонементи клієнта в точці, що покривають хоч одну з обраних послуг.
+function usableSubs(placeId, keys, serviceIds) {
+  return passesOf(placeId).sold.filter((s) => s.kind === 'sub' && passActive(s) && keys.includes(s.clientKey)
+    && serviceIds.some((id) => !s.services.length || s.services.includes(id)));
+}
+
+function findCert(placeId, code) {
+  const c = String(code ?? '').trim().toUpperCase();
+  return passesOf(placeId).sold.find((s) => s.kind === 'cert' && s.code === c) ?? null;
+}
+
+// Списати з абонемента чи сертифіката; amount — сума, яку покриваємо. Повертає запис для бронювання.
+function redeemPass(placeId, soldId, amount, bookingId) {
+  const data = passesOf(placeId);
+  const sold = data.sold.map((s) => {
+    if (s.id !== soldId) return s;
+    const h = [...s.history, { at: Date.now(), bookingId, amount }];
+    return s.kind === 'sub' ? { ...s, visitsLeft: s.visitsLeft - 1, history: h } : { ...s, balance: s.balance - amount, history: h };
+  });
+  savePasses(placeId, { sold });
+  return { soldId, amount };
+}
+
+// Повернути візит чи суму, якщо запис скасовано вчасно.
+function restorePass(placeId, use) {
+  if (!use) return;
+  const data = passesOf(placeId);
+  const sold = data.sold.map((s) => (s.id !== use.soldId ? s : s.kind === 'sub'
+    ? { ...s, visitsLeft: s.visitsLeft + 1, history: [...s.history, { at: Date.now(), amount: -use.amount, note: 'повернення' }] }
+    : { ...s, balance: s.balance + use.amount, history: [...s.history, { at: Date.now(), amount: -use.amount, note: 'повернення' }] }));
+  savePasses(placeId, { sold });
+}
+
+// ---------- шинний готель ----------
+
+const SEASONS = { winter: 'Зимові', summer: 'Літні', all: 'Всесезонні' };
+const TIRE_STATE = ['Нові', 'Добрий', 'Задовільний', 'Потребують заміни'];
+const tiresOf = (placeId) => store.peek('biz.tires', {})[placeId] ?? [];
+
+function saveTires(placeId, list) {
+  const all = store.get('biz.tires', {});
+  all[placeId] = list;
+  store.set('biz.tires', all);
+}
+
+// Сезон перевзування в Києві: з 1 жовтня до 30 листопада — на зимові, з 15 березня до 30 квітня — на літні.
+function seasonDue(date = new Date()) {
+  const m = date.getMonth() + 1;
+  const d = date.getDate();
+  if (m === 10 || m === 11) return 'winter';
+  if ((m === 3 && d >= 15) || m === 4) return 'summer';
+  return null;
+}
+
+// Комплект на зберіганні, який пора забрати й поставити.
+const tireDue = (t, date = new Date()) => t.status === 'stored' && t.season === seasonDue(date);
+
+function myTires(keys) {
+  return PLACES.flatMap((p) => tiresOf(p.id).filter((t) => t.status === 'stored' && keys.includes(t.clientKey)).map((t) => ({ ...t, place: p })));
+}
+
+const clientKeyOf = (phone, car) => phoneKey(phone) ?? (car ? `car:${car}` : null);
+
 
 // ---------- сховище (лише на цьому пристрої) ----------
 
@@ -1155,7 +1525,7 @@ function newRefCode() {
 }
 let favs = new Set(store.get('favs', []));
 // Профіль клієнта: імʼя й телефон бачить точка; за телефоном вона показує персональні ціни.
-let profile = store.get('profile', { name: '', phone: '' });
+let profile = { name: '', phone: '', optIn: false, ...store.get('profile', {}) };
 
 // Записи цього клієнта — те, що він бачить у «Мої записи».
 const mine = () => bookings.filter((b) => !b.source);
@@ -1401,6 +1771,7 @@ function filteredPlaces() {
   const q = ui.q.trim().toLowerCase();
   const list = PLACES.filter((p) => {
     if (!isListed(p)) return false;
+    if (ui.blackout && !worksInBlackout(p)) return false;
     if (ui.cat !== 'all' && !p.cats.includes(ui.cat)) return false;
     if (ui.openNow && !isOpenNow(p)) return false;
     if (ui.favOnly && !favs.has(p.id)) return false;
@@ -1439,9 +1810,35 @@ function placeCard(p) {
         ${ui.pos ? `<span class="badge dist">${fmtDist(distTo(p))}</span>` : ''}
         <span class="badge ${open ? 'open' : 'closed'}">${open ? 'Відчинено' : 'Зачинено'} · ${hoursText(p)}</span>
         <span class="badge">від ${uah(minPrice(p, ui.cat, ui.cls))}</span>
+        ${powerBadge(p)}
+        ${dealsOf(p.id).length ? `<span class="badge deal">${icon('bolt', 13)}−${Math.max(...dealsOf(p.id).map((d) => d.pct))}% у гарячі вікна</span>` : ''}
       </div>
     </a>
   </article>`;
+}
+
+// Статус світла від самої точки: показуємо, лише поки позначка свіжа.
+const POWER_SHORT = { grid: 'Світло є', generator: 'Працює від генератора', closed: 'Немає світла — не працює' };
+function powerBadge(p) {
+  const pw = powerOf(p.id);
+  if (!pw) return '';
+  return `<span class="badge ${pw.state === 'closed' ? 'closed' : 'open'} power">${icon('bolt', 13)}${POWER_SHORT[pw.state]} · ${new Date(pw.at).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}</span>`;
+}
+
+// Гарячі вікна на головній: знижки точок на сьогодні й завтра, де ще є вільний час.
+function hotBlock() {
+  const list = hotDeals(bookings).slice(0, 6);
+  if (!list.length) return '';
+  const when = (d) => (d === isoDate(new Date()) ? 'Сьогодні' : 'Завтра');
+  return `<section class="hot" aria-labelledby="h-hot">
+    <h2 id="h-hot" class="hot-title">${icon('bolt', 18)}Гарячі вікна</h2>
+    <div class="hot-row">${list.map(({ place: p, deal: d, free }) => `<a class="card hot-card" href="#/book/${p.id}/${d.date}/${free[0]}">
+      <span class="hot-pct">−${d.pct}%</span>
+      <b>${esc(p.name)}</b>
+      <span class="small">${when(d.date)} · ${hhmm(d.from)}–${hhmm(d.to)}</span>
+      <span class="small muted">вільно з ${free[0]}${d.services?.length ? ` · ${d.services.length} ${plural(d.services.length, 'послуга', 'послуги', 'послуг')}` : ' · усі послуги'}</span>
+    </a>`).join('')}</div>
+  </section>`;
 }
 
 function renderList() {
@@ -1462,6 +1859,7 @@ function viewCatalog() {
       ${chip('Усі', 'data-action="cat" data-cat="all"', ui.cat === 'all')}
       ${CATEGORIES.map((c) => chip(`${icon(c.icon, 16)}${c.name}`, `data-action="cat" data-cat="${c.id}"`, ui.cat === c.id)).join('')}
       ${chip('Відчинено зараз', 'data-action="toggle" data-key="openNow"', ui.openNow)}
+      ${chip(`${icon('bolt', 16)}Працює при відключеннях`, 'data-action="toggle" data-key="blackout"', !!ui.blackout)}
       ${chip(`${icon('heart', 16)}Обране`, 'data-action="toggle" data-key="favOnly"', ui.favOnly)}
     </div>
     <div class="toolbar">
@@ -1478,6 +1876,7 @@ function viewCatalog() {
         </select>
       </span>
     </div>
+    ${hotBlock()}
     ${wallet.bonus ? `<a class="bonus-banner" href="#/invite">${icon('gift', 20)}<span>У вас ${uah(wallet.bonus)} бонусу — спишеться під час оплати замовлення від ${uah(REFERRAL.minOrder)}</span></a>` : ''}
     <div id="list" class="stack"></div>
     <div style="margin-top:14px">${inviteCard()}</div>
@@ -1545,6 +1944,7 @@ function viewPlace(id) {
     </div>
     <div class="badges lg" style="margin-top:12px">
       <span class="badge ${open ? 'open' : 'closed'}">${open ? 'Відчинено' : 'Зачинено'} · ${hoursText(p)}</span>
+      ${powerBadge(p)}
       ${p.tags.map((t) => `<span class="badge">${/генератор/i.test(t) ? icon('bolt', 13) : ''}${esc(t)}</span>`).join('')}
     </div>
     <div class="infobox">
@@ -1560,6 +1960,8 @@ function viewPlace(id) {
       <div class="list personal-list" style="margin-top:10px">${personalFor(p).map((s) => `<div class="item">
         <span class="name"><span class="badge personal">Для вас</span> ${esc(s.name)}<small>${duration(s.min)}${s.note ? ` · ${esc(s.note)}` : ''}</small></span>
         <span class="price">${uah(s.price[0])}</span></div>`).join('')}</div>` : ''}
+    ${queueBlock(p)}
+    ${dealsOf(p.id).length ? `<p class="notice deal-note">${icon('bolt', 18)}<span><b>Гарячі вікна</b>${dealsOf(p.id).map((d) => `${dayLabel(d.date, { weekday: 'short', day: 'numeric', month: 'long' })}, ${hhmm(d.from)}–${hhmm(d.to)}: −${d.pct}%`).join('; ')}. Знижку видно біля часу під час запису.</span></p>` : ''}
     <h2 class="big" id="services">Послуги та ціни</h2>
     <p class="small muted" style="margin:-6px 0 0">Ціни для класу «${CAR_CLASSES[ui.cls]}». Остаточну вартість майстер підтвердить на місці.</p>
     ${groups.map(([c, items]) => `
@@ -1570,6 +1972,7 @@ function viewPlace(id) {
           <span class="price">${uah(s.price[ui.cls])}</span>
         </div>`).join('')}
       </div>`).join('')}
+    ${passesBlock(p)}
     ${askBlock(p)}
     <h2 class="big" id="hours">Графік роботи</h2>
     ${scheduleBlock(p)}
@@ -1580,6 +1983,54 @@ function viewPlace(id) {
     <div class="dock-space"></div>
     <div class="dock">${isListed(p) ? `<a class="btn primary block" href="#/book/${p.id}">Записатися онлайн</a>`
       : '<p class="notice" style="margin:0">Точка зараз не приймає онлайн-записи в CARCAR.</p>'}</div>`;
+}
+
+// ---------- жива черга ----------
+
+const myQueue = () => store.get('queue.mine', []);
+
+// Скільки авто попереду й скільки чекати, якщо приїхати без запису; можна стати в чергу з телефона.
+function queueBlock(p) {
+  if (!isListed(p) || !queueEnabled(p) || !isOpenNow(p)) return '';
+  const est = queueEstimate(p, bookings);
+  const mineIds = myQueue().map((x) => x.id);
+  const me = queueOf(p.id).find((q) => mineIds.includes(q.id) && (q.status === 'waiting' || q.status === 'working'));
+  const waiting = queueOf(p.id).filter((q) => q.status === 'waiting').sort((a, b) => a.joinedAt - b.joinedAt);
+  const now = new Date().getHours() * 60 + new Date().getMinutes();
+  let mine = '';
+  if (me?.status === 'working') mine = `<p class="notice ok" style="margin:0">${icon('checkCircle', 20)}<span><b>Ваше авто вже в боксі</b>Майстер працює з ${me.startedTime}.</span></p>`;
+  else if (me) {
+    const pos = waiting.findIndex((q) => q.id === me.id) + 1;
+    const eta = est.eta.get(me.id) ?? now;
+    mine = `<p class="notice ok" style="margin:0">${icon('checkCircle', 20)}<span><b>Ви в черзі: ${pos}-й</b>У боксі приблизно о ${hhmm(eta)} (≈ ${duration(Math.max(0, eta - now))}).</span></p>
+      <button class="btn" data-action="queue-leave" data-id="${me.id}" data-place="${p.id}">Вийти з черги</button>`;
+  }
+  return `<section class="card queue-card" aria-labelledby="h-queue">
+    <h2 id="h-queue" class="car-name">${icon('list', 20)}Жива черга зараз</h2>
+    <div class="tiles">
+      <div class="tile"><span>Авто попереду</span><b>${est.ahead}</b></div>
+      <div class="tile ${est.waitMin < 15 ? 'ok' : ''}"><span>Чекати без запису</span><b>${est.waitMin < 5 ? 'одразу' : `≈ ${duration(Math.round(est.waitMin / 5) * 5)}`}</b></div>
+    </div>
+    ${mine || `<form id="queue-join" class="inline-form" data-place="${p.id}">
+      <label class="field"><span>Послуга</span><select name="service">${p.services.filter((x) => x.min <= 120).map((x) => `<option value="${x.id}">${esc(x.name)} · ${duration(x.min)}</option>`).join('')}</select></label>
+      <button class="btn primary" type="submit">Стати в чергу</button></form>
+      <p class="fine">Оцінка з урахуванням записів на сьогодні. Приїжджайте — вас покличуть за номером авто${cars[0]?.plate ? ` ${esc(cars[0].plate)}` : ''}.</p>`}
+  </section>`;
+}
+
+// ---------- абонементи й сертифікати ----------
+
+function passesBlock(p) {
+  const plans = passesOf(p.id).plans.filter((x) => x.active !== false);
+  if (!plans.length || !isListed(p)) return '';
+  const mineHere = passesOf(p.id).sold.filter((x) => x.buyer === 'app' && passActive(x));
+  return `<h2 class="big" id="passes">Абонементи й сертифікати</h2>
+    ${mineHere.length ? `<p class="small" style="margin:-6px 0 0">У вас: ${mineHere.map((x) => `${esc(x.name)} — ${passLeft(x)}`).join('; ')}</p>` : ''}
+    <div class="list">${plans.map((x) => `<div class="item pass-item">
+      <span class="name">${esc(x.name)}<small>${x.kind === 'sub' ? `${x.visits} ${plural(x.visits, 'візит', 'візити', 'візитів')} на ${x.validDays} ${plural(x.validDays, 'день', 'дні', 'днів')}` : `номінал ${uah(x.amount)} · діє ${x.validDays} ${plural(x.validDays, 'день', 'дні', 'днів')}`}</small></span>
+      <button class="btn" data-action="buy-pass" data-place="${p.id}" data-id="${x.id}" aria-label="Купити: ${esc(x.name)} за ${uah(x.price)}">${uah(x.price)}</button>
+    </div>`).join('')}</div>
+    <p class="small muted">Абонемент списується автоматично під час запису на послуги, на які він діє. Сертифікат можна подарувати — кодом оплачують запис.</p>`;
 }
 
 // ---------- запити до точки ----------
@@ -1642,29 +2093,77 @@ function draftClass() {
   return car ? car.cls : ui.cls;
 }
 
-function viewBook(id) {
+function viewBook(id, date, time) {
   const p = placeById(id);
   if (!p) return viewNotFound();
   if (!isListed(p)) return `${back(`#/place/${p.id}`, esc(p.name))}<h1>Запис недоступний</h1><p class="muted">Точка зараз не приймає онлайн-записи в CARCAR.</p>`;
-  if (!draft || draft.placeId !== id) {
-    draft = { placeId: id, services: new Set(), date: firstOpenDay(p), time: null, carId: cars[0]?.id ?? null };
+  // Посилання з гарячого вікна чи листа очікування відкриває запис одразу на потрібний день і час.
+  const prefill = date && bookingDays(p).includes(date);
+  if (!draft || draft.placeId !== id || (prefill && draft.date !== date)) {
+    draft = { placeId: id, services: new Set(), date: prefill ? date : firstOpenDay(p), time: null, wantTime: prefill ? time : null, carId: cars[0]?.id ?? null };
   }
   return `${back(`#/place/${p.id}`, p.name)}
     <h1>Запис</h1>
     <div id="book"></div>`;
 }
 
-function renderBook() {
-  const p = placeById(draft.placeId);
+// Лист очікування: якщо зручний час зайнятий — повідомимо, щойно він звільниться.
+function waitlistBlock(p, minutes, chosen) {
+  const mineW = store.get('waitlist', []).find((w) => w.placeId === p.id && w.date === draft.date && w.status === 'active' && w.mine);
+  if (mineW) {
+    return `<p class="notice ok" style="margin-top:12px">${icon('checkCircle', 20)}<span><b>Ви в листі очікування</b>${dayLabel(draft.date, { day: 'numeric', month: 'long' })}, ${hhmm(mineW.from)}–${hhmm(mineW.to)}. Повідомимо, щойно звільниться час.</span></p>`;
+  }
+  if (!draft.waitOpen) return `<p class="small" style="margin:10px 0 0"><button class="link-btn" data-action="wait-open">Немає зручного часу? Повідомимо, якщо звільниться</button></p>`;
+  const h = hoursFor(p, draft.date) ?? [480, 1200];
+  const opts = (sel, from, to) => { let o = ''; for (let t = from; t <= to; t += 30) o += `<option value="${t}" ${t === sel ? 'selected' : ''}>${hhmm(t)}</option>`; return o; };
+  return `<form id="wait-form" class="card stack" style="margin-top:12px;gap:10px" data-minutes="${minutes}">
+    <b>Лист очікування на ${dayLabel(draft.date, { day: 'numeric', month: 'long' })}</b>
+    <div class="grid2">
+      <label class="field"><span>Зручно з</span><select name="from">${opts(h[0], h[0], h[1] - 30)}</select></label>
+      <label class="field"><span>До</span><select name="to">${opts(h[1], h[0] + 30, h[1])}</select></label>
+      <label class="field"><span>Ваше імʼя</span><input name="name" required autocomplete="name" value="${esc(profile.name)}"></label>
+      <label class="field"><span>Ваш телефон</span><input name="phone" type="tel" required autocomplete="tel" placeholder="+380" value="${esc(profile.phone)}"></label>
+    </div>
+    <p class="fine">${esc(chosen.map((x) => x.name).join(', '))} · ${duration(minutes)}. Сповіщення прийде в застосунок; оплата — лише коли ви запишетесь.</p>
+    <button class="btn primary" type="submit">Повідомити, коли звільниться</button>
+  </form>`;
+}
+
+// Розрахунок вартості запису: знижка гарячого вікна, абонемент чи сертифікат, бонус і баланс CARCAR.
+function quote(p) {
   const cls = draftClass();
   const list = bookable(p);
   const chosen = list.filter((s) => draft.services.has(s.id));
   const minutes = chosen.reduce((a, s) => a + s.min, 0);
-  const total = chosen.reduce((a, s) => a + s.price[cls], 0);
-  const bonus = draft.useBonus !== false ? bonusFor(total) : 0;
-  const fromBal = draft.useMoney !== false ? Math.min(wallet.money, total - bonus) : 0;
+  const deal = draft.time ? dealAt(p.id, draft.date, draft.time) : null;
+  const priceOf = (s) => (!s.personal && dealCovers(deal, s.id) ? dealPrice(s.price[cls], deal.pct) : s.price[cls]);
+  const listTotal = chosen.reduce((a, s) => a + s.price[cls], 0);
+  const total = chosen.reduce((a, s) => a + priceOf(s), 0);
+  const subs = usableSubs(p.id, myKeys(), chosen.map((s) => s.id));
+  let use = null;
+  let covered = 0;
+  const sub = draft.useSub !== false ? subs[0] : null;
+  if (sub) {
+    const ok = chosen.filter((s) => !sub.services.length || sub.services.includes(s.id)).map(priceOf);
+    covered = ok.length ? Math.max(...ok) : 0;
+    use = { kind: 'sub', soldId: sub.id, name: sub.name, left: sub.visitsLeft };
+  } else if (draft.cert) {
+    const c = findCert(p.id, draft.cert);
+    if (c && passActive(c)) { covered = Math.min(c.balance, total); use = { kind: 'cert', soldId: c.id, name: c.name, left: c.balance }; }
+  }
+  const rest = total - covered;
+  const bonus = draft.useBonus !== false ? bonusFor(rest) : 0;
+  const fromBal = draft.useMoney !== false ? Math.min(wallet.money, rest - bonus) : 0;
+  return { cls, list, chosen, minutes, deal: total < listTotal ? deal : null, listTotal, total, subs, covered, use, rest, bonus, fromBal, card: rest - bonus - fromBal };
+}
+
+function renderBook() {
+  const p = placeById(draft.placeId);
+  const q = quote(p);
+  const { cls, list, chosen, minutes, total, bonus, fromBal } = q;
   const slots = minutes ? slotsFor(p, draft.date, minutes) : [];
-  if (draft.time && !slots.some((s) => s.time === draft.time && !s.busy)) draft.time = null;
+  if (!draft.time && draft.wantTime && slots.some((s) => s.time === draft.wantTime && !s.busy)) { draft.time = draft.wantTime; draft.wantTime = null; return renderBook(); }
+  if (draft.time && !slots.some((s) => s.time === draft.time && !s.busy)) { draft.time = null; return renderBook(); }
   const free = slots.filter((s) => !s.busy);
 
   $('#book').innerHTML = `
@@ -1703,37 +2202,48 @@ function renderBook() {
     ${!minutes
       ? '<p class="muted">Оберіть послуги, щоб побачити вільний час.</p>'
       : free.length
-        ? `<div class="slots" role="group" aria-label="Час">${slots.map((s) => `<button class="slot" data-action="time" data-time="${s.time}"
-            ${s.busy ? 'disabled aria-label="' + s.time + ', зайнято"' : ''} aria-pressed="${s.time === draft.time}">${s.time}</button>`).join('')}</div>`
-        : '<p class="muted">На цей день вільного часу немає. Оберіть інший день.</p>'}
+        ? `<div class="slots" role="group" aria-label="Час">${slots.map((s) => {
+            const d = !s.busy && dealAt(p.id, draft.date, s.time);
+            return `<button class="slot${d ? ' hot' : ''}" data-action="time" data-time="${s.time}"
+            ${s.busy ? `disabled aria-label="${s.time}, зайнято"` : d ? `aria-label="${s.time}, знижка ${d.pct}%"` : ''} aria-pressed="${s.time === draft.time}">${s.time}${d ? `<small>−${d.pct}%</small>` : ''}</button>`;
+          }).join('')}</div>`
+        : '<p class="muted">На цей день вільного часу немає. Оберіть інший день або станьте в лист очікування.</p>'}
+    ${minutes ? waitlistBlock(p, minutes, chosen) : ''}
     <div class="dock-space tall"></div>
 
     ${draft.paying ? `<div class="sheet-dim" data-action="unpay"></div>
     <div class="sheet summary" role="dialog" aria-modal="true" aria-label="Оплата">
       <div class="handle"></div>
-      <div class="sheet-total"><span>До сплати${fromBal ? ' карткою' : ''}</span><b>${uah(total - bonus - fromBal)}</b></div>
-      ${wallet.bonus ? (bonusFor(total)
+      <div class="sheet-total"><span>До сплати${fromBal ? ' карткою' : ''}</span><b>${uah(q.card)}</b></div>
+      ${q.deal ? `<p class="small" style="margin:0">${icon('bolt', 14)} Гаряче вікно −${q.deal.pct}%: ${uah(q.listTotal)} → ${uah(total)}</p>` : ''}
+      ${q.subs.length ? `<label class="bonus-line"><input class="check" type="checkbox" id="usesub" ${draft.useSub !== false ? 'checked' : ''}>
+            <span>${esc(q.subs[0].name)}<small>Списати 1 візит, лишилось ${passLeft(q.subs[0])}</small></span><b>${q.use?.kind === 'sub' ? `−${uah(q.covered)}` : ''}</b></label>` : ''}
+      ${!q.use || q.use.kind === 'cert' ? `<div class="inline-form cert-line">
+        <label class="field"><span>Код подарункового сертифіката</span><input id="cert-code" autocomplete="off" placeholder="CC-XXXX-XXXX" value="${esc(draft.cert ?? '')}"></label>
+        <button class="btn" data-action="cert-apply">${q.use?.kind === 'cert' ? `−${uah(q.covered)}` : 'Застосувати'}</button></div>` : ''}
+      ${wallet.bonus ? (bonusFor(q.rest)
         ? `<label class="bonus-line"><input class="check" type="checkbox" id="usebonus" ${draft.useBonus !== false ? 'checked' : ''}>
-            <span>Бонус «Приведи друга»<small>Вартість ${uah(total)}, точка отримає повну суму</small></span><b>−${uah(bonusFor(total))}</b></label>`
+            <span>Бонус «Приведи друга»<small>Вартість ${uah(total)}, точка отримає повну суму</small></span><b>−${uah(bonusFor(q.rest))}</b></label>`
         : `<p class="small muted" style="margin:0">Бонус ${uah(wallet.bonus)} діє для замовлень від ${uah(REFERRAL.minOrder)}.</p>`) : ''}
       ${wallet.money > 0 ? `<label class="bonus-line"><input class="check" type="checkbox" id="usemoney" ${draft.useMoney !== false ? 'checked' : ''}>
-            <span>Баланс CARCAR<small>Доступно ${uah(wallet.money)}</small></span><b>−${uah(Math.min(wallet.money, total - bonus))}</b></label>` : ''}
+            <span>Баланс CARCAR<small>Доступно ${uah(wallet.money)}</small></span><b>−${uah(Math.min(wallet.money, q.rest - bonus))}</b></label>` : ''}
       <ul class="perks">
         <li><span class="perk-ic ok">${icon('shield', 20)}</span>Гроші утримуються, доки роботу не виконано</li>
         <li><span class="perk-ic">${icon('cash', 20)}</span>Комісія для клієнта — 0 ₴</li>
         <li><span class="perk-ic">${icon('undo', 20)}</span>Скасування до ${cancelWindow()} до візиту — уся сума повертається на баланс CARCAR</li>
       </ul>
       <div class="stack" style="gap:8px">
-        <button class="btn primary block" data-action="pay">${icon('card', 20)}${total - bonus - fromBal > 0 ? `Оплатити ${uah(total - bonus - fromBal)}` : 'Оплатити з балансу'}</button>
+        <button class="btn primary block" data-action="pay">${icon('card', 20)}${q.card > 0 ? `Оплатити ${uah(q.card)}` : fromBal ? 'Оплатити з балансу' : q.covered ? 'Записатися' : `Оплатити ${uah(0)}`}</button>
         <button class="btn block" data-action="unpay">Назад</button>
       </div>
       <div class="grid2 pf">
         <label class="field"><span>Ваше імʼя</span><input id="pf-name" autocomplete="name" value="${esc(draft.pfName ?? profile.name)}"></label>
         <label class="field"><span>Телефон</span><input id="pf-phone" type="tel" autocomplete="tel" placeholder="+380" value="${esc(draft.pfPhone ?? profile.phone)}"></label>
       </div>
+      <label class="row small"><input class="check" type="checkbox" id="pf-optin" ${(draft.pfOptIn ?? profile.optIn) ? 'checked' : ''}>Отримувати пропозиції цієї точки у Viber чи Telegram</label>
       <p class="demo">Імʼя й телефон бачить лише точка — щоб звʼязатися й показувати вам персональні ціни. Демо-оплата: гроші не списуються.</p>
     </div>` : `<div class="dock summary">
-      <div class="total"><span>${chosen.length ? `${chosen.length} ${plural(chosen.length, 'послуга', 'послуги', 'послуг')} · ${duration(minutes)}` : 'Нічого не обрано'}</span><span>${uah(total)}</span></div>
+      <div class="total"><span>${chosen.length ? `${chosen.length} ${plural(chosen.length, 'послуга', 'послуги', 'послуг')} · ${duration(minutes)}` : 'Нічого не обрано'}</span><span>${q.deal ? `<s class="muted">${uah(q.listTotal)}</s> ` : ''}${uah(total - q.covered)}</span></div>
       <button class="btn primary block" data-action="confirm" ${chosen.length && draft.time ? '' : 'disabled'}>
         ${draft.time ? `Записатися на ${dayLabel(draft.date, { day: 'numeric', month: 'long' })}, ${draft.time}` : 'Оберіть час'}
       </button>
@@ -1742,21 +2252,25 @@ function renderBook() {
 
 function confirmBooking() {
   const p = placeById(draft.placeId);
-  const cls = draftClass();
-  const chosen = bookable(p).filter((s) => draft.services.has(s.id));
   const car = cars.find((c) => c.id === draft.carId);
   // Імʼя й телефон з форми оплати зберігаємо в профіль, щоб наступного разу не вводити.
-  profile = { name: (draft.pfName ?? profile.name).trim(), phone: (draft.pfPhone ?? profile.phone).trim() };
+  profile = { name: (draft.pfName ?? profile.name).trim(), phone: (draft.pfPhone ?? profile.phone).trim(), optIn: draft.pfOptIn ?? profile.optIn };
   store.set('profile', profile);
-  const total = chosen.reduce((a, s) => a + s.price[cls], 0);
-  const bonus = draft.useBonus !== false ? bonusFor(total) : 0;
-  const fromBal = draft.useMoney !== false ? Math.min(wallet.money, total - bonus) : 0;
+  const q = quote(p);
+  const { cls, chosen, total, bonus, fromBal } = q;
+  const id = uid();
+  const passUse = q.use ? { ...redeemPass(p.id, q.use.soldId, q.covered, id), kind: q.use.kind } : null;
   const b = {
-    id: uid(),
+    id,
     placeId: p.id,
     services: chosen.map((s) => s.name),
     total,
-    paid: total - bonus,
+    listTotal: q.listTotal,
+    deal: q.deal ? { id: q.deal.id, pct: q.deal.pct } : null,
+    covered: q.covered,
+    passUse,
+    optIn: !!profile.optIn,
+    paid: q.rest - bonus,
     fromBalance: fromBal,
     bonus,
     minutes: chosen.reduce((a, s) => a + s.min, 0),
@@ -1919,8 +2433,65 @@ function bookingCard(b, highlight) {
     ${cardHead(b, esc(p?.name ?? 'Сервіс'))}
     ${steps(b)}
     ${body}
+    ${intakeBlock(b)}
     ${!ACTIVE.includes(b.state) && p ? `<a class="btn" href="#/book/${p.id}" data-action="repeat" data-id="${b.id}">${icon('repeat', 18)}Записатися знову</a>` : ''}
   </article>`;
+}
+
+// Акт приймання з фото до робіт: клієнт підтверджує або пише, що не так.
+function intakeBlock(b) {
+  const a = b.intake;
+  if (!a) return '';
+  return `<details class="intake-card" ${a.ack ? '' : 'open'}><summary>${icon('camera', 18)}Акт приймання авто · ${fmtTime(a.at)}${a.ack ? (a.ack.ok ? ' · підтверджено' : ' · є зауваження') : ''}</summary>
+    <p class="small" style="margin:8px 0">${a.marks.length ? `Точка зафіксувала: ${a.marks.map(esc).join(', ')}` : 'Пошкоджень не зафіксовано'}${a.km ? ` · пробіг ${km(a.km)}` : ''}${a.note ? ` · ${esc(a.note)}` : ''}</p>
+    ${a.photos.length ? `<div class="photos">${a.photos.map((src, i) => `<img src="${esc(src)}" alt="Фото до робіт ${i + 1}">`).join('')}</div>` : ''}
+    ${a.ack ? (a.ack.ok ? '' : `<p class="small muted" style="margin:6px 0 0">Ваше зауваження: ${esc(a.ack.note)}</p>`)
+      : `<div class="grid2" style="margin-top:10px"><button class="btn primary" data-action="intake-ok" data-id="${b.id}">Усе вірно</button>
+        <button class="btn" data-action="intake-no" data-id="${b.id}">Є зауваження</button></div>
+        <p class="fine">Акт захищає вас і точку: якщо після робіт зʼявиться нова подряпина, буде з чим порівняти.</p>`}
+  </details>`;
+}
+
+// ---------- повідомлення ----------
+
+function viewInbox() {
+  const keys = myKeys();
+  const list = inboxFor(keys);
+  const waits = store.get('waitlist', []).filter((w) => w.mine && w.status === 'active');
+  const html = `<h1>Повідомлення</h1>
+    ${keys.length ? '' : '<p class="notice">Вкажіть телефон у <a href="#/garage">профілі</a> — тоді сюди прийдуть пропозиції й нагадування точок.</p>'}
+    ${waits.length ? `<h2>Лист очікування</h2><div class="stack" style="gap:8px">${waits.map((w) => `<div class="card head" style="align-items:center">
+      <span><b>${esc(placeById(w.placeId)?.name ?? '')}</b><small class="small muted" style="display:block">${dayLabel(w.date, { day: 'numeric', month: 'long' })}, ${hhmm(w.from)}–${hhmm(w.to)} · ${esc(w.services.join(', '))}</small></span>
+      <button class="btn" data-action="wait-cancel" data-id="${w.id}">Вийти</button></div>`).join('')}</div>` : ''}
+    <h2>Вхідні</h2>
+    ${list.length ? `<div class="stack" style="gap:8px">${list.map((m) => `<article class="card msg-card${m.read ? '' : ' unread'}">
+      <div class="head"><b>${esc(placeById(m.placeId)?.name ?? 'CARCAR')}</b><span class="small muted">${CHANNELS[m.channel] ?? ''} · ${fmtTime(m.at)}</span></div>
+      <p style="margin:6px 0 0">${esc(m.text)}</p>
+      ${m.link ? `<a class="btn" href="${esc(m.link)}" style="margin-top:8px">${m.kind === 'waitlist' ? 'Записатися' : m.kind === 'tires' ? 'Записатися на перевзування' : 'Відкрити'}</a>` : ''}
+    </article>`).join('')}</div>` : empty('chat', 'Повідомлень поки немає.')}
+    <p class="note">Демо: розсилки, які точка надсилає у Viber чи Telegram, тут дублюються, щоб їх було видно в прототипі.</p>`;
+  markRead(keys);
+  return html;
+}
+
+// ---------- гараж: шини на зберіганні й абонементи ----------
+
+function garageExtras() {
+  const keys = myKeys();
+  const tires = myTires(keys);
+  const passes = PLACES.flatMap((p) => passesOf(p.id).sold.filter((x) => (x.buyer === 'app' || keys.includes(x.clientKey)) && passActive(x)).map((x) => ({ ...x, place: p })));
+  if (!tires.length && !passes.length) return '';
+  const due = seasonDue();
+  return `${tires.length ? `<h2 class="big">Шини на зберіганні</h2><div class="stack" style="gap:8px">${tires.map((t) => `<section class="card stack" style="gap:6px" aria-label="Шини: ${esc(t.place.name)}">
+      <div class="head"><b>${SEASONS[t.season]} · ${t.count} шт</b><span class="small muted">${esc(t.place.name)}</span></div>
+      <span class="small">${esc(t.brand || '')} ${esc(t.size || '')}${t.rims ? ' · на дисках' : ''} · стан: ${esc(t.condition).toLowerCase()} · місце ${esc(t.slot)}</span>
+      ${tireDue(t) ? `<div class="warn-pill">${icon('wheel', 16)}Час ставити ${due === 'winter' ? 'зимові' : 'літні'} шини</div><a class="btn primary" href="#/book/${t.place.id}">Записатися на перевзування</a>` : ''}
+    </section>`).join('')}</div>` : ''}
+    ${passes.length ? `<h2 class="big">Абонементи й сертифікати</h2><div class="stack" style="gap:8px">${passes.map((x) => `<section class="card stack" style="gap:4px" aria-label="${esc(x.name)}">
+      <div class="head"><b>${esc(x.name)}</b><span class="small muted">${esc(x.place.name)}</span></div>
+      <span class="small">Лишилось ${passLeft(x)} · діє до ${fmtDate(x.validUntil)}</span>
+      ${x.kind === 'cert' ? `<span class="small">Код для оплати чи подарунка: <b class="code">${esc(x.code)}</b></span>` : ''}
+    </section>`).join('')}</div>` : ''}`;
 }
 
 function viewBookings(highlightId) {
@@ -2123,8 +2694,10 @@ function viewGarage() {
         <label class="field"><span>Імʼя</span><input name="name" autocomplete="name" value="${esc(profile.name)}"></label>
         <label class="field"><span>Телефон</span><input name="phone" type="tel" autocomplete="tel" placeholder="+380" value="${esc(profile.phone)}"></label>
       </div>
+      <label class="row small"><input class="check" type="checkbox" name="optIn" ${profile.optIn ? 'checked' : ''}>Отримувати пропозиції точок, де я обслуговуюсь, у Viber чи Telegram</label>
       <button class="btn" type="submit">Зберегти профіль</button>
     </form>
+    ${garageExtras()}
     <p class="lead" style="margin-top:16px">Сервісна книжка кожного авто: історія обслуговування, пробіг і нагадування.</p>
     <div class="stack">
       ${cars.map((c) => {
@@ -2242,6 +2815,8 @@ const bookingActions = {
       b.refundTo = 'balance';
       if (t.refund) addMoney(t.refund, `Повернення: ${placeById(b.placeId)?.name ?? 'скасований запис'}`);
       returnBonus(b, 'скасоване замовлення');
+      // Візит абонемента чи сума сертифіката повертаються.
+      if (b.passUse) { restorePass(b.placeId, b.passUse); b.passUse = null; }
     }
     toast(t.free ? `Запис скасовано, ${uah(t.refund)} повернено на баланс` : 'Запис скасовано, оплату зараховано точці');
   },
@@ -2295,13 +2870,18 @@ const bookingActions = {
 // ---------- роутер і події ----------
 
 function route() {
-  const [, page = '', arg, sub] = location.hash.replace(/^#/, '').split('/');
+  const [, page = '', arg, sub, extra] = location.hash.replace(/^#/, '').split('/');
   const view = $('#view');
-  const tab = page === 'disputes' ? 'partner' : page === 'invite' ? '' : ['bookings', 'garage', 'partner'].includes(page) ? page : 'catalog';
+  const tab = page === 'disputes' ? 'partner' : page === 'invite' || page === 'inbox' ? '' : ['bookings', 'garage', 'partner'].includes(page) ? page : 'catalog';
   settle();
-  // Крапка на вкладці «Мої записи», коли машина готова або точка просить доплату.
-  const ready = mine().some((b) => b.state === 'done' || b.extra) || requests.some((r) => r.unreadClient);
+  // Хтось скасував запис — можливо, звільнився час для листа очікування.
+  checkWaitlist(bookings);
+  // Крапка на вкладці «Мої записи», коли машина готова, точка просить доплату чи підтвердити акт.
+  const ready = mine().some((b) => b.state === 'done' || b.extra || (b.intake && !b.intake.ack)) || requests.some((r) => r.unreadClient);
   document.querySelector('.tabs a[data-tab="bookings"]').toggleAttribute('data-badge', ready);
+  const unread = inboxFor(myKeys()).filter((m) => !m.read).length;
+  $('#inbox-btn').innerHTML = `${icon('bell', 22)}${unread ? `<span class="count">${unread}</span>` : ''}`;
+  $('#inbox-btn').setAttribute('aria-label', unread ? `Повідомлення, непрочитаних: ${unread}` : 'Повідомлення');
   document.querySelectorAll('.tabs a').forEach((a) => {
     if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
@@ -2309,7 +2889,8 @@ function route() {
 
   if (page === '') { view.innerHTML = viewCatalog(); renderList(); }
   else if (page === 'place') view.innerHTML = viewPlace(arg);
-  else if (page === 'book') { view.innerHTML = viewBook(arg); if ($('#book')) renderBook(); }
+  else if (page === 'book') { view.innerHTML = viewBook(arg, sub, extra); if ($('#book')) renderBook(); }
+  else if (page === 'inbox') view.innerHTML = viewInbox();
   else if (page === 'bookings') view.innerHTML = viewBookings(arg);
   else if (page === 'garage') view.innerHTML = arg ? viewCar(arg) : viewGarage();
   else if (page === 'partner') view.innerHTML = arg ? viewPartnerJob(arg) : viewPartner();
@@ -2397,6 +2978,44 @@ document.addEventListener('click', (e) => {
     save();
     route();
     toast(`Виплату відправлено на рахунок ${iban}`);
+  } else if (action === 'cert-apply') {
+    const code = $('#cert-code').value.trim().toUpperCase();
+    const c = findCert(draft.placeId, code);
+    if (!c) { toast('Сертифікат не знайдено в цій точці'); return; }
+    if (!passActive(c)) { toast('Сертифікат вичерпано або строк дії минув'); return; }
+    draft.cert = code;
+    draft.useSub = false;
+    renderBook();
+    toast(`Сертифікат застосовано: на ньому ${passLeft(c)}`);
+  } else if (action === 'wait-open') {
+    draft.waitOpen = true;
+    renderBook();
+    $('#wait-form select')?.focus();
+  } else if (action === 'buy-pass') {
+    const p = placeById(el.dataset.place);
+    const plan = passesOf(p.id).plans.find((x) => x.id === id);
+    if (!profile.phone) { toast('Вкажіть телефон у профілі в «Гаражі» — до нього привʼяжемо абонемент'); return; }
+    if (!confirm(`Купити «${plan.name}» за ${uah(plan.price)}? Оплата карткою через CARCAR.`)) return;
+    const sold = sellPass(p.id, plan, { clientName: profile.name, phone: profile.phone, clientKey: myKeys()[0], source: 'carcar', buyer: 'app' });
+    route();
+    toast(plan.kind === 'cert' ? `Сертифікат куплено, код ${sold.code} — його можна подарувати` : 'Абонемент куплено — спишеться під час запису');
+  } else if (action === 'queue-leave') {
+    const list = store.get('biz.queue', {})[el.dataset.place] ?? [];
+    saveQueue(el.dataset.place, list.map((q) => (q.id === id ? { ...q, status: 'left' } : q)));
+    route();
+    toast('Ви вийшли з черги');
+  } else if (action === 'wait-cancel') {
+    store.set('waitlist', store.get('waitlist', []).map((w) => (w.id === id ? { ...w, status: 'cancelled' } : w)));
+    route();
+    toast('Ви вийшли з листа очікування');
+  } else if (action === 'intake-ok' || action === 'intake-no') {
+    const b = bookings.find((x) => x.id === id);
+    const note = action === 'intake-no' ? prompt('Що в акті не так?')?.trim() : '';
+    if (action === 'intake-no' && !note) return;
+    b.intake.ack = { ok: action === 'intake-ok', note, at: Date.now() };
+    save();
+    route();
+    toast(action === 'intake-ok' ? 'Акт приймання підтверджено' : 'Точка отримала ваше зауваження до акта');
   } else if (action === 'money-out') {
     if (!confirm(`Вивести ${uah(wallet.money)} на картку? Гроші надійдуть протягом 1–3 банківських днів.`)) return;
     addMoney(-wallet.money, 'Виведено на картку');
@@ -2432,6 +3051,13 @@ document.addEventListener('change', (e) => {
   } else if (t.id === 'car') {
     draft.carId = t.value;
     renderBook();
+  } else if (t.id === 'usesub') {
+    draft.useSub = t.checked;
+    if (t.checked) draft.cert = null;
+    renderBook();
+    $('#usesub')?.focus();
+  } else if (t.id === 'pf-optin') {
+    draft.pfOptIn = t.checked;
   } else if (t.id === 'usebonus' || t.id === 'usemoney') {
     draft[t.id === 'usebonus' ? 'useBonus' : 'useMoney'] = t.checked;
     renderBook();
@@ -2477,12 +3103,48 @@ document.addEventListener('submit', (e) => {
     toast('Дякуємо за відгук!');
     return;
   }
+  if (e.target.id === 'wait-form') {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const from = Number(f.get('from'));
+    const to = Number(f.get('to'));
+    const minutes = Number(e.target.dataset.minutes);
+    if (to - from < minutes) { toast(`Проміжок має вміщати ${duration(minutes)}`); return; }
+    const p = placeById(draft.placeId);
+    const free = openStarts(p, draft.date, minutes, bookings).filter((t) => toMin(t) >= from && toMin(t) + minutes <= to);
+    if (free.length) { draft.time = free[0]; renderBook(); toast(`У цьому проміжку є вільний час: ${free[0]} — можна записатися одразу`); return; }
+    profile = { ...profile, name: f.get('name').trim(), phone: f.get('phone').trim() };
+    store.set('profile', profile);
+    const chosen = quote(p).chosen;
+    store.set('waitlist', [...store.get('waitlist', []), {
+      id: uid(), placeId: p.id, date: draft.date, from, to, minutes, services: chosen.map((x) => x.name), clientName: profile.name, phone: profile.phone,
+      clientKey: myKeys()[0], status: 'active', mine: true, createdAt: Date.now(),
+    }]);
+    draft.waitOpen = false;
+    renderBook();
+    toast('Готово! Повідомимо, щойно звільниться час');
+    return;
+  }
+  if (e.target.id === 'queue-join') {
+    e.preventDefault();
+    const p = placeById(e.target.dataset.place);
+    const svc = p.services.find((x) => x.id === new FormData(e.target).get('service'));
+    const entry = {
+      id: uid(), day: isoDate(new Date()), plate: cars[0]?.plate || (cars[0] ? carLabel(cars[0]) : profile.name || 'Клієнт CARCAR'), car: cars[0] ? carLabel(cars[0]) : '',
+      service: svc.name, minutes: svc.min, status: 'waiting', joinedAt: Date.now(), source: 'app', clientName: profile.name, phone: profile.phone,
+    };
+    saveQueue(p.id, [...(store.get('biz.queue', {})[p.id] ?? []).filter((q) => q.day === entry.day), entry]);
+    store.set('queue.mine', [...myQueue(), { id: entry.id, placeId: p.id }]);
+    route();
+    toast('Ви в черзі — точка бачить ваше авто');
+    return;
+  }
   if (e.target.id === 'askform' || e.target.matches('.req-reply')) {
     e.preventDefault();
     const f = new FormData(e.target);
     const msg = { from: 'client', text: f.get('text').trim(), at: Date.now() };
     if (e.target.id === 'askform') {
-      profile = { name: f.get('name').trim(), phone: f.get('phone').trim() };
+      profile = { ...profile, name: f.get('name').trim(), phone: f.get('phone').trim() };
       store.set('profile', profile);
       requests.push({
         id: uid(), placeId: e.target.dataset.place, clientName: profile.name, clientPhone: profile.phone,
@@ -2502,8 +3164,9 @@ document.addEventListener('submit', (e) => {
   if (e.target.id === 'profileform') {
     e.preventDefault();
     const f = new FormData(e.target);
-    profile = { name: f.get('name').trim(), phone: f.get('phone').trim() };
+    profile = { name: f.get('name').trim(), phone: f.get('phone').trim(), optIn: !!f.get('optIn') };
     store.set('profile', profile);
+    route();
     toast('Профіль збережено');
     return;
   }
@@ -2555,6 +3218,7 @@ window.addEventListener('storage', (e) => {
   payouts = store.get('payouts', []);
   reviews = store.get('reviews', []);
   requests = store.get('requests', []);
+  profile = { name: '', phone: '', optIn: false, ...store.get('profile', {}) };
   wallet = { bonus: 0, money: 0, history: [], ...store.get('wallet', {}) };
   applyOverrides();
   if (!draft?.paying) route();

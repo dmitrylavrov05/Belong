@@ -321,11 +321,29 @@ table.t.pnl tfoot tr + tr td { border-top: 0; font-weight: 500; color: var(--mut
 .photos { display: flex; gap: 8px; flex-wrap: wrap; }
 .photos img { width: 120px; height: 90px; object-fit: cover; border-radius: 10px; }
 
+/* меню з групами, персонал, абонементи, черга, акт */
+.nav-group { display: flex; flex-direction: column; gap: 2px; }
+.nav-group + .nav-group { margin-top: 10px; }
+.nav-h { font-size: 11px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); padding: 4px 12px; }
+.biz-top .power-field select { min-width: 0; max-width: 230px; }
+table.t tr.off td { opacity: .55; }
+.plan-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.plan { display: flex; flex-direction: column; gap: 6px; }
+.plan h3 { margin: 4px 0 0; font-size: 16px; }
+.plan.off { opacity: .6; }
+.price-big { font-size: 24px; font-weight: 800; margin: 0; }
+.svc-scope label { font-size: 14px; }
+.intake { display: grid; gap: 6px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.queue-list { counter-reset: q; }
+
 @media (max-width: 960px) {
   .biz-shell { flex-direction: column; }
   .biz-side { position: static; height: auto; width: auto; flex-direction: row; align-items: center; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--line); overflow-x: auto; }
   .biz-side .brand { padding: 0 8px 0 0; flex: none; }
   .biz-nav { flex-direction: row; }
+  .nav-group { flex-direction: row; }
+  .nav-group + .nav-group { margin: 0 0 0 10px; }
+  .nav-h { display: none; }
   .biz-nav a { white-space: nowrap; }
   .biz-side .to-app { margin: 0; white-space: nowrap; }
   .biz-top { padding: 10px 16px; position: static; }

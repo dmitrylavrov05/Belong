@@ -106,7 +106,7 @@ svg.ic { flex: none; display: block; }
 .brand:hover { color: var(--text); }
 .brand .c1 { color: var(--accent); }
 .brand .c2 { color: var(--navy); margin-left: -8px; }
-.city { display: inline-flex; align-items: center; gap: 4px; font-size: 15px; color: var(--muted); }
+.city { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: 15px; color: var(--muted); }
 
 main { max-width: 720px; margin: 0 auto; padding: 0 16px; outline: none; }
 
@@ -497,6 +497,38 @@ label.item { cursor: pointer; padding: 10px 14px; }
 .thread .msg.client { justify-self: end; background: var(--accent-soft); border-bottom-right-radius: 4px; }
 .thread .msg.biz { justify-self: start; border-bottom-left-radius: 4px; }
 .thread .who { display: block; font-size: 12px; color: var(--muted); margin-bottom: 2px; white-space: normal; }
+
+/* повідомлення, гарячі вікна, черга, абонементи, акт приймання */
+.inbox-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; color: var(--text); margin-left: 4px; }
+.inbox-btn:hover { background: var(--soft); }
+.inbox-btn .count { position: absolute; top: 4px; right: 2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.badge.deal { background: var(--accent-soft); color: var(--text); }
+.badge.power .ic, .badge.deal .ic { flex: none; }
+.hot { margin-top: 14px; }
+.hot-title { display: flex; align-items: center; gap: 6px; font-size: 17px; margin: 0 0 8px; }
+.hot-title .ic { color: var(--accent); }
+.hot-row { display: flex; gap: 10px; overflow-x: auto; margin: 0 -16px; padding: 2px 16px 6px; scrollbar-width: none; }
+.hot-row::-webkit-scrollbar { display: none; }
+.hot-card { flex: 0 0 210px; display: flex; flex-direction: column; gap: 3px; text-decoration: none; color: var(--text); }
+.hot-pct { align-self: flex-start; background: var(--accent); color: #fff; font-weight: 800; font-size: 14px; padding: 2px 8px; border-radius: 999px; margin-bottom: 4px; }
+.slot { display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; }
+.slot small { font-size: 11px; font-weight: 700; color: var(--accent); }
+.slot.hot { border-color: var(--accent); }
+.slot[aria-pressed="true"] small { color: var(--on-navy); }
+.deal-note { display: flex; gap: 10px; align-items: flex-start; background: var(--accent-soft); margin-top: 14px; }
+.deal-note > .ic { color: var(--accent); flex: none; margin-top: 2px; }
+.queue-card { margin-top: 14px; display: grid; gap: 10px; }
+.queue-card h2 { display: flex; align-items: center; gap: 8px; margin: 0; }
+.link-btn { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
+.cert-line { align-items: flex-end; }
+.intake-card { margin-top: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.intake-card summary { cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.msg-card.unread { border-color: var(--accent); }
+.pass-item .btn { flex: none; }
+.code { font-family: ui-monospace, monospace; letter-spacing: .5px; }
+.notice > .ic { flex: none; }
+
+[hidden] { display: none !important; }
 </style>
   <style>
 /* Панель для бізнесу CARCAR: десктоп-перший макет поверх токенів і компонентів styles.css. */
@@ -822,11 +854,29 @@ table.t.pnl tfoot tr + tr td { border-top: 0; font-weight: 500; color: var(--mut
 .photos { display: flex; gap: 8px; flex-wrap: wrap; }
 .photos img { width: 120px; height: 90px; object-fit: cover; border-radius: 10px; }
 
+/* меню з групами, персонал, абонементи, черга, акт */
+.nav-group { display: flex; flex-direction: column; gap: 2px; }
+.nav-group + .nav-group { margin-top: 10px; }
+.nav-h { font-size: 11px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); padding: 4px 12px; }
+.biz-top .power-field select { min-width: 0; max-width: 230px; }
+table.t tr.off td { opacity: .55; }
+.plan-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.plan { display: flex; flex-direction: column; gap: 6px; }
+.plan h3 { margin: 4px 0 0; font-size: 16px; }
+.plan.off { opacity: .6; }
+.price-big { font-size: 24px; font-weight: 800; margin: 0; }
+.svc-scope label { font-size: 14px; }
+.intake { display: grid; gap: 6px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.queue-list { counter-reset: q; }
+
 @media (max-width: 960px) {
   .biz-shell { flex-direction: column; }
   .biz-side { position: static; height: auto; width: auto; flex-direction: row; align-items: center; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--line); overflow-x: auto; }
   .biz-side .brand { padding: 0 8px 0 0; flex: none; }
   .biz-nav { flex-direction: row; }
+  .nav-group { flex-direction: row; }
+  .nav-group + .nav-group { margin: 0 0 0 10px; }
+  .nav-h { display: none; }
   .biz-nav a { white-space: nowrap; }
   .biz-side .to-app { margin: 0; white-space: nowrap; }
   .biz-top { padding: 10px 16px; position: static; }
@@ -1096,7 +1146,24 @@ const REFERRAL = {
 // Спільна логіка застосунку клієнта (app.js) і панелі для бізнесу (business.js):
 // сховище, форматування, іконки, гроші, рейтинг і налаштування точок із CRM.
 
+// peek — для частого читання без змін: розбираємо JSON лише тоді, коли значення змінилося.
+// Повернений обʼєкт спільний — не змінюйте його, для змін є get/set.
+const peeked = new Map();
 const store = {
+  peek(key, fallback) {
+    let raw = null;
+    try { raw = localStorage.getItem(`carcar.${key}`); } catch { /* приватний режим */ }
+    if (raw === null) return fallback;
+    const hit = peeked.get(key);
+    if (hit?.raw === raw) return hit.value;
+    try {
+      const value = JSON.parse(raw);
+      peeked.set(key, { raw, value });
+      return value;
+    } catch {
+      return fallback;
+    }
+  },
   get(key, fallback) {
     try {
       const raw = localStorage.getItem(`carcar.${key}`);
@@ -1159,6 +1226,7 @@ const ICONS = {
   users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>',
   list: '<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>',
   settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M2.5 12h3M18.5 12h3M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1"/>',
+  bell: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
   upload: '<path d="M12 20V9M7 14l5-5 5 5M5 4h14"/>',
   download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
   x: '<path d="M6 6l12 12M18 6 6 18"/>',
@@ -1235,9 +1303,37 @@ function inBreak(place, t, minutes) {
   return !!b && t < b[1] && t + minutes > b[0];
 }
 
+// ---------- світло: статус від самої точки ----------
+
+// Точка в панелі відмічає, чи є світло, чи працює від генератора, чи стоїть без світла.
+// Позначка свіжа 12 годин — далі клієнти бачать лише, чи є в точки генератор.
+const POWER = {
+  grid: ['Світло є', 'ok'],
+  generator: ['Немає світла — працюємо від генератора', 'ok'],
+  closed: ['Немає світла — не працюємо', 'muted'],
+};
+const POWER_FRESH_HOURS = 12;
+function powerOf(placeId, now = Date.now()) {
+  const pw = store.peek('biz.power', {})[placeId];
+  return pw && now - pw.at < POWER_FRESH_HOURS * 3600000 ? pw : null;
+}
+function setPower(placeId, state) {
+  const all = store.get('biz.power', {});
+  all[placeId] = { state, at: Date.now() };
+  store.set('biz.power', all);
+}
+const hasGenerator = (p) => p.tags.some((t) => /генератор/i.test(t));
+// Чи працює точка під час відключень: свіжа позначка точки важливіша за опис.
+function worksInBlackout(p) {
+  const pw = powerOf(p.id);
+  if (pw) return pw.state !== 'closed';
+  return hasGenerator(p);
+}
+
 function isOpenNow(place, now = new Date()) {
   const h = hoursFor(place, isoDate(now));
   if (!h) return false;
+  if (powerOf(place.id, now.getTime())?.state === 'closed') return false;
   const m = now.getHours() * 60 + now.getMinutes();
   return m >= h[0] && m < h[1] && !inBreak(place, m, 1);
 }
@@ -1397,8 +1493,37 @@ const PAY_METHODS = { cash: 'Готівка', card: 'Картка', account: 'Р
 
 // Витрати точки за проміжком дат: разові плюс щомісячні, розгорнуті на кожен місяць до кінця проміжку
 // (або до дати зупинки). Розгорнуті записи мають id «шаблон@дата».
+// ---------- персонал і зарплата ----------
+
+const ROLES = { owner: 'Власник', admin: 'Адміністратор', master: 'Майстер' };
+const staffOf = (placeId) => store.peek('biz.staff', {})[placeId] ?? [];
+
+// База для відсотка майстра — вартість робіт: оплата клієнта, бонус і покрите абонементом чи сертифікатом.
+const workBase = (b) => (isCarcar(b) ? price(b) : b.paid) + (b.covered || 0);
+
+// Зарплата майстрів — відсоток від виконаних робіт, одним рядком на майстра за день.
+// Ці витрати не зберігаються окремо: їх завжди перераховано з виконаних записів.
+function salaryExpenses(placeId, from, to) {
+  const staff = staffOf(placeId);
+  const map = new Map();
+  for (const b of store.peek('bookings', [])) {
+    if (b.placeId !== placeId || b.state !== 'completed' || !b.masterId || b.date < from || b.date > to) continue;
+    const m = staff.find((x) => x.id === b.masterId);
+    if (!m?.pct) continue;
+    const k = `${b.date}|${m.id}`;
+    const e = map.get(k) ?? { id: `salary:${m.id}:${b.date}`, placeId, date: b.date, cat: 'Зарплата', method: 'card', amount: 0, works: 0, auto: 'salary', masterId: m.id };
+    e.amount += (workBase(b) * m.pct) / 100;
+    e.works++;
+    map.set(k, e);
+  }
+  return [...map.values()].map((e) => {
+    const m = staff.find((x) => x.id === e.masterId);
+    return { ...e, amount: Math.round(e.amount), note: `${m.name}: ${e.works} ${plural(e.works, 'робота', 'роботи', 'робіт')} × ${m.pct}%` };
+  });
+}
+
 function expensesIn(placeId, from, to) {
-  const out = [];
+  const out = [...salaryExpenses(placeId, from, to)];
   for (const e of store.get('biz.expenses', []).filter((x) => x.placeId === placeId)) {
     if (!e.recurring) {
       if (e.date >= from && e.date <= to) out.push(e);
@@ -1453,7 +1578,12 @@ function balanceFor(placeId, bookings, payouts) {
   const withdrawn = payouts.filter((x) => x.placeId === placeId).reduce((a, x) => a + x.gross, 0);
   const frozen = own.filter((b) => ACTIVE.includes(b.state) || isFrozen(b)).reduce((a, b) => a + price(b), 0);
   const next = own.filter(isFrozen).sort((a, b) => a.unfreezeAt - b.unfreezeAt)[0];
-  return { available: earned - withdrawn, frozen, next, withdrawn };
+  // Абонементи й сертифікати, куплені в застосунку: гроші точці через ті самі 48 годин.
+  const sales = (store.peek('biz.passes', {})[placeId]?.sold ?? []).filter((x) => x.source === 'carcar');
+  const ripe = (x) => Date.now() >= x.soldAt + PAYMENT.freezeHours * HOUR;
+  const passEarned = sales.filter(ripe).reduce((a, x) => a + x.price, 0);
+  const passFrozen = sales.filter((x) => !ripe(x)).reduce((a, x) => a + x.price, 0);
+  return { available: earned + passEarned - withdrawn, frozen: frozen + passFrozen, next, withdrawn };
 }
 
 // Якщо клієнт мовчить після «Машина готова», замовлення підтверджується саме.

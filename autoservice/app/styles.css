@@ -96,7 +96,7 @@ svg.ic { flex: none; display: block; }
 .brand:hover { color: var(--text); }
 .brand .c1 { color: var(--accent); }
 .brand .c2 { color: var(--navy); margin-left: -8px; }
-.city { display: inline-flex; align-items: center; gap: 4px; font-size: 15px; color: var(--muted); }
+.city { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: 15px; color: var(--muted); }
 
 main { max-width: 720px; margin: 0 auto; padding: 0 16px; outline: none; }
 
@@ -487,3 +487,35 @@ label.item { cursor: pointer; padding: 10px 14px; }
 .thread .msg.client { justify-self: end; background: var(--accent-soft); border-bottom-right-radius: 4px; }
 .thread .msg.biz { justify-self: start; border-bottom-left-radius: 4px; }
 .thread .who { display: block; font-size: 12px; color: var(--muted); margin-bottom: 2px; white-space: normal; }
+
+/* повідомлення, гарячі вікна, черга, абонементи, акт приймання */
+.inbox-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; color: var(--text); margin-left: 4px; }
+.inbox-btn:hover { background: var(--soft); }
+.inbox-btn .count { position: absolute; top: 4px; right: 2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.badge.deal { background: var(--accent-soft); color: var(--text); }
+.badge.power .ic, .badge.deal .ic { flex: none; }
+.hot { margin-top: 14px; }
+.hot-title { display: flex; align-items: center; gap: 6px; font-size: 17px; margin: 0 0 8px; }
+.hot-title .ic { color: var(--accent); }
+.hot-row { display: flex; gap: 10px; overflow-x: auto; margin: 0 -16px; padding: 2px 16px 6px; scrollbar-width: none; }
+.hot-row::-webkit-scrollbar { display: none; }
+.hot-card { flex: 0 0 210px; display: flex; flex-direction: column; gap: 3px; text-decoration: none; color: var(--text); }
+.hot-pct { align-self: flex-start; background: var(--accent); color: #fff; font-weight: 800; font-size: 14px; padding: 2px 8px; border-radius: 999px; margin-bottom: 4px; }
+.slot { display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; }
+.slot small { font-size: 11px; font-weight: 700; color: var(--accent); }
+.slot.hot { border-color: var(--accent); }
+.slot[aria-pressed="true"] small { color: var(--on-navy); }
+.deal-note { display: flex; gap: 10px; align-items: flex-start; background: var(--accent-soft); margin-top: 14px; }
+.deal-note > .ic { color: var(--accent); flex: none; margin-top: 2px; }
+.queue-card { margin-top: 14px; display: grid; gap: 10px; }
+.queue-card h2 { display: flex; align-items: center; gap: 8px; margin: 0; }
+.link-btn { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
+.cert-line { align-items: flex-end; }
+.intake-card { margin-top: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.intake-card summary { cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.msg-card.unread { border-color: var(--accent); }
+.pass-item .btn { flex: none; }
+.code { font-family: ui-monospace, monospace; letter-spacing: .5px; }
+.notice > .ic { flex: none; }
+
+[hidden] { display: none !important; }

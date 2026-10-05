@@ -2,7 +2,24 @@
 // сховище, форматування, іконки, гроші, рейтинг і налаштування точок із CRM.
 import { CATEGORIES, PLACES, PAYMENT } from './data.js';
 
+// peek — для частого читання без змін: розбираємо JSON лише тоді, коли значення змінилося.
+// Повернений обʼєкт спільний — не змінюйте його, для змін є get/set.
+const peeked = new Map();
 export const store = {
+  peek(key, fallback) {
+    let raw = null;
+    try { raw = localStorage.getItem(`carcar.${key}`); } catch { /* приватний режим */ }
+    if (raw === null) return fallback;
+    const hit = peeked.get(key);
+    if (hit?.raw === raw) return hit.value;
+    try {
+      const value = JSON.parse(raw);
+      peeked.set(key, { raw, value });
+      return value;
+    } catch {
+      return fallback;
+    }
+  },
   get(key, fallback) {
     try {
       const raw = localStorage.getItem(`carcar.${key}`);
@@ -65,6 +82,7 @@ export const ICONS = {
   users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>',
   list: '<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>',
   settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M2.5 12h3M18.5 12h3M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1"/>',
+  bell: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
   upload: '<path d="M12 20V9M7 14l5-5 5 5M5 4h14"/>',
   download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
   x: '<path d="M6 6l12 12M18 6 6 18"/>',
@@ -141,9 +159,37 @@ export function inBreak(place, t, minutes) {
   return !!b && t < b[1] && t + minutes > b[0];
 }
 
+// ---------- світло: статус від самої точки ----------
+
+// Точка в панелі відмічає, чи є світло, чи працює від генератора, чи стоїть без світла.
+// Позначка свіжа 12 годин — далі клієнти бачать лише, чи є в точки генератор.
+export const POWER = {
+  grid: ['Світло є', 'ok'],
+  generator: ['Немає світла — працюємо від генератора', 'ok'],
+  closed: ['Немає світла — не працюємо', 'muted'],
+};
+export const POWER_FRESH_HOURS = 12;
+export function powerOf(placeId, now = Date.now()) {
+  const pw = store.peek('biz.power', {})[placeId];
+  return pw && now - pw.at < POWER_FRESH_HOURS * 3600000 ? pw : null;
+}
+export function setPower(placeId, state) {
+  const all = store.get('biz.power', {});
+  all[placeId] = { state, at: Date.now() };
+  store.set('biz.power', all);
+}
+export const hasGenerator = (p) => p.tags.some((t) => /генератор/i.test(t));
+// Чи працює точка під час відключень: свіжа позначка точки важливіша за опис.
+export function worksInBlackout(p) {
+  const pw = powerOf(p.id);
+  if (pw) return pw.state !== 'closed';
+  return hasGenerator(p);
+}
+
 export function isOpenNow(place, now = new Date()) {
   const h = hoursFor(place, isoDate(now));
   if (!h) return false;
+  if (powerOf(place.id, now.getTime())?.state === 'closed') return false;
   const m = now.getHours() * 60 + now.getMinutes();
   return m >= h[0] && m < h[1] && !inBreak(place, m, 1);
 }
@@ -303,8 +349,37 @@ export const PAY_METHODS = { cash: 'Готівка', card: 'Картка', accou
 
 // Витрати точки за проміжком дат: разові плюс щомісячні, розгорнуті на кожен місяць до кінця проміжку
 // (або до дати зупинки). Розгорнуті записи мають id «шаблон@дата».
+// ---------- персонал і зарплата ----------
+
+export const ROLES = { owner: 'Власник', admin: 'Адміністратор', master: 'Майстер' };
+export const staffOf = (placeId) => store.peek('biz.staff', {})[placeId] ?? [];
+
+// База для відсотка майстра — вартість робіт: оплата клієнта, бонус і покрите абонементом чи сертифікатом.
+export const workBase = (b) => (isCarcar(b) ? price(b) : b.paid) + (b.covered || 0);
+
+// Зарплата майстрів — відсоток від виконаних робіт, одним рядком на майстра за день.
+// Ці витрати не зберігаються окремо: їх завжди перераховано з виконаних записів.
+export function salaryExpenses(placeId, from, to) {
+  const staff = staffOf(placeId);
+  const map = new Map();
+  for (const b of store.peek('bookings', [])) {
+    if (b.placeId !== placeId || b.state !== 'completed' || !b.masterId || b.date < from || b.date > to) continue;
+    const m = staff.find((x) => x.id === b.masterId);
+    if (!m?.pct) continue;
+    const k = `${b.date}|${m.id}`;
+    const e = map.get(k) ?? { id: `salary:${m.id}:${b.date}`, placeId, date: b.date, cat: 'Зарплата', method: 'card', amount: 0, works: 0, auto: 'salary', masterId: m.id };
+    e.amount += (workBase(b) * m.pct) / 100;
+    e.works++;
+    map.set(k, e);
+  }
+  return [...map.values()].map((e) => {
+    const m = staff.find((x) => x.id === e.masterId);
+    return { ...e, amount: Math.round(e.amount), note: `${m.name}: ${e.works} ${plural(e.works, 'робота', 'роботи', 'робіт')} × ${m.pct}%` };
+  });
+}
+
 export function expensesIn(placeId, from, to) {
-  const out = [];
+  const out = [...salaryExpenses(placeId, from, to)];
   for (const e of store.get('biz.expenses', []).filter((x) => x.placeId === placeId)) {
     if (!e.recurring) {
       if (e.date >= from && e.date <= to) out.push(e);
@@ -359,7 +434,12 @@ export function balanceFor(placeId, bookings, payouts) {
   const withdrawn = payouts.filter((x) => x.placeId === placeId).reduce((a, x) => a + x.gross, 0);
   const frozen = own.filter((b) => ACTIVE.includes(b.state) || isFrozen(b)).reduce((a, b) => a + price(b), 0);
   const next = own.filter(isFrozen).sort((a, b) => a.unfreezeAt - b.unfreezeAt)[0];
-  return { available: earned - withdrawn, frozen, next, withdrawn };
+  // Абонементи й сертифікати, куплені в застосунку: гроші точці через ті самі 48 годин.
+  const sales = (store.peek('biz.passes', {})[placeId]?.sold ?? []).filter((x) => x.source === 'carcar');
+  const ripe = (x) => Date.now() >= x.soldAt + PAYMENT.freezeHours * HOUR;
+  const passEarned = sales.filter(ripe).reduce((a, x) => a + x.price, 0);
+  const passFrozen = sales.filter((x) => !ripe(x)).reduce((a, x) => a + x.price, 0);
+  return { available: earned + passEarned - withdrawn, frozen: frozen + passFrozen, next, withdrawn };
 }
 
 // Якщо клієнт мовчить після «Машина готова», замовлення підтверджується саме.
