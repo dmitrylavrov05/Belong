@@ -679,8 +679,8 @@ function fraudDemo() {
   const self = mk({ placeId: 'keramika', clientName: 'Вигаданий клієнт', clientPhone: '+380 44 000 00 09', state: 'completed', date: addDays(d, -2), completedAt: now - 2 * DAY });
   bookings.push(self);
   reviews.push({ id: uid(), placeId: 'keramika', bookingId: self.id, stars: 5, text: 'Ідеально, рекомендую', services: 'Експрес-мийка кузова', date: addDays(d, -1), at: now - DAY, demoFraud: true });
-  ['blysk', 'koleso', 'motor', 'aqua24'].forEach((pid, i) => bookings.push(mk({ placeId: pid, clientName: 'Вигаданий Скасувальник', clientPhone: '+380 67 000 00 99', state: 'cancelled', refundTo: 'balance', refund: 250, placeAmount: 0, date: addDays(d, -i - 1) })));
-  for (let i = 0; i < 5; i++) bookings.push(mk({ placeId: 'avtodoktor', clientName: `Вигаданий клієнт ${i + 1}`, clientPhone: `+380 63 000 00 2${i}`, state: i < 3 ? 'noshow' : 'completed', placeAmount: 250, date: addDays(d, -i - 1) }));
+  ['blysk', 'hvylia', 'pina', 'aqua24'].forEach((pid, i) => bookings.push(mk({ placeId: pid, clientName: 'Вигаданий Скасувальник', clientPhone: '+380 67 000 00 99', state: 'cancelled', refundTo: 'balance', refund: 250, placeAmount: 0, date: addDays(d, -i - 1) })));
+  for (let i = 0; i < 5; i++) bookings.push(mk({ placeId: 'kraplia', clientName: `Вигаданий клієнт ${i + 1}`, clientPhone: `+380 63 000 00 2${i}`, state: i < 3 ? 'noshow' : 'completed', placeAmount: 250, date: addDays(d, -i - 1) }));
   for (let i = 0; i < 3; i++) bookings.push(mk({ placeId: 'blysk', clientPhone: `+380 93 000 00 3${i}`, plate: 'AA0000AA', promo: { code: 'PERSHA30', amount: 75 }, paid: 175, state: 'completed', date: addDays(d, -i - 1) }));
   const twin = PLACES.find((x) => x.id === 'blysk');
   addCustomPlace({
@@ -709,7 +709,7 @@ function fraudDemoClear(silent) {
 // Кампанія: канал, бюджет і промокод чи посилання ?c=ID. Нові клієнти — ті, для кого запис за кампанією
 // перший. CAC = (бюджет + знижки промокоду) / нові клієнти. LTV — дохід CARCAR з клієнта за рік:
 // середній чек × комісія × очікувана кількість замовлень на рік (налаштування нижче).
-const M_CHANNELS = ['Instagram', 'Facebook', 'Google Ads', 'TikTok', 'Telegram-канали', 'Партнери (АЗС, СТО)', 'Офлайн', 'Інше'];
+const M_CHANNELS = ['Instagram', 'Facebook', 'Google Ads', 'TikTok', 'Telegram-канали', 'Партнери (АЗС, ЖК, бізнес-центри)', 'Офлайн', 'Інше'];
 const campaigns = () => store.get('admin.campaigns', []);
 const mSettings = () => ({ ordersPerYear: 6, ...store.get('admin.settings', {}) });
 
@@ -790,7 +790,7 @@ function viewMarketing() {
       <form id="ltv-form" class="panel stack" aria-labelledby="h-ltv" style="gap:12px">
         <h2 id="h-ltv">Припущення для LTV</h2>
         <label class="field"><span>Замовлень одного клієнта за рік</span><input name="ordersPerYear" type="number" min="1" max="52" step="0.5" value="${mSettings().ordersPerYear}"></label>
-        <p class="fine" style="margin:0">LTV = середній чек кампанії × комісія CARCAR × замовлень на рік. Мийка — 6–12 разів на рік, шиномонтаж — 2, СТО — 2–3.</p>
+        <p class="fine" style="margin:0">LTV = середній чек кампанії × комісія CARCAR × замовлень на рік. Звичайна мийка — 6–12 разів на рік, хімчистка — 2–3, кераміка — 1.</p>
         <button class="btn" type="submit" style="align-self:flex-start">Зберегти</button>
       </form>
     </div>`;
@@ -802,9 +802,9 @@ function marketingDemo() {
   const now = Date.now();
   const defs = [
     ['Instagram: перша мийка', 'Instagram', 'PERSHA30', 12000, 900, 0.09, 0.85, 320],
-    ['Google Ads: шиномонтаж восени', 'Google Ads', null, 18000, 1400, 0.05, 0.7, 1050],
-    ['TikTok: детейлінг', 'TikTok', null, 60000, 2600, 0.008, 0.9, 6500],
-    ['Партнери: шиномонтаж на АЗС', 'Партнери (АЗС, СТО)', null, 2000, 300, 0.12, 0.8, 1050],
+    ['Google Ads: мийка поруч', 'Google Ads', null, 9000, 1400, 0.05, 0.7, 650],
+    ['TikTok: кераміка й полірування', 'TikTok', null, 60000, 2600, 0.008, 0.9, 6500],
+    ['Партнери: мийка в ЖК', 'Партнери (АЗС, ЖК, бізнес-центри)', null, 2000, 300, 0.12, 0.8, 600],
   ];
   const list = [];
   const rows = [];
@@ -894,7 +894,7 @@ function viewPromos() {
     <div class="table-wrap" tabindex="0" role="region" aria-label="Промокоди" style="margin-top:16px"><table class="t">
       <thead><tr><th>Код</th><th>Акція</th><th>Умови</th><th class="num">Використано</th><th class="num">Витрати</th><th>Статус</th><th><span class="sr-only">Дія</span></th></tr></thead>
       <tbody>${rows.map(({ pr, used, cost, st }) => `<tr><td><b class="code">${esc(pr.code)}</b></td><td>${esc(pr.title)}</td>
-        <td class="small">${promoText(pr)}${pr.cats?.length ? ` · ${pr.cats.map((c) => catById(c).name.toLowerCase()).join(', ')}` : ' · усі послуги'}${pr.firstOnly ? ' · перше замовлення' : ''}${pr.minOrder ? ` · від ${uah(pr.minOrder)}` : ''}${pr.auto ? ' · автоматично' : ''}${pr.until ? ` · до ${fmtDate(pr.until)}` : ''}</td>
+        <td class="small">${promoText(pr)}${pr.firstOnly ? ' · перше замовлення' : ''}${pr.minOrder ? ` · від ${uah(pr.minOrder)}` : ''}${pr.auto ? ' · автоматично' : ''}${pr.until ? ` · до ${fmtDate(pr.until)}` : ''}</td>
         <td class="num">${used.length}${pr.limit ? ` з ${pr.limit}` : ''}</td><td class="num">${uah(cost)}</td>
         <td><span class="pill ${st[1]}">${st[0]}</span></td>
         <td><button class="btn" data-action="promo-toggle" data-id="${esc(pr.code)}">${pr.active === false ? 'Увімкнути' : 'Вимкнути'}</button></td></tr>`).join('')}</tbody>
@@ -903,8 +903,8 @@ function viewPromos() {
       <h2 id="h-new-promo">Новий промокод</h2>
       <form id="promo-form" class="stack" style="gap:12px">
         <div class="form-grid">
-          <label class="field"><span>Код</span><input name="code" required maxlength="20" pattern="[A-Za-z0-9]{3,20}" placeholder="Наприклад, SHYNY15" autocomplete="off"></label>
-          <label class="field"><span>Назва акції для клієнтів</span><input name="title" required maxlength="60" placeholder="Наприклад, −15% на перевзування" autocomplete="off"></label>
+          <label class="field"><span>Код</span><input name="code" required maxlength="20" pattern="[A-Za-z0-9]{3,20}" placeholder="Наприклад, CHYSTO15" autocomplete="off"></label>
+          <label class="field"><span>Назва акції для клієнтів</span><input name="title" required maxlength="60" placeholder="Наприклад, −15% на хімчистку" autocomplete="off"></label>
           <label class="field"><span>Тип знижки</span><select name="kind"><option value="pct">Відсоток</option><option value="sum">Сума, ₴</option></select></label>
           <label class="field"><span>Розмір знижки</span><input name="value" type="number" min="1" required></label>
           <label class="field"><span>Не більше, ₴ (для відсотка)</span><input name="max" type="number" min="0"></label>
@@ -912,11 +912,11 @@ function viewPromos() {
           <label class="field"><span>Ліміт використань</span><input name="limit" type="number" min="1" placeholder="без ліміту"></label>
           <label class="field"><span>Діє до</span><input name="until" type="date" min="${isoDate(new Date())}"></label>
         </div>
-        <fieldset class="radio-row"><legend>Категорії</legend>${CATEGORIES.map((c) => `<label><input type="checkbox" name="cats" value="${c.id}"> ${c.name}</label>`).join('')}</fieldset>
-        <label class="check-row"><input class="check" type="checkbox" name="firstOnly"><span>Лише на перше замовлення в цих категоріях</span></label>
+        ${CATEGORIES.length > 1 ? `<fieldset class="radio-row"><legend>Категорії</legend>${CATEGORIES.map((c) => `<label><input type="checkbox" name="cats" value="${c.id}"> ${c.name}</label>`).join('')}</fieldset>` : ''}
+        <label class="check-row"><input class="check" type="checkbox" name="firstOnly"><span>Лише на перше замовлення клієнта</span></label>
         <label class="check-row"><input class="check" type="checkbox" name="auto"><span>Застосовувати автоматично, без введення коду</span></label>
         <button class="btn primary" type="submit" style="align-self:flex-start">Створити промокод</button>
-        <p class="fine">Без обраних категорій промокод діє на всі послуги. Кожен клієнт може скористатися промокодом один раз; після безкоштовного скасування запису — знову.</p>
+        <p class="fine">Промокод діє на всі послуги мийок. Кожен клієнт може скористатися промокодом один раз; після безкоштовного скасування запису — знову.</p>
       </form>
     </section>`;
 }
@@ -984,7 +984,7 @@ function viewStats() {
     searches.set(e.q, s);
   }
   const topSearch = [...searches.values()].sort((a, b) => b.n - a.n).slice(0, 8);
-  const FILTER_NAMES = { openNow: 'Відчинено зараз', blackout: 'Працює при відключеннях', favOnly: 'Обране', 'cat:wash': 'Мийка', 'cat:tires': 'Шиномонтаж', 'cat:service': 'СТО', 'cat:detailing': 'Детейлінг' };
+  const FILTER_NAMES = { openNow: 'Відчинено зараз', blackout: 'Працює при відключеннях', favOnly: 'Обране', 'cat:wash': 'Мийка', mobileOnly: 'Виїзд до вас' };
   const filters = Object.entries(FILTER_NAMES).map(([k, name]) => ({ name, value: ev.filter((e) => e.t === 'filter' && e.name === k).length })).filter((x) => x.value).sort((a, b) => b.value - a.value);
 
   // Утримання: скільки клієнтів повернулися.
@@ -1093,7 +1093,7 @@ function statsDemo() {
   const since = Date.now() - 90 * 864e5;
   const app = bookings.filter((b) => isCarcar(b) && b.source === 'demo');
   const ev = (t, at, data = {}) => out.push({ t, at: Math.round(at), demo: true, ...data });
-  const words = ['мийка', 'шиномонтаж', 'полірування', 'кераміка', 'хімчистка', 'перевзування', 'розвал', 'кондиціонер', 'мийка двигуна', 'оболонь', 'троєщина', 'антидощ', 'фари'];
+  const words = ['мийка', 'цілодобова мийка', 'полірування', 'кераміка', 'хімчистка', 'мийка днища', 'нановіск', 'чорніння шин', 'мийка двигуна', 'оболонь', 'троєщина', 'антидощ', 'фари'];
   for (const b of app) {
     const start = bookingStart(b).getTime();
     const leadH = [1, 3, 8, 20, 40, 70, 120, 200][Math.floor(rnd() * 8)];
@@ -1114,7 +1114,7 @@ function statsDemo() {
     if (rnd() < 0.25) ev('open_book', at - 100000, { placeId: p.id });
     if (rnd() < 0.07) ev('open_pay', at, { placeId: p.id });
     if (rnd() < 0.35) { const q = words[Math.floor(rnd() * words.length)]; ev('search', at - 250000, { q, found: /антидощ|фари|кондиціонер/.test(q) && rnd() < 0.7 ? 0 : 1 + Math.floor(rnd() * 4) }); }
-    if (rnd() < 0.2) ev('filter', at - 240000, { name: ['openNow', 'blackout', 'cat:wash', 'cat:tires', 'cat:detailing', 'favOnly'][Math.floor(rnd() * 6)] });
+    if (rnd() < 0.2) ev('filter', at - 240000, { name: ['openNow', 'blackout', 'mobileOnly', 'favOnly'][Math.floor(rnd() * 4)] });
     if (rnd() < 0.15) { ev('map_open', at - 230000); ev('map_pin', at - 220000, { placeId: p.id }); }
     if (rnd() < 0.05) ev('hot_click', at - 210000, { placeId: p.id });
     if (rnd() < 0.02) ev('queue_join', at, { placeId: p.id });

@@ -4,7 +4,12 @@ import AxeBuilder from '@axe-core/playwright';
 // Неділя, 4 жовтня 2026, 10:00. Завтра — понеділок.
 const TILE = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page }, testInfo) => {
+  // Усі точки — мийки, тож акція «Перша мийка −30%» діяла б у кожному тесті. Вимикаємо її,
+  // крім тестів промокодів і маркетингу.
+  if (!/промокод|маркетинг/i.test(testInfo.title)) {
+    await page.addInitScript(() => localStorage.getItem('carcar.admin.promos') ?? localStorage.setItem('carcar.admin.promos', '[]'));
+  }
   await page.route('https://tile.openstreetmap.org/**', (r) => r.fulfill({ contentType: 'image/png', body: TILE }));
   await page.clock.setFixedTime(new Date(2026, 9, 4, 10, 0));
   const errors = [];
@@ -22,7 +27,7 @@ const PANEL = '/business.html';
 // Суми з тисячами форматуються з нерозривним пробілом.
 const money = (s) => new RegExp(s.replace(/ /g, '\\s'));
 
-async function book(page, { place = 'koleso', service = /Сезонне перевзування/, time = '10:00', pay = 'Оплатити 900 ₴' } = {}) {
+async function book(page, { place = 'hvylia', service = /Комплекс преміум/, time = '10:00', pay = 'Оплатити 900 ₴' } = {}) {
   await page.goto(`/#/book/${place}`);
   await page.getByLabel(service).check();
   await page.getByRole('button', { name: /Завтра/ }).click();
@@ -56,13 +61,13 @@ test('перенесення: новий час без скасування оп
   await expect(page.getByRole('region', { name: 'Баланс CARCAR' })).toHaveCount(0);
 
   // Старий час звільнився, новий зайнятий.
-  await page.goto('/#/book/koleso');
-  await page.getByLabel(/Сезонне перевзування/).check();
+  await page.goto('/#/book/hvylia');
+  await page.getByLabel(/Комплекс преміум/).check();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await expect(page.locator('.slot[data-time="10:00"]')).toBeEnabled();
   await expect(page.locator('.slot[data-time="14:00"]')).toBeDisabled();
 
-  await openInPanel(page, 'Шиномонтаж «Колесо»');
+  await openInPanel(page, 'Автомийка «Хвиля»');
   const drawer = page.getByRole('dialog');
   await expect(drawer).toContainText('Перенесено');
   await expect(drawer).toContainText('з 5 жовт., 10:00');
@@ -70,8 +75,8 @@ test('перенесення: новий час без скасування оп
 });
 
 test('перенесення недоступне пізніше ніж за 1,5 год до візиту', async ({ page }) => {
-  await page.goto('/#/book/koleso');
-  await page.getByLabel(/Сезонне перевзування/).check();
+  await page.goto('/#/book/hvylia');
+  await page.getByLabel(/Комплекс преміум/).check();
   await page.locator('.slot[data-time="11:00"]').click();
   await page.locator('[data-action="confirm"]').click();
   await page.getByRole('button', { name: 'Оплатити 900 ₴' }).click();
@@ -83,25 +88,25 @@ test('перенесення недоступне пізніше ніж за 1,5
   await expect(page.locator('.notice.warn')).toContainText('Перенести можна було до 4 жовтня о 09:30');
 });
 
-test('чат за записом: клієнт пише «Приїду з причепом», точка відповідає, відповідь приходить у «Повідомлення»', async ({ page }) => {
+test('чат за записом: клієнт пише «Приїду з багажником на даху», точка відповідає, відповідь приходить у «Повідомлення»', async ({ page }) => {
   await book(page);
   const card = page.locator('article').first();
   await card.getByRole('button', { name: 'Чат з точкою' }).click();
-  await card.getByRole('button', { name: 'Приїду з причепом' }).click();
+  await card.getByRole('button', { name: 'Приїду з багажником на даху' }).click();
   await expect(page.locator('#toast')).toHaveText('Повідомлення надіслано точці');
   await card.getByLabel('Повідомлення точці').fill('І ще: можна зберегти старі шини?');
   await card.getByRole('button', { name: 'Надіслати' }).click();
   await expect(card.locator('.thread .msg')).toHaveCount(2);
 
   await page.goto(`${PANEL}#/requests`);
-  await page.getByLabel('Точка').selectOption({ label: 'Шиномонтаж «Колесо»' });
+  await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
   await expect(page.locator('#nav a[href="#/requests"] .count')).toHaveText('1');
   const chats = page.getByRole('region', { name: 'Повідомлення за записами' });
   await expect(chats).toContainText('Клієнт: І ще: можна зберегти старі шини?');
   await expect(chats).toContainText('Нове');
   await chats.getByRole('button', { name: 'Відкрити запис' }).click();
   const drawer = page.getByRole('dialog');
-  await expect(drawer.locator('.thread')).toContainText('Приїду з причепом');
+  await expect(drawer.locator('.thread')).toContainText('Приїду з багажником на даху');
   await drawer.getByRole('button', { name: 'Так, чекаємо' }).click();
   await expect(page.locator('#toast')).toHaveText('Повідомлення надіслано клієнту');
   await expect(page.locator('#nav a[href="#/requests"] .count')).toHaveCount(0);
@@ -111,7 +116,7 @@ test('чат за записом: клієнт пише «Приїду з при
   await page.locator('#inbox-tab').click();
   const list = page.locator('h2', { hasText: 'Чати за записами' }).locator('xpath=following-sibling::div[1]');
   await expect(list).toContainText('Точка: Так, чекаємо');
-  await list.getByRole('link', { name: /Шиномонтаж «Колесо»/ }).click();
+  await list.getByRole('link', { name: /Автомийка «Хвиля»/ }).click();
   await expect(page.locator('.bk-chat .thread')).toContainText('Так, чекаємо');
   await page.goto('/');
   await expect(page.locator('#inbox-tab .tab-count')).toBeHidden();
@@ -122,9 +127,9 @@ test('кошторис СТО: клієнт погоджує пункти окр
   await page.getByLabel('Марка').fill('Skoda');
   await page.getByLabel('Модель').fill('Octavia');
   await page.getByRole('button', { name: 'Зберегти', exact: true }).click();
-  await book(page, { place: 'motor', service: /Компʼютерна діагностика/, pay: 'Оплатити 500 ₴' });
+  await book(page, { place: 'pina', service: /Мийка днища й арок/, pay: 'Оплатити 500 ₴' });
 
-  await openInPanel(page, 'СТО «Мотор»');
+  await openInPanel(page, 'Автомийка «Піна»');
   await page.getByRole('dialog').getByRole('button', { name: 'Скласти кошторис' }).click();
   const f = page.locator('#estimate-form');
   await f.getByLabel('Назва, пункт 1').fill('Заміна передніх колодок');
@@ -156,7 +161,7 @@ test('кошторис СТО: клієнт погоджує пункти окр
   await expect(card.locator('.bk-price')).toHaveText(money('2 400 ₴'));
   await expect(card.locator('.estimate')).toContainText(money('Кошторис: погоджено на 1 900 ₴'));
 
-  await openInPanel(page, 'СТО «Мотор»');
+  await openInPanel(page, 'Автомийка «Піна»');
   const drawer = page.getByRole('dialog');
   await expect(drawer.locator('.estimate-box')).toContainText(money('Погоджено 1 900 ₴'));
   await expect(drawer).toContainText(money('2 400 ₴ · оплачено через CARCAR'));
@@ -171,7 +176,7 @@ test('кошторис СТО: клієнт погоджує пункти окр
   await expect(w).toBeVisible();
   await expect(page.locator('.reminder', { hasText: 'Колодки передні' })).toContainText('12 міс з 4 жовтня 2026 р. · діє до 4 жовтня 2027 р.');
   await expect(page.locator('.reminder', { hasText: 'Заміна передніх колодок' })).toContainText('діє до 4 квітня 2027 р.');
-  await expect(page.locator('.log-item').first()).toContainText('Компʼютерна діагностика, Заміна передніх колодок, Колодки передні');
+  await expect(page.locator('.log-item').first()).toContainText('Мийка днища й арок, Заміна передніх колодок, Колодки передні');
 });
 
 test('виїзд до вас: мийка біля дому з адресою на карті, окрема колонка бригади в журналі', async ({ page }) => {
@@ -197,10 +202,9 @@ test('виїзд до вас: мийка біля дому з адресою н�
   await expect(page.locator('#addr-note')).toContainText('від точки — приїдемо');
   await expect(map.getByRole('img', { name: 'Обрана адреса' })).toBeVisible();
   await expect(page.locator('.dock .total')).toContainText('· виїзд');
-  // 230 ₴ за мийку + 250 ₴ виїзд, мінус 30% на першу мийку (лише з послуги).
+  // 230 ₴ за мийку + 250 ₴ виїзд.
   await page.locator('[data-action="confirm"]').click();
   await expect(page.locator('.sheet')).toContainText('Виїзд до вас: 250 ₴');
-  await page.getByRole('button', { name: 'Прибрати' }).click();
   await page.getByRole('button', { name: 'Оплатити 480 ₴' }).click();
   const card = page.locator('article').first();
   await expect(card).toContainText('Виїзд до вас: вул. Героїв полку «Азов», 10');
@@ -252,7 +256,7 @@ test('оплата частинами для дорогого детейлінг
   await expect(card).toContainText(money('Частинами: 4 платежі, перший 2 250 ₴, далі по 2 250 ₴/міс'));
   await expect(card.locator('.bk-price')).toHaveText(money('9 000 ₴'));
 
-  await openInPanel(page, 'Детейлінг-студія «Глянець»');
+  await openInPanel(page, 'Детейлінг-мийка «Глянець»');
   await expect(page.getByRole('dialog')).toContainText('Частинами · 4 платежі');
   await expect(page.getByRole('dialog')).toContainText(money('9 000 ₴ · оплачено через CARCAR'));
 
@@ -269,7 +273,7 @@ test('промокоди: «Перша мийка −30%» сама, свій к
   await page.goto('/');
   await expect(page.locator('.promo-banner')).toContainText('Перша мийка −30%');
   await page.locator('.promo-banner').click();
-  await expect(page.locator('#count')).toHaveText('4 місця');
+  await expect(page.locator('#count')).toHaveText('9 місць');
 
   await page.goto('/#/book/blysk');
   await page.getByLabel(/Експрес-мийка/).check();
@@ -298,24 +302,23 @@ test('промокоди: «Перша мийка −30%» сама, свій к
   await page.locator('.promo-form').getByRole('button', { name: 'Застосувати' }).click();
   await expect(page.getByRole('alert')).toHaveText('Ви вже скористалися цим промокодом');
 
-  // Адмінка: новий код на шиномонтаж.
+  // Адмінка: новий код на будь-яку мийку.
   await page.goto('/admin.html#/promos');
   const table = page.getByRole('region', { name: 'Промокоди' }).last();
   await expect(table.locator('tr', { hasText: 'PERSHA30' })).toContainText('75 ₴');
   const f = page.locator('#promo-form');
-  await f.getByLabel('Код', { exact: true }).fill('shyny15');
-  await f.getByLabel('Назва акції для клієнтів').fill('−15% на перевзування');
+  await f.getByLabel('Код', { exact: true }).fill('chysto15');
+  await f.getByLabel('Назва акції для клієнтів').fill('−15% на преміум-комплекс');
   await f.getByLabel('Розмір знижки').fill('15');
-  await f.getByLabel('Шиномонтаж').check();
   await f.getByRole('button', { name: 'Створити промокод' }).click();
-  await expect(page.locator('#toast')).toHaveText('Промокод SHYNY15 створено');
+  await expect(page.locator('#toast')).toHaveText('Промокод CHYSTO15 створено');
 
-  await page.goto('/#/book/koleso');
-  await page.getByLabel(/Сезонне перевзування/).check();
+  await page.goto('/#/book/hvylia');
+  await page.getByLabel(/Комплекс преміум/).check();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await page.locator('.slot[data-time="10:00"]').click();
   await page.locator('[data-action="confirm"]').click();
-  await page.getByLabel('Промокод CARCAR').fill('SHYNY15');
+  await page.getByLabel('Промокод CARCAR').fill('CHYSTO15');
   await page.locator('.promo-form').getByRole('button', { name: 'Застосувати' }).click();
   await expect(page.locator('#toast')).toHaveText('Промокод застосовано: −135 ₴');
   await page.getByRole('button', { name: 'Оплатити 765 ₴' }).click();
@@ -326,15 +329,15 @@ test('промокоди: «Перша мийка −30%» сама, свій к
   await expect(page.locator('#toast')).toHaveText('Запис скасовано, 765 ₴ повернено на баланс');
 
   await page.goto('/admin.html#/promos');
-  await expect(page.locator('tr', { hasText: 'SHYNY15' })).toContainText('0 ₴');
-  await page.locator('tr', { hasText: 'SHYNY15' }).getByRole('button', { name: 'Вимкнути' }).click();
-  await expect(page.locator('tr', { hasText: 'SHYNY15' })).toContainText('Вимкнено');
-  await page.goto('/#/book/koleso');
-  await page.getByLabel(/Сезонне перевзування/).check();
+  await expect(page.locator('tr', { hasText: 'CHYSTO15' })).toContainText('0 ₴');
+  await page.locator('tr', { hasText: 'CHYSTO15' }).getByRole('button', { name: 'Вимкнути' }).click();
+  await expect(page.locator('tr', { hasText: 'CHYSTO15' })).toContainText('Вимкнено');
+  await page.goto('/#/book/hvylia');
+  await page.getByLabel(/Комплекс преміум/).check();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await page.locator('.slot[data-time="10:00"]').click();
   await page.locator('[data-action="confirm"]').click();
-  await page.getByLabel('Промокод CARCAR').fill('SHYNY15');
+  await page.getByLabel('Промокод CARCAR').fill('CHYSTO15');
   await page.locator('.promo-form').getByRole('button', { name: 'Застосувати' }).click();
   await expect(page.getByRole('alert')).toHaveText('Промокод не діє');
 });
@@ -342,8 +345,8 @@ test('промокоди: «Перша мийка −30%» сама, свій к
 const PAGES = {
   'перенесення': async (page) => { await book(page); await page.locator('article').first().getByRole('link', { name: 'Перенести' }).click(); await page.getByRole('button', { name: /Завтра/ }).click(); await page.locator('.slot[data-time="14:00"]').click(); },
   'запис із кошторисом і чатом': async (page) => {
-    await book(page, { place: 'motor', service: /Компʼютерна діагностика/, pay: 'Оплатити 500 ₴' });
-    await openInPanel(page, 'СТО «Мотор»');
+    await book(page, { place: 'pina', service: /Мийка днища й арок/, pay: 'Оплатити 500 ₴' });
+    await openInPanel(page, 'Автомийка «Піна»');
     await page.getByRole('dialog').getByRole('button', { name: 'Скласти кошторис' }).click();
     await page.getByLabel('Назва, пункт 1').fill('Заміна колодок');
     await page.getByLabel('Ціна за одиницю, ₴, пункт 1').fill('700');
@@ -352,8 +355,8 @@ const PAGES = {
     await page.locator('article').first().getByRole('button', { name: /Чат з точкою/ }).click();
   },
   'кошторис і чат у панелі': async (page) => {
-    await book(page, { place: 'motor', service: /Компʼютерна діагностика/, pay: 'Оплатити 500 ₴' });
-    await openInPanel(page, 'СТО «Мотор»');
+    await book(page, { place: 'pina', service: /Мийка днища й арок/, pay: 'Оплатити 500 ₴' });
+    await openInPanel(page, 'Автомийка «Піна»');
     await page.getByRole('dialog').getByRole('button', { name: 'Скласти кошторис' }).click();
   },
   'виїзд і оплата частинами': async (page) => {

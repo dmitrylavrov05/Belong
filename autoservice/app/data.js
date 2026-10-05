@@ -1,5 +1,4 @@
-// Місто та список автосервісів. Щоб додати реальні мийки, шиномонтажі й СТО,
-// замініть PLACES на справжні точки.
+// Місто та список автомийок. Щоб додати реальні мийки, замініть PLACES на справжні точки.
 // Зараз тут демо-дані: назви, номери будинків і телефони вигадані.
 
 export const CITY = {
@@ -13,9 +12,6 @@ export const CITY = {
 // icon — назва лінійної іконки з ICONS в app.js.
 export const CATEGORIES = [
   { id: 'wash', name: 'Мийка', icon: 'drop' },
-  { id: 'tires', name: 'Шиномонтаж', icon: 'wheel' },
-  { id: 'service', name: 'СТО', icon: 'wrench' },
-  { id: 'detailing', name: 'Детейлінг', icon: 'sparkle' },
 ];
 
 // Ціна залежить від класу авто: [легкове, кросовер, позашляховик/мінівен], у гривнях.
@@ -28,36 +24,23 @@ const WASH = {
   wax: { name: 'Віск і полірування', min: 40, price: [400, 500, 600] },
   engine: { name: 'Мийка двигуна', min: 30, price: [400, 450, 500] },
   dry: { name: 'Хімчистка салону', min: 240, price: [3500, 4200, 5000] },
-};
-
-const TIRES = {
-  change: { name: 'Сезонне перевзування (4 колеса)', min: 50, price: [900, 1100, 1400] },
-  balance: { name: 'Балансування (4 колеса)', min: 30, price: [400, 500, 600] },
-  repair: { name: 'Ремонт проколу', min: 20, price: [200, 200, 250] },
-  storage: { name: 'Зберігання шин (сезон)', min: 10, price: [1200, 1400, 1600] },
-  rolling: { name: 'Рихтування литого диска', min: 60, price: [600, 700, 900] },
-};
-
-const SERVICE = {
-  diag: { name: 'Компʼютерна діагностика', min: 30, price: [500, 600, 700] },
-  oil: { name: 'Заміна оливи та фільтра', min: 40, price: [400, 500, 600] },
-  brakes: { name: 'Заміна гальмівних колодок (вісь)', min: 60, price: [600, 700, 900] },
-  align: { name: 'Розвал-сходження', min: 45, price: [700, 800, 1000] },
-  ac: { name: 'Заправка кондиціонера', min: 40, price: [900, 1000, 1200] },
-  suspension: { name: 'Діагностика підвіски', min: 30, price: [300, 350, 400] },
-  battery: { name: 'Заміна акумулятора', min: 20, price: [150, 150, 200] },
-};
-
-const DETAILING = {
+  premium: { name: 'Комплекс преміум: кузов, салон, віск', min: 50, price: [900, 1100, 1400] },
+  leather: { name: 'Чистка й кондиціонер шкіри', min: 30, price: [400, 500, 600] },
+  tireshine: { name: 'Чорніння шин', min: 20, price: [200, 200, 250] },
+  seats: { name: 'Хімчистка сидінь', min: 60, price: [600, 700, 900] },
+  underbody: { name: 'Мийка днища й арок', min: 30, price: [500, 600, 700] },
+  antirain: { name: 'Антидощ на всі скла', min: 45, price: [700, 800, 1000] },
+  nanowax: { name: 'Нановіск кузова', min: 40, price: [900, 1000, 1200] },
+  trunk: { name: 'Прибирання багажника', min: 30, price: [300, 350, 400] },
+  aroma: { name: 'Ароматизація салону', min: 20, price: [150, 150, 200] },
   polish: { name: 'Полірування кузова', min: 180, price: [3500, 4200, 5000] },
   ceramic: { name: 'Керамічне покриття кузова', min: 360, price: [9000, 11000, 13000] },
-  ppf: { name: 'Антигравійна плівка: капот і бампер', min: 480, price: [12000, 14000, 16000] },
   deepclean: { name: 'Глибока хімчистка салону з розбиранням', min: 300, price: [4000, 4800, 5600] },
   headlights: { name: 'Полірування фар', min: 60, price: [600, 600, 700] },
 };
 
-// Каталоги послуг за категоріями: нова точка стартує з повного прайсу своїх категорій і редагує його.
-export const SERVICE_TEMPLATES = { wash: WASH, tires: TIRES, service: SERVICE, detailing: DETAILING };
+// Каталог послуг: нова точка стартує з повного прайсу мийки й редагує його.
+export const SERVICE_TEMPLATES = { wash: WASH };
 
 // Райони Києва з приблизними центрами — для нових точок, поки вони не вказали точні координати.
 export const DISTRICTS = {
@@ -104,103 +87,103 @@ export const PLACES = [
     mobile: { radiusKm: 12, fee: 250, crews: 2, services: ['express', 'complex', 'inside'] },
   },
   {
-    id: 'koleso',
+    id: 'hvylia',
     lat: 50.407,
     lng: 30.652,
-    name: 'Шиномонтаж «Колесо»',
-    cats: ['tires'],
+    name: 'Автомийка «Хвиля»',
+    cats: ['wash'],
     address: 'Харківське шосе, 58',
     district: 'Дарницький',
     phone: '+380 44 000 00 03',
     hours: [9, 21],
     boxes: 3,
-    tags: ['Зберігання шин', 'Шини в наявності'],
-    services: pick(TIRES, ['change', 'balance', 'repair', 'storage', 'rolling']),
-    mobile: { radiusKm: 15, fee: 300, crews: 1, services: ['change', 'repair'] },
+    tags: ['Преміум-комплекс', 'Чорніння шин'],
+    services: pick(WASH, ['premium', 'leather', 'tireshine', 'seats']),
+    mobile: { radiusKm: 15, fee: 300, crews: 1, services: ['premium', 'tireshine'] },
   },
   {
-    id: 'shynservis',
+    id: 'strumin',
     lat: 50.457,
     lng: 30.375,
-    name: 'ШинСервіс',
-    cats: ['tires', 'service'],
+    name: 'Автомийка «Струмінь»',
+    cats: ['wash'],
     address: 'просп. Берестейський, 120',
     district: 'Святошинський',
     phone: '+380 44 000 00 04',
     hours: [8, 20],
     boxes: 2,
-    tags: ['Вантажні шини', 'Розвал-сходження 3D'],
-    services: [...pick(TIRES, ['change', 'balance', 'repair'], 0.9), ...pick(SERVICE, ['align', 'suspension'])],
+    tags: ['Мийка мікроавтобусів', 'Мийка днища'],
+    services: [...pick(WASH, ['premium', 'leather', 'tireshine'], 0.9), ...pick(WASH, ['underbody', 'antirain'])],
   },
   {
-    id: 'motor',
+    id: 'pina',
     lat: 50.48,
     lng: 30.488,
-    name: 'СТО «Мотор»',
-    cats: ['service'],
+    name: 'Автомийка «Піна»',
+    cats: ['wash'],
     address: 'вул. Кирилівська, 77',
     district: 'Подільський',
     phone: '+380 44 000 00 05',
     hours: [9, 19],
     boxes: 5,
-    tags: ['Гарантія 1 рік', 'Можна свої запчастини'],
-    services: pick(SERVICE, ['diag', 'oil', 'brakes', 'align', 'ac', 'suspension', 'battery']),
+    tags: ['Нановіск і антидощ', 'Чек для компаній'],
+    services: pick(WASH, ['underbody', 'wax', 'seats', 'antirain', 'nanowax', 'trunk', 'aroma']),
   },
   {
-    id: 'avtodoktor',
+    id: 'kraplia',
     lat: 50.429,
     lng: 30.472,
-    name: 'Автодоктор',
-    cats: ['service', 'tires'],
+    name: 'Автомийка «Краплина»',
+    cats: ['wash'],
     address: 'просп. Валерія Лобановського, 14',
     district: 'Солом’янський',
     phone: '+380 44 000 00 06',
     hours: [8, 21],
     boxes: 3,
-    tags: ['Евакуатор', 'Генератор: працює під час відключень'],
-    services: [...pick(SERVICE, ['diag', 'oil', 'brakes', 'battery'], 1.1), ...pick(TIRES, ['change', 'balance'], 1.05)],
+    tags: ['Зона відпочинку', 'Генератор: працює під час відключень'],
+    services: [...pick(WASH, ['underbody', 'wax', 'seats', 'aroma'], 1.1), ...pick(WASH, ['premium', 'leather'], 1.05)],
   },
   {
     id: 'chysto',
     lat: 50.51,
     lng: 30.6,
     name: 'Чисто і швидко',
-    cats: ['wash', 'tires'],
+    cats: ['wash'],
     address: 'просп. Червоної Калини, 31',
     district: 'Деснянський',
     phone: '+380 44 000 00 07',
     hours: [7, 23],
     boxes: 3,
-    tags: ['Мийка + перевзування за раз', 'Wi‑Fi'],
-    services: [...pick(WASH, ['express', 'complex', 'inside'], 0.85), ...pick(TIRES, ['change', 'balance', 'repair'], 0.95)],
+    tags: ['Мийка + чорніння шин за раз', 'Wi‑Fi'],
+    services: [...pick(WASH, ['express', 'complex', 'inside'], 0.85), ...pick(WASH, ['premium', 'leather', 'tireshine'], 0.95)],
   },
   {
     id: 'hlyanets',
     lat: 50.4255,
     lng: 30.5120,
-    name: 'Детейлінг-студія «Глянець»',
-    cats: ['detailing'],
+    name: 'Детейлінг-мийка «Глянець»',
+    cats: ['wash'],
     address: 'вул. Антоновича, 100',
     district: 'Голосіївський',
     phone: '+380 44 000 00 08',
     hours: [9, 20],
     boxes: 2,
     tags: ['Тепла камера', 'Гарантія на кераміку 2 роки'],
-    services: pick(DETAILING, ['polish', 'ceramic', 'ppf', 'deepclean', 'headlights']),
+    services: pick(WASH, ['polish', 'ceramic', 'deepclean', 'headlights']),
   },
   {
     id: 'keramika',
     lat: 50.4570,
     lng: 30.6150,
     name: 'Кераміка Про',
-    cats: ['detailing', 'wash'],
+    cats: ['wash'],
     address: 'просп. Соборності, 17',
     district: 'Дніпровський',
     phone: '+380 44 000 00 09',
     hours: [8, 21],
     boxes: 3,
     tags: ['Детейлінг-мийка', 'Генератор: працює під час відключень'],
-    services: [...pick(WASH, ['complex', 'wax'], 1.2), ...pick(DETAILING, ['polish', 'ceramic', 'headlights'], 0.9)],
+    services: [...pick(WASH, ['complex', 'wax'], 1.2), ...pick(WASH, ['polish', 'ceramic', 'headlights'], 0.9)],
   },
 ];
 
@@ -219,11 +202,9 @@ export const PAYMENT = {
   installments: { minTotal: 3000, parts: [3, 4, 6] },
 };
 
-// Нагадування сервісної книжки.
+// Нагадування в гаражі.
 export const MAINTENANCE = {
-  oilKm: 10000, // заміна оливи кожні N км
-  oilMonths: 12, // або раз на N місяців
-  oilWarnKm: 1000, // попереджати, коли до заміни лишилося менше
+  washDays: 14, // нагадати помити авто, якщо після останньої мийки минуло стільки днів
   insuranceWarnDays: 30, // попереджати про кінець поліса за N днів
 };
 

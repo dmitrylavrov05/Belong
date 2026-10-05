@@ -212,12 +212,8 @@ export const fmtTime = (ms) => new Date(ms).toLocaleString('uk-UA', { day: 'nume
 export const fmtDate = (s) => parseDate(s).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' });
 export const km = (n) => `${n.toLocaleString('uk-UA')} км`;
 
-// Категорія послуги: задана в CRM або за каталогом, з якого її взято.
-const WASH_IDS = ['express', 'complex', 'inside', 'wax', 'engine', 'dry'];
-const TIRE_IDS = ['change', 'balance', 'repair', 'storage', 'rolling'];
-const DETAIL_IDS = ['polish', 'ceramic', 'ppf', 'deepclean', 'headlights'];
-export const serviceCat = (s) =>
-  s.cat ?? (WASH_IDS.includes(s.id) ? 'wash' : TIRE_IDS.includes(s.id) ? 'tires' : DETAIL_IDS.includes(s.id) ? 'detailing' : 'service');
+// Категорія послуги: задана в CRM, інакше — мийка (CARCAR працює лише з автомийками).
+export const serviceCat = (s) => s.cat ?? 'wash';
 export const catById = (id) => CATEGORIES.find((c) => c.id === id);
 
 // Зменшує фото до 720 px, щоб воно вмістилося у сховище пристрою.

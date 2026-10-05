@@ -2,7 +2,12 @@ import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 // Той самий фіксований час, що й в інших тестах: неділя, 4 жовтня 2026, 10:00.
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page }, testInfo) => {
+  // Усі точки — мийки, тож акція «Перша мийка −30%» діяла б у кожному тесті. Вимикаємо її,
+  // крім тестів промокодів і маркетингу.
+  if (!/промокод|маркетинг/i.test(testInfo.title)) {
+    await page.addInitScript(() => localStorage.getItem('carcar.admin.promos') ?? localStorage.setItem('carcar.admin.promos', '[]'));
+  }
   await page.clock.setFixedTime(new Date(2026, 9, 4, 10, 0));
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -22,7 +27,7 @@ const RNOKPP = '1234567899';
 const EDRPOU = '12345678';
 const IBAN = 'UA22 3052 9900 0002 6001 2345 6789 0';
 
-async function newPlace(page, name = 'Автомийка «Хвиля»') {
+async function newPlace(page, name = 'Автомийка «Хмаринка»') {
   await page.goto(PANEL);
   await page.getByLabel('Точка').selectOption('__new');
   const d = page.getByRole('dialog');
@@ -60,7 +65,7 @@ test('нова точка: підключення ФОП, перевірка CAR
   await page.locator('#nav').getByRole('link', { name: 'Розклад' }).click();
   await expect(page.locator('.status-banner')).toContainText('Клієнти ще не бачать цю точку');
   await page.goto('/');
-  await expect(page.getByText('Автомийка «Хвиля»')).toHaveCount(0);
+  await expect(page.getByText('Автомийка «Хмаринка»')).toHaveCount(0);
 
   // Неправильний код одразу видно, заявку з ним не надіслати.
   await page.goto(`${PANEL}#/connect`);
@@ -84,7 +89,7 @@ test('нова точка: підключення ФОП, перевірка CAR
   await page.goto(ADMIN);
   await expect(page.locator('.queue')).toContainText('1 точка чекає перевірки');
   await page.locator('#nav').getByRole('link', { name: /Точки/ }).click();
-  await page.getByRole('link', { name: 'Автомийка «Хвиля»' }).click();
+  await page.getByRole('link', { name: 'Автомийка «Хмаринка»' }).click();
   await expect(page.locator('.checks .bad-text')).toHaveCount(0);
   await expect(page.locator('.checks')).toContainText('Оферту 1.0 прийнято');
   await page.getByRole('button', { name: 'Схвалити й додати в каталог' }).click();
@@ -92,7 +97,7 @@ test('нова точка: підключення ФОП, перевірка CAR
 
   // Точка в каталозі, до неї можна записатися, а виплати дозволені.
   await page.goto('/');
-  await page.getByRole('link', { name: /Автомийка «Хвиля»/ }).first().click();
+  await page.getByRole('link', { name: /Автомийка «Хмаринка»/ }).first().click();
   await expect(page.getByRole('link', { name: 'Записатися онлайн' })).toBeVisible();
   await page.goto(`${PANEL}#/finance`);
   await expect(page.locator('.status-banner')).toHaveCount(0);
@@ -161,8 +166,8 @@ test('модератор просить виправлення, точка ви�
 test('скарга точки на відгук: модератор приховує, рейтинг перераховується', async ({ page }) => {
   for (const [stars, text] of [[5, 'Усе чудово'], [1, 'Майстер Іван — шахрай, ось його номер 0670000000']]) {
     await page.clock.setFixedTime(new Date(2026, 9, 4, 10, 0));
-    await page.goto('/#/book/koleso');
-    await page.getByLabel(/Сезонне перевзування/).check();
+    await page.goto('/#/book/hvylia');
+    await page.getByLabel(/Комплекс преміум/).check();
     await page.getByRole('button', { name: /Завтра/ }).click();
     await page.locator('.slot:not([disabled])').first().click();
     await page.locator('[data-action="confirm"]').click();
@@ -174,12 +179,12 @@ test('скарга точки на відгук: модератор прихов
     await page.getByLabel('Відгук (необовʼязково)').fill(text);
     await page.getByRole('button', { name: 'Надіслати відгук' }).click();
   }
-  await page.goto('/#/place/koleso');
+  await page.goto('/#/place/hvylia');
   await expect(page.locator('.meta .rating').first()).toHaveText('3,0');
   await expect(page.getByText('шахрай')).toBeVisible();
 
   await page.goto(`${PANEL}#/reviews`);
-  await page.getByLabel('Точка').selectOption({ label: 'Шиномонтаж «Колесо»' });
+  await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
   page.once('dialog', (d) => d.accept('Персональні дані й образи майстра'));
   await page.locator('article', { hasText: 'шахрай' }).getByRole('button', { name: 'Поскаржитися модератору' }).click();
   await expect(page.locator('#toast')).toHaveText('Скаргу надіслано модератору CARCAR');
@@ -193,7 +198,7 @@ test('скарга точки на відгук: модератор прихов
   await card.getByRole('button', { name: 'Приховати' }).click();
   await expect(page.locator('#toast')).toHaveText('Відгук приховано');
 
-  await page.goto('/#/place/koleso');
+  await page.goto('/#/place/hvylia');
   await expect(page.getByText('шахрай')).toHaveCount(0);
   await expect(page.locator('.meta .rating').first()).toHaveText('5,0');
   await page.goto(`${PANEL}#/reviews`);
@@ -201,15 +206,15 @@ test('скарга точки на відгук: модератор прихов
 });
 
 test('спір: модератор ділить суму, клієнт отримує решту на баланс', async ({ page }) => {
-  await page.goto('/#/book/koleso');
-  await page.getByLabel(/Сезонне перевзування/).check();
+  await page.goto('/#/book/hvylia');
+  await page.getByLabel(/Комплекс преміум/).check();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await page.locator('.slot:not([disabled])').first().click();
   await page.locator('[data-action="confirm"]').click();
   await page.getByRole('button', { name: 'Оплатити 900 ₴' }).click();
   await page.clock.setFixedTime(new Date(2026, 9, 5, 21, 30));
   await page.goto(`${PANEL}#/schedule/2026-10-05`);
-  await page.getByLabel('Точка').selectOption({ label: 'Шиномонтаж «Колесо»' });
+  await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
   await page.locator('.slot-block').first().click();
   await page.getByRole('dialog').getByRole('button', { name: 'Машина готова' }).click();
   await page.goto('/#/bookings');
@@ -227,9 +232,9 @@ test('спір: модератор ділить суму, клієнт отри�
 
   await page.goto('/#/bookings');
   await expect(page.getByRole('region', { name: 'Баланс CARCAR' }).locator('.bonus-sum')).toHaveText('300 ₴');
-  await expect(page.locator('article', { hasText: 'Шиномонтаж «Колесо»' })).toContainText('Повернено 300 ₴ на баланс CARCAR, 600 ₴ отримала точка');
+  await expect(page.locator('article', { hasText: 'Автомийка «Хвиля»' })).toContainText('Повернено 300 ₴ на баланс CARCAR, 600 ₴ отримала точка');
   await page.goto('/#/partner');
-  await page.getByLabel('Точка').selectOption({ label: 'Шиномонтаж «Колесо»' });
+  await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
   await expect(page.getByRole('region', { name: 'Баланс' })).toContainText('Доступно до виведення600 ₴');
 });
 
@@ -239,16 +244,16 @@ test('комісії: загальна й індивідуальна ставк�
   await page.getByRole('button', { name: 'Зберегти', exact: true }).click();
   await expect(page.locator('#toast')).toHaveText('Загальну комісію встановлено: 8%');
 
-  await page.goto(`${ADMIN}#/places/koleso`);
+  await page.goto(`${ADMIN}#/places/hvylia`);
   await page.getByLabel(/Комісія для точки, %/).fill('5');
   await page.getByRole('button', { name: 'Зберегти комісію' }).click();
   await page.goto(`${ADMIN}#/commission`);
   await expect(page.getByRole('region', { name: 'Комісії' })).toContainText('8%');
-  await expect(page.locator('.special-list')).toContainText('Шиномонтаж «Колесо»');
+  await expect(page.locator('.special-list')).toContainText('Автомийка «Хвиля»');
   await expect(page.locator('.special-list')).toContainText('5%');
 
   await page.goto(`${PANEL}#/finance`);
-  await page.getByLabel('Точка').selectOption({ label: 'Шиномонтаж «Колесо»' });
+  await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
   await expect(page.locator('table.pnl')).toContainText('Комісія CARCAR, 5%');
   await page.getByLabel('Точка').selectOption({ label: 'Аква 24' });
   await expect(page.locator('table.pnl')).toContainText('Комісія CARCAR, 8%');
@@ -270,7 +275,7 @@ test('огляд платформи рахує оборот і комісію з
   await expect(row).toContainText('7%');
 });
 
-for (const path of [`${ADMIN}#/`, `${ADMIN}#/places`, `${ADMIN}#/places/koleso`, `${ADMIN}#/reviews`, `${ADMIN}#/disputes`, `${ADMIN}#/commission`, `${PANEL}#/connect`, `${PANEL}#/offer`]) {
+for (const path of [`${ADMIN}#/`, `${ADMIN}#/places`, `${ADMIN}#/places/hvylia`, `${ADMIN}#/reviews`, `${ADMIN}#/disputes`, `${ADMIN}#/commission`, `${PANEL}#/connect`, `${PANEL}#/offer`]) {
   test(`доступність і верстка ${path}`, async ({ page }) => {
     await page.goto(path);
     await page.locator('#view h1').waitFor();

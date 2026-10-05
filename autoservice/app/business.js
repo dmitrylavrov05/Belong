@@ -14,7 +14,7 @@ import {
 import {
   CHANNELS, sendMessages, viberLink, telegramLink, dealsOf, weeklyDealsOf, daysText, queueOf, queueEnabled, saveQueue, queueEstimate, checkWaitlist,
   PASS_KIND, passesOf, savePasses, sellPass, passActive, passLeft, usableSubs, findCert, redeemPass, restorePass,
-  SEASONS, TIRE_STATE, tiresOf, saveTires, seasonDue, tireDue, clientKeyOf,
+  clientKeyOf,
   chatPost, BIZ_QUICK, ITEM_KIND, itemSum, estimateTotal,
 } from './ops.js';
 import { ENTITY, TAX, DOCS, OFFER, codeValid, ibanValid, ibanBank, normIban, formatIban, missingSteps, offerHtml } from './partners.js';
@@ -304,13 +304,11 @@ function viewOverview() {
     </div>`;
 }
 
-// Що варто зробити сьогодні: закупівля, шини, порожні вікна.
+// Що варто зробити сьогодні: закупівля, порожні вікна.
 function overviewAlerts() {
   const out = [];
   const low = lowStock();
   if (low.length && can('stock')) out.push(`<a class="queue" href="#/stock">${icon('drop', 20)}Закінчується на складі: ${low.slice(0, 3).map((x) => esc(x.name)).join(', ')}${low.length > 3 ? ` і ще ${low.length - 3}` : ''}</a>`);
-  const due = tiresOf(ui.place).filter((t) => tireDue(t) && !t.remindedAt).length;
-  if (due) out.push(`<a class="queue" href="#/tires">${icon('wheel', 20)}${due} ${plural(due, 'клієнту', 'клієнтам', 'клієнтам')} пора нагадати про перевзування</a>`);
   const gaps = emptyWindows(addDays(today(), 1));
   if (gaps.length && !dealsOf(ui.place).some((d) => d.date === addDays(today(), 1))) out.push(`<a class="queue" href="#/deals">${icon('bolt', 20)}Завтра вільно ${hhmm(gaps[0][0])}–${hhmm(gaps[0][1])} — запустіть гаряче вікно</a>`);
   return out.length ? `<div class="queue-row">${out.join('')}</div>` : '';
@@ -529,7 +527,7 @@ function viewClient(key) {
         <h2 id="h-notes">Мітки й нотатки</h2><p class="sub">Бачите лише ви</p>
         <div class="tags" role="group" aria-label="Мітки">${TAGS.map((t) => `<button class="tag-toggle" data-action="tag" data-tag="${esc(t)}" aria-pressed="${c.meta.tags.includes(t)}">${esc(t)}</button>`).join('')}</div>
         <form class="stack" id="note-form" style="margin-top:14px">
-          <label class="field"><span>Нотатка</span><textarea name="note" rows="4" placeholder="Наприклад, любить чай, шини зберігаємо в нас">${esc(c.meta.note)}</textarea></label>
+          <label class="field"><span>Нотатка</span><textarea name="note" rows="4" placeholder="Наприклад, любить чай, авто з дитячим кріслом">${esc(c.meta.note)}</textarea></label>
           <button class="btn" type="submit">Зберегти нотатку</button>
         </form>
       </section>
@@ -554,12 +552,10 @@ function viewClient(key) {
     </table></div>` : '<p class="muted">Записів ще не було.</p>'}`;
 }
 
-// Абонементи й шини клієнта — коротко в картці.
+// Абонементи клієнта — коротко в картці.
 function clientExtras(c) {
   const passes = passesOf(ui.place).sold.filter((x) => x.clientKey === c.key && passActive(x));
-  const tires = tiresOf(ui.place).filter((t) => t.clientKey === c.key && t.status === 'stored');
-  return `${passes.map((x) => `<p class="small" style="margin:0">${icon('gift', 16)} ${esc(x.name)}: лишилось ${passLeft(x)}, до ${fmtDate(x.validUntil)}</p>`).join('')}
-    ${tires.map((t) => `<p class="small" style="margin:0">${icon('wheel', 16)} ${SEASONS[t.season]} шини на зберіганні · ${esc(t.slot)}</p>`).join('')}`;
+  return `${passes.map((x) => `<p class="small" style="margin:0">${icon('gift', 16)} ${esc(x.name)}: лишилось ${passLeft(x)}, до ${fmtDate(x.validUntil)}</p>`).join('')}`;
 }
 
 // Персональні послуги клієнта: окрема ціна або послуга, якої немає в загальному прайсі.
@@ -1454,8 +1450,8 @@ function me() {
 }
 // Що бачить кожна роль. Власник — усе; 'assign' — право призначати майстрів.
 const ACCESS = {
-  admin: ['', 'schedule', 'queue', 'clients', 'requests', 'support', 'tires', 'services', 'deals', 'passes', 'mailings', 'reviews', 'stock', 'settings', 'import', 'assign', 'offer'],
-  master: ['schedule', 'queue', 'tires', 'earnings'],
+  admin: ['', 'schedule', 'queue', 'clients', 'requests', 'support', 'services', 'deals', 'passes', 'mailings', 'reviews', 'stock', 'settings', 'import', 'assign', 'offer'],
+  master: ['schedule', 'queue', 'earnings'],
 };
 const can = (page) => (me().role === 'owner' ? page !== 'earnings' : ACCESS[me().role].includes(page));
 const masters = () => staffOf(ui.place).filter((x) => x.role === 'master' && x.active !== false);
@@ -1504,8 +1500,8 @@ function viewStaff() {
         <h2 id="h-roles">Що бачать ролі</h2>
         <dl class="kv">
           <dt>Власник</dt><dd>Усе, зокрема фінанси, витрати, персонал і підключення.</dd>
-          <dt>Адміністратор</dt><dd>Розклад, черга, клієнти, прайс, склад, шинний готель, продажі й розсилки. Без фінансів і зарплат.</dd>
-          <dt>Майстер</dt><dd>Свої записи в розкладі, черга, шинний готель і власний заробіток.</dd>
+          <dt>Адміністратор</dt><dd>Розклад, черга, клієнти, прайс, склад, продажі й розсилки. Без фінансів і зарплат.</dd>
+          <dt>Майстер</dt><dd>Свої записи в розкладі, черга й власний заробіток.</dd>
         </dl>
         <p class="fine">Перемкнути, від чийого імені працює панель, можна вгорі — «Ви». У робочій версії кожен входить під своїм номером телефону.</p>
       </section>
@@ -1665,78 +1661,6 @@ function stockNormsDrawer(serviceId) {
   </form>`);
 }
 
-// ---------- шинний готель ----------
-
-function viewTires() {
-  const all = tiresOf(ui.place);
-  const stored = all.filter((t) => t.status === 'stored');
-  const due = stored.filter((t) => tireDue(t));
-  const season = seasonDue();
-  const q = (ui.tq ?? '').toLowerCase();
-  const list = (ui.tiresAll ? all : stored).filter((t) => !q || [t.clientName, t.phone, t.car, t.plate, t.slot, t.brand].join(' ').toLowerCase().includes(q));
-  const remindable = due.filter((t) => !t.remindedAt || t.remindedAt < Date.now() - 30 * 864e5);
-  return `<h1>Шинний готель</h1><p class="page-sub">Сезонне зберігання шин клієнтів: місце, сезон, стан і нагадування про перевзування</p>
-    <section class="kpis" aria-label="Шинний готель">
-      <div class="kpi"><span class="label">На зберіганні</span><span class="value">${stored.length}</span><span class="kpi-note">${stored.filter((t) => t.season === 'winter').length} зимових · ${stored.filter((t) => t.season === 'summer').length} літніх</span></div>
-      <div class="kpi"><span class="label">Пора перевзуватися</span><span class="value">${due.length}</span><span class="kpi-note">${season ? `сезон: ${season === 'winter' ? 'ставимо зимові' : 'ставимо літні'}` : 'зараз не сезон перевзування'}</span></div>
-      <div class="kpi"><span class="label">Видано за весь час</span><span class="value">${all.filter((t) => t.status === 'returned').length}</span></div>
-    </section>
-    ${remindable.length ? `<div class="notice warn row" style="margin-top:12px;justify-content:space-between">${icon('wheel', 18)}<span style="flex:1"><b>${remindable.length} ${plural(remindable.length, 'клієнту', 'клієнтам', 'клієнтам')} пора ставити ${season === 'winter' ? 'зимові' : 'літні'} шини</b>Нагадування прийде у Viber чи Telegram і в застосунок CARCAR.</span>
-      <button class="btn primary" data-action="tires-remind-all">Нагадати всім</button></div>` : ''}
-    <div class="toolbar-row" style="margin-top:16px">
-      <label class="search">${icon('search', 20)}<input id="tires-q" type="search" placeholder="Клієнт, номер авто, місце" aria-label="Пошук шин" value="${esc(ui.tq ?? '')}"></label>
-      <label class="row"><input class="check" type="checkbox" id="tires-all" ${ui.tiresAll ? 'checked' : ''}>Показати видані</label>
-      <span class="spacer"></span>
-      <button class="btn primary" data-action="tire-add">${icon('plus', 18)}Прийняти на зберігання</button>
-    </div>
-    <div class="table-wrap" tabindex="0" role="region" aria-label="Шини на зберіганні"><table class="t">
-      <thead><tr><th>Клієнт</th><th>Шини</th><th>Місце</th><th>Стан</th><th>З</th><th><span class="sr-only">Дії</span></th></tr></thead>
-      <tbody>${list.length ? list.map((t) => `<tr class="${t.status === 'returned' ? 'off' : ''}">
-        <td>${esc(t.clientName)}<small>${esc(t.phone || '')}${t.car ? ` · ${esc(t.car)}` : ''}</small></td>
-        <td>${SEASONS[t.season]} · ${esc(t.brand || '')} ${esc(t.size || '')}<small>${t.count} шт${t.rims ? ', на дисках' : ''}${t.tread ? ` · протектор ${t.tread} мм` : ''}</small></td>
-        <td><b>${esc(t.slot)}</b></td><td>${esc(t.condition)}</td><td>${fmtDate(t.since)}</td>
-        <td>${t.status === 'returned' ? `<span class="pill muted">Видано ${fmtDate(t.returnedAt)}</span>` : `<div class="row" style="gap:6px;flex-wrap:nowrap">
-          ${tireDue(t) ? `<button class="btn" data-action="tire-remind" data-id="${t.id}" aria-label="Нагадати: ${esc(t.clientName)}">${t.remindedAt ? 'Нагадано' : 'Нагадати'}</button>` : ''}
-          <button class="btn" data-action="tire-return" data-id="${t.id}" aria-label="Видати: ${esc(t.clientName)}">Видати</button></div>`}</td></tr>`).join('')
-        : '<tr><td colspan="6" class="muted">Немає шин на зберіганні.</td></tr>'}</tbody>
-    </table></div>`;
-}
-
-function tireDrawer() {
-  const p = place();
-  const svc = p.allServices.find((x) => /зберігання шин/i.test(x.name));
-  openDrawer('Прийняти шини на зберігання', `<form class="stack" id="tire-form" style="gap:14px">
-    <div class="form-grid">
-      <label class="field"><span>Імʼя клієнта</span><input name="clientName" required autocomplete="off"></label>
-      <label class="field"><span>Телефон клієнта</span><input name="phone" required inputmode="tel" placeholder="+380" autocomplete="off"></label>
-      <label class="field"><span>Авто</span><input name="car" autocomplete="off" placeholder="Skoda Octavia"></label>
-      <label class="field"><span>Держномер</span><input name="plate" autocomplete="off"></label>
-      <label class="field"><span>Сезон</span><select name="season">${Object.entries(SEASONS).map(([k, v]) => `<option value="${k}" ${k === (seasonDue() === 'winter' ? 'summer' : 'winter') ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
-      <label class="field"><span>Кількість</span><input name="count" type="number" min="1" max="8" value="4"></label>
-      <label class="field"><span>Марка й модель</span><input name="brand" autocomplete="off" placeholder="Nokian Hakkapeliitta R5"></label>
-      <label class="field"><span>Розмір</span><input name="size" autocomplete="off" placeholder="205/55 R16"></label>
-      <label class="field"><span>Стан</span><select name="condition">${TIRE_STATE.map((x, i) => `<option ${i === 1 ? 'selected' : ''}>${x}</option>`).join('')}</select></label>
-      <label class="field"><span>Протектор, мм</span><input name="tread" type="number" min="0" max="15" step="0.5"></label>
-      <label class="field"><span>Місце на складі</span><input name="slot" required autocomplete="off" placeholder="Стелаж A, полиця 3"></label>
-      <label class="row"><input class="check" type="checkbox" name="rims">На дисках</label>
-    </div>
-    ${svc ? `<label class="row"><input class="check" type="checkbox" name="paid" checked>Оплачено зберігання за сезон — ${uah(svc.price[0])}</label>
-      <fieldset class="radio-row"><legend>Оплата</legend><label><input type="radio" name="payment" value="card" checked> Картка</label><label><input type="radio" name="payment" value="cash"> Готівка</label></fieldset>` : ''}
-    <button class="btn primary" type="submit">Прийняти</button>
-  </form>`);
-}
-
-function remindTires(list) {
-  const due = seasonDue();
-  sendMessages(list.map((t) => ({
-    placeId: ui.place, clientKey: t.clientKey, channel: t.channel ?? 'viber', kind: 'tires',
-    text: `${t.clientName}, пора ставити ${due === 'winter' ? 'зимові' : 'літні'} шини! Ваш комплект (${SEASONS[t.season].toLowerCase()}, ${t.count} шт) зберігається в нас — ${place().name}. Запишіться на перевзування в CARCAR.`,
-    link: `#/book/${ui.place}`,
-  })));
-  const ids = new Set(list.map((t) => t.id));
-  saveTires(ui.place, tiresOf(ui.place).map((t) => (ids.has(t.id) ? { ...t, remindedAt: Date.now() } : t)));
-}
-
 // ---------- абонементи й сертифікати ----------
 
 function viewPasses() {
@@ -1813,7 +1737,6 @@ const SEGMENTS = {
   vip: ['VIP', (c) => c.meta.tags.includes('VIP')],
   regular: ['Постійні (3+ візити)', (c) => c.visits >= 3],
   new: ['Нові (1 візит)', (c) => c.visits === 1],
-  tires: ['Шини на зберіганні — пора перевзуватися', (c) => tiresOf(ui.place).some((t) => t.clientKey === c.key && tireDue(t))],
 };
 // Пишемо лише тим, хто погодився на розсилки й не просив не турбувати.
 const optedIn = (c) => (c.meta.optIn ?? c.list.some((b) => b.optIn)) && !c.meta.tags.includes('Не дзвонити') && c.key.startsWith('tel:');
@@ -2034,7 +1957,7 @@ function intakeDrawer(id) {
   </form>`);
 }
 
-// Відправка форм нових розділів: персонал, склад, шини, абонементи, розсилки, гарячі вікна, черга, акт.
+// Відправка форм нових розділів: персонал, склад, абонементи, розсилки, гарячі вікна, черга, акт.
 async function submitOps(f) {
   const d = new FormData(f);
   const done = (msg) => { closeDrawer(); rerenderKeepScroll(); toast(msg); return true; };
@@ -2079,26 +2002,6 @@ async function submitOps(f) {
     for (const it of st.items) { const v = Number(d.get(it.id)); if (v > 0) norm[it.id] = v; }
     saveStock({ norms: { ...st.norms, [f.dataset.id]: norm } });
     return done('Норми списання збережено');
-  }
-  if (f.id === 'tire-form') {
-    const phone = d.get('phone').trim();
-    const t = {
-      id: uid(), clientName: d.get('clientName').trim(), phone, clientKey: clientKeyOf(phone), car: [d.get('car').trim(), d.get('plate').trim().toUpperCase()].filter(Boolean).join(' · '),
-      season: d.get('season'), count: Number(d.get('count')) || 4, brand: d.get('brand').trim(), size: d.get('size').trim(), condition: d.get('condition'),
-      tread: Number(d.get('tread')) || null, slot: d.get('slot').trim(), rims: !!d.get('rims'), since: today(), status: 'stored',
-    };
-    saveTires(ui.place, [...tiresOf(ui.place), t]);
-    const svc = place().allServices.find((x) => /зберігання шин/i.test(x.name));
-    if (svc && d.get('paid')) {
-      const now = new Date();
-      bookings.push({
-        id: uid(), source: 'crm', channel: 'walkin', placeId: ui.place, services: [svc.name], total: svc.price[0], paid: svc.price[0], bonus: 0, minutes: svc.min,
-        date: today(), time: hhmm(Math.floor((now.getHours() * 60 + now.getMinutes()) / 30) * 30), car: t.car || CAR_CLASSES[0], plate: d.get('plate').trim().toUpperCase(), cls: 0,
-        clientName: t.clientName, clientPhone: phone, state: 'completed', payment: d.get('payment'), completedAt: Date.now(), createdAt: Date.now(),
-      });
-      save();
-    }
-    return done(`Шини прийнято: ${t.slot}`);
   }
   if (f.id === 'plan-form') {
     const kind = d.get('kind');
@@ -2225,7 +2128,7 @@ function viewSettings() {
     </form>
     <form id="mobile-form" class="panel stack" aria-labelledby="h-mobile" style="gap:14px">
       <h2 id="h-mobile">Виїзд до клієнта</h2>
-      <p class="sub" style="margin:0">Мобільна мийка чи шиномонтаж біля дому клієнта. Клієнт обирає адресу на карті, а запис потрапляє в колонку «Виїзд» журналу — бокси він не займає.</p>
+      <p class="sub" style="margin:0">Мобільна мийка біля дому чи офісу клієнта. Клієнт обирає адресу на карті, а запис потрапляє в колонку «Виїзд» журналу — бокси він не займає.</p>
       <label class="row"><input class="check" type="checkbox" name="on" ${mobileOn(p) ? 'checked' : ''}>Приймаємо виїзні записи</label>
       <div class="form-grid">
         <label class="field"><span>Радіус, км</span><input name="radiusKm" type="number" min="1" max="50" value="${p.mobile?.radiusKm ?? 10}"></label>
@@ -2377,7 +2280,7 @@ function estimateDrawer(id) {
   const b = bookings.find((x) => x.id === id);
   const row = (i) => `<fieldset class="est-row"><legend>Пункт ${i + 1}</legend>
     <select class="select" name="kind" aria-label="Тип, пункт ${i + 1}">${Object.entries(ITEM_KIND).map(([k, v]) => `<option value="${k}" ${k === (i % 2 ? 'part' : 'work') ? 'selected' : ''}>${v}</option>`).join('')}</select>
-    <input name="name" aria-label="Назва, пункт ${i + 1}" placeholder="${i % 2 ? 'Наприклад, колодки передні' : 'Наприклад, заміна колодок'}" autocomplete="off">
+    <input name="name" aria-label="Назва, пункт ${i + 1}" placeholder="${i % 2 ? 'Наприклад, очищувач бітуму' : 'Наприклад, видалення бітумних плям'}" autocomplete="off">
     <input name="qty" type="number" min="0.1" step="0.1" value="1" aria-label="Кількість, пункт ${i + 1}">
     <input name="price" type="number" min="0" aria-label="Ціна за одиницю, ₴, пункт ${i + 1}" placeholder="₴">
     <select class="select" name="warranty" aria-label="Гарантія, пункт ${i + 1}">${[0, 1, 3, 6, 12, 24].map((m) => `<option value="${m}" ${m === (i % 2 ? 6 : 3) ? 'selected' : ''}>${m ? `${m} міс` : 'без гарантії'}</option>`).join('')}</select>
@@ -2386,7 +2289,7 @@ function estimateDrawer(id) {
     <p class="small muted" style="margin:0">${esc(clientName(b))} · ${esc(b.car || '')} · ${esc(b.services.join(', '))}</p>
     <div id="est-rows" class="stack" style="gap:8px">${Array.from({ length: ESTIMATE_ROWS }, (_, i) => row(i)).join('')}</div>
     <button class="btn small-btn" type="button" data-action="estimate-row" style="align-self:flex-start">${icon('plus', 16)}Ще пункт</button>
-    <label class="field"><span>Коментар для клієнта</span><input name="note" autocomplete="off" placeholder="Наприклад, при діагностиці знайшли знос колодок"></label>
+    <label class="field"><span>Коментар для клієнта</span><input name="note" autocomplete="off" placeholder="Наприклад, на кузові знайшли бітум і сліди смоли"></label>
     <button class="btn primary" type="submit">Надіслати клієнту</button>
     <p class="fine">${isCarcar(b) ? 'Клієнт отримає сповіщення, погодить потрібні пункти й доплатить у застосунку.' : 'Запис з журналу: клієнт погоджує на місці — позначте це після розмови.'} Порожні рядки не надсилаються. Гарантія потрапить у сервісну книжку авто.</p>
   </form>`);
@@ -2659,14 +2562,9 @@ function demoFill() {
 
 // Демо для складу, шинного готелю й абонементів. Позначено demo: true, щоб очищення їх знайшло.
 const DEMO_STOCK = {
-  wash: [['Шампунь для безконтактної мийки', 'л', 10, 180, { express: 0.15, complex: 0.2, wax: 0.15 }], ['Віск рідкий', 'л', 2, 420, { wax: 0.1, complex: 0.05 }],
-    ['Хімія для салону', 'л', 3, 260, { complex: 0.1, inside: 0.1, engine: 0.2, dry: 1 }], ['Мікрофібра', 'шт', 20, 45, { complex: 1, dry: 2, wax: 1 }]],
-  tires: [['Грузики балансувальні', 'кг', 2, 600, { balance: 0.2, change: 0.1 }], ['Латки для ремонту шин', 'шт', 15, 25, { repair: 1 }],
-    ['Вентилі', 'шт', 20, 15, { change: 1 }], ['Монтажна паста', 'кг', 1, 350, { change: 0.05 }]],
-  service: [['Олива моторна 5W-30', 'л', 10, 320, { oil: 4.5 }], ['Фільтр оливний', 'шт', 4, 250, { oil: 1 }],
-    ['Гальмівні колодки, комплект', 'шт', 2, 1200, { brakes: 1 }], ['Фреон R134a', 'кг', 1, 900, { ac: 0.5 }]],
-  detailing: [['Полірувальна паста', 'л', 1, 1500, { polish: 0.3, ceramic: 0.2, headlights: 0.05 }], ['Керамічне покриття', 'шт', 2, 2500, { ceramic: 1 }],
-    ['Антигравійна плівка', 'м', 5, 1300, { ppf: 3 }]],
+  wash: [['Шампунь для безконтактної мийки', 'л', 10, 180, { express: 0.15, complex: 0.2, wax: 0.15, premium: 0.25 }], ['Віск рідкий', 'л', 2, 420, { wax: 0.1, complex: 0.05, premium: 0.1, nanowax: 0.15 }],
+    ['Хімія для салону', 'л', 3, 260, { complex: 0.1, inside: 0.1, engine: 0.2, dry: 1, seats: 0.4, premium: 0.1 }], ['Мікрофібра', 'шт', 20, 45, { complex: 1, dry: 2, wax: 1, premium: 1 }],
+    ['Полірувальна паста', 'л', 1, 1500, { polish: 0.3, ceramic: 0.2, headlights: 0.05 }], ['Керамічне покриття', 'шт', 2, 2500, { ceramic: 1 }]],
 };
 
 function demoOps(p, r, pool, out) {
@@ -2688,23 +2586,12 @@ function demoOps(p, r, pool, out) {
     }
   }
   if (items.length) saveStock({ items, norms, moves: [] });
-  // Шинний готель: зимові комплекти чекають сезону.
-  if (p.cats.includes('tires')) {
-    const brands = ['Nokian Hakkapeliitta R5', 'Michelin Alpin 6', 'Continental WinterContact TS 870', 'Bridgestone Blizzak LM005', 'Goodyear UltraGrip 9+'];
-    const sizes = ['205/55 R16', '215/60 R17', '225/45 R17', '195/65 R15', '235/55 R18'];
-    const sets = pool.slice(0, 26).map((c, i) => ({
-      id: uid(), clientName: c.name, phone: c.phone, clientKey: phoneKey(c.phone), car: `${c.car} · ${c.plate}`, season: i % 6 === 5 ? 'summer' : 'winter',
-      count: 4, brand: brands[i % brands.length], size: sizes[i % sizes.length], condition: TIRE_STATE[i % 7 === 3 ? 3 : i % 3 === 0 ? 2 : 1], tread: 5 + (i % 4),
-      slot: `Стелаж ${'ABC'[i % 3]}, полиця ${1 + (i % 5)}`, rims: i % 2 === 0, since: addDays(today(), -150 - i), status: 'stored', demo: true,
-    }));
-    saveTires(p.id, [...tiresOf(p.id).filter((t) => !t.demo), ...sets]);
-  }
   // Абонементи й сертифікати: що продає точка й кому вже продано.
   const has = (id) => p.services.find((x) => x.id === id);
   const plans = [];
   if (has('express')) plans.push({ id: uid(), kind: 'sub', name: '8 мийок на місяць', price: Math.round((has('express').price[0] * 8 * 0.75) / 10) * 10, visits: 8, validDays: 30, services: ['express', ...(has('complex') ? ['complex'] : [])], active: true, demo: true });
   if (has('change')) plans.push({ id: uid(), kind: 'sub', name: 'Перевзування двічі на рік', price: Math.round((has('change').price[0] * 2 * 0.85) / 10) * 10, visits: 2, validDays: 365, services: ['change'], active: true, demo: true });
-  plans.push({ id: uid(), kind: 'cert', name: p.cats.includes('detailing') ? 'Сертифікат на детейлінг 3 000 ₴' : 'Подарунковий сертифікат 1 000 ₴', price: p.cats.includes('detailing') ? 3000 : 1000, amount: p.cats.includes('detailing') ? 3000 : 1000, validDays: 365, active: true, demo: true });
+  plans.push({ id: uid(), kind: 'cert', name: p.services.some((x) => x.id === 'ceramic') ? 'Сертифікат на детейлінг 3 000 ₴' : 'Подарунковий сертифікат 1 000 ₴', price: p.cats.includes('detailing') ? 3000 : 1000, amount: p.cats.includes('detailing') ? 3000 : 1000, validDays: 365, active: true, demo: true });
   const sold = pool.slice(30, 42).map((c, i) => {
     const plan = plans[i % plans.length];
     const at = Date.now() - (5 + i * 4) * 864e5;
@@ -2729,7 +2616,6 @@ function demoClear(silent) {
   // Демо-персонал, склад, шини й абонементи — лише позначені demo.
   if (staffOf(ui.place).some((x) => x.demo)) saveStaff(staffOf(ui.place).filter((x) => !x.demo));
   if (stockData().items.some((x) => x.demo)) saveStock({ items: stockData().items.filter((x) => !x.demo) });
-  if (tiresOf(ui.place).some((t) => t.demo)) saveTires(ui.place, tiresOf(ui.place).filter((t) => !t.demo));
   const pp = passesOf(ui.place);
   if (pp.plans.some((x) => x.demo) || pp.sold.some((x) => x.demo)) savePasses(ui.place, { plans: pp.plans.filter((x) => !x.demo), sold: pp.sold.filter((x) => !x.demo) });
   if (!silent) { route(); toast('Демо-дані очищено'); }
@@ -2752,7 +2638,7 @@ function downloadCsv(name, rows) {
 // Меню згруповане за задачами; кожен бачить лише те, що дозволяє його роль.
 const NAV = [
   ['Робота', [['', 'Огляд', 'chart'], ['schedule', 'Розклад', 'calendar'], ['queue', 'Жива черга', 'list'], ['clients', 'Клієнти', 'users'],
-    ['requests', 'Запити клієнтів', 'chat'], ['tires', 'Шинний готель', 'wheel']]],
+    ['requests', 'Запити клієнтів', 'chat']]],
   ['Продажі', [['services', 'Послуги й ціни', 'list'], ['deals', 'Гарячі вікна', 'bolt'], ['passes', 'Абонементи й сертифікати', 'gift'],
     ['mailings', 'Розсилки', 'share'], ['reviews', 'Відгуки', 'star']]],
   ['Гроші', [['finance', 'Фінанси', 'card'], ['expenses', 'Витрати', 'cash'], ['stock', 'Склад', 'drop'], ['staff', 'Персонал', 'users'], ['earnings', 'Мій заробіток', 'cash']]],
@@ -2764,7 +2650,6 @@ function renderChrome(page) {
   const openReq = requests.filter((r) => r.placeId === ui.place && reqState(r) === 'new').length + own().filter((b) => b.chatUnreadBiz).length;
   const badge = {
     reviews: [unanswered, 'без відповіді'], requests: [openReq, 'чекають відповіді'], stock: [lowStock().length, 'закінчується'],
-    tires: [tiresOf(ui.place).filter((t) => tireDue(t) && !t.remindedAt).length, 'пора нагадати'],
     queue: [queueOf(ui.place).filter((q) => q.status === 'waiting').length, 'у черзі'],
     support: [placeTickets().filter((t) => t.unreadUser).length, 'нові відповіді'],
   };
@@ -2809,7 +2694,6 @@ function route() {
   else if (page === 'staff') view.innerHTML = viewStaff();
   else if (page === 'earnings') view.innerHTML = viewEarnings();
   else if (page === 'stock') view.innerHTML = viewStock();
-  else if (page === 'tires') view.innerHTML = viewTires();
   else if (page === 'passes') view.innerHTML = viewPasses();
   else if (page === 'mailings') view.innerHTML = viewMailings();
   else if (page === 'deals') view.innerHTML = viewDeals();
@@ -3008,18 +2892,6 @@ document.addEventListener('click', (e) => {
     const low = lowStock();
     downloadCsv(`carcar-zakupivlia-${ui.place}.csv`, [['Позиція', 'Залишок', 'Одиниця', 'Купити', 'Орієнтовно, ₴'],
       ...low.map((x) => { const buy = Math.max(x.min * 2 - Math.max(0, x.qty), x.min); return [x.name, Math.max(0, x.qty), x.unit, Math.round(buy * 100) / 100, Math.round(buy * x.cost)]; })]);
-  } else if (action === 'tire-add') tireDrawer();
-  else if (action === 'tire-remind' || action === 'tires-remind-all') {
-    const list = action === 'tire-remind' ? tiresOf(ui.place).filter((t) => t.id === id)
-      : tiresOf(ui.place).filter((t) => tireDue(t) && (!t.remindedAt || t.remindedAt < Date.now() - 30 * 864e5));
-    remindTires(list);
-    rerenderKeepScroll();
-    toast(`Нагадування надіслано: ${list.length}`);
-  } else if (action === 'tire-return') {
-    if (!confirm('Видати шини клієнту?')) return;
-    saveTires(ui.place, tiresOf(ui.place).map((t) => (t.id === id ? { ...t, status: 'returned', returnedAt: today() } : t)));
-    rerenderKeepScroll();
-    toast('Шини видано клієнту');
   } else if (action === 'plan-add') planDrawer();
   else if (action === 'pass-sell') sellDrawer();
   else if (action === 'deal-quick') {
@@ -3074,14 +2946,6 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('input', (e) => {
   const t = e.target;
   if (t.id === 'mail-text') ui.mailText = t.value;
-  if (t.id === 'tires-q') {
-    ui.tq = t.value;
-    rerenderKeepScroll();
-    const q = $('#tires-q');
-    q.focus();
-    q.setSelectionRange(q.value.length, q.value.length);
-    return;
-  }
   if (t.closest?.('#connect-form')) {
     const type = $('#connect-form').elements.type.value;
     if (t.name === 'code') $('#code-check').innerHTML = codeNote(type, t.value.replace(/\D/g, ''));
@@ -3161,7 +3025,6 @@ document.addEventListener('change', async (e) => {
     toast(t.checked ? 'Клієнти бачать чергу в застосунку' : 'Чергу приховано від клієнтів');
     return;
   }
-  if (t.id === 'tires-all') { ui.tiresAll = t.checked; rerenderKeepScroll(); return; }
   if (t.dataset.action === 'plan-toggle') {
     savePasses(ui.place, { plans: passesOf(ui.place).plans.map((x) => (x.id === t.dataset.id ? { ...x, active: t.checked } : x)) });
     t.closest('.plan').classList.toggle('off', !t.checked);

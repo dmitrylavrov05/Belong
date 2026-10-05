@@ -2,7 +2,12 @@ import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 // Неділя, 4 жовтня 2026, 10:00. Завтра — понеділок.
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page }, testInfo) => {
+  // Усі точки — мийки, тож акція «Перша мийка −30%» діяла б у кожному тесті. Вимикаємо її,
+  // крім тестів промокодів і маркетингу.
+  if (!/промокод|маркетинг/i.test(testInfo.title)) {
+    await page.addInitScript(() => localStorage.getItem('carcar.admin.promos') ?? localStorage.setItem('carcar.admin.promos', '[]'));
+  }
   await page.clock.setFixedTime(new Date(2026, 9, 4, 10, 0));
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -18,8 +23,8 @@ test.afterEach(async ({ page }) => {
 const PANEL = '/business.html';
 
 async function bookToday(page, time = '11:00') {
-  await page.goto('/#/book/koleso');
-  await page.getByLabel(/Сезонне перевзування/).check();
+  await page.goto('/#/book/hvylia');
+  await page.getByLabel(/Комплекс преміум/).check();
   await page.locator(`.slot[data-time="${time}"]`).click();
   await page.locator('[data-action="confirm"]').click();
   await page.getByRole('button', { name: 'Оплатити 900 ₴' }).click();
@@ -40,7 +45,7 @@ test('підтримка: клієнт пише про запис, модера�
 
   // Точка теж пише в підтримку.
   await page.goto(`${PANEL}#/support`);
-  await page.getByLabel('Точка').selectOption({ label: 'Шиномонтаж «Колесо»' });
+  await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
   await page.getByLabel('Тема').selectOption({ label: 'Виплати й комісія' });
   await page.getByLabel('Опишіть питання').fill('Коли надійде виплата за вересень?');
   await page.getByRole('button', { name: 'Надіслати', exact: true }).click();
@@ -52,7 +57,7 @@ test('підтримка: клієнт пише про запис, модера�
   await expect(rows).toHaveCount(2);
   await expect(rows.first()).toContainText('терміново');
   await page.getByRole('link', { name: '№1001' }).click();
-  await expect(page.getByRole('region', { name: 'Запис і спір' }).locator('dl')).toContainText('Шиномонтаж «Колесо»');
+  await expect(page.getByRole('region', { name: 'Запис і спір' }).locator('dl')).toContainText('Автомийка «Хвиля»');
   await page.getByRole('button', { name: 'Перевести в спір і заморозити гроші' }).click();
   await expect(page.locator('#toast')).toHaveText('Спір відкрито, гроші заморожено');
   await expect(page.locator('#nav a[href="#/disputes"] .count')).toHaveText('1');
@@ -83,14 +88,14 @@ test('підтримка: спір клієнта одразу створює з
   await expect(page.locator('article').first().getByRole('link', { name: 'Звернення в підтримку за цим записом' })).toBeVisible();
 
   await page.goto(`${PANEL}#/schedule`);
-  await page.getByLabel('Точка').selectOption({ label: 'Шиномонтаж «Колесо»' });
+  await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
   await page.locator('.slot-block').first().click();
   await page.getByLabel('Пояснення для модератора').fill('Подряпина була до візиту, є в акті');
   await page.getByRole('button', { name: 'Надіслати модератору' }).click();
   await expect(page.locator('#toast')).toHaveText('Звернення №1002 надіслано в CARCAR');
 
   await page.goto('/admin.html#/disputes');
-  const d = page.getByRole('article', { name: /Спір: Шиномонтаж «Колесо»/ });
+  const d = page.getByRole('article', { name: /Спір: Автомийка «Хвиля»/ });
   await expect(d).toContainText('№1001 від клієнта');
   await expect(d).toContainText('№1002 від точки');
 });
@@ -104,7 +109,7 @@ test('антифрод: накрутка відгуків, масові скас
   await expect(page.getByRole('article', { name: 'Однаковий текст у різних відгуках' })).toBeVisible();
   await expect(page.getByRole('article', { name: /Відгук із телефону самої точки: Кераміка Про/ })).toBeVisible();
   await expect(page.getByRole('article', { name: /Масові скасування: Вигаданий Скасувальник/ })).toContainText('4 скасувань і неявок');
-  await expect(page.getByRole('article', { name: 'Багато неявок у точці: Автодоктор' })).toContainText('60%');
+  await expect(page.getByRole('article', { name: 'Багато неявок у точці: Автомийка «Краплина»' })).toContainText('60%');
   await expect(page.getByRole('article', { name: /Промокод PERSHA30 кілька разів/ })).toBeVisible();
   const twin = page.getByRole('article', { name: /Підозріла точка: Автомийка «Блиск Плюс»/ });
   await expect(twin).toContainText('телефон збігається з «Автомийка «Блиск»»');
@@ -118,8 +123,8 @@ test('антифрод: накрутка відгуків, масові скас
   await expect(page.locator('#toast')).toHaveText('Заявку точки відхилено');
   await page.getByRole('article', { name: /Масові скасування/ }).getByRole('button', { name: 'Обмежити онлайн-запис' }).click();
   await expect(page.getByText('+380670000099')).toBeVisible();
-  await page.getByRole('article', { name: 'Багато неявок у точці: Автодоктор' }).getByRole('button', { name: 'Не порушення' }).click();
-  await expect(page.getByRole('article', { name: 'Багато неявок у точці: Автодоктор' })).toHaveCount(0);
+  await page.getByRole('article', { name: 'Багато неявок у точці: Автомийка «Краплина»' }).getByRole('button', { name: 'Не порушення' }).click();
+  await expect(page.getByRole('article', { name: 'Багато неявок у точці: Автомийка «Краплина»' })).toHaveCount(0);
 
   await page.goto('/admin.html#/reviews');
   await page.getByRole('button', { name: /Приховані/ }).click();
@@ -182,7 +187,7 @@ test('маркетинг: кампанія з посиланням і промо
 
   await page.getByRole('button', { name: 'Згенерувати демо-кампанії' }).click();
   await expect(page.getByRole('region', { name: 'Кампанії' }).locator('tbody tr')).toHaveCount(5);
-  await expect(page.getByRole('region', { name: 'Кампанії' }).locator('tr', { hasText: 'Партнери: шиномонтаж' })).toContainText('Окупається');
+  await expect(page.getByRole('region', { name: 'Кампанії' }).locator('tr', { hasText: 'Партнери: мийка в ЖК' })).toContainText('Окупається');
   await expect(page.getByRole('region', { name: 'Кампанії' }).locator('tr', { hasText: 'TikTok' })).toContainText('Збиткова');
   await page.getByLabel('Замовлень одного клієнта за рік').fill('12');
   await page.getByRole('button', { name: 'Зберегти', exact: true }).click();

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>CARCAR</title>
-  <meta name="description" content="CARCAR: мийки, шиномонтажі та СТО Києва — ціни, вільний час, онлайн-запис і оплата.">
+  <meta name="description" content="CARCAR: автомийки Києва — ціни, вільний час, онлайн-запис і оплата.">
   <meta name="theme-color" content="#c8402b">
     <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20512%20512%22%3E%0A%20%20%3Crect%20width%3D%22512%22%20height%3D%22512%22%20rx%3D%22112%22%20fill%3D%22%23c8402b%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M236%20168a96%2096%200%201%200%200%20176%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%2244%22%20stroke-linecap%3D%22round%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M380%20168a96%2096%200%201%200%200%20176%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%2244%22%20stroke-linecap%3D%22round%22%20opacity%3D%22.75%22%2F%3E%0A%3C%2Fsvg%3E" type="image/svg+xml">
   <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20512%20512%22%3E%0A%20%20%3Crect%20width%3D%22512%22%20height%3D%22512%22%20rx%3D%22112%22%20fill%3D%22%23c8402b%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M236%20168a96%2096%200%201%200%200%20176%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%2244%22%20stroke-linecap%3D%22round%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M380%20168a96%2096%200%201%200%200%20176%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%2244%22%20stroke-linecap%3D%22round%22%20opacity%3D%22.75%22%2F%3E%0A%3C%2Fsvg%3E">
@@ -731,15 +731,14 @@ label.item { cursor: pointer; padding: 10px 14px; }
   </header>
   <main id="view" tabindex="-1"></main>
   <nav class="tabs" aria-label="Розділи">
-    <a href="#/" data-tab="catalog"><span class="tab-ic"><svg class="ic" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg></span>Сервіси</a>
+    <a href="#/" data-tab="catalog"><span class="tab-ic"><svg class="ic" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg></span>Мийки</a>
     <a href="#/bookings" data-tab="bookings"><span class="tab-ic"><svg class="ic" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></span>Мої записи</a>
     <a href="#/inbox" data-tab="inbox" id="inbox-tab"><span class="tab-ic"><svg class="ic" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg><span class="tab-count" hidden></span></span>Повідомлення</a>
     <a href="#/garage" data-tab="garage"><span class="tab-ic"><svg class="ic" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 16.5V12l1.8-4.6A2 2 0 0 1 8.7 6h6.6a2 2 0 0 1 1.9 1.4L19 12v4.5"/><rect x="3.5" y="12" width="17" height="5" rx="1.5"/><path d="M6 17v2M18 17v2"/></svg></span>Гараж</a>
   </nav>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script type="module">
-// Місто та список автосервісів. Щоб додати реальні мийки, шиномонтажі й СТО,
-// замініть PLACES на справжні точки.
+// Місто та список автомийок. Щоб додати реальні мийки, замініть PLACES на справжні точки.
 // Зараз тут демо-дані: назви, номери будинків і телефони вигадані.
 
 const CITY = {
@@ -753,9 +752,6 @@ const CITY = {
 // icon — назва лінійної іконки з ICONS в app.js.
 const CATEGORIES = [
   { id: 'wash', name: 'Мийка', icon: 'drop' },
-  { id: 'tires', name: 'Шиномонтаж', icon: 'wheel' },
-  { id: 'service', name: 'СТО', icon: 'wrench' },
-  { id: 'detailing', name: 'Детейлінг', icon: 'sparkle' },
 ];
 
 // Ціна залежить від класу авто: [легкове, кросовер, позашляховик/мінівен], у гривнях.
@@ -768,36 +764,23 @@ const WASH = {
   wax: { name: 'Віск і полірування', min: 40, price: [400, 500, 600] },
   engine: { name: 'Мийка двигуна', min: 30, price: [400, 450, 500] },
   dry: { name: 'Хімчистка салону', min: 240, price: [3500, 4200, 5000] },
-};
-
-const TIRES = {
-  change: { name: 'Сезонне перевзування (4 колеса)', min: 50, price: [900, 1100, 1400] },
-  balance: { name: 'Балансування (4 колеса)', min: 30, price: [400, 500, 600] },
-  repair: { name: 'Ремонт проколу', min: 20, price: [200, 200, 250] },
-  storage: { name: 'Зберігання шин (сезон)', min: 10, price: [1200, 1400, 1600] },
-  rolling: { name: 'Рихтування литого диска', min: 60, price: [600, 700, 900] },
-};
-
-const SERVICE = {
-  diag: { name: 'Компʼютерна діагностика', min: 30, price: [500, 600, 700] },
-  oil: { name: 'Заміна оливи та фільтра', min: 40, price: [400, 500, 600] },
-  brakes: { name: 'Заміна гальмівних колодок (вісь)', min: 60, price: [600, 700, 900] },
-  align: { name: 'Розвал-сходження', min: 45, price: [700, 800, 1000] },
-  ac: { name: 'Заправка кондиціонера', min: 40, price: [900, 1000, 1200] },
-  suspension: { name: 'Діагностика підвіски', min: 30, price: [300, 350, 400] },
-  battery: { name: 'Заміна акумулятора', min: 20, price: [150, 150, 200] },
-};
-
-const DETAILING = {
+  premium: { name: 'Комплекс преміум: кузов, салон, віск', min: 50, price: [900, 1100, 1400] },
+  leather: { name: 'Чистка й кондиціонер шкіри', min: 30, price: [400, 500, 600] },
+  tireshine: { name: 'Чорніння шин', min: 20, price: [200, 200, 250] },
+  seats: { name: 'Хімчистка сидінь', min: 60, price: [600, 700, 900] },
+  underbody: { name: 'Мийка днища й арок', min: 30, price: [500, 600, 700] },
+  antirain: { name: 'Антидощ на всі скла', min: 45, price: [700, 800, 1000] },
+  nanowax: { name: 'Нановіск кузова', min: 40, price: [900, 1000, 1200] },
+  trunk: { name: 'Прибирання багажника', min: 30, price: [300, 350, 400] },
+  aroma: { name: 'Ароматизація салону', min: 20, price: [150, 150, 200] },
   polish: { name: 'Полірування кузова', min: 180, price: [3500, 4200, 5000] },
   ceramic: { name: 'Керамічне покриття кузова', min: 360, price: [9000, 11000, 13000] },
-  ppf: { name: 'Антигравійна плівка: капот і бампер', min: 480, price: [12000, 14000, 16000] },
   deepclean: { name: 'Глибока хімчистка салону з розбиранням', min: 300, price: [4000, 4800, 5600] },
   headlights: { name: 'Полірування фар', min: 60, price: [600, 600, 700] },
 };
 
-// Каталоги послуг за категоріями: нова точка стартує з повного прайсу своїх категорій і редагує його.
-const SERVICE_TEMPLATES = { wash: WASH, tires: TIRES, service: SERVICE, detailing: DETAILING };
+// Каталог послуг: нова точка стартує з повного прайсу мийки й редагує його.
+const SERVICE_TEMPLATES = { wash: WASH };
 
 // Райони Києва з приблизними центрами — для нових точок, поки вони не вказали точні координати.
 const DISTRICTS = {
@@ -844,103 +827,103 @@ const PLACES = [
     mobile: { radiusKm: 12, fee: 250, crews: 2, services: ['express', 'complex', 'inside'] },
   },
   {
-    id: 'koleso',
+    id: 'hvylia',
     lat: 50.407,
     lng: 30.652,
-    name: 'Шиномонтаж «Колесо»',
-    cats: ['tires'],
+    name: 'Автомийка «Хвиля»',
+    cats: ['wash'],
     address: 'Харківське шосе, 58',
     district: 'Дарницький',
     phone: '+380 44 000 00 03',
     hours: [9, 21],
     boxes: 3,
-    tags: ['Зберігання шин', 'Шини в наявності'],
-    services: pick(TIRES, ['change', 'balance', 'repair', 'storage', 'rolling']),
-    mobile: { radiusKm: 15, fee: 300, crews: 1, services: ['change', 'repair'] },
+    tags: ['Преміум-комплекс', 'Чорніння шин'],
+    services: pick(WASH, ['premium', 'leather', 'tireshine', 'seats']),
+    mobile: { radiusKm: 15, fee: 300, crews: 1, services: ['premium', 'tireshine'] },
   },
   {
-    id: 'shynservis',
+    id: 'strumin',
     lat: 50.457,
     lng: 30.375,
-    name: 'ШинСервіс',
-    cats: ['tires', 'service'],
+    name: 'Автомийка «Струмінь»',
+    cats: ['wash'],
     address: 'просп. Берестейський, 120',
     district: 'Святошинський',
     phone: '+380 44 000 00 04',
     hours: [8, 20],
     boxes: 2,
-    tags: ['Вантажні шини', 'Розвал-сходження 3D'],
-    services: [...pick(TIRES, ['change', 'balance', 'repair'], 0.9), ...pick(SERVICE, ['align', 'suspension'])],
+    tags: ['Мийка мікроавтобусів', 'Мийка днища'],
+    services: [...pick(WASH, ['premium', 'leather', 'tireshine'], 0.9), ...pick(WASH, ['underbody', 'antirain'])],
   },
   {
-    id: 'motor',
+    id: 'pina',
     lat: 50.48,
     lng: 30.488,
-    name: 'СТО «Мотор»',
-    cats: ['service'],
+    name: 'Автомийка «Піна»',
+    cats: ['wash'],
     address: 'вул. Кирилівська, 77',
     district: 'Подільський',
     phone: '+380 44 000 00 05',
     hours: [9, 19],
     boxes: 5,
-    tags: ['Гарантія 1 рік', 'Можна свої запчастини'],
-    services: pick(SERVICE, ['diag', 'oil', 'brakes', 'align', 'ac', 'suspension', 'battery']),
+    tags: ['Нановіск і антидощ', 'Чек для компаній'],
+    services: pick(WASH, ['underbody', 'wax', 'seats', 'antirain', 'nanowax', 'trunk', 'aroma']),
   },
   {
-    id: 'avtodoktor',
+    id: 'kraplia',
     lat: 50.429,
     lng: 30.472,
-    name: 'Автодоктор',
-    cats: ['service', 'tires'],
+    name: 'Автомийка «Краплина»',
+    cats: ['wash'],
     address: 'просп. Валерія Лобановського, 14',
     district: 'Солом’янський',
     phone: '+380 44 000 00 06',
     hours: [8, 21],
     boxes: 3,
-    tags: ['Евакуатор', 'Генератор: працює під час відключень'],
-    services: [...pick(SERVICE, ['diag', 'oil', 'brakes', 'battery'], 1.1), ...pick(TIRES, ['change', 'balance'], 1.05)],
+    tags: ['Зона відпочинку', 'Генератор: працює під час відключень'],
+    services: [...pick(WASH, ['underbody', 'wax', 'seats', 'aroma'], 1.1), ...pick(WASH, ['premium', 'leather'], 1.05)],
   },
   {
     id: 'chysto',
     lat: 50.51,
     lng: 30.6,
     name: 'Чисто і швидко',
-    cats: ['wash', 'tires'],
+    cats: ['wash'],
     address: 'просп. Червоної Калини, 31',
     district: 'Деснянський',
     phone: '+380 44 000 00 07',
     hours: [7, 23],
     boxes: 3,
-    tags: ['Мийка + перевзування за раз', 'Wi‑Fi'],
-    services: [...pick(WASH, ['express', 'complex', 'inside'], 0.85), ...pick(TIRES, ['change', 'balance', 'repair'], 0.95)],
+    tags: ['Мийка + чорніння шин за раз', 'Wi‑Fi'],
+    services: [...pick(WASH, ['express', 'complex', 'inside'], 0.85), ...pick(WASH, ['premium', 'leather', 'tireshine'], 0.95)],
   },
   {
     id: 'hlyanets',
     lat: 50.4255,
     lng: 30.5120,
-    name: 'Детейлінг-студія «Глянець»',
-    cats: ['detailing'],
+    name: 'Детейлінг-мийка «Глянець»',
+    cats: ['wash'],
     address: 'вул. Антоновича, 100',
     district: 'Голосіївський',
     phone: '+380 44 000 00 08',
     hours: [9, 20],
     boxes: 2,
     tags: ['Тепла камера', 'Гарантія на кераміку 2 роки'],
-    services: pick(DETAILING, ['polish', 'ceramic', 'ppf', 'deepclean', 'headlights']),
+    services: pick(WASH, ['polish', 'ceramic', 'deepclean', 'headlights']),
   },
   {
     id: 'keramika',
     lat: 50.4570,
     lng: 30.6150,
     name: 'Кераміка Про',
-    cats: ['detailing', 'wash'],
+    cats: ['wash'],
     address: 'просп. Соборності, 17',
     district: 'Дніпровський',
     phone: '+380 44 000 00 09',
     hours: [8, 21],
     boxes: 3,
     tags: ['Детейлінг-мийка', 'Генератор: працює під час відключень'],
-    services: [...pick(WASH, ['complex', 'wax'], 1.2), ...pick(DETAILING, ['polish', 'ceramic', 'headlights'], 0.9)],
+    services: [...pick(WASH, ['complex', 'wax'], 1.2), ...pick(WASH, ['polish', 'ceramic', 'headlights'], 0.9)],
   },
 ];
 
@@ -959,11 +942,9 @@ const PAYMENT = {
   installments: { minTotal: 3000, parts: [3, 4, 6] },
 };
 
-// Нагадування сервісної книжки.
+// Нагадування в гаражі.
 const MAINTENANCE = {
-  oilKm: 10000, // заміна оливи кожні N км
-  oilMonths: 12, // або раз на N місяців
-  oilWarnKm: 1000, // попереджати, коли до заміни лишилося менше
+  washDays: 14, // нагадати помити авто, якщо після останньої мийки минуло стільки днів
   insuranceWarnDays: 30, // попереджати про кінець поліса за N днів
 };
 
@@ -1187,12 +1168,8 @@ const fmtTime = (ms) => new Date(ms).toLocaleString('uk-UA', { day: 'numeric', m
 const fmtDate = (s) => parseDate(s).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' });
 const km = (n) => `${n.toLocaleString('uk-UA')} км`;
 
-// Категорія послуги: задана в CRM або за каталогом, з якого її взято.
-const WASH_IDS = ['express', 'complex', 'inside', 'wax', 'engine', 'dry'];
-const TIRE_IDS = ['change', 'balance', 'repair', 'storage', 'rolling'];
-const DETAIL_IDS = ['polish', 'ceramic', 'ppf', 'deepclean', 'headlights'];
-const serviceCat = (s) =>
-  s.cat ?? (WASH_IDS.includes(s.id) ? 'wash' : TIRE_IDS.includes(s.id) ? 'tires' : DETAIL_IDS.includes(s.id) ? 'detailing' : 'service');
+// Категорія послуги: задана в CRM, інакше — мийка (CARCAR працює лише з автомийками).
+const serviceCat = (s) => s.cat ?? 'wash';
 const catById = (id) => CATEGORIES.find((c) => c.id === id);
 
 // Зменшує фото до 720 px, щоб воно вмістилося у сховище пристрою.
@@ -1648,14 +1625,14 @@ function chatPost(b, from, text, notify = from === 'client' ? 'biz' : 'client') 
   if (notify === 'biz' || notify === 'both') b.chatUnreadBiz = true;
   if (notify === 'client' || notify === 'both') b.chatUnreadClient = true;
 }
-const CLIENT_QUICK = ['Можна приїхати раніше?', 'Приїду з причепом', 'Залишу ключі адміністратору', 'Потрібен чек для компанії'];
+const CLIENT_QUICK = ['Можна приїхати раніше?', 'Приїду з багажником на даху', 'Залишу ключі адміністратору', 'Потрібен чек для компанії'];
 const BIZ_QUICK = ['Так, чекаємо', 'Можна на 30 хв раніше', 'На жаль, ні — лише у ваш час', 'Майстер передзвонить'];
 
 // ---------- кошторис і гарантія ----------
 
-// Кошторис СТО: роботи й запчастини з цінами; клієнт погоджує кожен пункт окремо.
+// Кошторис додаткових робіт: роботи й матеріали з цінами; клієнт погоджує кожен пункт окремо.
 // warranty — гарантія в місяцях від дня виконання.
-const ITEM_KIND = { work: 'Робота', part: 'Запчастина' };
+const ITEM_KIND = { work: 'Робота', part: 'Матеріал' };
 const itemSum = (x) => Math.round(x.qty * x.price);
 const estimateTotal = (items, status) => items.filter((x) => !status || x.status === status).reduce((a, x) => a + itemSum(x), 0);
 function warrantyUntil(iso, months) {
@@ -1865,34 +1842,6 @@ function restorePass(placeId, use) {
     ? { ...s, visitsLeft: s.visitsLeft + 1, history: [...s.history, { at: Date.now(), amount: -use.amount, note: 'повернення' }] }
     : { ...s, balance: s.balance + use.amount, history: [...s.history, { at: Date.now(), amount: -use.amount, note: 'повернення' }] }));
   savePasses(placeId, { sold });
-}
-
-// ---------- шинний готель ----------
-
-const SEASONS = { winter: 'Зимові', summer: 'Літні', all: 'Всесезонні' };
-const TIRE_STATE = ['Нові', 'Добрий', 'Задовільний', 'Потребують заміни'];
-const tiresOf = (placeId) => store.peek('biz.tires', {})[placeId] ?? [];
-
-function saveTires(placeId, list) {
-  const all = store.get('biz.tires', {});
-  all[placeId] = list;
-  store.set('biz.tires', all);
-}
-
-// Сезон перевзування в Києві: з 1 жовтня до 30 листопада — на зимові, з 15 березня до 30 квітня — на літні.
-function seasonDue(date = new Date()) {
-  const m = date.getMonth() + 1;
-  const d = date.getDate();
-  if (m === 10 || m === 11) return 'winter';
-  if ((m === 3 && d >= 15) || m === 4) return 'summer';
-  return null;
-}
-
-// Комплект на зберіганні, який пора забрати й поставити.
-const tireDue = (t, date = new Date()) => t.status === 'stored' && t.season === seasonDue(date);
-
-function myTires(keys) {
-  return PLACES.flatMap((p) => tiresOf(p.id).filter((t) => t.status === 'stored' && keys.includes(t.clientKey)).map((t) => ({ ...t, place: p })));
 }
 
 const clientKeyOf = (phone, car) => phoneKey(phone) ?? (car ? `car:${car}` : null);
@@ -2466,19 +2415,6 @@ function viewInvite() {
 
 // ---------- каталог ----------
 
-function seasonBanner() {
-  const m = new Date().getMonth();
-  const winter = m === 9 || m === 10;
-  const summer = m === 2 || m === 3;
-  if (!winter && !summer) return '';
-  return `<a class="banner" href="#/" data-action="cat" data-cat="tires">
-    <span class="banner-ic">${icon(winter ? 'snow' : 'sun', 22)}</span>
-    <span><b>Час ${winter ? 'на зимову' : 'на літню'} гуму</b>
-    <span class="small">Запишіться на перевзування заздалегідь, поки немає черг</span></span>
-    ${icon('chevR', 18)}
-  </a>`;
-}
-
 function filteredPlaces() {
   const q = ui.q.trim().toLowerCase();
   const list = PLACES.filter((p) => {
@@ -2631,14 +2567,13 @@ function renderList() {
 
 function viewCatalog() {
   const chip = (label, attrs, on) => `<button class="chip" ${attrs} aria-pressed="${on}">${label}</button>`;
-  return `${seasonBanner()}
-    <h1 class="catalog-title">Мийки, шиномонтаж, СТО й детейлінг</h1>
+  return `    <h1 class="catalog-title">Автомийки Києва</h1>
     <label class="search">${icon('search', 20)}
       <input id="q" type="search" placeholder="Назва, адреса або послуга" aria-label="Пошук" value="${esc(ui.q)}"></label>
     <div class="chips" role="group" aria-label="Фільтри">
       ${chip(`${icon('pin', 16)}Поруч`, 'data-action="near"', ui.sort === 'near')}
-      ${chip('Усі', 'data-action="cat" data-cat="all"', ui.cat === 'all')}
-      ${CATEGORIES.map((c) => chip(`${icon(c.icon, 16)}${c.name}`, `data-action="cat" data-cat="${c.id}"`, ui.cat === c.id)).join('')}
+      ${CATEGORIES.length > 1 ? `${chip('Усі', 'data-action="cat" data-cat="all"', ui.cat === 'all')}
+      ${CATEGORIES.map((c) => chip(`${icon(c.icon, 16)}${c.name}`, `data-action="cat" data-cat="${c.id}"`, ui.cat === c.id)).join('')}` : ''}
       ${chip('Відчинено зараз', 'data-action="toggle" data-key="openNow"', ui.openNow)}
       ${chip(`${icon('carSide', 16)}Виїзд до вас`, 'data-action="toggle" data-key="mobileOnly"', !!ui.mobileOnly)}
       ${chip(`${icon('bolt', 16)}Працює при відключеннях`, 'data-action="toggle" data-key="blackout"', !!ui.blackout)}
@@ -2668,7 +2603,7 @@ function viewCatalog() {
     <div id="list" class="stack"></div>
     <div style="margin-top:14px">${inviteCard()}</div>
     <p class="note">Демо-дані: назви, номери будинків і телефони вигадані. Список місць задається у файлі data.js.</p>
-    <p class="note"><a href="#/partner">Для бізнесу: підключити свою мийку, шиномонтаж чи СТО</a></p>`;
+    <p class="note"><a href="#/partner">Для бізнесу: підключити свою автомийку</a></p>`;
 }
 
 // ---------- сторінка бізнесу ----------
@@ -2885,7 +2820,7 @@ function askBlock(p) {
       </article>`;
     }).join('')}
     <form id="askform" class="card stack" data-place="${p.id}">
-      <label class="field"><span>Що потрібно зробити?</span><textarea name="text" rows="3" required maxlength="600" placeholder="Наприклад, зняти захист картера або помити дах автобудинку"></textarea></label>
+      <label class="field"><span>Що потрібно зробити?</span><textarea name="text" rows="3" required maxlength="600" placeholder="Наприклад, помити дах автобудинку чи відмити сліди фарби"></textarea></label>
       <div class="grid2 pf">
         <label class="field"><span>Ваше імʼя</span><input name="name" required autocomplete="name" value="${esc(profile.name)}"></label>
         <label class="field"><span>Ваш телефон</span><input name="phone" type="tel" required autocomplete="tel" placeholder="+380" value="${esc(profile.phone)}"></label>
@@ -3397,7 +3332,7 @@ function bookingCard(b, highlight) {
 
 // ---------- кошторис і гарантія ----------
 
-// Кошторис від СТО: клієнт погоджує пункти окремо й доплачує лише за погоджене.
+// Кошторис додаткових робіт від мийки: клієнт погоджує пункти окремо й доплачує лише за погоджене.
 function estimateBlock(b) {
   const e = b.estimate;
   if (!e) return '';
@@ -3754,7 +3689,7 @@ function viewInbox() {
     ${list.length ? `<div class="stack" style="gap:8px">${list.map((m) => `<article class="card msg-card${m.read ? '' : ' unread'}">
       <div class="head"><b>${esc(placeById(m.placeId)?.name ?? 'CARCAR')}</b><span class="small muted">${CHANNELS[m.channel] ?? ''} · ${fmtTime(m.at)}</span></div>
       <p style="margin:6px 0 0">${esc(m.text)}</p>
-      ${m.link ? `<a class="btn" href="${esc(m.link)}" style="margin-top:8px">${m.kind === 'waitlist' ? 'Записатися' : m.kind === 'tires' ? 'Записатися на перевзування' : 'Відкрити'}</a>` : ''}
+      ${m.link ? `<a class="btn" href="${esc(m.link)}" style="margin-top:8px">${m.kind === 'waitlist' ? 'Записатися' : 'Відкрити'}</a>` : ''}
     </article>`).join('')}</div>` : empty('chat', 'Повідомлень поки немає.')}
     <p class="note">Демо: розсилки, які точка надсилає у Viber чи Telegram, тут дублюються, щоб їх було видно в прототипі.</p>`;
   markRead(keys);
@@ -3770,28 +3705,21 @@ function updateInboxBadge() {
   $('#inbox-tab').setAttribute('aria-label', unread ? `Повідомлення, непрочитаних: ${unread}` : 'Повідомлення');
 }
 
-// ---------- гараж: шини на зберіганні й абонементи ----------
+// ---------- гараж: абонементи ----------
 
 // Вхід для власників точок — у профілі, а не в нижньому меню: клієнтам він не потрібен.
 const businessEntry = () => `<a class="card link-card biz-entry" href="#/partner" style="margin-top:16px">${icon('chart', 22)}<span>Для бізнесу
-    <small class="small muted" style="display:block;font-weight:400">Маєте мийку, шиномонтаж, СТО чи детейлінг? Кабінет точки й панель із записами, клієнтами й фінансами</small></span>${icon('chevR', 18)}</a>`;
+    <small class="small muted" style="display:block;font-weight:400">Маєте автомийку чи детейлінг-студію? Кабінет точки й панель із записами, клієнтами й фінансами</small></span>${icon('chevR', 18)}</a>`;
 
 function garageExtras() {
   const keys = myKeys();
-  const tires = myTires(keys);
   const passes = PLACES.flatMap((p) => passesOf(p.id).sold.filter((x) => (x.buyer === 'app' || keys.includes(x.clientKey)) && passActive(x)).map((x) => ({ ...x, place: p })));
-  if (!tires.length && !passes.length) return '';
-  const due = seasonDue();
-  return `${tires.length ? `<h2 class="big">Шини на зберіганні</h2><div class="stack" style="gap:8px">${tires.map((t) => `<section class="card stack" style="gap:6px" aria-label="Шини: ${esc(t.place.name)}">
-      <div class="head"><b>${SEASONS[t.season]} · ${t.count} шт</b><span class="small muted">${esc(t.place.name)}</span></div>
-      <span class="small">${esc(t.brand || '')} ${esc(t.size || '')}${t.rims ? ' · на дисках' : ''} · стан: ${esc(t.condition).toLowerCase()} · місце ${esc(t.slot)}</span>
-      ${tireDue(t) ? `<div class="warn-pill">${icon('wheel', 16)}Час ставити ${due === 'winter' ? 'зимові' : 'літні'} шини</div><a class="btn primary" href="#/book/${t.place.id}">Записатися на перевзування</a>` : ''}
-    </section>`).join('')}</div>` : ''}
-    ${passes.length ? `<h2 class="big">Абонементи й сертифікати</h2><div class="stack" style="gap:8px">${passes.map((x) => `<section class="card stack" style="gap:4px" aria-label="${esc(x.name)}">
+  if (!passes.length) return '';
+  return `<h2 class="big">Абонементи й сертифікати</h2><div class="stack" style="gap:8px">${passes.map((x) => `<section class="card stack" style="gap:4px" aria-label="${esc(x.name)}">
       <div class="head"><b>${esc(x.name)}</b><span class="small muted">${esc(x.place.name)}</span></div>
       <span class="small">Лишилось ${passLeft(x)} · діє до ${fmtDate(x.validUntil)}</span>
       ${x.kind === 'cert' ? `<span class="small">Код для оплати чи подарунка: <b class="code">${esc(x.code)}</b></span>` : ''}
-    </section>`).join('')}</div>` : ''}`;
+    </section>`).join('')}</div>`;
 }
 
 function viewBookings(highlightId) {
@@ -3800,7 +3728,7 @@ function viewBookings(highlightId) {
   const active = sorted.filter((b) => ACTIVE.includes(b.state));
   const rest = sorted.filter((b) => !ACTIVE.includes(b.state)).reverse();
   if (!list.length) {
-    return `<h1>Мої записи</h1>${empty('calendar', 'Записів поки немає.', '<a class="btn primary" href="#/">Знайти мийку або сервіс</a>')}${moneyCard()}${inviteCard()}`;
+    return `<h1>Мої записи</h1>${empty('calendar', 'Записів поки немає.', '<a class="btn primary" href="#/">Знайти мийку</a>')}${moneyCard()}${inviteCard()}`;
   }
   return `<h1>Мої записи</h1>
     ${moneyCard()}
@@ -3934,42 +3862,20 @@ function historyOf(car) {
 
 const currentKm = (car) => Math.max(car.mileage || 0, ...historyOf(car).map((h) => h.km || 0));
 
+// Нагадування в гаражі: час помити авто (за останньою мийкою) і поліс ОСЦПВ.
 function reminders(car) {
   const out = [];
   const now = new Date();
-  const history = historyOf(car);
-
-  const m = now.getMonth();
-  const winter = m >= 9 && m <= 10;
-  const summer = m >= 2 && m <= 3;
-  if (winter || summer) {
-    const since = isoDate(winter ? new Date(now.getFullYear(), 8, 1) : new Date(now.getFullYear(), 1, 15));
-    const done = history.find((h) => h.date >= since && /перевзування/i.test(h.text));
-    out.push(done
-      ? { level: 'ok', text: `Перевзування зроблено ${fmtDate(done.date)}` }
-      : { level: 'due', text: `Час перевзутися на ${winter ? 'зимові' : 'літні'} шини`, cat: 'tires' });
-  }
-
-  const oil = history.find((h) => /олив|масл/i.test(h.text));
-  const cur = currentKm(car);
-  if (!oil) {
-    out.push({ level: 'info', text: 'Немає даних про заміну оливи — додайте запис нижче' });
-  } else {
-    const ageMonths = (now - parseDate(oil.date)) / (30.4 * 24 * HOUR);
-    const left = oil.km && cur ? oil.km + MAINTENANCE.oilKm - cur : null;
-    if (ageMonths >= MAINTENANCE.oilMonths || (left !== null && left <= 0)) {
-      out.push({ level: 'due', text: left !== null && left <= 0 ? `Пора міняти оливу: прострочено на ${km(-left)}` : 'Пора міняти оливу: минув рік', cat: 'service' });
-    } else if (left !== null && left <= MAINTENANCE.oilWarnKm) {
-      out.push({ level: 'due', text: `Заміна оливи через ${km(left)}`, cat: 'service' });
-    } else {
-      out.push({ level: 'ok', text: left !== null ? `Олива: ще ${km(left)}` : `Оливу міняли ${fmtDate(oil.date)}` });
-    }
-  }
+  const last = historyOf(car)[0];
+  const days = last ? Math.floor((now - parseDate(last.date)) / (24 * HOUR)) : null;
+  if (days === null) out.push({ level: 'info', text: 'Ще немає мийок цього авто в CARCAR', cat: 'wash' });
+  else if (days >= MAINTENANCE.washDays) out.push({ level: 'due', text: `Авто не мили ${days} ${plural(days, 'день', 'дні', 'днів')} — час на мийку`, cat: 'wash' });
+  else out.push({ level: 'ok', text: `Остання мийка ${fmtDate(last.date)}` });
 
   if (car.insuranceUntil) {
-    const days = Math.ceil((parseDate(car.insuranceUntil) - now) / (24 * HOUR));
-    if (days < 0) out.push({ level: 'due', text: 'Поліс ОСЦПВ прострочено' });
-    else if (days <= MAINTENANCE.insuranceWarnDays) out.push({ level: 'due', text: `Поліс ОСЦПВ закінчується через ${days} ${plural(days, 'день', 'дні', 'днів')}` });
+    const left = Math.ceil((parseDate(car.insuranceUntil) - now) / (24 * HOUR));
+    if (left < 0) out.push({ level: 'due', text: 'Поліс ОСЦПВ прострочено' });
+    else if (left <= MAINTENANCE.insuranceWarnDays) out.push({ level: 'due', text: `Поліс ОСЦПВ закінчується через ${left} ${plural(left, 'день', 'дні', 'днів')}` });
     else out.push({ level: 'ok', text: `Поліс ОСЦПВ до ${fmtDate(car.insuranceUntil)}` });
   }
   return out;
@@ -4024,7 +3930,6 @@ function viewGarage() {
       <label class="field"><span>Рік випуску (необовʼязково)</span><input name="year" type="number" inputmode="numeric" min="1950" max="${new Date().getFullYear() + 1}" autocomplete="off"></label>
       <label class="field"><span>Клас</span><select name="cls">${CAR_CLASSES.map((c, i) => `<option value="${i}">${c}</option>`).join('')}</select></label>
       <label class="field"><span>Пробіг, км (необовʼязково)</span><input name="mileage" type="number" inputmode="numeric" min="0" autocomplete="off"></label>
-      <label class="field"><span>Розмір шин (необовʼязково)</span><input name="tires" placeholder="205/55 R16" autocomplete="off"></label>
       <label class="field"><span>Поліс ОСЦПВ дійсний до (необовʼязково)</span><input name="insuranceUntil" type="date"></label>`, 'Зберегти')}
     ${businessEntry()}`;
 }
@@ -4035,7 +3940,7 @@ function viewCar(id) {
   const history = historyOf(c);
   return `${back('#/garage', 'Гараж')}
     <h1 style="margin-bottom:2px">${esc(c.make)} ${esc(c.model)}</h1>
-    <div class="car-sub">${[c.plate, c.year && `${c.year} р.`, c.color, CAR_CLASSES[c.cls], c.tires && `шини ${c.tires}`].filter(Boolean).map(esc).join(' · ')}</div>
+    <div class="car-sub">${[c.plate, c.year && `${c.year} р.`, c.color, CAR_CLASSES[c.cls]].filter(Boolean).map(esc).join(' · ')}</div>
     <h2>Нагадування</h2>
     <div class="stack">${reminders(c).map(reminderRow).join('')}</div>
     <h2>Пробіг</h2>
@@ -4057,7 +3962,7 @@ function viewCar(id) {
         ${h.place || h.km ? `<div class="log-meta">${[h.place, h.km && km(h.km)].filter(Boolean).map(esc).join(' · ')}</div>` : ''}
         ${h.note ? `<div class="facts"><div class="il">${icon('chat', 18)}${esc(h.note)}</div></div>` : ''}
         ${h.photos?.length ? `<div class="thumbs">${h.photos.map((src, i) => `<img src="${esc(src)}" alt="Фото ${i + 1}">`).join('')}</div>` : ''}
-      </div>`).join('') : '<p class="muted" style="margin:0">Тут зʼявляться всі візити через CARCAR. Роботи в інших сервісах можна додати вручну.</p>'}
+      </div>`).join('') : '<p class="muted" style="margin:0">Тут зʼявляться всі візити через CARCAR. Мийки й догляд деінде можна додати вручну.</p>'}
     </div>
     <h2>Додати запис вручну</h2>
     ${carForm('logform', `
@@ -4308,7 +4213,7 @@ document.addEventListener('click', (e) => {
       .then(() => toast('Посилання скопійовано'))
       .catch(() => { $('#ref-link')?.select(); toast('Скопіюйте посилання вручну'); });
     if (action === 'share' && navigator.share) {
-      navigator.share({ title: 'CARCAR', text: `Записуйся на мийку, шиномонтаж чи СТО через CARCAR — ${uah(REFERRAL.bonus)} на перше замовлення`, url }).catch(() => {});
+      navigator.share({ title: 'CARCAR', text: `Записуйся на автомийку через CARCAR — ${uah(REFERRAL.bonus)} на перше замовлення`, url }).catch(() => {});
     } else {
       copy();
     }
@@ -4732,7 +4637,6 @@ document.addEventListener('submit', async (e) => {
     color: e.target.dataset.color || null,
     plate: normPlate(f.get('plate')),
     cls: Number(f.get('cls')),
-    tires: f.get('tires').trim(),
     mileage: Number(f.get('mileage')) || 0,
     insuranceUntil: f.get('insuranceUntil') || null,
     log: [],

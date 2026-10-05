@@ -5,7 +5,12 @@ import AxeBuilder from '@axe-core/playwright';
 // Тайли OpenStreetMap у тестах не завантажуємо з мережі — підставляємо порожню картинку.
 const TILE = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page }, testInfo) => {
+  // Усі точки — мийки, тож акція «Перша мийка −30%» діяла б у кожному тесті. Вимикаємо її,
+  // крім тестів промокодів і маркетингу.
+  if (!/промокод|маркетинг/i.test(testInfo.title)) {
+    await page.addInitScript(() => localStorage.getItem('carcar.admin.promos') ?? localStorage.setItem('carcar.admin.promos', '[]'));
+  }
   await page.route('https://tile.openstreetmap.org/**', (r) => r.fulfill({ contentType: 'image/png', body: TILE }));
   await page.clock.setFixedTime(new Date(2026, 9, 4, 10, 0));
   const errors = [];
@@ -30,18 +35,18 @@ test('карта: точки на схемі Києва, фільтри, виб�
   await expect(page.locator('#count')).toHaveText('9 місць');
 
   // Фільтр працює й на карті.
-  await page.getByRole('button', { name: 'Шиномонтаж', exact: true }).click();
-  await expect(map.locator('[data-pin]')).toHaveCount(4);
-  await expect(page.locator('#count')).toHaveText('4 місця');
+  await page.getByRole('button', { name: 'Виїзд до вас' }).click();
+  await expect(map.locator('[data-pin]')).toHaveCount(2);
+  await expect(page.locator('#count')).toHaveText('2 місця');
 
-  await map.getByRole('button', { name: /^Шиномонтаж «Колесо»/ }).click();
-  await expect(map.getByRole('button', { name: /^Шиномонтаж «Колесо»/ })).toHaveAttribute('aria-pressed', 'true');
+  await map.getByRole('button', { name: /^Автомийка «Хвиля»/ }).click();
+  await expect(map.getByRole('button', { name: /^Автомийка «Хвиля»/ })).toHaveAttribute('aria-pressed', 'true');
   const card = page.locator('#map-card');
-  await expect(card).toContainText('Шиномонтаж «Колесо»');
+  await expect(card).toContainText('Автомийка «Хвиля»');
   await expect(card).toContainText('Харківське шосе, 58');
 
   // Масштаб кнопками змінює положення пінів.
-  const pin = map.locator('[data-pin="koleso"]');
+  const pin = map.locator('[data-pin="hvylia"]');
   const before = await pin.boundingBox();
   await map.getByRole('button', { name: 'Наблизити' }).click();
   const after = await pin.boundingBox();
@@ -57,7 +62,7 @@ test('карта: точки на схемі Києва, фільтри, виб�
   expect(dragged.x - after.x).toBeGreaterThan(80);
 
   await card.getByRole('link', { name: 'Записатися' }).click();
-  await expect(page).toHaveURL(/#\/book\/koleso/);
+  await expect(page).toHaveURL(/#\/book\/hvylia/);
 
   // Вигляд запамʼятовується.
   await page.goto('/');
@@ -67,7 +72,7 @@ test('карта: точки на схемі Києва, фільтри, виб�
 
 test('щасливі години: точка ставить щотижневу знижку, клієнт бачить її при записі й платить менше', async ({ page }) => {
   await page.goto(`${PANEL}#/deals`);
-  await page.getByLabel('Точка').selectOption({ label: 'Шиномонтаж «Колесо»' });
+  await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
   const f = page.locator('#weekly-form');
   await expect(f.getByLabel('Понеділок')).toBeChecked();
   await expect(f.getByLabel('Неділя')).not.toBeChecked();
@@ -77,13 +82,13 @@ test('щасливі години: точка ставить щотижневу 
   await expect(page.locator('#toast')).toHaveText('Щасливі години −15%: Пн–Пт, 10:00–12:00');
   await expect(page.locator('.wb-deal')).toHaveCount(5);
 
-  await page.goto('/#/place/koleso');
+  await page.goto('/#/place/hvylia');
   const deals = page.getByRole('region', { name: 'Знижки за годинами' });
   await expect(deals).toContainText('−15%');
   await expect(deals).toContainText('Пн–Пт, 10:00–12:00');
 
-  await page.goto('/#/book/koleso');
-  await page.getByLabel(/Сезонне перевзування/).check();
+  await page.goto('/#/book/hvylia');
+  await page.getByLabel(/Комплекс преміум/).check();
   // Сьогодні неділя — знижки немає; завтра понеділок — є.
   await expect(page.locator('.slot.hot')).toHaveCount(0);
   const monday = page.getByRole('button', { name: /Завтра, 5, є знижка до 15%/ });
@@ -110,12 +115,12 @@ test('статистика застосунку: воронка з реальн�
 
   // Клієнт шукає, відкриває карту й записується.
   await page.goto('/');
-  await page.getByLabel('Пошук').fill('антидощ');
+  await page.getByLabel('Пошук').fill('шиномонтаж');
   await page.waitForTimeout(1500);
   await page.getByRole('button', { name: 'Карта' }).click();
-  await page.goto('/#/place/koleso');
-  await page.goto('/#/book/koleso');
-  await page.getByLabel(/Сезонне перевзування/).check();
+  await page.goto('/#/place/hvylia');
+  await page.goto('/#/book/hvylia');
+  await page.getByLabel(/Комплекс преміум/).check();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await page.locator('.slot:not([disabled])').first().click();
   await page.locator('[data-action="confirm"]').click();
@@ -126,7 +131,7 @@ test('статистика застосунку: воронка з реальн�
   await expect(funnel.locator('li').nth(0)).toContainText('Переглянули точку');
   await expect(funnel.locator('li').nth(3)).toContainText('Оплатили');
   await expect(funnel.locator('li').nth(3).locator('b')).toHaveText('1');
-  await expect(page.getByRole('region', { name: 'Що шукають' })).toContainText('«антидощ»');
+  await expect(page.getByRole('region', { name: 'Що шукають' })).toContainText('«шиномонтаж»');
   await expect(page.getByRole('region', { name: 'Що шукають' })).toContainText('без результатів 1');
   await expect(page.getByRole('region', { name: 'Використання функцій' })).toContainText('1 відкриттів');
 
@@ -142,21 +147,21 @@ test('статистика застосунку: воронка з реальн�
   await expect(funnel.locator('li').nth(3).locator('b')).toHaveText('1');
 });
 
-for (const path of ['/', '/admin.html#/stats', `${PANEL}#/deals`, '/#/book/koleso/2026-10-05/10:00', '/#/place/koleso']) {
+for (const path of ['/', '/admin.html#/stats', `${PANEL}#/deals`, '/#/book/hvylia/2026-10-05/10:00', '/#/place/hvylia']) {
   test(`доступність і верстка ${path}`, async ({ page }) => {
     await page.goto(`${PANEL}`);
-    await page.getByLabel('Точка').selectOption({ label: 'Шиномонтаж «Колесо»' });
+    await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
     await page.getByRole('button', { name: 'Заповнити демо-історію' }).click();
     await page.goto(`${PANEL}#/deals`);
     await page.getByRole('button', { name: 'Додати щасливі години' }).click();
     if (path === '/') {
       await page.goto('/');
       await page.getByRole('button', { name: 'Карта' }).click();
-      await page.locator('[data-pin="koleso"]').click();
+      await page.locator('[data-pin="hvylia"]').click();
     } else {
       await page.goto(path);
       if (path.includes('stats')) await page.getByRole('button', { name: 'Згенерувати демо-активність' }).click();
-      if (path.includes('book')) await page.getByLabel(/Сезонне перевзування/).check();
+      if (path.includes('book')) await page.getByLabel(/Комплекс преміум/).check();
     }
     await page.locator('#view h1').first().waitFor();
     const { violations } = await new AxeBuilder({ page }).analyze();

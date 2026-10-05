@@ -9,7 +9,7 @@ import {
 import {
   CHANNELS, inboxFor, markRead, sendMessages, dealsOf, dealsOn, weeklyDealsOf, daysText, dealAt, dealPrice, dealCovers, hotDeals, queueOf, queueEnabled, saveQueue, queueEstimate,
   checkWaitlist, openStarts, passesOf, sellPass, passActive, passLeft, usableSubs, findCert, redeemPass, restorePass,
-  SEASONS, myTires, tireDue, seasonDue, chatPost, CLIENT_QUICK, ITEM_KIND, itemSum, estimateTotal, warrantyUntil,
+  chatPost, CLIENT_QUICK, ITEM_KIND, itemSum, estimateTotal, warrantyUntil,
 } from './ops.js';
 import { mountMap } from './map.js';
 import { lookupPlate, normPlate, DEMO_PLATES } from './vehicles.js';
@@ -286,19 +286,6 @@ function viewInvite() {
 
 // ---------- каталог ----------
 
-function seasonBanner() {
-  const m = new Date().getMonth();
-  const winter = m === 9 || m === 10;
-  const summer = m === 2 || m === 3;
-  if (!winter && !summer) return '';
-  return `<a class="banner" href="#/" data-action="cat" data-cat="tires">
-    <span class="banner-ic">${icon(winter ? 'snow' : 'sun', 22)}</span>
-    <span><b>Час ${winter ? 'на зимову' : 'на літню'} гуму</b>
-    <span class="small">Запишіться на перевзування заздалегідь, поки немає черг</span></span>
-    ${icon('chevR', 18)}
-  </a>`;
-}
-
 function filteredPlaces() {
   const q = ui.q.trim().toLowerCase();
   const list = PLACES.filter((p) => {
@@ -451,14 +438,13 @@ function renderList() {
 
 function viewCatalog() {
   const chip = (label, attrs, on) => `<button class="chip" ${attrs} aria-pressed="${on}">${label}</button>`;
-  return `${seasonBanner()}
-    <h1 class="catalog-title">Мийки, шиномонтаж, СТО й детейлінг</h1>
+  return `    <h1 class="catalog-title">Автомийки Києва</h1>
     <label class="search">${icon('search', 20)}
       <input id="q" type="search" placeholder="Назва, адреса або послуга" aria-label="Пошук" value="${esc(ui.q)}"></label>
     <div class="chips" role="group" aria-label="Фільтри">
       ${chip(`${icon('pin', 16)}Поруч`, 'data-action="near"', ui.sort === 'near')}
-      ${chip('Усі', 'data-action="cat" data-cat="all"', ui.cat === 'all')}
-      ${CATEGORIES.map((c) => chip(`${icon(c.icon, 16)}${c.name}`, `data-action="cat" data-cat="${c.id}"`, ui.cat === c.id)).join('')}
+      ${CATEGORIES.length > 1 ? `${chip('Усі', 'data-action="cat" data-cat="all"', ui.cat === 'all')}
+      ${CATEGORIES.map((c) => chip(`${icon(c.icon, 16)}${c.name}`, `data-action="cat" data-cat="${c.id}"`, ui.cat === c.id)).join('')}` : ''}
       ${chip('Відчинено зараз', 'data-action="toggle" data-key="openNow"', ui.openNow)}
       ${chip(`${icon('carSide', 16)}Виїзд до вас`, 'data-action="toggle" data-key="mobileOnly"', !!ui.mobileOnly)}
       ${chip(`${icon('bolt', 16)}Працює при відключеннях`, 'data-action="toggle" data-key="blackout"', !!ui.blackout)}
@@ -488,7 +474,7 @@ function viewCatalog() {
     <div id="list" class="stack"></div>
     <div style="margin-top:14px">${inviteCard()}</div>
     <p class="note">Демо-дані: назви, номери будинків і телефони вигадані. Список місць задається у файлі data.js.</p>
-    <p class="note"><a href="#/partner">Для бізнесу: підключити свою мийку, шиномонтаж чи СТО</a></p>`;
+    <p class="note"><a href="#/partner">Для бізнесу: підключити свою автомийку</a></p>`;
 }
 
 // ---------- сторінка бізнесу ----------
@@ -705,7 +691,7 @@ function askBlock(p) {
       </article>`;
     }).join('')}
     <form id="askform" class="card stack" data-place="${p.id}">
-      <label class="field"><span>Що потрібно зробити?</span><textarea name="text" rows="3" required maxlength="600" placeholder="Наприклад, зняти захист картера або помити дах автобудинку"></textarea></label>
+      <label class="field"><span>Що потрібно зробити?</span><textarea name="text" rows="3" required maxlength="600" placeholder="Наприклад, помити дах автобудинку чи відмити сліди фарби"></textarea></label>
       <div class="grid2 pf">
         <label class="field"><span>Ваше імʼя</span><input name="name" required autocomplete="name" value="${esc(profile.name)}"></label>
         <label class="field"><span>Ваш телефон</span><input name="phone" type="tel" required autocomplete="tel" placeholder="+380" value="${esc(profile.phone)}"></label>
@@ -1217,7 +1203,7 @@ function bookingCard(b, highlight) {
 
 // ---------- кошторис і гарантія ----------
 
-// Кошторис від СТО: клієнт погоджує пункти окремо й доплачує лише за погоджене.
+// Кошторис додаткових робіт від мийки: клієнт погоджує пункти окремо й доплачує лише за погоджене.
 function estimateBlock(b) {
   const e = b.estimate;
   if (!e) return '';
@@ -1574,7 +1560,7 @@ function viewInbox() {
     ${list.length ? `<div class="stack" style="gap:8px">${list.map((m) => `<article class="card msg-card${m.read ? '' : ' unread'}">
       <div class="head"><b>${esc(placeById(m.placeId)?.name ?? 'CARCAR')}</b><span class="small muted">${CHANNELS[m.channel] ?? ''} · ${fmtTime(m.at)}</span></div>
       <p style="margin:6px 0 0">${esc(m.text)}</p>
-      ${m.link ? `<a class="btn" href="${esc(m.link)}" style="margin-top:8px">${m.kind === 'waitlist' ? 'Записатися' : m.kind === 'tires' ? 'Записатися на перевзування' : 'Відкрити'}</a>` : ''}
+      ${m.link ? `<a class="btn" href="${esc(m.link)}" style="margin-top:8px">${m.kind === 'waitlist' ? 'Записатися' : 'Відкрити'}</a>` : ''}
     </article>`).join('')}</div>` : empty('chat', 'Повідомлень поки немає.')}
     <p class="note">Демо: розсилки, які точка надсилає у Viber чи Telegram, тут дублюються, щоб їх було видно в прототипі.</p>`;
   markRead(keys);
@@ -1590,28 +1576,21 @@ function updateInboxBadge() {
   $('#inbox-tab').setAttribute('aria-label', unread ? `Повідомлення, непрочитаних: ${unread}` : 'Повідомлення');
 }
 
-// ---------- гараж: шини на зберіганні й абонементи ----------
+// ---------- гараж: абонементи ----------
 
 // Вхід для власників точок — у профілі, а не в нижньому меню: клієнтам він не потрібен.
 const businessEntry = () => `<a class="card link-card biz-entry" href="#/partner" style="margin-top:16px">${icon('chart', 22)}<span>Для бізнесу
-    <small class="small muted" style="display:block;font-weight:400">Маєте мийку, шиномонтаж, СТО чи детейлінг? Кабінет точки й панель із записами, клієнтами й фінансами</small></span>${icon('chevR', 18)}</a>`;
+    <small class="small muted" style="display:block;font-weight:400">Маєте автомийку чи детейлінг-студію? Кабінет точки й панель із записами, клієнтами й фінансами</small></span>${icon('chevR', 18)}</a>`;
 
 function garageExtras() {
   const keys = myKeys();
-  const tires = myTires(keys);
   const passes = PLACES.flatMap((p) => passesOf(p.id).sold.filter((x) => (x.buyer === 'app' || keys.includes(x.clientKey)) && passActive(x)).map((x) => ({ ...x, place: p })));
-  if (!tires.length && !passes.length) return '';
-  const due = seasonDue();
-  return `${tires.length ? `<h2 class="big">Шини на зберіганні</h2><div class="stack" style="gap:8px">${tires.map((t) => `<section class="card stack" style="gap:6px" aria-label="Шини: ${esc(t.place.name)}">
-      <div class="head"><b>${SEASONS[t.season]} · ${t.count} шт</b><span class="small muted">${esc(t.place.name)}</span></div>
-      <span class="small">${esc(t.brand || '')} ${esc(t.size || '')}${t.rims ? ' · на дисках' : ''} · стан: ${esc(t.condition).toLowerCase()} · місце ${esc(t.slot)}</span>
-      ${tireDue(t) ? `<div class="warn-pill">${icon('wheel', 16)}Час ставити ${due === 'winter' ? 'зимові' : 'літні'} шини</div><a class="btn primary" href="#/book/${t.place.id}">Записатися на перевзування</a>` : ''}
-    </section>`).join('')}</div>` : ''}
-    ${passes.length ? `<h2 class="big">Абонементи й сертифікати</h2><div class="stack" style="gap:8px">${passes.map((x) => `<section class="card stack" style="gap:4px" aria-label="${esc(x.name)}">
+  if (!passes.length) return '';
+  return `<h2 class="big">Абонементи й сертифікати</h2><div class="stack" style="gap:8px">${passes.map((x) => `<section class="card stack" style="gap:4px" aria-label="${esc(x.name)}">
       <div class="head"><b>${esc(x.name)}</b><span class="small muted">${esc(x.place.name)}</span></div>
       <span class="small">Лишилось ${passLeft(x)} · діє до ${fmtDate(x.validUntil)}</span>
       ${x.kind === 'cert' ? `<span class="small">Код для оплати чи подарунка: <b class="code">${esc(x.code)}</b></span>` : ''}
-    </section>`).join('')}</div>` : ''}`;
+    </section>`).join('')}</div>`;
 }
 
 function viewBookings(highlightId) {
@@ -1620,7 +1599,7 @@ function viewBookings(highlightId) {
   const active = sorted.filter((b) => ACTIVE.includes(b.state));
   const rest = sorted.filter((b) => !ACTIVE.includes(b.state)).reverse();
   if (!list.length) {
-    return `<h1>Мої записи</h1>${empty('calendar', 'Записів поки немає.', '<a class="btn primary" href="#/">Знайти мийку або сервіс</a>')}${moneyCard()}${inviteCard()}`;
+    return `<h1>Мої записи</h1>${empty('calendar', 'Записів поки немає.', '<a class="btn primary" href="#/">Знайти мийку</a>')}${moneyCard()}${inviteCard()}`;
   }
   return `<h1>Мої записи</h1>
     ${moneyCard()}
@@ -1754,42 +1733,20 @@ function historyOf(car) {
 
 const currentKm = (car) => Math.max(car.mileage || 0, ...historyOf(car).map((h) => h.km || 0));
 
+// Нагадування в гаражі: час помити авто (за останньою мийкою) і поліс ОСЦПВ.
 function reminders(car) {
   const out = [];
   const now = new Date();
-  const history = historyOf(car);
-
-  const m = now.getMonth();
-  const winter = m >= 9 && m <= 10;
-  const summer = m >= 2 && m <= 3;
-  if (winter || summer) {
-    const since = isoDate(winter ? new Date(now.getFullYear(), 8, 1) : new Date(now.getFullYear(), 1, 15));
-    const done = history.find((h) => h.date >= since && /перевзування/i.test(h.text));
-    out.push(done
-      ? { level: 'ok', text: `Перевзування зроблено ${fmtDate(done.date)}` }
-      : { level: 'due', text: `Час перевзутися на ${winter ? 'зимові' : 'літні'} шини`, cat: 'tires' });
-  }
-
-  const oil = history.find((h) => /олив|масл/i.test(h.text));
-  const cur = currentKm(car);
-  if (!oil) {
-    out.push({ level: 'info', text: 'Немає даних про заміну оливи — додайте запис нижче' });
-  } else {
-    const ageMonths = (now - parseDate(oil.date)) / (30.4 * 24 * HOUR);
-    const left = oil.km && cur ? oil.km + MAINTENANCE.oilKm - cur : null;
-    if (ageMonths >= MAINTENANCE.oilMonths || (left !== null && left <= 0)) {
-      out.push({ level: 'due', text: left !== null && left <= 0 ? `Пора міняти оливу: прострочено на ${km(-left)}` : 'Пора міняти оливу: минув рік', cat: 'service' });
-    } else if (left !== null && left <= MAINTENANCE.oilWarnKm) {
-      out.push({ level: 'due', text: `Заміна оливи через ${km(left)}`, cat: 'service' });
-    } else {
-      out.push({ level: 'ok', text: left !== null ? `Олива: ще ${km(left)}` : `Оливу міняли ${fmtDate(oil.date)}` });
-    }
-  }
+  const last = historyOf(car)[0];
+  const days = last ? Math.floor((now - parseDate(last.date)) / (24 * HOUR)) : null;
+  if (days === null) out.push({ level: 'info', text: 'Ще немає мийок цього авто в CARCAR', cat: 'wash' });
+  else if (days >= MAINTENANCE.washDays) out.push({ level: 'due', text: `Авто не мили ${days} ${plural(days, 'день', 'дні', 'днів')} — час на мийку`, cat: 'wash' });
+  else out.push({ level: 'ok', text: `Остання мийка ${fmtDate(last.date)}` });
 
   if (car.insuranceUntil) {
-    const days = Math.ceil((parseDate(car.insuranceUntil) - now) / (24 * HOUR));
-    if (days < 0) out.push({ level: 'due', text: 'Поліс ОСЦПВ прострочено' });
-    else if (days <= MAINTENANCE.insuranceWarnDays) out.push({ level: 'due', text: `Поліс ОСЦПВ закінчується через ${days} ${plural(days, 'день', 'дні', 'днів')}` });
+    const left = Math.ceil((parseDate(car.insuranceUntil) - now) / (24 * HOUR));
+    if (left < 0) out.push({ level: 'due', text: 'Поліс ОСЦПВ прострочено' });
+    else if (left <= MAINTENANCE.insuranceWarnDays) out.push({ level: 'due', text: `Поліс ОСЦПВ закінчується через ${left} ${plural(left, 'день', 'дні', 'днів')}` });
     else out.push({ level: 'ok', text: `Поліс ОСЦПВ до ${fmtDate(car.insuranceUntil)}` });
   }
   return out;
@@ -1844,7 +1801,6 @@ function viewGarage() {
       <label class="field"><span>Рік випуску (необовʼязково)</span><input name="year" type="number" inputmode="numeric" min="1950" max="${new Date().getFullYear() + 1}" autocomplete="off"></label>
       <label class="field"><span>Клас</span><select name="cls">${CAR_CLASSES.map((c, i) => `<option value="${i}">${c}</option>`).join('')}</select></label>
       <label class="field"><span>Пробіг, км (необовʼязково)</span><input name="mileage" type="number" inputmode="numeric" min="0" autocomplete="off"></label>
-      <label class="field"><span>Розмір шин (необовʼязково)</span><input name="tires" placeholder="205/55 R16" autocomplete="off"></label>
       <label class="field"><span>Поліс ОСЦПВ дійсний до (необовʼязково)</span><input name="insuranceUntil" type="date"></label>`, 'Зберегти')}
     ${businessEntry()}`;
 }
@@ -1855,7 +1811,7 @@ function viewCar(id) {
   const history = historyOf(c);
   return `${back('#/garage', 'Гараж')}
     <h1 style="margin-bottom:2px">${esc(c.make)} ${esc(c.model)}</h1>
-    <div class="car-sub">${[c.plate, c.year && `${c.year} р.`, c.color, CAR_CLASSES[c.cls], c.tires && `шини ${c.tires}`].filter(Boolean).map(esc).join(' · ')}</div>
+    <div class="car-sub">${[c.plate, c.year && `${c.year} р.`, c.color, CAR_CLASSES[c.cls]].filter(Boolean).map(esc).join(' · ')}</div>
     <h2>Нагадування</h2>
     <div class="stack">${reminders(c).map(reminderRow).join('')}</div>
     <h2>Пробіг</h2>
@@ -1877,7 +1833,7 @@ function viewCar(id) {
         ${h.place || h.km ? `<div class="log-meta">${[h.place, h.km && km(h.km)].filter(Boolean).map(esc).join(' · ')}</div>` : ''}
         ${h.note ? `<div class="facts"><div class="il">${icon('chat', 18)}${esc(h.note)}</div></div>` : ''}
         ${h.photos?.length ? `<div class="thumbs">${h.photos.map((src, i) => `<img src="${esc(src)}" alt="Фото ${i + 1}">`).join('')}</div>` : ''}
-      </div>`).join('') : '<p class="muted" style="margin:0">Тут зʼявляться всі візити через CARCAR. Роботи в інших сервісах можна додати вручну.</p>'}
+      </div>`).join('') : '<p class="muted" style="margin:0">Тут зʼявляться всі візити через CARCAR. Мийки й догляд деінде можна додати вручну.</p>'}
     </div>
     <h2>Додати запис вручну</h2>
     ${carForm('logform', `
@@ -2128,7 +2084,7 @@ document.addEventListener('click', (e) => {
       .then(() => toast('Посилання скопійовано'))
       .catch(() => { $('#ref-link')?.select(); toast('Скопіюйте посилання вручну'); });
     if (action === 'share' && navigator.share) {
-      navigator.share({ title: 'CARCAR', text: `Записуйся на мийку, шиномонтаж чи СТО через CARCAR — ${uah(REFERRAL.bonus)} на перше замовлення`, url }).catch(() => {});
+      navigator.share({ title: 'CARCAR', text: `Записуйся на автомийку через CARCAR — ${uah(REFERRAL.bonus)} на перше замовлення`, url }).catch(() => {});
     } else {
       copy();
     }
@@ -2552,7 +2508,6 @@ document.addEventListener('submit', async (e) => {
     color: e.target.dataset.color || null,
     plate: normPlate(f.get('plate')),
     cls: Number(f.get('cls')),
-    tires: f.get('tires').trim(),
     mileage: Number(f.get('mileage')) || 0,
     insuranceUntil: f.get('insuranceUntil') || null,
     log: [],

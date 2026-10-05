@@ -65,14 +65,14 @@ export function chatPost(b, from, text, notify = from === 'client' ? 'biz' : 'cl
   if (notify === 'biz' || notify === 'both') b.chatUnreadBiz = true;
   if (notify === 'client' || notify === 'both') b.chatUnreadClient = true;
 }
-export const CLIENT_QUICK = ['Можна приїхати раніше?', 'Приїду з причепом', 'Залишу ключі адміністратору', 'Потрібен чек для компанії'];
+export const CLIENT_QUICK = ['Можна приїхати раніше?', 'Приїду з багажником на даху', 'Залишу ключі адміністратору', 'Потрібен чек для компанії'];
 export const BIZ_QUICK = ['Так, чекаємо', 'Можна на 30 хв раніше', 'На жаль, ні — лише у ваш час', 'Майстер передзвонить'];
 
 // ---------- кошторис і гарантія ----------
 
-// Кошторис СТО: роботи й запчастини з цінами; клієнт погоджує кожен пункт окремо.
+// Кошторис додаткових робіт: роботи й матеріали з цінами; клієнт погоджує кожен пункт окремо.
 // warranty — гарантія в місяцях від дня виконання.
-export const ITEM_KIND = { work: 'Робота', part: 'Запчастина' };
+export const ITEM_KIND = { work: 'Робота', part: 'Матеріал' };
 export const itemSum = (x) => Math.round(x.qty * x.price);
 export const estimateTotal = (items, status) => items.filter((x) => !status || x.status === status).reduce((a, x) => a + itemSum(x), 0);
 export function warrantyUntil(iso, months) {
@@ -282,34 +282,6 @@ export function restorePass(placeId, use) {
     ? { ...s, visitsLeft: s.visitsLeft + 1, history: [...s.history, { at: Date.now(), amount: -use.amount, note: 'повернення' }] }
     : { ...s, balance: s.balance + use.amount, history: [...s.history, { at: Date.now(), amount: -use.amount, note: 'повернення' }] }));
   savePasses(placeId, { sold });
-}
-
-// ---------- шинний готель ----------
-
-export const SEASONS = { winter: 'Зимові', summer: 'Літні', all: 'Всесезонні' };
-export const TIRE_STATE = ['Нові', 'Добрий', 'Задовільний', 'Потребують заміни'];
-export const tiresOf = (placeId) => store.peek('biz.tires', {})[placeId] ?? [];
-
-export function saveTires(placeId, list) {
-  const all = store.get('biz.tires', {});
-  all[placeId] = list;
-  store.set('biz.tires', all);
-}
-
-// Сезон перевзування в Києві: з 1 жовтня до 30 листопада — на зимові, з 15 березня до 30 квітня — на літні.
-export function seasonDue(date = new Date()) {
-  const m = date.getMonth() + 1;
-  const d = date.getDate();
-  if (m === 10 || m === 11) return 'winter';
-  if ((m === 3 && d >= 15) || m === 4) return 'summer';
-  return null;
-}
-
-// Комплект на зберіганні, який пора забрати й поставити.
-export const tireDue = (t, date = new Date()) => t.status === 'stored' && t.season === seasonDue(date);
-
-export function myTires(keys) {
-  return PLACES.flatMap((p) => tiresOf(p.id).filter((t) => t.status === 'stored' && keys.includes(t.clientKey)).map((t) => ({ ...t, place: p })));
 }
 
 export const clientKeyOf = (phone, car) => phoneKey(phone) ?? (car ? `car:${car}` : null);

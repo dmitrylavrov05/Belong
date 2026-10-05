@@ -4,7 +4,12 @@ import AxeBuilder from '@axe-core/playwright';
 // Неділя, 4 жовтня 2026, 10:00.
 const TILE = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page }, testInfo) => {
+  // Усі точки — мийки, тож акція «Перша мийка −30%» діяла б у кожному тесті. Вимикаємо її,
+  // крім тестів промокодів і маркетингу.
+  if (!/промокод|маркетинг/i.test(testInfo.title)) {
+    await page.addInitScript(() => localStorage.getItem('carcar.admin.promos') ?? localStorage.setItem('carcar.admin.promos', '[]'));
+  }
   await page.clock.setFixedTime(new Date(2026, 9, 4, 10, 0));
   // Акцію «Перша мийка −30%» перевіряє features.spec.js — тут ціни без неї.
   await page.addInitScript(() => localStorage.getItem('carcar.admin.promos') ?? localStorage.setItem('carcar.admin.promos', '[]'));
@@ -21,7 +26,7 @@ test.afterEach(async ({ page }) => {
 
 const PANEL = '/business.html';
 
-async function book(page, { place = 'koleso', service = /Сезонне перевзування/, day = /Завтра/, time = '10:00', price = '900 ₴' } = {}) {
+async function book(page, { place = 'hvylia', service = /Комплекс преміум/, day = /Завтра/, time = '10:00', price = '900 ₴' } = {}) {
   await page.goto(`/#/book/${place}`);
   await page.getByLabel(service).check();
   if (day) await page.getByRole('button', { name: day }).click();
@@ -42,17 +47,17 @@ test('нагадування напередодні й за 2 години: «З
   await expect(page.locator('#toast')).toHaveText('Точка знає: запізнюєтесь на 15 хв');
   await expect(bar.getByRole('button', { name: 'Ще на 15 хв' })).toBeVisible();
   await page.goto('/#/inbox');
-  await expect(page.locator('.msg-card').first()).toContainText('Нагадуємо: завтра о 10:00 — Шиномонтаж «Колесо»');
+  await expect(page.locator('.msg-card').first()).toContainText('Нагадуємо: завтра о 10:00 — Автомийка «Хвиля»');
 
   await page.clock.setFixedTime(new Date(2026, 9, 5, 8, 15));
   await page.goto('/#/bookings');
   await page.getByRole('group', { name: 'Візит сьогодні о 10:00' }).getByRole('button', { name: 'Їду' }).click();
   await expect(page.locator('#toast')).toHaveText('Точка знає, що ви їдете');
   await page.goto('/#/inbox');
-  await expect(page.locator('.msg-card').first()).toContainText('Через 1 год 45 хв — Шиномонтаж «Колесо», 10:00');
+  await expect(page.locator('.msg-card').first()).toContainText('Через 1 год 45 хв — Автомийка «Хвиля», 10:00');
 
   await page.goto(`${PANEL}#/schedule/2026-10-05`);
-  await page.getByLabel('Точка').selectOption({ label: 'Шиномонтаж «Колесо»' });
+  await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
   await expect(page.locator('.slot-block').first()).toContainText('їде, запізниться на 15 хв');
 });
 
@@ -65,7 +70,7 @@ test('повтор запису в один дотик: ті самі послу
   await page.getByRole('link', { name: 'Повторити запис' }).click();
   await expect(page.locator('#toast')).toContainText('о 10:00 — лишилось оплатити');
   await expect(page.getByRole('dialog', { name: 'Оплата' })).toBeVisible();
-  await expect(page.getByLabel(/Сезонне перевзування/)).toBeChecked();
+  await expect(page.getByLabel(/Комплекс преміум/)).toBeChecked();
   // Гроші за скасований запис уже на балансі CARCAR — ним і оплачуємо.
   await page.getByRole('button', { name: 'Оплатити з балансу' }).click();
   await expect(page.locator('article').first()).toContainText('10:00');
@@ -114,11 +119,11 @@ test('відгук із фото й відповідь точки в спові�
   await expect(page.locator('#toast')).toHaveText('Дякуємо за відгук!');
   await expect(page.locator('.my-review img')).toHaveCount(1);
 
-  await page.goto('/#/place/koleso');
+  await page.goto('/#/place/hvylia');
   await expect(page.locator('.review img[alt="Фото клієнта 1"]')).toBeVisible();
 
   await page.goto(`${PANEL}#/reviews`);
-  await page.getByLabel('Точка').selectOption({ label: 'Шиномонтаж «Колесо»' });
+  await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
   await expect(page.locator('article img[alt="Фото клієнта 1"]')).toBeVisible();
   await page.getByLabel('Відповісти').fill('Дякуємо, чекаємо навесні!');
   await page.getByRole('button', { name: 'Відповісти' }).click();

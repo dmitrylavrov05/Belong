@@ -2,7 +2,12 @@ import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 // Той самий фіксований час, що й у тестах застосунку: неділя, 4 жовтня 2026, 10:00.
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page }, testInfo) => {
+  // Усі точки — мийки, тож акція «Перша мийка −30%» діяла б у кожному тесті. Вимикаємо її,
+  // крім тестів промокодів і маркетингу.
+  if (!/промокод|маркетинг/i.test(testInfo.title)) {
+    await page.addInitScript(() => localStorage.getItem('carcar.admin.promos') ?? localStorage.setItem('carcar.admin.promos', '[]'));
+  }
   await page.clock.setFixedTime(new Date(2026, 9, 4, 10, 0));
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -75,20 +80,20 @@ test('порожня панель пропонує демо-історію, а �
 
 test('запис із журналу займає час у застосунку клієнта', async ({ page }) => {
   await page.goto(`${PANEL}#/settings`);
-  await selectPlace(page, 'Шиномонтаж «Колесо»');
+  await selectPlace(page, 'Автомийка «Хвиля»');
   await page.getByLabel('Кількість боксів').fill('1');
   await page.getByRole('button', { name: 'Зберегти', exact: true }).click();
   await expect(page.locator('#toast')).toHaveText('Профіль збережено');
 
   await page.goto(`${PANEL}#/schedule`);
-  await addCrmBooking(page, { name: 'Тестовий Клієнт', phone: '+380 50 000 00 01', service: /Сезонне перевзування/, time: '10:00' });
+  await addCrmBooking(page, { name: 'Тестовий Клієнт', phone: '+380 50 000 00 01', service: /Комплекс преміум/, time: '10:00' });
   await expect(page).toHaveURL(/#\/schedule\/2026-10-05/);
   const block = page.locator('.slot-block', { hasText: 'Тестовий Клієнт' });
   await expect(block).toContainText('10:00–10:50');
   await expect(block).toContainText('Телефон · Записано');
 
-  await page.goto('/#/book/koleso');
-  await page.getByLabel(/Сезонне перевзування/).check();
+  await page.goto('/#/book/hvylia');
+  await page.getByLabel(/Комплекс преміум/).check();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await expect(page.locator('.slot[data-time="10:00"]')).toBeDisabled();
   await expect(page.locator('.slot[data-time="09:30"]')).toBeDisabled();
@@ -97,8 +102,8 @@ test('запис із журналу займає час у застосунку
 
 test('виконаний запис зʼявляється в клієнтах і виручці, нотатки й мітки зберігаються', async ({ page }) => {
   await page.goto(`${PANEL}#/schedule`);
-  await selectPlace(page, 'Шиномонтаж «Колесо»');
-  await addCrmBooking(page, { name: 'Олена Тест', phone: '+380 50 000 00 02', service: /Сезонне перевзування/, date: '2026-10-04', time: '11:00' });
+  await selectPlace(page, 'Автомийка «Хвиля»');
+  await addCrmBooking(page, { name: 'Олена Тест', phone: '+380 50 000 00 02', service: /Комплекс преміум/, date: '2026-10-04', time: '11:00' });
 
   await page.locator('.slot-block', { hasText: 'Олена Тест' }).click();
   const drawer = page.getByRole('dialog');
@@ -129,32 +134,32 @@ test('виконаний запис зʼявляється в клієнтах �
 
 test('прайс із панелі одразу бачать клієнти', async ({ page }) => {
   await page.goto(`${PANEL}#/services`);
-  await selectPlace(page, 'Шиномонтаж «Колесо»');
-  await page.getByLabel('Ціна, Легкове: Сезонне перевзування (4 колеса)').fill('1000');
-  await page.getByLabel('Активна: Ремонт проколу').uncheck();
+  await selectPlace(page, 'Автомийка «Хвиля»');
+  await page.getByLabel('Ціна, Легкове: Комплекс преміум: кузов, салон, віск').fill('1000');
+  await page.getByLabel('Активна: Чорніння шин').uncheck();
   await page.getByRole('button', { name: 'Додати послугу' }).click();
-  await page.getByLabel('Назва послуги 6').fill('Перевірка тиску в шинах');
+  await page.getByLabel('Назва послуги 5').fill('Перевірка тиску в шинах');
   await page.getByLabel('Тривалість, хв: Перевірка тиску в шинах').fill('10');
   await page.getByLabel('Ціна, Легкове: Перевірка тиску в шинах').fill('100');
   await page.getByRole('button', { name: 'Зберегти прайс' }).click();
   await expect(page.locator('#toast')).toHaveText('Прайс збережено — клієнти вже бачать нові ціни');
 
-  await page.goto('/#/place/koleso');
-  await expect(page.locator('.item', { hasText: 'Сезонне перевзування' })).toContainText('1 000 ₴');
-  await expect(page.getByText('Ремонт проколу')).toHaveCount(0);
+  await page.goto('/#/place/hvylia');
+  await expect(page.locator('.item', { hasText: 'Комплекс преміум' })).toContainText('1 000 ₴');
+  await expect(page.locator('.item', { hasText: 'Чорніння шин' })).toHaveCount(0);
   await expect(page.locator('.item', { hasText: 'Перевірка тиску в шинах' })).toContainText('100 ₴');
 
   await page.goto(`${PANEL}#/services`);
   page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Повернути стандартний прайс' }).click();
-  await page.goto('/#/place/koleso');
-  await expect(page.locator('.item', { hasText: 'Сезонне перевзування' })).toContainText('900 ₴');
+  await page.goto('/#/place/hvylia');
+  await expect(page.locator('.item', { hasText: 'Комплекс преміум' })).toContainText('900 ₴');
 });
 
 test('відповідь на відгук видно на сторінці точки', async ({ page }) => {
   // Клієнт записується, підтверджує виконання й залишає відгук.
-  await page.goto('/#/book/koleso');
-  await page.getByLabel(/Сезонне перевзування/).check();
+  await page.goto('/#/book/hvylia');
+  await page.getByLabel(/Комплекс преміум/).check();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await page.locator('.slot:not([disabled])').first().click();
   await page.locator('[data-action="confirm"]').click();
@@ -166,27 +171,27 @@ test('відповідь на відгук видно на сторінці то
   await page.getByRole('button', { name: 'Надіслати відгук' }).click();
 
   await page.goto(`${PANEL}#/reviews`);
-  await selectPlace(page, 'Шиномонтаж «Колесо»');
+  await selectPlace(page, 'Автомийка «Хвиля»');
   await expect(page.locator('#nav')).toContainText('1');
   await page.getByLabel('Відповісти').fill('Дякуємо, чекаємо навесні!');
   await page.getByRole('button', { name: 'Відповісти' }).click();
   await expect(page.locator('#toast')).toHaveText('Відповідь опубліковано на сторінці точки');
 
-  await page.goto('/#/place/koleso');
+  await page.goto('/#/place/hvylia');
   await expect(page.locator('.review .reply')).toContainText('Дякуємо, чекаємо навесні!');
 });
 
 test('фінанси: замовлення через CARCAR, заморожування, виплата й експорт', async ({ page }) => {
-  await page.goto('/#/book/koleso');
-  await page.getByLabel(/Сезонне перевзування/).check();
+  await page.goto('/#/book/hvylia');
+  await page.getByLabel(/Комплекс преміум/).check();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await page.locator('.slot:not([disabled])').first().click();
   await page.locator('[data-action="confirm"]').click();
   await page.getByRole('button', { name: 'Оплатити 900 ₴' }).click();
 
   await page.goto(`${PANEL}#/finance`);
-  await selectPlace(page, 'Шиномонтаж «Колесо»');
-  const row = page.locator('tbody tr', { hasText: 'Сезонне перевзування' });
+  await selectPlace(page, 'Автомийка «Хвиля»');
+  const row = page.locator('tbody tr', { hasText: 'Комплекс преміум' });
   await expect(row).toContainText('У роботі');
 
   // Майстер позначає «Машина готова» з журналу, клієнт підтверджує в застосунку.
@@ -206,11 +211,11 @@ test('фінанси: замовлення через CARCAR, заморожув
 
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Експорт CSV' }).click();
-  expect((await download).suggestedFilename()).toBe('carcar-finance-koleso.csv');
+  expect((await download).suggestedFilename()).toBe('carcar-finance-hvylia.csv');
 
   await expect(page.getByRole('link', { name: 'Вказати реквізити для виплат' })).toBeVisible();
   await page.evaluate(() => localStorage.setItem('carcar.partners', JSON.stringify({
-    koleso: { status: 'approved', payout: { iban: 'UA223052990000026001234567890', holder: 'ФОП Тест', code: '1234567899', verified: true } },
+    hvylia: { status: 'approved', payout: { iban: 'UA223052990000026001234567890', holder: 'ФОП Тест', code: '1234567899', verified: true } },
   })));
   await page.reload();
   page.once('dialog', (d) => d.accept());
@@ -255,7 +260,7 @@ test('картка клієнта й бічна панель запису дос
 
 test('графік: вихідний, перерва, особлива дата й горизонт запису видно клієнту', async ({ page }) => {
   await page.goto(`${PANEL}#/settings`);
-  await selectPlace(page, 'Шиномонтаж «Колесо»');
+  await selectPlace(page, 'Автомийка «Хвиля»');
   const form = page.locator('#settings-form');
   await form.getByRole('checkbox', { name: 'Понеділок' }).uncheck();
   await expect(form.getByLabel('Відкриття, Понеділок')).toBeDisabled();
@@ -277,8 +282,8 @@ test('графік: вихідний, перерва, особлива дата 
   await page.goto(`${PANEL}#/schedule/2026-10-05`);
   await expect(page.locator('.notice.warn')).toContainText('вихідний');
 
-  await page.goto('/#/book/koleso');
-  await page.getByLabel(/Сезонне перевзування/).check();
+  await page.goto('/#/book/hvylia');
+  await page.getByLabel(/Комплекс преміум/).check();
   await expect(page.getByRole('button', { name: /Завтра/ })).toBeDisabled();
   await expect(page.locator('.day[data-date="2026-10-06"]')).toBeDisabled();
   await expect(page.locator('.day[data-date="2026-10-06"]')).toContainText('вихідний');
@@ -297,7 +302,7 @@ test('графік: вихідний, перерва, особлива дата 
 
 test('персональна послуга з індивідуальною ціною: клієнт бачить її й оплачує', async ({ page }) => {
   await page.goto(`${PANEL}#/clients`);
-  await selectPlace(page, 'Шиномонтаж «Колесо»');
+  await selectPlace(page, 'Автомийка «Хвиля»');
   await page.getByRole('button', { name: 'Новий клієнт' }).click();
   const drawer = page.getByRole('dialog');
   await drawer.getByLabel('Імʼя клієнта').fill('Марина Постійна');
@@ -309,7 +314,7 @@ test('персональна послуга з індивідуальною ці
 
   await page.getByRole('button', { name: 'Додати персональну послугу' }).click();
   await drawer.getByLabel('Основа').selectOption({ index: 1 });
-  await expect(drawer.getByLabel('Назва послуги')).toHaveValue(/Сезонне перевзування/);
+  await expect(drawer.getByLabel('Назва послуги')).toHaveValue(/Комплекс преміум/);
   await drawer.getByLabel('Ціна для клієнта, ₴').fill('700');
   await drawer.getByLabel('Примітка для клієнта').fill('Ціна для постійного клієнта');
   await drawer.getByRole('button', { name: 'Зберегти послугу' }).click();
@@ -321,18 +326,18 @@ test('персональна послуга з індивідуальною ці
   await expect(page.locator('#client-rows tr', { hasText: 'Марина Постійна' })).toContainText('Toyota RAV4');
 
   // Інший телефон — персональної послуги не видно.
-  await page.goto('/#/place/koleso');
+  await page.goto('/#/place/hvylia');
   await expect(page.getByText('Тільки для вас')).toHaveCount(0);
 
   // Клієнт із цим телефоном (у іншому форматі) бачить і оплачує персональну ціну.
   await page.goto('/#/garage');
   await page.locator('#profileform').getByLabel('Телефон').fill('+380671112233');
   await page.locator('#profileform').getByRole('button', { name: 'Зберегти профіль' }).click();
-  await page.goto('/#/place/koleso');
+  await page.goto('/#/place/hvylia');
   await expect(page.getByRole('heading', { name: 'Тільки для вас' })).toBeVisible();
   await expect(page.locator('.personal-list')).toContainText('700 ₴');
-  await page.goto('/#/book/koleso');
-  await page.getByLabel(/Сезонне перевзування.*Для вас|Для вас.*Сезонне/).check();
+  await page.goto('/#/book/hvylia');
+  await page.getByLabel(/Для вас.*Комплекс преміум/).check();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await page.locator('.slot:not([disabled])').first().click();
   await page.locator('[data-action="confirm"]').click();
@@ -349,7 +354,7 @@ test('персональна послуга з індивідуальною ці
 
 test('імпорт клієнтів, прайсу й записів з CSV іншої CRM', async ({ page }) => {
   await page.goto(`${PANEL}#/import`);
-  await selectPlace(page, 'Шиномонтаж «Колесо»');
+  await selectPlace(page, 'Автомийка «Хвиля»');
 
   // Клієнти: роздільник «;», назви стовпців російською, той самий телефон двічі.
   await page.getByLabel('Або вставте рядки з таблиці (разом із заголовками)').fill(
@@ -364,7 +369,7 @@ test('імпорт клієнтів, прайсу й записів з CSV ін�
   // Прайс: кома як роздільник, ціни з «грн».
   await page.getByRole('button', { name: 'Послуги й ціни' }).click();
   await page.getByLabel('Або вставте рядки з таблиці (разом із заголовками)').fill(
-    'Услуга,Цена легковой,Цена кроссовер,Длительность\nСезонне перевзування (4 колеса),950 грн,1100 грн,50\nПравка дисків,600,700,60');
+    'Услуга,Цена легковой,Цена кроссовер,Длительность\n"Комплекс преміум: кузов, салон, віск",950 грн,1100 грн,50\nЧистка дисків,600,700,60');
   await page.getByRole('button', { name: 'Розібрати' }).click();
   await page.getByRole('button', { name: /Імпортувати 2 рядки/ }).click();
   await expect(page.locator('#toast')).toHaveText('Імпорт завершено: додано 1, оновлено 1, пропущено 0');
@@ -372,7 +377,7 @@ test('імпорт клієнтів, прайсу й записів з CSV ін�
   // Записи: дата й час в одній клітинці, статуси й оплата словами.
   await page.getByRole('button', { name: 'Записи й історія' }).click();
   await page.getByLabel('Або вставте рядки з таблиці (разом із заголовками)').fill(
-    'Дата и время\tКлиент\tТелефон\tУслуги\tСумма\tОплата\tСтатус\n20.09.2026 11:00\tПетро Імпорт\t0501234567\tПравка дисків\t600\tналичные\tВыполнен\n21.09.2026 12:00\tОксана Імпорт\t0991234567\tПравка дисків\t600\t\tОтменен\n05.10.2026 09:00\tОксана Імпорт\t0991234567\tПравка дисків\t600\t\tОжидает\nдата?\t\t\t\t\t\t');
+    'Дата и время\tКлиент\tТелефон\tУслуги\tСумма\tОплата\tСтатус\n20.09.2026 11:00\tПетро Імпорт\t0501234567\tЧистка дисків\t600\tналичные\tВыполнен\n21.09.2026 12:00\tОксана Імпорт\t0991234567\tЧистка дисків\t600\t\tОтменен\n05.10.2026 09:00\tОксана Імпорт\t0991234567\tЧистка дисків\t600\t\tОжидает\nдата?\t\t\t\t\t\t');
   await page.getByRole('button', { name: 'Розібрати' }).click();
   await page.getByRole('button', { name: /Імпортувати 4 рядки/ }).click();
   await expect(page.locator('#toast')).toHaveText('Імпорт завершено: додано 3, оновлено 0, пропущено 1');
@@ -386,15 +391,15 @@ test('імпорт клієнтів, прайсу й записів з CSV ін�
   // Імпортований майбутній запис займає бокс у застосунку клієнта, а нова послуга є в прайсі.
   await page.goto(`${PANEL}#/schedule/2026-10-05`);
   await expect(page.locator('.slot-block', { hasText: 'Оксана Імпорт' })).toContainText('09:00–10:00');
-  await page.goto('/#/place/koleso');
-  await expect(page.locator('.item', { hasText: 'Сезонне перевзування' })).toContainText('950 ₴');
-  await expect(page.locator('.item', { hasText: 'Правка дисків' })).toContainText('600 ₴');
+  await page.goto('/#/place/hvylia');
+  await expect(page.locator('.item', { hasText: 'Комплекс преміум' })).toContainText('950 ₴');
+  await expect(page.locator('.item', { hasText: 'Чистка дисків' })).toContainText('600 ₴');
 
   // Повторний імпорт тих самих записів не створює дублів.
   await page.goto(`${PANEL}#/import`);
   await page.getByRole('button', { name: 'Записи й історія' }).click();
   await page.getByLabel('Або вставте рядки з таблиці (разом із заголовками)').fill(
-    'Дата\tЧас\tКлієнт\tТелефон\tПослуги\n05.10.2026\t09:00\tОксана Імпорт\t0991234567\tПравка дисків');
+    'Дата\tЧас\tКлієнт\tТелефон\tПослуги\n05.10.2026\t09:00\tОксана Імпорт\t0991234567\tЧистка дисків');
   await page.getByRole('button', { name: 'Розібрати' }).click();
   await page.getByRole('button', { name: /Імпортувати 1 рядок/ }).click();
   await expect(page.locator('#toast')).toHaveText('Імпорт завершено: додано 0, оновлено 0, пропущено 1');
@@ -402,7 +407,7 @@ test('імпорт клієнтів, прайсу й записів з CSV ін�
 
 test('витрати й звіт про прибутки: разові й щомісячні', async ({ page }) => {
   await page.goto(`${PANEL}#/expenses`);
-  await selectPlace(page, 'Шиномонтаж «Колесо»');
+  await selectPlace(page, 'Автомийка «Хвиля»');
   await page.getByRole('button', { name: 'Додати витрату' }).first().click();
   const drawer = page.getByRole('dialog');
   await drawer.getByLabel('Сума, ₴').fill('10000');
@@ -427,7 +432,7 @@ test('витрати й звіт про прибутки: разові й щом
 
   // Виконаний запис з оплатою на місці — дохід.
   await page.goto(`${PANEL}#/schedule`);
-  await addCrmBooking(page, { name: 'Дохід Тест', phone: '+380 50 000 00 09', service: /Сезонне перевзування/, date: '2026-10-04', time: '11:00' });
+  await addCrmBooking(page, { name: 'Дохід Тест', phone: '+380 50 000 00 09', service: /Комплекс преміум/, date: '2026-10-04', time: '11:00' });
   await page.locator('.slot-block', { hasText: 'Дохід Тест' }).click();
   await page.getByRole('dialog').getByLabel('Готівка').check();
   await page.getByRole('dialog').getByRole('button', { name: 'Виконано й оплачено' }).click();
@@ -445,7 +450,7 @@ test('витрати й звіт про прибутки: разові й щом
 
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Експорт звіту' }).click();
-  expect((await download).suggestedFilename()).toMatch(/^carcar-pnl-koleso-/);
+  expect((await download).suggestedFilename()).toMatch(/^carcar-pnl-hvylia-/);
 
   // Зупинка щомісячного платежу: майбутні місяці не нараховуються.
   await page.goto(`${PANEL}#/expenses`);
@@ -455,8 +460,8 @@ test('витрати й звіт про прибутки: разові й щом
 });
 
 test('нагадування клієнту підтвердити виконання', async ({ page }) => {
-  await page.goto('/#/book/koleso');
-  await page.getByLabel(/Сезонне перевзування/).check();
+  await page.goto('/#/book/hvylia');
+  await page.getByLabel(/Комплекс преміум/).check();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await page.locator('.slot:not([disabled])').first().click();
   await page.locator('[data-action="confirm"]').click();
@@ -464,7 +469,7 @@ test('нагадування клієнту підтвердити викона�
 
   await page.clock.setFixedTime(new Date(2026, 9, 5, 21, 30));
   await page.goto(`${PANEL}#/schedule/2026-10-05`);
-  await selectPlace(page, 'Шиномонтаж «Колесо»');
+  await selectPlace(page, 'Автомийка «Хвиля»');
   await page.locator('.slot-block').first().click();
   const drawer = page.getByRole('dialog');
   await expect(drawer.locator('.notice.warn')).toContainText('Час візиту минув');
@@ -478,13 +483,13 @@ test('нагадування клієнту підтвердити викона�
   await expect(page.getByText(/Точка нагадала/)).toBeVisible();
   await page.getByRole('button', { name: 'Усе добре' }).click();
   await page.goto(`${PANEL}#/finance`);
-  await expect(page.locator('tbody tr', { hasText: 'Сезонне перевзування' })).toContainText('Заморожено');
+  await expect(page.locator('tbody tr', { hasText: 'Комплекс преміум' })).toContainText('Заморожено');
 });
 
 test('клієнт не знайшов послугу: пише точці, точка відповідає й додає послугу', async ({ page }) => {
-  await page.goto('/#/book/koleso');
+  await page.goto('/#/book/hvylia');
   await page.getByRole('link', { name: 'Не знайшли потрібну послугу? Напишіть точці' }).click();
-  await expect(page).toHaveURL(/#\/place\/koleso\/ask/);
+  await expect(page).toHaveURL(/#\/place\/hvylia\/ask/);
   const ask = page.locator('#askform');
   await ask.getByLabel('Що потрібно зробити?').fill('Чи можете відрихтувати диск R17?');
   await ask.getByLabel('Ваше імʼя').fill('Андрій Запит');
@@ -495,7 +500,7 @@ test('клієнт не знайшов послугу: пише точці, то
 
   // Точка бачить запит у панелі з лічильником і відповідає.
   await page.goto(PANEL);
-  await selectPlace(page, 'Шиномонтаж «Колесо»');
+  await selectPlace(page, 'Автомийка «Хвиля»');
   await expect(page.locator('#nav').getByRole('link', { name: /Запити клієнтів/ })).toContainText('1');
   await page.locator('#nav').getByRole('link', { name: /Запити клієнтів/ }).click();
   const req = page.locator('article.req', { hasText: 'Андрій Запит' });
@@ -508,7 +513,7 @@ test('клієнт не знайшов послугу: пише точці, то
   // Додає персональну послугу саме для цього клієнта.
   await req.getByRole('button', { name: 'Додати послугу' }).click();
   const drawer = page.getByRole('dialog');
-  await drawer.getByLabel('Назва послуги').fill('Рихтування литого диска R17');
+  await drawer.getByLabel('Назва послуги').fill('Хімчистка сидінь R17');
   await drawer.getByLabel('Ціна, ₴').fill('650');
   await drawer.getByLabel('Тривалість, хв').fill('60');
   await drawer.getByLabel('Лише для цього клієнта').check();
@@ -521,12 +526,12 @@ test('клієнт не знайшов послугу: пише точці, то
   // Клієнт бачить відповідь у «Повідомленнях» і персональну послугу на сторінці точки.
   await page.goto('/#/inbox');
   await expect(page.locator('#inbox-tab .tab-count')).toHaveText('1');
-  await page.getByRole('link', { name: /Шиномонтаж «Колесо».*Послугу додано/ }).click();
+  await page.getByRole('link', { name: /Автомийка «Хвиля».*Послугу додано/ }).click();
   await expect(page.locator('.req .thread')).toContainText('Так, робимо, близько години');
-  await expect(page.locator('.req')).toContainText('Рихтування литого диска R17 — 650 ₴');
-  await expect(page.locator('.personal-list')).toContainText('Рихтування литого диска R17');
+  await expect(page.locator('.req')).toContainText('Хімчистка сидінь R17 — 650 ₴');
+  await expect(page.locator('.personal-list')).toContainText('Хімчистка сидінь R17');
   await page.locator('.req').getByRole('link', { name: 'Записатися' }).click();
-  await expect(page.getByLabel(/Рихтування литого диска R17/)).toBeVisible();
+  await expect(page.getByLabel(/Хімчистка сидінь R17/)).toBeVisible();
 
   // Послуга для всіх потрапляє в загальний прайс.
   await page.goto('/#/place/blysk');
