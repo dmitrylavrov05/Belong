@@ -323,6 +323,7 @@ function viewReviews() {
     ${list.length ? list.map((r) => `<article class="panel stack" style="gap:8px" aria-label="Відгук про ${esc(placeName(r.placeId))}">
       <div class="head"><div><b>${esc(placeName(r.placeId))}</b><small class="muted" style="display:block">${fmtDate(r.date)} · ${esc(r.services)}</small></div>${stars(r.stars)}</div>
       ${r.text ? `<p style="margin:0">${esc(r.text)}</p>` : '<p class="muted" style="margin:0">Без тексту, лише оцінка.</p>'}
+      ${r.photos?.length ? `<div class="photos">${r.photos.map((src, i) => `<img src="${esc(src)}" alt="Фото клієнта ${i + 1}">`).join('')}</div>` : ''}
       ${r.reply ? `<p class="small" style="margin:0"><b>Відповідь точки:</b> ${esc(r.reply.text)}</p>` : ''}
       ${r.report ? `<p class="notice ${r.report.status === 'open' ? 'warn' : ''}" style="margin:0"><b>Скарга точки ${fmtTime(r.report.at)}</b>${esc(r.report.reason)}${r.report.status === 'rejected' ? ' — відхилено' : r.report.status === 'accepted' ? ' — прийнято' : ''}</p>` : ''}
       ${r.hidden ? `<div class="row"><span class="pill muted">Приховано: ${esc(r.hidden.reason)}</span><button class="btn" data-action="review-restore" data-id="${r.id}">Повернути відгук</button></div>`

@@ -6,11 +6,12 @@ import {
   POWER, powerOf, worksInBlackout,
 } from './core.js';
 import {
-  CHANNELS, inboxFor, markRead, dealsOf, dealsOn, weeklyDealsOf, daysText, dealAt, dealPrice, dealCovers, hotDeals, queueOf, queueEnabled, saveQueue, queueEstimate,
+  CHANNELS, inboxFor, markRead, sendMessages, dealsOf, dealsOn, weeklyDealsOf, daysText, dealAt, dealPrice, dealCovers, hotDeals, queueOf, queueEnabled, saveQueue, queueEstimate,
   checkWaitlist, openStarts, passesOf, sellPass, passActive, passLeft, usableSubs, findCert, redeemPass, restorePass,
   SEASONS, myTires, tireDue, seasonDue,
 } from './ops.js';
 import { mountMap } from './map.js';
+import { lookupPlate, normPlate, DEMO_PLATES } from './vehicles.js';
 
 // ---------- сховище (лише на цьому пристрої) ----------
 
@@ -150,7 +151,8 @@ const bookingDays = (p) => nextDays(scheduleOf(p).horizon);
 const firstOpenDay = (p) => bookingDays(p).find((d) => hoursFor(p, d)) ?? bookingDays(p)[0];
 
 // Ключі, за якими точка знає цього клієнта: телефон із профілю й авто з гаража.
-const myKeys = () => [phoneKey(profile.phone), ...cars.map((c) => `car:${carLabel(c)}`)].filter(Boolean);
+// 'device' — сповіщення самого застосунку (нагадування, відповіді на відгуки) навіть без телефону в профілі.
+const myKeys = () => [phoneKey(profile.phone), ...cars.map((c) => `car:${carLabel(c)}`), 'device'].filter(Boolean);
 const personalFor = (p) => offersOf(p.id).filter((o) => myKeys().includes(o.clientKey)).map(offerAsService);
 // Усе, що клієнт може замовити в точці: спершу персональні послуги, далі прайс.
 const bookable = (p) => [...personalFor(p), ...p.services];
@@ -365,7 +367,7 @@ function track(type, data = {}) {
 // ---------- карта ----------
 
 let mapApi = null;
-const mapState = {};
+const mapState = { layer: store.get('mapLayer', undefined) };
 
 function mapPin(p) {
   const open = isOpenNow(p);
@@ -394,7 +396,7 @@ function renderMap(list) {
     $('#list').innerHTML = `<div class="map" id="map" tabindex="0" role="region" aria-label="Карта точок. Стрілки зсувають карту, плюс і мінус змінюють масштаб"></div>
       <div id="map-card" aria-live="polite"></div>`;
     mapApi = mountMap($('#map'), {
-      places: list.map(mapPin), pos: ui.pos, state: mapState,
+      places: list.map(mapPin), pos: ui.pos, state: mapState, onLayer: (l) => store.set('mapLayer', l),
       onSelect: (id) => { $('#map-card').innerHTML = mapCard(id); track('map_pin', { placeId: id }); },
     });
   } else mapApi.setPins(list.map(mapPin));
@@ -451,10 +453,13 @@ function viewCatalog() {
 
 // ---------- сторінка бізнесу ----------
 
+const reviewPhotos = (r) => (r.photos?.length ? `<div class="photos review-photos">${r.photos.map((src, i) => `<img src="${esc(src)}" alt="Фото клієнта ${i + 1}">`).join('')}</div>` : '');
+
 function reviewItem(r) {
   return `<article class="review">
     <div class="head">${stars(r.stars)}<span class="small muted">${fmtDate(r.date)}</span></div>
     ${r.text ? `<p>${esc(r.text)}</p>` : ''}
+    ${reviewPhotos(r)}
     <div class="small muted">${icon('checkCircle', 14)}Підтверджений візит · ${esc(r.services)}</div>
     ${r.reply ? `<div class="reply"><b>Відповідь точки</b>${esc(r.reply.text)}</div>` : ''}
   </article>`;
@@ -841,7 +846,7 @@ function renderBook() {
         <label class="field"><span>Ваше імʼя</span><input id="pf-name" autocomplete="name" value="${esc(draft.pfName ?? profile.name)}"></label>
         <label class="field"><span>Телефон</span><input id="pf-phone" type="tel" autocomplete="tel" placeholder="+380" value="${esc(draft.pfPhone ?? profile.phone)}"></label>
       </div>
-      <label class="row small"><input class="check" type="checkbox" id="pf-optin" ${(draft.pfOptIn ?? profile.optIn) ? 'checked' : ''}>Отримувати пропозиції цієї точки у Viber чи Telegram</label>
+      <label class="check-row small"><input class="check" type="checkbox" id="pf-optin" ${(draft.pfOptIn ?? profile.optIn) ? 'checked' : ''}><span>Отримувати пропозиції цієї точки у Viber чи Telegram</span></label>
       <p class="demo">Імʼя й телефон бачить лише точка — щоб звʼязатися й показувати вам персональні ціни. Демо-оплата: гроші не списуються.</p>
     </div>` : `<div class="dock summary">
       <div class="total"><span>${chosen.length ? `${chosen.length} ${plural(chosen.length, 'послуга', 'послуги', 'послуг')} · ${duration(minutes)}` : 'Нічого не обрано'}</span><span>${q.deal ? `<s class="muted">${uah(q.listTotal)}</s> ` : ''}${uah(total - q.covered)}</span></div>
@@ -958,6 +963,8 @@ function reviewBlock(b) {
   const mine = reviews.find((r) => r.bookingId === b.id);
   if (mine) {
     return `<div class="my-review"><div class="head"><b>Ваш відгук</b>${stars(mine.stars)}</div>${mine.text ? `<p>${esc(mine.text)}</p>` : ''}
+      ${reviewPhotos(mine)}
+      ${mine.reply ? `<div class="reply"><b>Відповідь точки</b>${esc(mine.reply.text)}</div>` : ''}
       <a href="#/invite">Сподобалось? Приведіть друга — по ${uah(REFERRAL.bonus)} обом</a></div>`;
   }
   return `<form class="review-form" data-id="${b.id}">
@@ -967,6 +974,8 @@ function reviewBlock(b) {
         <span aria-hidden="true">${icon('star', 30)}</span><span class="sr-only">${n} з 5</span></label>`).join('')}
     </fieldset>
     <label class="field"><span>Відгук (необовʼязково)</span><textarea name="text" rows="3" maxlength="600" placeholder="Що сподобалось, що варто покращити"></textarea></label>
+    <label class="dropzone">${icon('camera', 22)}Додати фото результату (до 3)<span class="photo-count" aria-live="polite"></span>
+      <input class="sr-only" name="photos" type="file" accept="image/*" multiple></label>
     <button class="btn primary block" type="submit">Надіслати відгук</button>
   </form>`;
 }
@@ -1034,11 +1043,156 @@ function bookingCard(b, highlight) {
   }
   return `<article class="bk${highlight ? ' hl' : ''}" id="b-${b.id}">
     ${cardHead(b, esc(p?.name ?? 'Сервіс'))}
+    ${b.state === 'paid' ? visitBar(b) : ''}
     ${steps(b)}
     ${body}
     ${intakeBlock(b)}
-    ${!ACTIVE.includes(b.state) && p ? `<a class="btn" href="#/book/${p.id}" data-action="repeat" data-id="${b.id}">${icon('repeat', 18)}Записатися знову</a>` : ''}
+    ${!ACTIVE.includes(b.state) && p ? `<div class="grid2">
+      <a class="btn" href="#/book/${p.id}" data-action="repeat" data-id="${b.id}">${icon('repeat', 18)}Повторити запис</a>
+      ${p.cats.includes('wash') && !b.subId ? `<button class="btn" data-action="sub-open" data-id="${b.id}">${icon('calendar', 18)}Зробити регулярним</button>` : ''}
+    </div>${ui.subFor === b.id ? subForm(b) : ''}` : ''}
   </article>`;
+}
+
+// ---------- нагадування про візит ----------
+
+// Нагадування надходять увечері напередодні (о 18:00) і за 2 години до візиту.
+// У робочій версії це push-сповіщення; тут — у «Вхідних» і на картці запису.
+function visitReminders() {
+  const now = Date.now();
+  const sent = [];
+  for (const b of mine()) {
+    if (b.state !== 'paid') continue;
+    const start = bookingStart(b).getTime();
+    if (start <= now) continue;
+    const p = placeById(b.placeId);
+    const eve = parseDate(b.date).getTime() - 6 * HOUR; // 18:00 напередодні
+    const h2 = start - 2 * HOUR;
+    if (now >= h2 && (b.createdAt ?? 0) < h2 && !b.remind2h) {
+      b.remind2h = now;
+      sent.push({ b, text: `Через ${duration(Math.round((start - now) / 60000 / 5) * 5)} — ${p.name}, ${b.time}, ${p.address}. Ви вже їдете?` });
+    } else if (now >= eve && now < h2 && (b.createdAt ?? 0) < eve && !b.remindDay) {
+      b.remindDay = now;
+      sent.push({ b, text: `Нагадуємо: ${b.date === isoDate(new Date(now)) ? 'сьогодні' : 'завтра'} о ${b.time} — ${p.name}, ${p.address}. ${b.services.join(', ')}.` });
+    }
+  }
+  if (!sent.length) return;
+  save();
+  sendMessages(sent.map(({ b, text }) => ({ placeId: b.placeId, clientKey: 'device', channel: 'app', kind: 'remind', bookingId: b.id, text, link: `#/bookings/${b.id}` })));
+}
+
+// Блок біля запису, що скоро: «Їду» й «Запізнююсь на 15 хв» — точка бачить це в журналі.
+function visitBar(b) {
+  const left = bookingStart(b).getTime() - Date.now();
+  if (left <= -30 * 60000 || left > 24 * HOUR) return '';
+  const status = b.eta === 'onway' ? `Точка знає, що ви їдете${b.late ? ` і запізнюєтесь на ${b.late} хв` : ''}.`
+    : b.late ? `Точка знає, що ви запізнюєтесь на ${b.late} хв.` : 'Повідомте точку, якщо ви вже в дорозі чи запізнюєтесь.';
+  return `<div class="visit-bar" role="group" aria-label="Візит ${b.date === isoDate(new Date()) ? 'сьогодні' : 'завтра'} о ${b.time}">
+    <p class="small" style="margin:0">${icon('bell', 16)}${status}</p>
+    <div class="grid2">
+      <button class="btn ${b.eta === 'onway' ? 'soft' : 'primary'}" data-action="eta-go" data-id="${b.id}" ${b.eta === 'onway' ? 'aria-pressed="true"' : ''}>Їду</button>
+      <button class="btn" data-action="eta-late" data-id="${b.id}" ${(b.late ?? 0) >= 30 ? 'disabled' : ''}>${b.late ? 'Ще на 15 хв' : 'Запізнююсь на 15 хв'}</button>
+    </div>
+    ${(b.late ?? 0) >= 15 ? '<p class="fine">Якщо запізнення більше 15 хвилин, точка може попросити перенести запис.</p>' : ''}
+  </div>`;
+}
+
+// ---------- повтор і регулярні записи ----------
+
+// Найближчий день, коли вільний той самий час; інакше — найближчий вільний час до нього.
+function repeatSlot(p, minutes, time) {
+  for (const d of bookingDays(p)) {
+    const slots = slotsFor(p, d, minutes).filter((x) => !x.busy);
+    if (slots.some((x) => x.time === time)) return [d, time];
+  }
+  for (const d of bookingDays(p)) {
+    const slots = slotsFor(p, d, minutes).filter((x) => !x.busy);
+    if (slots.length) return [d, slots.sort((a, c) => Math.abs(toMin(a.time) - toMin(time)) - Math.abs(toMin(c.time) - toMin(time)))[0].time];
+  }
+  return [firstOpenDay(p), null];
+}
+
+const subs = () => store.get('subscriptions', []);
+const EVERY = { 1: 'Щотижня', 2: 'Кожні 2 тижні', 4: 'Кожні 4 тижні' };
+const WD_IN = ['у понеділок', 'у вівторок', 'у середу', 'у четвер', 'у пʼятницю', 'у суботу', 'у неділю'];
+const subText = (x) => `${EVERY[x.every]} ${WD_IN[x.weekday]} о ${x.time}`;
+
+function subForm(b) {
+  const wd = weekdayOf(b.date);
+  const opts = [];
+  for (let t = 7 * 60; t <= 21 * 60; t += 30) opts.push(hhmm(t));
+  return `<form class="sub-form card stack" data-id="${b.id}" style="gap:10px;margin-top:8px">
+    <b>Регулярний запис: ${esc(b.services.join(', '))}</b>
+    <div class="grid2">
+      <label class="field"><span>Як часто</span><select name="every">${Object.entries(EVERY).map(([k, v]) => `<option value="${k}" ${k === '2' ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+      <label class="field"><span>День</span><select name="weekday">${WEEKDAY_NAMES.map((n, i) => `<option value="${i}" ${i === wd ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+      <label class="field full"><span>Час</span><select name="time">${opts.map((t) => `<option ${t === b.time ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+    </div>
+    <p class="fine">Записуємо за тиждень до візиту й оплачуємо карткою автоматично; про кожен запис прийде сповіщення. Скасувати візит чи всю підписку можна будь-коли.</p>
+    <button class="btn primary" type="submit">Увімкнути</button>
+  </form>`;
+}
+
+function subsCard() {
+  const list = subs().filter((x) => x.status !== 'deleted');
+  if (!list.length) return '';
+  return `<h2>Регулярні записи</h2><div class="stack" style="gap:8px">${list.map((x) => {
+    const p = placeById(x.placeId);
+    const next = mine().filter((b) => b.subId === x.id && b.state === 'paid' && bookingStart(b) > new Date()).sort((a, c) => bookingStart(a) - bookingStart(c))[0];
+    return `<section class="card stack sub-card" style="gap:6px" aria-label="Регулярний запис: ${esc(p?.name ?? '')}">
+      <div class="head"><b>${subText(x)}</b><span class="pill ${x.status === 'paused' ? '' : 'ok'}">${x.status === 'paused' ? 'на паузі' : 'активний'}</span></div>
+      <span class="small">${esc(p?.name ?? '')} · ${esc(x.names.join(', '))}${x.car ? ` · ${esc(x.car)}` : ''}</span>
+      ${next ? `<span class="small muted">Найближчий: ${dayLabel(next.date, { weekday: 'short', day: 'numeric', month: 'long' })}, ${next.time}</span>` : ''}
+      <div class="grid2"><button class="btn" data-action="sub-toggle" data-id="${x.id}">${x.status === 'paused' ? 'Відновити' : 'Призупинити'}</button>
+        <button class="btn text-danger" data-action="sub-del" data-id="${x.id}">Видалити</button></div>
+    </section>`;
+  }).join('')}</div>`;
+}
+
+// Створює записи за регулярними підписками на найближчі 7 днів. Час зайнятий — беремо найближчий вільний у межах 2 годин.
+function runSubscriptions() {
+  const list = subs();
+  if (!list.length) return;
+  const sent = [];
+  const today = isoDate(new Date());
+  for (const x of list) {
+    if (x.status !== 'active') continue;
+    const p = placeById(x.placeId);
+    if (!p || !isListed(p)) continue;
+    for (let i = 0; i <= 7; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      const date = isoDate(d);
+      if (date < x.start || weekdayOf(date) !== x.weekday) continue;
+      const weeks = Math.round((parseDate(date) - parseDate(x.start)) / (7 * 864e5));
+      if (weeks % x.every || x.made.includes(date)) continue;
+      x.made.push(date);
+      const chosen = bookable(p).filter((sv) => x.services.includes(sv.id));
+      if (!chosen.length) continue;
+      const minutes = chosen.reduce((a, sv) => a + sv.min, 0);
+      const free = slotsFor(p, date, minutes).filter((sl) => !sl.busy).map((sl) => sl.time)
+        .filter((t) => Math.abs(toMin(t) - toMin(x.time)) <= 120).sort((a, c) => Math.abs(toMin(a) - toMin(x.time)) - Math.abs(toMin(c) - toMin(x.time)));
+      if (!free.length) {
+        sent.push({ placeId: p.id, clientKey: 'device', channel: 'app', kind: 'sub', text: `${p.name}: на ${dayLabel(date, { weekday: 'short', day: 'numeric', month: 'long' })} біля ${x.time} немає вільного часу, регулярний запис пропущено. Оберіть інший час.`, link: `#/book/${p.id}/${date}` });
+        continue;
+      }
+      const time = free[0];
+      const deal = dealAt(p.id, date, time);
+      const total = chosen.reduce((a, sv) => a + (!sv.personal && dealCovers(deal, sv.id) ? dealPrice(sv.price[x.cls], deal.pct) : sv.price[x.cls]), 0);
+      const b = {
+        id: uid(), placeId: p.id, services: chosen.map((sv) => sv.name), total, listTotal: chosen.reduce((a, sv) => a + sv.price[x.cls], 0),
+        deal: total < chosen.reduce((a, sv) => a + sv.price[x.cls], 0) ? { id: deal.id, pct: deal.pct } : null, covered: 0, passUse: null,
+        paid: total, fromBalance: 0, bonus: 0, minutes, date, time, car: x.car || CAR_CLASSES[x.cls], carId: x.carId, plate: x.plate ?? '', cls: x.cls,
+        clientName: profile.name, clientPhone: profile.phone, optIn: !!profile.optIn, personal: [], state: 'paid', createdAt: Date.now(), subId: x.id,
+      };
+      bookings.push(b);
+      sent.push({ placeId: p.id, clientKey: 'device', channel: 'app', kind: 'sub', bookingId: b.id, link: `#/bookings/${b.id}`,
+        text: `Регулярний запис: ${p.name}, ${dayLabel(date, { weekday: 'short', day: 'numeric', month: 'long' })} о ${time}${time !== x.time ? ` (о ${x.time} було зайнято)` : ''}. Оплачено ${uah(total)} з картки.` });
+      track('sub_booking', { placeId: p.id });
+    }
+  }
+  store.set('subscriptions', list);
+  if (sent.length) { save(); sendMessages(sent); }
 }
 
 // Акт приймання з фото до робіт: клієнт підтверджує або пише, що не так.
@@ -1107,6 +1261,7 @@ function viewBookings(highlightId) {
   }
   return `<h1>Мої записи</h1>
     ${moneyCard()}
+    ${subsCard()}
     ${requestsCard()}
     ${inviteCard()}
     <h2>Активні</h2>
@@ -1297,7 +1452,7 @@ function viewGarage() {
         <label class="field"><span>Імʼя</span><input name="name" autocomplete="name" value="${esc(profile.name)}"></label>
         <label class="field"><span>Телефон</span><input name="phone" type="tel" autocomplete="tel" placeholder="+380" value="${esc(profile.phone)}"></label>
       </div>
-      <label class="row small"><input class="check" type="checkbox" name="optIn" ${profile.optIn ? 'checked' : ''}>Отримувати пропозиції точок, де я обслуговуюсь, у Viber чи Telegram</label>
+      <label class="check-row small"><input class="check" type="checkbox" name="optIn" ${profile.optIn ? 'checked' : ''}><span>Отримувати пропозиції точок, де я обслуговуюсь, у Viber чи Telegram</span></label>
       <button class="btn" type="submit">Зберегти профіль</button>
     </form>
     ${garageExtras()}
@@ -1308,7 +1463,7 @@ function viewGarage() {
         return `<a class="card car-card" href="#/garage/${c.id}">
           <div class="car-top"><span class="car-tile">${icon('car', 26)}</span>
             <div><h2 class="car-name">${esc(c.make)} ${esc(c.model)}</h2>
-            <div class="car-sub">${[c.plate, CAR_CLASSES[c.cls], currentKm(c) ? km(currentKm(c)) : ''].filter(Boolean).map(esc).join(' · ')}</div></div></div>
+            <div class="car-sub">${[c.plate, c.year, CAR_CLASSES[c.cls], currentKm(c) ? km(currentKm(c)) : ''].filter(Boolean).map(esc).join(' · ')}</div></div></div>
           ${due.length ? `<div class="warn-pill">${icon('warn', 16)}${esc(due[0].text)}${due.length > 1 ? ` і ще ${due.length - 1}` : ''}</div>` : ''}
           <div class="card-foot">Сервісна книжка${icon('chevR', 18)}</div>
         </a>`;
@@ -1316,9 +1471,14 @@ function viewGarage() {
     </div>
     <h2 class="big">${cars.length ? 'Додати ще авто' : 'Додати авто'}</h2>
     ${carForm('carform', `
+      <div class="plate-row">
+        <label class="field"><span>Держномер</span><input name="plate" placeholder="AA1234BB" autocomplete="off" aria-describedby="plate-result"></label>
+        <button class="btn" type="button" data-action="plate-check">${icon('search', 18)}Перевірити</button>
+      </div>
+      <div id="plate-result" aria-live="polite"></div>
       <label class="field"><span>Марка</span><input name="make" required placeholder="Наприклад, Skoda" autocomplete="off"></label>
       <label class="field"><span>Модель</span><input name="model" required placeholder="Наприклад, Octavia" autocomplete="off"></label>
-      <label class="field"><span>Держномер (необовʼязково)</span><input name="plate" placeholder="AA1234BB" autocomplete="off"></label>
+      <label class="field"><span>Рік випуску (необовʼязково)</span><input name="year" type="number" inputmode="numeric" min="1950" max="${new Date().getFullYear() + 1}" autocomplete="off"></label>
       <label class="field"><span>Клас</span><select name="cls">${CAR_CLASSES.map((c, i) => `<option value="${i}">${c}</option>`).join('')}</select></label>
       <label class="field"><span>Пробіг, км (необовʼязково)</span><input name="mileage" type="number" inputmode="numeric" min="0" autocomplete="off"></label>
       <label class="field"><span>Розмір шин (необовʼязково)</span><input name="tires" placeholder="205/55 R16" autocomplete="off"></label>
@@ -1331,7 +1491,7 @@ function viewCar(id) {
   const history = historyOf(c);
   return `${back('#/garage', 'Гараж')}
     <h1 style="margin-bottom:2px">${esc(c.make)} ${esc(c.model)}</h1>
-    <div class="car-sub">${[c.plate, CAR_CLASSES[c.cls], c.tires && `шини ${c.tires}`].filter(Boolean).map(esc).join(' · ')}</div>
+    <div class="car-sub">${[c.plate, c.year && `${c.year} р.`, c.color, CAR_CLASSES[c.cls], c.tires && `шини ${c.tires}`].filter(Boolean).map(esc).join(' · ')}</div>
     <h2>Нагадування</h2>
     <div class="stack">${reminders(c).map(reminderRow).join('')}</div>
     <h2>Пробіг</h2>
@@ -1480,6 +1640,8 @@ function route() {
   settle();
   // Хтось скасував запис — можливо, звільнився час для листа очікування.
   checkWaitlist(bookings);
+  runSubscriptions();
+  visitReminders();
   // Крапка на вкладці «Мої записи», коли машина готова, точка просить доплату чи підтвердити акт.
   const ready = mine().some((b) => b.state === 'done' || b.extra || (b.intake && !b.intake.ack)) || requests.some((r) => r.unreadClient);
   document.querySelector('.tabs a[data-tab="bookings"]').toggleAttribute('data-badge', ready);
@@ -1646,13 +1808,62 @@ document.addEventListener('click', (e) => {
   } else if (action === 'ics') {
     downloadIcs(bookings.find((x) => x.id === id));
   } else if (action === 'repeat') {
+    // Повтор в один дотик: ті самі послуги й авто, найближчий день із тим самим часом — одразу до оплати.
     const b = bookings.find((x) => x.id === id);
     const p = placeById(b.placeId);
-    draft = {
-      placeId: p.id,
-      services: new Set(bookable(p).filter((s) => b.services.includes(s.name)).map((s) => s.id)),
-      date: firstOpenDay(p), time: null, carId: cars[0]?.id ?? null,
-    };
+    const services = new Set(bookable(p).filter((s) => b.services.includes(s.name)).map((s) => s.id));
+    const minutes = bookable(p).filter((s) => services.has(s.id)).reduce((a, s) => a + s.min, 0);
+    const [date, time] = repeatSlot(p, minutes, b.time);
+    draft = { placeId: p.id, services, date, time, carId: b.carId && cars.some((c) => c.id === b.carId) ? b.carId : cars[0]?.id ?? null, paying: !!time };
+    track('repeat', { placeId: p.id });
+    if (time) setTimeout(() => toast(`Той самий запис: ${dayLabel(date, { weekday: 'short', day: 'numeric', month: 'long' })} о ${time} — лишилось оплатити`), 0);
+  } else if (action === 'plate-check') {
+    const f = $('#carform');
+    const r = lookupPlate(f.elements.plate.value, isoDate(new Date()));
+    const box = $('#plate-result');
+    track('plate_check', { found: !!r.car });
+    if (r.error) { box.innerHTML = `<p class="notice warn" style="margin:0">${r.error}.</p>`; return; }
+    f.elements.plate.value = r.plate;
+    if (r.car) {
+      // Підставляємо знайдені дані — їх можна виправити перед збереженням.
+      f.elements.make.value = r.car.make;
+      f.elements.model.value = r.car.model;
+      f.elements.year.value = r.car.year;
+      f.elements.cls.value = r.car.cls;
+      if (r.insurance?.until) f.elements.insuranceUntil.value = r.insurance.until;
+      f.dataset.color = r.car.color;
+    }
+    const ins = !r.insurance ? '' : r.insurance.state === 'ok' ? `<li class="ok-text">${icon('checkCircle', 16)}Поліс ОСЦПВ діє до ${fmtDate(r.insurance.until)}</li>`
+      : r.insurance.state === 'expired' ? `<li class="bad-text">${icon('warn', 16)}Поліс ОСЦПВ закінчився ${fmtDate(r.insurance.until)} — без нього їздити не можна</li>`
+        : `<li class="bad-text">${icon('warn', 16)}Чинного поліса ОСЦПВ не знайдено</li>`;
+    box.innerHTML = `<div class="notice plate-card">
+      <b>${esc(r.plate)}${r.region ? ` · ${r.region}` : ''}</b>
+      ${r.car ? `<ul><li>${esc(r.car.make)} ${esc(r.car.model)}, ${r.car.year} р., ${esc(r.car.color)}, ${esc(r.car.fuel)} ${esc(r.car.engine)}</li>${ins}</ul>
+        <span class="small muted">Дані підставлено у форму — перевірте й збережіть.</span>`
+        : `<span class="small">Авто з цим номером немає в демо-реєстрі. Заповніть дані вручну.</span>`}
+      <span class="fine">Демо: перевірка знаходить лише вигадані номери ${Object.keys(DEMO_PLATES).join(', ')}. У робочій версії дані беремо з відкритого реєстру МВС і бази полісів МТСБУ.</span>
+    </div>`;
+  } else if (action === 'eta-go' || action === 'eta-late') {
+    const b = bookings.find((x) => x.id === id);
+    if (action === 'eta-go') b.eta = 'onway';
+    else b.late = Math.min(30, (b.late ?? 0) + 15);
+    b.etaAt = Date.now();
+    save();
+    route();
+    track(action === 'eta-go' ? 'eta_go' : 'eta_late', { placeId: b.placeId });
+    toast(action === 'eta-go' ? 'Точка знає, що ви їдете' : `Точка знає: запізнюєтесь на ${b.late} хв`);
+  } else if (action === 'sub-open') {
+    ui.subFor = ui.subFor === id ? null : id;
+    route();
+    $('.sub-form select')?.focus();
+  } else if (action === 'sub-toggle' || action === 'sub-del') {
+    const list = subs();
+    const x = list.find((y) => y.id === id);
+    if (action === 'sub-del' && !confirm('Видалити регулярний запис? Уже створені записи залишаться — їх можна скасувати окремо.')) return;
+    x.status = action === 'sub-del' ? 'deleted' : x.status === 'paused' ? 'active' : 'paused';
+    store.set('subscriptions', list);
+    route();
+    toast(action === 'sub-del' ? 'Регулярний запис видалено' : x.status === 'paused' ? 'Регулярний запис на паузі' : 'Регулярний запис відновлено');
   } else if (action === 'delcar') {
     if (!confirm('Видалити авто разом із сервісною книжкою?')) return;
     cars = cars.filter((c) => c.id !== id);
@@ -1709,21 +1920,48 @@ document.addEventListener('input', (e) => {
   if (e.target.id === 'pf-phone') draft.pfPhone = e.target.value;
 });
 
-document.addEventListener('submit', (e) => {
+document.addEventListener('submit', async (e) => {
   if (e.target.matches('.ready-form')) {
     e.preventDefault();
     finishJob(e.target);
+    return;
+  }
+  if (e.target.matches('.sub-form')) {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const b = bookings.find((x) => x.id === e.target.dataset.id);
+    const p = placeById(b.placeId);
+    const weekday = Number(f.get('weekday'));
+    // Перша дата — найближчий обраний день тижня, починаючи із сьогодні.
+    const d = new Date();
+    while (weekdayOf(isoDate(d)) !== weekday) d.setDate(d.getDate() + 1);
+    // Сьогоднішній час уже минув чи надто близько — починаємо з наступного тижня.
+    if (isoDate(d) === isoDate(new Date()) && toMin(f.get('time')) <= new Date().getHours() * 60 + new Date().getMinutes() + 60) d.setDate(d.getDate() + 7);
+    store.set('subscriptions', [...subs(), {
+      id: uid(), placeId: p.id, services: bookable(p).filter((s) => b.services.includes(s.name)).map((s) => s.id), names: b.services,
+      carId: b.carId, car: b.car, plate: b.plate, cls: b.cls ?? 0, every: Number(f.get('every')), weekday, time: f.get('time'),
+      start: isoDate(d), made: [], status: 'active', createdAt: Date.now(),
+    }]);
+    ui.subFor = null;
+    track('sub_new', { placeId: p.id });
+    route();
+    toast('Регулярний запис увімкнено — найближчий візит уже в «Моїх записах»');
     return;
   }
   if (e.target.matches('.review-form')) {
     e.preventDefault();
     const b = bookings.find((x) => x.id === e.target.dataset.id);
     const f = new FormData(e.target);
+    const files = f.getAll('photos').filter((x) => x.size).slice(0, 3);
     reviews.push({
       id: uid(), placeId: b.placeId, bookingId: b.id, stars: Number(f.get('stars')),
       text: f.get('text').trim(), services: b.services.join(', '), date: isoDate(new Date()), at: Date.now(),
+      clientKey: 'device', photos: [],
     });
-    save();
+    const r = reviews.at(-1);
+    // Фото зменшуємо; якщо сховище переповнене — зберігаємо відгук без них.
+    r.photos = (await Promise.all(files.map(shrinkPhoto))).filter(Boolean);
+    if (!save() && r.photos.length) { r.photos = []; save(); toast('Фото не вмістилися в памʼять пристрою — відгук збережено без них'); }
     route();
     track('review', { placeId: b.placeId });
     toast('Дякуємо за відгук!');
@@ -1824,7 +2062,9 @@ document.addEventListener('submit', (e) => {
     id: uid(),
     make: f.get('make').trim(),
     model: f.get('model').trim(),
-    plate: f.get('plate').trim().toUpperCase(),
+    year: Number(f.get('year')) || null,
+    color: e.target.dataset.color || null,
+    plate: normPlate(f.get('plate')),
     cls: Number(f.get('cls')),
     tires: f.get('tires').trim(),
     mileage: Number(f.get('mileage')) || 0,

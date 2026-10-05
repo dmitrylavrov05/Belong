@@ -581,3 +581,36 @@ label.item { cursor: pointer; padding: 10px 14px; }
 .slot.hot small { color: var(--accent-hover); }
 .slot.hot[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: var(--on-navy); }
 .slot.hot[aria-pressed="true"] small { color: var(--on-navy); }
+
+/* детальна карта: тайли OpenStreetMap */
+.map-tiles { position: absolute; inset: 0; overflow: hidden; background: #f2efe9; }
+.map-tiles img { position: absolute; left: 0; top: 0; max-width: none; user-select: none; -webkit-user-drag: none; }
+.map.detail .map-svg { display: none; }
+.map:not(.detail) .map-tiles, .map:not(.detail) .map-attr { display: none; }
+.map-layers { position: absolute; left: 10px; top: 10px; display: inline-flex; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
+.map-layers button { border: 0; background: var(--bg); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; padding: 8px 12px; min-height: 36px; cursor: pointer; }
+.map-layers button[aria-pressed="true"] { background: var(--navy); color: var(--on-navy); }
+.map-attr { position: absolute; right: 6px; bottom: 6px; font-size: 11px; background: color-mix(in srgb, var(--bg) 85%, transparent); color: var(--text); padding: 1px 6px; border-radius: 4px; text-decoration: underline; }
+.map.detail .map-hint { bottom: 8px; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .map-tiles img { filter: invert(1) hue-rotate(180deg) brightness(.85) contrast(.9); }
+}
+
+/* нагадування, регулярні записи, перевірка номера, фото у відгуках */
+.visit-bar { display: grid; gap: 8px; margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: var(--ok-soft); }
+.visit-bar p { display: flex; align-items: center; gap: 6px; }
+.btn.soft[aria-pressed="true"] { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); }
+.sub-form .grid2 .full { grid-column: 1 / -1; }
+.plate-row { display: flex; gap: 8px; align-items: flex-end; }
+.plate-row .field { flex: 1; }
+.plate-row .btn { min-height: 48px; }
+.plate-card { display: grid; gap: 6px; }
+.plate-card ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 14px; }
+.ok-text, .bad-text { display: inline-flex; align-items: center; gap: 6px; }
+.ok-text { color: var(--ok); }
+.bad-text { color: var(--danger); }
+.review-photos img, .my-review .photos img { width: 84px; height: 64px; object-fit: cover; border-radius: 8px; }
+.photos { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.check-row { display: flex; align-items: flex-start; gap: 10px; line-height: 1.4; cursor: pointer; }
+.check-row .check { flex: none; margin-top: 1px; }
+.visit-bar { margin-top: 0; }

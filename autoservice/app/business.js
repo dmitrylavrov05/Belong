@@ -314,6 +314,9 @@ function overviewAlerts() {
   return out.length ? `<div class="queue-row">${out.join('')}</div>` : '';
 }
 
+// Що клієнт відповів на нагадування: «Їду» чи «Запізнююсь».
+const etaText = (b) => (b.state !== 'paid' ? '' : [b.eta === 'onway' ? 'їде' : '', b.late ? `запізниться на ${b.late} хв` : ''].filter(Boolean).join(', '));
+
 // ---------- розклад ----------
 
 const ROW = 40; // висота 30 хвилин у журналі, px
@@ -357,7 +360,8 @@ function viewSchedule(day = today()) {
       aria-label="${esc(`${b.time}, ${clientName(b)}, ${b.services.join(', ')}, ${STATUS[b.state][0]}`)}">
       <b>${b.time}–${hhmm(toMin(b.time) + b.minutes)} · ${esc(clientName(b))}</b>
       <span>${esc(b.services.join(', '))}</span>
-      <span>${CHANNEL[channelOf(b)]} · ${STATUS[b.state][0]}${masterName(b) ? ` · ${esc(masterName(b))}` : ''}</span></button>`;
+      <span>${CHANNEL[channelOf(b)]} · ${STATUS[b.state][0]}${masterName(b) ? ` · ${esc(masterName(b))}` : ''}</span>
+      ${etaText(b) ? `<span class="eta">${etaText(b)}</span>` : ''}</button>`;
   };
   const times = [];
   for (let t = o; t <= c; t += 60) times.push(`<span style="top:${((t - o) / 30) * ROW}px">${hhmm(t % 1440)}</span>`);
@@ -1237,6 +1241,7 @@ function viewReviews() {
       ${list.length ? list.map((x) => `<article class="panel stack" style="gap:8px">
         <div class="head">${stars(x.stars)}<span class="small muted">${fmtDate(x.date)}</span></div>
         ${x.text ? `<p style="margin:0">${esc(x.text)}</p>` : '<p class="muted" style="margin:0">Без тексту, лише оцінка.</p>'}
+        ${x.photos?.length ? `<div class="photos">${x.photos.map((src, i) => `<img src="${esc(src)}" alt="Фото клієнта ${i + 1}">`).join('')}</div>` : ''}
         <span class="small muted">Підтверджений візит · ${esc(x.services)}</span>
         ${x.hidden ? `<p class="notice warn" style="margin:0">Приховано модератором CARCAR: ${esc(x.hidden.reason)}. Відгук не видно клієнтам і він не впливає на рейтинг.</p>`
           : x.report?.status === 'open' ? '<p class="small muted" style="margin:0">Скаргу надіслано модератору CARCAR.</p>'
@@ -2296,6 +2301,7 @@ function bookingDrawer(id) {
       <option value="">Не призначено</option>
       ${masters().map((m) => `<option value="${m.id}" ${b.masterId === m.id ? 'selected' : ''}>${esc(m.name)}${masterBusy(m.id, b) ? ' (має інший запис у цей час)' : ''}</option>`).join('')}
     </select></label>` : ''}
+    ${etaText(b) ? `<p class="notice ok" style="margin:0">${icon('bell', 18)}<span>Клієнт повідомив: ${etaText(b)} (${fmtTime(b.etaAt)}).</span></p>` : ''}
     ${intakeSummary(b)}
     ${actions}
     <form class="stack" id="staff-note" data-id="${b.id}" style="gap:8px">
@@ -3256,8 +3262,14 @@ document.addEventListener('submit', async (e) => {
     loadImportText(ui.imp.text);
   } else if (f.matches('.reply-form')) {
     const r = reviews.find((x) => x.id === f.dataset.id);
+    const first = !r.reply;
     r.reply = { text: new FormData(f).get('reply').trim(), at: Date.now() };
     save();
+    // Клієнт отримує відповідь у сповіщеннях застосунку.
+    if (r.clientKey) {
+      sendMessages([{ placeId: ui.place, clientKey: r.clientKey, channel: 'app', kind: 'reply', link: `#/place/${ui.place}`,
+        text: `${place().name} ${first ? 'відповіла' : 'оновила відповідь'} на ваш відгук: «${r.reply.text}»` }]);
+    }
     rerenderKeepScroll();
     toast('Відповідь опубліковано на сторінці точки');
   }

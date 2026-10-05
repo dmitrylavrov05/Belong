@@ -2,7 +2,11 @@ import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 // Неділя, 4 жовтня 2026, 10:00. Завтра — понеділок.
+// Тайли OpenStreetMap у тестах не завантажуємо з мережі — підставляємо порожню картинку.
+const TILE = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+
 test.beforeEach(async ({ page }) => {
+  await page.route('https://tile.openstreetmap.org/**', (r) => r.fulfill({ contentType: 'image/png', body: TILE }));
   await page.clock.setFixedTime(new Date(2026, 9, 4, 10, 0));
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));

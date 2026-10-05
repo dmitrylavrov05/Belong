@@ -39,6 +39,6 @@ function bundle({ html, script, out, modules = [] }) {
   console.log(`${join(outDir, out)}: ${(page.length / 1024).toFixed(0)} КБ`);
 }
 
-bundle({ html: 'index.html', script: 'app.js', out: 'carcar-prototype.html', modules: ['ops.js', 'map.js'] });
+bundle({ html: 'index.html', script: 'app.js', out: 'carcar-prototype.html', modules: ['ops.js', 'map.js', 'vehicles.js'] });
 bundle({ html: 'business.html', script: 'business.js', out: 'carcar-business.html', modules: ['ops.js', 'charts.js', 'partners.js'] });
 bundle({ html: 'admin.html', script: 'admin.js', out: 'carcar-admin.html', modules: ['charts.js', 'partners.js'] });
