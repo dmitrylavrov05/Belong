@@ -983,3 +983,25 @@ a.chat-pin { color: var(--muted); text-decoration: none; }
 .done-list .st-cancelled, .done-list .st-refunded { background: color-mix(in srgb, var(--soft) 55%, var(--bg)); }
 .done-list .st-cancelled::before, .done-list .st-refunded::before { background: var(--faint); }
 .done-list .st-cancelled .bk-title, .done-list .st-refunded .bk-title { color: var(--muted); }
+
+/* Завершені — компактні рядки, що розгортаються */
+.done-list { display: grid; gap: 10px; }
+.done-item { border: 1px solid var(--line); border-radius: 16px; background: var(--bg); overflow: hidden; box-shadow: 0 1px 2px rgb(16 24 40 / 5%); }
+.done-item > summary { list-style: none; display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer; border-left: 5px solid var(--faint); }
+.done-item > summary::-webkit-details-marker { display: none; }
+.done-item[open] > summary { border-bottom: 1px solid var(--line); }
+.di-ic { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--soft); color: var(--muted); }
+.di-main { display: grid; min-width: 0; }
+.di-main b { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.di-main small, .di-side small { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.di-side { display: grid; justify-items: end; }
+.di-chev { color: var(--faint); transition: transform .2s; }
+.done-item[open] .di-chev { transform: rotate(90deg); }
+.done-item.st-completed > summary { border-left-color: var(--ok); }
+.done-item.st-completed .di-ic { background: var(--ok-soft); color: var(--ok); }
+.done-item.st-noshow > summary, .done-item.st-dispute > summary { border-left-color: var(--warn); }
+.done-item.st-noshow .di-ic, .done-item.st-dispute .di-ic { background: var(--warn-soft); color: var(--warn); }
+.done-item.st-cancelled > summary b, .done-item.st-refunded > summary b { color: var(--muted); }
+.done-item > .bk { border: 0; border-radius: 0; box-shadow: none; padding-left: 16px; }
+.done-item > .bk::before { display: none; }
+.done-more { margin-top: 14px; }

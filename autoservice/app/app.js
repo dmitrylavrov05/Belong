@@ -1981,22 +1981,47 @@ function garageExtras() {
     </section>`).join('')}</div>`;
 }
 
-// Завершені — по місяцях, з підсумком: так довга історія не зливається в одну стрічку.
-function doneByMonth(list, highlightId) {
+// Завершені — компактні рядки по місяцях: тап розгортає повну картку. Розгорнуті лише ті, що чекають
+// на дію (оцінити візит, спір) або щойно відкриті. Довга історія — сторінками по DONE_PAGE.
+const DONE_PAGE = 10;
+const needsAction = (b) => (b.state === 'completed' && !reviews.some((r) => r.bookingId === b.id)) || b.state === 'dispute';
+
+function doneItem(b, highlight) {
+  const p = placeById(b.placeId);
+  const [, label] = isFrozen(b) ? ['go', 'Виконано'] : STATE_LABEL[b.state];
+  // Розгорнуте лишається розгорнутим після оновлення сторінки (відгук, повтор, регулярний запис).
+  const open = highlight || needsAction(b) || ui.doneOpen?.has(b.id);
+  return `<details class="done-item st-${b.state}" data-id="${b.id}" ${open ? 'open' : ''}>
+    <summary>
+      <span class="di-ic" aria-hidden="true">${icon(STATE_ICON[b.state] ?? 'checkCircle', 18)}</span>
+      <span class="di-main"><b>${esc(p?.name ?? 'Мийка')}</b><small>${dayLabel(b.date, { day: 'numeric', month: 'short' })}, ${b.time} · ${esc(b.services[0] ?? '')}${b.services.length > 1 ? ` +${b.services.length - 1}` : ''}</small></span>
+      <span class="di-side"><b>${uah(b.paid)}</b><small>${esc(label)}${needsAction(b) && b.state === 'completed' ? ' · оцініть' : ''}</small></span>
+      <span class="di-chev" aria-hidden="true">${icon('chevR', 18)}</span>
+    </summary>
+    ${bookingCard(b, highlight)}
+  </details>`;
+}
+
+function doneByMonth(all, highlightId) {
+  const limit = Math.max(ui.doneLimit ?? DONE_PAGE, all.findIndex((b) => b.id === highlightId) + 1);
+  const list = all.slice(0, limit);
   const groups = new Map();
   for (const b of list) {
     const key = b.date.slice(0, 7);
     groups.set(key, [...(groups.get(key) ?? []), b]);
   }
-  return [...groups].map(([key, items]) => {
+  const months = [...groups].map(([key, items]) => {
     const name = parseDate(`${key}-01`).toLocaleDateString('uk-UA', { month: 'long', year: 'numeric' }).replace(' р.', '');
-    const done = items.filter((b) => b.state === 'completed');
+    const monthAll = all.filter((b) => b.date.startsWith(key));
+    const done = monthAll.filter((b) => b.state === 'completed');
     return `<section class="done-month" aria-label="${esc(name)}">
       <div class="month-h"><h3>${esc(name[0].toUpperCase() + name.slice(1))}</h3>
         <span>${done.length} ${plural(done.length, 'візит', 'візити', 'візитів')}${done.length ? ` · ${uah(done.reduce((a, b) => a + price(b), 0))}` : ''}</span></div>
-      <div class="stack done-list">${items.map((b) => bookingCard(b, b.id === highlightId)).join('')}</div>
+      <div class="done-list">${items.map((b) => doneItem(b, b.id === highlightId)).join('')}</div>
     </section>`;
   }).join('');
+  const left = all.length - list.length;
+  return `${months}${left ? `<button class="btn block done-more" data-action="done-more">Показати ще ${Math.min(left, DONE_PAGE)} з ${left}</button>` : ''}`;
 }
 
 function viewBookings(highlightId) {
@@ -2020,7 +2045,7 @@ function viewBookings(highlightId) {
     </div>
     ${tab === 'active'
       ? `${subsCard()}<h2 class="sr-only">Активні записи</h2><div class="stack" style="margin-top:12px">${active.length ? active.map((b) => bookingCard(b, b.id === highlightId)).join('') : empty('calendar', 'Активних записів немає.', '<a class="btn primary" href="#/">Записатися на мийку</a>')}</div>`
-      : `<h2 class="sr-only">Завершені записи</h2>${rest.length ? doneByMonth(rest, highlightId) : `<div class="stack" style="margin-top:12px">${empty('calendar', 'Завершених записів ще немає.')}</div>`}${inviteCard()}`}`;
+      : `<h2 class="sr-only">Завершені записи</h2>${rest.length ? doneByMonth(rest, highlightId ?? focus) : `<div class="stack" style="margin-top:12px">${empty('calendar', 'Завершених записів ще немає.')}</div>`}${inviteCard()}`}`;
 }
 
 // ---------- кабінет точки ----------
@@ -2383,7 +2408,7 @@ const bookingActions = {
 function route() {
   const [, page = '', arg, sub, extra] = location.hash.replace(/^#/, '').split('/');
   // Вкладка «Мої записи» памʼятається лише поки клієнт у розділі: при новому вході — спершу активні.
-  if (page !== 'bookings') ui.bookTab = null;
+  if (page !== 'bookings') { ui.bookTab = null; ui.doneLimit = null; }
   const view = $('#view');
   const tab = ['partner', 'disputes', 'invite'].includes(page) ? '' : ['support', 'wallet'].includes(page) ? 'garage' : page === 'move' ? 'bookings' : page === 'chat' ? 'inbox' : ['bookings', 'garage', 'inbox'].includes(page) ? page : 'catalog';
   settle();
@@ -2641,6 +2666,11 @@ document.addEventListener('click', (e) => {
     store.set('subscriptions', list);
     route();
     toast(action === 'sub-del' ? 'Регулярний запис видалено' : x.status === 'paused' ? 'Регулярний запис на паузі' : 'Регулярний запис відновлено');
+  } else if (action === 'done-more') {
+    ui.doneLimit = (ui.doneLimit ?? DONE_PAGE) + DONE_PAGE;
+    const y = window.scrollY;
+    route();
+    window.scrollTo(0, y);
   } else if (action === 'book-tab') {
     ui.bookTab = el.dataset.tab;
     route();
@@ -2695,6 +2725,13 @@ document.addEventListener('scroll', (e) => {
   if (!el.classList?.contains('pc-slides')) return;
   const i = Math.round(el.scrollLeft / el.clientWidth);
   el.parentElement.querySelectorAll('.pc-dots i').forEach((d, k) => d.classList.toggle('on', k === i));
+}, true);
+
+// Памʼятаємо, які завершені записи клієнт розгорнув.
+document.addEventListener('toggle', (e) => {
+  if (!e.target.matches?.('.done-item')) return;
+  ui.doneOpen ??= new Set();
+  ui.doneOpen[e.target.open ? 'add' : 'delete'](e.target.dataset.id);
 }, true);
 
 document.addEventListener('change', (e) => {

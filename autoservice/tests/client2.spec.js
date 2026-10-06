@@ -88,6 +88,36 @@ test('мої записи: вкладки «Активні» й «Заверше
   await expect(page.locator('article').first()).toContainText('10:00');
 });
 
+test('завершені записи — компактні рядки по місяцях, розгортаються, історія сторінками по 10', async ({ page }) => {
+  // 13 скасованих записів за вересень—жовтень (вигадані дані для перевірки).
+  await page.addInitScript(() => {
+    const list = Array.from({ length: 13 }, (_, i) => ({
+      id: `old${i}`, placeId: i % 2 ? 'blysk' : 'hvylia', date: i < 2 ? `2026-10-0${2 - i}` : `2026-09-${String(28 - i * 2).padStart(2, '0')}`,
+      time: '10:00', minutes: 30, services: ['Експрес-мийка кузова'], paid: 250, bonus: 0, state: 'cancelled', refund: 250, placeAmount: 0,
+      car: 'Легкове', cls: 0, cancelBy: 'client', cancelKind: 'free', closedAt: 1, createdAt: 1,
+    }));
+    if (!localStorage.getItem('carcar.bookings')) localStorage.setItem('carcar.bookings', JSON.stringify(list));
+  });
+  await page.goto('/#/bookings');
+  await page.getByRole('button', { name: /^Завершені/ }).click();
+  await expect(page.getByRole('region', { name: 'жовтень 2026' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'вересень 2026' })).toBeVisible();
+  const rows = page.locator('details.done-item');
+  await expect(rows).toHaveCount(10);
+  // Згорнуті: видно лише рядок, кнопок картки не видно, поки не розгорнути.
+  const first = rows.first();
+  await expect(first.locator('summary')).toContainText('Скасовано');
+  await expect(first.getByRole('link', { name: 'Повторити запис' })).toBeHidden();
+  await first.locator('summary').click();
+  await expect(first.getByRole('link', { name: 'Повторити запис' })).toBeVisible();
+  await page.getByRole('button', { name: 'Показати ще 3 з 3' }).click();
+  await expect(rows).toHaveCount(13);
+  await expect(page.locator('.done-more')).toHaveCount(0);
+  // Розгорнутий запис лишається розгорнутим після оновлення списку.
+  await expect(first).toHaveAttribute('open', '');
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+});
+
 test('повтор запису в один дотик: ті самі послуги й час, одразу до оплати', async ({ page }) => {
   await book(page);
   await page.goto('/#/bookings');
