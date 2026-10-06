@@ -4865,6 +4865,8 @@ const bookingActions = {
 
 function route() {
   const [, page = '', arg, sub, extra] = location.hash.replace(/^#/, '').split('/');
+  // Вкладка «Мої записи» памʼятається лише поки клієнт у розділі: при новому вході — спершу активні.
+  if (page !== 'bookings') ui.bookTab = null;
   const view = $('#view');
   const tab = ['partner', 'disputes', 'invite'].includes(page) ? '' : ['support', 'wallet'].includes(page) ? 'garage' : page === 'move' ? 'bookings' : page === 'chat' ? 'inbox' : ['bookings', 'garage', 'inbox'].includes(page) ? page : 'catalog';
   settle();
