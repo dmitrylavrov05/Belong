@@ -1074,6 +1074,7 @@ function renderBook() {
       <ul class="perks">
         <li><span class="perk-ic ok">${icon('shield', 20)}</span>Гроші утримуються, доки роботу не виконано</li>
         <li><span class="perk-ic">${icon('undo', 20)}</span>Скасування до ${cancelWindow()} до візиту — уся сума повертається на баланс CARCAR</li>
+        <li><span class="perk-ic">${icon('clock', 20)}</span>Запізнення понад ${PAYMENT.lateMinutes} хв — як неявка, оплата зараховується мийці</li>
       </ul>
       <div class="grid2 pf">
         <label class="field"><span>Ваше імʼя</span><input id="pf-name" autocomplete="name" value="${esc(draft.pfName ?? profile.name)}"></label>
@@ -1324,7 +1325,7 @@ function bookingCard(b, highlight) {
   } else {
     body += b.refund || b.state === 'refunded' || !b.placeAmount
       ? `<p class="small muted" style="margin:0">Повернено ${uah(b.refund ?? b.paid)} ${b.refundTo === 'balance' ? 'на баланс CARCAR' : 'на картку'}${b.bonusReturned ? ` і ${uah(b.bonus)} на бонусний рахунок` : ''}${b.placeAmount ? `, ${uah(b.placeAmount)} отримала точка` : ''}.</p>`
-      : `<p class="small muted" style="margin:0">${b.state === 'noshow' ? 'Ви не приїхали' : `Запис скасовано пізніше ніж за ${cancelWindow()}`} — оплату ${uah(b.placeAmount)} зараховано точці за послугу.</p>`;
+      : `<p class="small muted" style="margin:0">${b.lateForfeit ? `Запізнення понад ${PAYMENT.lateMinutes} хв` : b.state === 'noshow' ? 'Ви не приїхали' : `Запис скасовано пізніше ніж за ${cancelWindow()}`} — оплату ${uah(b.placeAmount)} зараховано точці за послугу.</p>`;
   }
   return `<article class="bk${highlight ? ' hl' : ''}" id="b-${b.id}">
     ${cardHead(b, esc(p?.name ?? 'Сервіс'))}
@@ -1555,19 +1556,15 @@ function visitReminders() {
   sendMessages(sent.map(({ b, text }) => ({ placeId: b.placeId, clientKey: 'device', channel: 'app', kind: 'remind', bookingId: b.id, text, link: `#/bookings/${b.id}` })));
 }
 
-// Блок біля запису, що скоро: «Їду» й «Запізнююсь на 15 хв» — точка бачить це в журналі.
+// Блок біля запису, що скоро: «Запізнююсь на 15 хв» — мийка бачить це в журналі.
+// Запізнення понад PAYMENT.lateMinutes — як неявка: оплата зараховується мийці.
 function visitBar(b) {
   const left = bookingStart(b).getTime() - Date.now();
   if (left <= -30 * 60000 || left > 24 * HOUR) return '';
-  const status = b.eta === 'onway' ? `Точка знає, що ви їдете${b.late ? ` і запізнюєтесь на ${b.late} хв` : ''}.`
-    : b.late ? `Точка знає, що ви запізнюєтесь на ${b.late} хв.` : 'Повідомте точку, якщо ви вже в дорозі чи запізнюєтесь.';
   return `<div class="visit-bar" role="group" aria-label="Візит ${b.date === isoDate(new Date()) ? 'сьогодні' : 'завтра'} о ${b.time}">
-    <p class="small" style="margin:0">${icon('bell', 16)}${status}</p>
-    <div class="grid2">
-      <button class="btn ${b.eta === 'onway' ? 'soft' : 'primary'}" data-action="eta-go" data-id="${b.id}" ${b.eta === 'onway' ? 'aria-pressed="true"' : ''}>Їду</button>
-      <button class="btn" data-action="eta-late" data-id="${b.id}" ${(b.late ?? 0) >= 30 ? 'disabled' : ''}>${b.late ? 'Ще на 15 хв' : 'Запізнююсь на 15 хв'}</button>
-    </div>
-    ${(b.late ?? 0) >= 15 ? '<p class="fine">Якщо запізнення більше 15 хвилин, точка може попросити перенести запис.</p>' : ''}
+    <p class="small" style="margin:0">${icon('bell', 16)}${b.late ? `Мийка знає, що ви запізнюєтесь на ${b.late} хв.` : 'Не встигаєте вчасно? Попередьте мийку.'}</p>
+    ${b.late ? '' : `<button class="btn" data-action="eta-late" data-id="${b.id}">Запізнююсь на ${PAYMENT.lateMinutes} хв</button>`}
+    <p class="fine">Якщо запізнитеся більше ніж на ${PAYMENT.lateMinutes} хв, візит вважається неявкою — оплата ${uah(b.paid)} зараховується мийці.</p>
   </div>`;
 }
 
@@ -1742,13 +1739,21 @@ function viewBookings(highlightId) {
   if (!list.length) {
     return `<h1>Мої записи</h1>${empty('calendar', 'Записів поки немає.', '<a class="btn primary" href="#/">Знайти мийку</a>')}${moneyCard()}${inviteCard()}`;
   }
+  // Відкриваємо вкладку з записом, про який ідеться (щойно оплачений, скасований чи з повідомлення).
+  const focus = ui.bookFocus ?? (highlightId !== ui.tabFor ? highlightId : null);
+  ui.bookFocus = null;
+  ui.tabFor = highlightId;
+  if (focus && list.some((b) => b.id === focus)) ui.bookTab = active.some((b) => b.id === focus) ? 'active' : 'done';
+  const tab = ui.bookTab ?? (active.length || !rest.length ? 'active' : 'done');
   return `<h1>Мої записи</h1>
+    <div class="book-tabs" role="group" aria-label="Які записи показати">
+      <button data-action="book-tab" data-tab="active" aria-pressed="${tab === 'active'}">Активні<span>${active.length}</span></button>
+      <button data-action="book-tab" data-tab="done" aria-pressed="${tab === 'done'}">Завершені<span>${rest.length}</span></button>
+    </div>
     ${moneyCard()}
-    ${subsCard()}
-    ${inviteCard()}
-    <h2>Активні</h2>
-    <div class="stack">${active.length ? active.map((b) => bookingCard(b, b.id === highlightId)).join('') : '<p class="muted">Немає активних записів.</p>'}</div>
-    ${rest.length ? `<h2>Історія</h2><div class="stack">${rest.map((b) => bookingCard(b, b.id === highlightId)).join('')}</div>` : ''}`;
+    ${tab === 'active'
+      ? `${subsCard()}<h2 class="sr-only">Активні записи</h2><div class="stack" style="margin-top:12px">${active.length ? active.map((b) => bookingCard(b, b.id === highlightId)).join('') : empty('calendar', 'Активних записів немає.', '<a class="btn primary" href="#/">Записатися на мийку</a>')}</div>`
+      : `<h2 class="sr-only">Завершені записи</h2><div class="stack" style="margin-top:12px">${rest.length ? rest.map((b) => bookingCard(b, b.id === highlightId)).join('') : empty('calendar', 'Завершених записів ще немає.')}</div>${inviteCard()}`}`;
 }
 
 // ---------- кабінет точки ----------
@@ -2297,7 +2302,7 @@ document.addEventListener('click', (e) => {
     toast('Гроші відправлено на картку');
   } else if (bookingActions[action]) {
     const b = bookings.find((x) => x.id === id);
-    if (b && bookingActions[action](b) !== false) { save(); route(); }
+    if (b && bookingActions[action](b) !== false) { ui.bookFocus = b.id; save(); route(); }
   } else if (action === 'ics') {
     downloadIcs(bookings.find((x) => x.id === id));
   } else if (action === 'repeat') {
@@ -2337,15 +2342,14 @@ document.addEventListener('click', (e) => {
         : `<span class="small">Авто з цим номером немає в демо-реєстрі. Заповніть дані вручну.</span>`}
       <span class="fine">Демо: перевірка знаходить лише вигадані номери ${Object.keys(DEMO_PLATES).join(', ')}. У робочій версії дані беремо з відкритого реєстру МВС і бази полісів МТСБУ.</span>
     </div>`;
-  } else if (action === 'eta-go' || action === 'eta-late') {
+  } else if (action === 'eta-late') {
     const b = bookings.find((x) => x.id === id);
-    if (action === 'eta-go') b.eta = 'onway';
-    else b.late = Math.min(30, (b.late ?? 0) + 15);
+    b.late = PAYMENT.lateMinutes;
     b.etaAt = Date.now();
     save();
     route();
-    track(action === 'eta-go' ? 'eta_go' : 'eta_late', { placeId: b.placeId });
-    toast(action === 'eta-go' ? 'Точка знає, що ви їдете' : `Точка знає: запізнюєтесь на ${b.late} хв`);
+    track('eta_late', { placeId: b.placeId });
+    toast(`Мийка знає: запізнюєтесь на ${b.late} хв`);
   } else if (action === 'sub-open') {
     ui.subFor = ui.subFor === id ? null : id;
     route();
@@ -2358,6 +2362,10 @@ document.addEventListener('click', (e) => {
     store.set('subscriptions', list);
     route();
     toast(action === 'sub-del' ? 'Регулярний запис видалено' : x.status === 'paused' ? 'Регулярний запис на паузі' : 'Регулярний запис відновлено');
+  } else if (action === 'book-tab') {
+    ui.bookTab = el.dataset.tab;
+    route();
+    $(`[data-action="book-tab"][data-tab="${ui.bookTab}"]`)?.focus();
   } else if (action === 'move-day' || action === 'move-time') {
     if (action === 'move-day') { move.date = el.dataset.date; move.time = null; } else move.time = el.dataset.time;
     renderMove();
@@ -2551,6 +2559,7 @@ document.addEventListener('submit', async (e) => {
       start: isoDate(d), made: [], status: 'active', createdAt: Date.now(),
     }]);
     ui.subFor = null;
+    ui.bookTab = 'active';
     track('sub_new', { placeId: p.id });
     route();
     toast('Регулярний запис увімкнено — найближчий візит уже в «Моїх записах»');

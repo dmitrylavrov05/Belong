@@ -37,29 +37,62 @@ async function book(page, { place = 'hvylia', service = /Комплекс пре
   await expect(page.locator('#toast')).toHaveText('Оплачено, ви записані');
 }
 
-test('нагадування напередодні й за 2 години: «Запізнююсь» і «Їду» бачить точка', async ({ page }) => {
+test('нагадування напередодні й за 2 години, «Запізнююсь» бачить мийка', async ({ page }) => {
   await book(page);
 
   await page.clock.setFixedTime(new Date(2026, 9, 4, 18, 30));
   await page.goto('/#/bookings');
   await expect(page.locator('#inbox-tab .tab-count')).toHaveText('1');
   const bar = page.getByRole('group', { name: 'Візит завтра о 10:00' });
+  await expect(bar.getByRole('button', { name: 'Їду' })).toHaveCount(0);
+  await expect(bar).toContainText('більше ніж на 15 хв, візит вважається неявкою');
   await bar.getByRole('button', { name: 'Запізнююсь на 15 хв' }).click();
-  await expect(page.locator('#toast')).toHaveText('Точка знає: запізнюєтесь на 15 хв');
-  await expect(bar.getByRole('button', { name: 'Ще на 15 хв' })).toBeVisible();
+  await expect(page.locator('#toast')).toHaveText('Мийка знає: запізнюєтесь на 15 хв');
+  await expect(bar.getByRole('button', { name: /Запізнююсь/ })).toHaveCount(0);
   await page.goto('/#/inbox');
   await expect(page.locator('.msg-card').first()).toContainText('Нагадуємо: завтра о 10:00 — Автомийка «Хвиля»');
 
   await page.clock.setFixedTime(new Date(2026, 9, 5, 8, 15));
   await page.goto('/#/bookings');
-  await page.getByRole('group', { name: 'Візит сьогодні о 10:00' }).getByRole('button', { name: 'Їду' }).click();
-  await expect(page.locator('#toast')).toHaveText('Точка знає, що ви їдете');
   await page.goto('/#/inbox');
   await expect(page.locator('.msg-card').first()).toContainText('Через 1 год 45 хв — Автомийка «Хвиля», 10:00');
 
   await page.goto(`${PANEL}#/schedule/2026-10-05`);
   await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
-  await expect(page.locator('.slot-block').first()).toContainText('їде, запізниться на 15 хв');
+  await expect(page.locator('.slot-block').first()).toContainText('запізниться на 15 хв');
+});
+
+test('запізнення понад 15 хв: мийка зараховує оплату собі, клієнт бачить причину', async ({ page }) => {
+  await book(page);
+  // Візит о 10:00, зараз 10:20 — клієнта немає.
+  await page.clock.setFixedTime(new Date(2026, 9, 5, 10, 20));
+  await page.goto(`${PANEL}#/schedule/2026-10-05`);
+  await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
+  await page.locator('.slot-block').first().click();
+  page.once('dialog', (d) => d.accept());
+  await page.getByRole('button', { name: 'Запізнення понад 15 хв — оплата нам' }).click();
+  await expect(page.locator('#toast')).toHaveText('Оплату 900 ₴ зараховано вам');
+
+  await page.goto('/#/bookings');
+  await expect(page.getByRole('button', { name: /Завершені/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('article').first()).toContainText('Запізнення понад 15 хв — оплату 900 ₴ зараховано точці за послугу');
+  await page.goto('/#/inbox');
+  await expect(page.locator('.msg-card').first()).toContainText('ви запізнилися більше ніж на 15 хв');
+});
+
+test('мої записи: вкладки «Активні» й «Завершені» з лічильниками', async ({ page }) => {
+  await book(page);
+  await book(page, { time: '12:00' });
+  page.once('dialog', (d) => d.accept());
+  await page.locator('article.hl').getByRole('button', { name: 'Скасувати' }).click();
+  // Скасований запис — у «Завершених», вкладка перемкнулася сама.
+  await expect(page.getByRole('button', { name: /Завершені/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: /Завершені/ })).toContainText('1');
+  await expect(page.locator('article')).toHaveCount(1);
+  await page.getByRole('button', { name: /Активні/ }).click();
+  await expect(page.getByRole('button', { name: /Активні/ })).toContainText('1');
+  await expect(page.locator('article')).toHaveCount(1);
+  await expect(page.locator('article').first()).toContainText('10:00');
 });
 
 test('повтор запису в один дотик: ті самі послуги й час, одразу до оплати', async ({ page }) => {

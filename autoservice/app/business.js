@@ -2209,6 +2209,8 @@ function bookingDrawer(id) {
         <button class="btn primary" type="submit">Машина готова</button>
         <p class="fine">Клієнт підтвердить виконання в застосунку — тоді гроші заморозяться на ${PAYMENT.freezeHours} год і стануть доступні до виведення.</p>
       </form>
+      ${Date.now() > bookingStart(b).getTime() + PAYMENT.lateMinutes * 60000 ? `<div class="notice late-box"><b>Клієнт запізнюється понад ${PAYMENT.lateMinutes} хв?</b>За правилами CARCAR це неявка: оплата ${uah(price(b))} зараховується вам.
+        <button class="btn" data-action="late-forfeit" data-id="${b.id}" style="margin-top:8px">Запізнення понад ${PAYMENT.lateMinutes} хв — оплата нам</button></div>` : ''}
       ${started ? `<button class="btn text-danger" data-action="carcar-noshow" data-id="${b.id}">Клієнт не приїхав</button>` : ''}`;
   } else if (b.state === 'dispute') {
     const t = ticketsAll().find((x) => x.bookingId === b.id && x.from === 'place');
@@ -2799,6 +2801,16 @@ document.addEventListener('click', (e) => {
     closeDrawer();
     rerenderKeepScroll();
     toast(action === 'crm-noshow' ? 'Позначено неявку' : 'Запис скасовано');
+  } else if (action === 'late-forfeit') {
+    const b = bookings.find((x) => x.id === id);
+    if (!confirm(`Клієнт запізнюється понад ${PAYMENT.lateMinutes} хв: зарахувати оплату ${uah(price(b))} мийці й закрити запис?`)) return;
+    Object.assign(b, { state: 'noshow', placeAmount: price(b), refund: 0, lateForfeit: true });
+    sendMessages([{ placeId: b.placeId, clientKey: 'device', channel: 'app', kind: 'late', bookingId: b.id, link: `#/bookings/${b.id}`,
+      text: `${place().name}: ви запізнилися більше ніж на ${PAYMENT.lateMinutes} хв, тому візит вважається неявкою — оплату зараховано мийці. Якщо це помилка, напишіть у підтримку.` }]);
+    save();
+    closeDrawer();
+    rerenderKeepScroll();
+    toast(`Оплату ${uah(price(b))} зараховано вам`);
   } else if (action === 'carcar-noshow') {
     const b = bookings.find((x) => x.id === id);
     const placeAmount = Math.round(price(b) * PAYMENT.noShowShare);

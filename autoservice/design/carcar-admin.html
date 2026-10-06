@@ -840,6 +840,13 @@ label.item { cursor: pointer; padding: 10px 14px; }
 #book[data-step] { margin-top: 4px; }
 #view > h1 + #book .step-head { margin-top: -4px; }
 .travel { display: inline-flex; align-items: center; gap: 6px; } .meta .badge.dist { background: none; padding: 0; font-size: inherit; color: inherit; }
+
+/* Мої записи: дві вкладки замість довгого списку */
+.book-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; margin: 4px 0 12px; border-radius: 16px; background: var(--soft); }
+.book-tabs button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; border: 0; border-radius: 12px; background: transparent; font: inherit; font-size: 15px; font-weight: 600; color: var(--muted); cursor: pointer; }
+.book-tabs button span { min-width: 22px; padding: 1px 7px; border-radius: 999px; background: var(--bg); font-size: 12px; color: var(--muted); }
+.book-tabs button[aria-pressed="true"] { background: var(--bg); color: var(--text); box-shadow: var(--shadow-1); }
+.book-tabs button[aria-pressed="true"] span { background: var(--accent); color: var(--on-accent); }
 </style>
   <style>
 /* Панель для бізнесу CARCAR: десктоп-перший макет поверх токенів і компонентів styles.css. */
@@ -1491,6 +1498,7 @@ const PAYMENT = {
   // Пізніше (або якщо клієнт не приїхав) оплата зараховується точці як оплата послуги.
   freeCancelHours: 1.5,
   noShowShare: 1, // частка точці, якщо клієнт не приїхав або скасував пізно
+  lateMinutes: 15, // запізнення довше — як неявка: мийка може зарахувати собі оплату
   // Оплата частинами для дорогих послуг: клієнт платить рівними частинами без переплати,
   // точка отримує всю суму одразу від банку-партнера (комісію банку в прототипі не враховано).
   installments: { minTotal: 3000, parts: [3, 4, 6] },
