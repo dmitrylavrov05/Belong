@@ -22,6 +22,16 @@ test.afterEach(async ({ page }) => {
 
 const PANEL = '/business.html';
 
+// Мийка підтверджує виконання («Машина готова») у кабінеті точки; клієнт відкриває завершені записи.
+async function washDone(page, place = 'Автомийка «Хвиля»') {
+  await page.goto('/#/partner');
+  await page.getByLabel('Точка').selectOption({ label: place });
+  await page.locator('a.prow').first().click();
+  await page.getByRole('button', { name: 'Машина готова' }).click();
+  await page.goto('/#/bookings');
+  await page.getByRole('button', { name: /^Завершені/ }).click();
+}
+
 // У панелі точки на телефоні розділи — у меню «Ще» нижньої панелі.
 async function openNav(page) {
   const more = page.locator('#tabbar [data-action="menu-open"]');
@@ -181,8 +191,7 @@ test('скарга точки на відгук: модератор прихов
     await page.locator('[data-action="confirm"]').click();
     await page.getByRole('button', { name: 'Оплатити 900 ₴' }).click();
     await page.clock.setFixedTime(new Date(2026, 9, 5, 21, 30));
-    await page.goto('/#/bookings');
-    await page.getByRole('button', { name: 'Підтвердити виконання' }).click();
+    await washDone(page);
     await page.locator('.star-input label').nth(stars - 1).click();
     await page.getByLabel('Відгук (необовʼязково)').fill(text);
     await page.getByRole('button', { name: 'Надіслати відгук' }).click();

@@ -24,6 +24,16 @@ test.afterEach(async ({ page }) => {
 });
 
 const PANEL = '/business.html';
+
+// Мийка підтверджує виконання («Машина готова») у кабінеті точки; клієнт відкриває завершені записи.
+async function washDone(page, place = 'Автомийка «Хвиля»') {
+  await page.goto('/#/partner');
+  await page.getByLabel('Точка').selectOption({ label: place });
+  await page.locator('a.prow').first().click();
+  await page.getByRole('button', { name: 'Машина готова' }).click();
+  await page.goto('/#/bookings');
+  await page.getByRole('button', { name: /^Завершені/ }).click();
+}
 // Суми з тисячами форматуються з нерозривним пробілом.
 const money = (s) => new RegExp(s.replace(/ /g, '\\s'));
 
@@ -140,11 +150,9 @@ test('чат: коли запис завершено, у стрічці зʼяв
   await chat.getByRole('button', { name: 'Приїду з багажником на даху' }).click();
   await expect(chat.locator('.chat-mark')).toHaveCount(0);
 
-  // Вечір дня візиту: клієнт підтверджує виконання.
+  // Вечір дня візиту: мийка підтверджує виконання.
   await page.clock.setFixedTime(new Date(2026, 9, 5, 21, 30));
-  await page.goto('/#/bookings');
-  await page.getByRole('button', { name: 'Підтвердити виконання' }).click();
-  await expect(page.locator('#toast')).toHaveText('Дякуємо! Виконання підтверджено');
+  await washDone(page);
 
   await page.locator('#inbox-tab').click();
   // Завершена переписка переїжджає в згорнуті «Завершені».
@@ -179,8 +187,7 @@ test('«Повідомлення»: завершений запис не змі�
 
   // Увечері запис у «Хвилю» виконано й підтверджено.
   await page.clock.setFixedTime(new Date(2026, 9, 5, 21, 30));
-  await page.goto('/#/bookings');
-  await page.locator('article', { hasText: 'Хвиля' }).getByRole('button', { name: 'Підтвердити виконання' }).click();
+  await washDone(page);
   await page.locator('#inbox-tab').click();
   await expect(page.locator('#inbox-tab .tab-count')).toBeHidden();
 
@@ -329,8 +336,6 @@ test('кошторис СТО: клієнт погоджує пункти окр
   await expect(drawer.locator('.thread')).toContainText('Клієнт погодив кошторис: 2 з 3 пунктів');
   await drawer.getByRole('button', { name: 'Машина готова' }).click();
 
-  await page.goto('/#/bookings');
-  await page.locator('article').first().getByRole('button', { name: 'Усе добре' }).click();
   await page.goto('/#/garage');
   await page.getByRole('link', { name: /Skoda Octavia/ }).click();
   const w = page.locator('h2', { hasText: 'Гарантії' });

@@ -1017,6 +1017,8 @@ function svcRow(s, cls, main) {
 }
 
 function renderBook() {
+  // Авто з гаража: якщо в чернетці нема або його видалили — беремо обране на головній.
+  if (draft && cars.length && !cars.some((c) => c.id === draft.carId)) draft.carId = mainCar()?.id ?? cars[0].id;
   const p = placeById(draft.placeId);
   const q = quote(p);
   const { cls, list, chosen, minutes, total, bonus, fromBal } = q;
@@ -1040,9 +1042,10 @@ function renderBook() {
     const main = chosen.find((s) => s.main || s.personal);
     html = `
     <div class="book-car">${cars.length
-      ? `<label class="car-chip">${icon('carSide', 18)}<span class="sr-only">Ваше авто</span><select id="car">
-          ${cars.map((c) => `<option value="${c.id}" ${c.id === draft.carId ? 'selected' : ''}>${esc(carLabel(c))}</option>`).join('')}
-        </select></label>`
+      ? `<div class="car-choice" role="radiogroup" aria-label="Ваше авто">
+          ${cars.map((c) => `<label class="car-opt"><input class="sr-only" type="radio" name="bookcar" value="${c.id}" ${c.id === draft.carId ? 'checked' : ''}>${icon('carSide', 18)}<span>${esc(`${c.make} ${c.model}`)}${c.plate ? `<small>${esc(c.plate)}</small>` : ''}</span></label>`).join('')}
+          <a class="car-opt add" href="#/garage/add/book">${icon('plus', 18)}<span>Додати авто</span></a>
+        </div>`
       : `<label class="car-chip">${icon('carSide', 18)}<span class="sr-only">Клас авто</span><select id="bookcls">
           ${CAR_CLASSES.map((c, i) => `<option value="${i}" ${i === cls ? 'selected' : ''}>${c}</option>`).join('')}
         </select></label>`}</div>
@@ -1333,17 +1336,18 @@ function reliabilityCard() {
 }
 
 
+// Клієнт бачить два кроки: оплатив — мийка виконала.
 function steps(b) {
-  const at = b.state === 'completed' && isFrozen(b) ? 1 : { paid: 0, done: 1, dispute: 1, completed: 2 }[b.state];
+  const at = { paid: 0, done: 1, dispute: 1, completed: 1 }[b.state];
   if (at === undefined) return '';
-  return `<ol class="steps" aria-label="Статус оплати">${['Оплачено', 'Виконано', 'Гроші точці']
+  return `<ol class="steps two" aria-label="Статус запису">${['Оплачено', 'Виконано']
     .map((s, i) => `<li class="${i <= at ? 'on' : ''}" ${i === at ? 'aria-current="step"' : ''}>${s}</li>`).join('')}</ol>`;
 }
 
 // [клас кольору статусу, підпис]
 const STATE_LABEL = {
-  paid: ['go', 'Оплачено · гроші утримуються'],
-  done: ['go', 'Чекає вашого підтвердження'],
+  paid: ['go', 'Оплачено'],
+  done: ['', 'Виконано'],
   dispute: ['warn', 'Спір розглядається'],
   completed: ['', 'Виконано'],
   cancelled: ['', 'Скасовано'],
@@ -1355,7 +1359,7 @@ const STATE_LABEL = {
 const STATE_ICON = { completed: 'checkCircle', cancelled: 'x', refunded: 'x', noshow: 'clock', dispute: 'info' };
 
 const cardHead = (b, title, sm, amount = b.paid) => {
-  const [cls, label] = isFrozen(b) ? ['go', 'Виконано · гроші заморожені'] : STATE_LABEL[b.state];
+  const [cls, label] = STATE_LABEL[b.state];
   return `<div class="head">
       <div><div class="bk-status ${cls}">${STATE_ICON[b.state] ? icon(STATE_ICON[b.state], 14) : ''}${label}</div><h3 class="bk-title${sm ? ' sm' : ''}">${title}</h3></div>
       <div class="bk-price">${uah(amount)}</div>
@@ -1409,10 +1413,6 @@ function bookingCard(b, highlight) {
     </div>`;
   let body = lines;
   const started = bookingStart(b) <= new Date();
-  const confirmBtns = (label) => `<div class="grid2">
-      <button class="btn primary" data-action="client-ok" data-id="${b.id}">${icon('check', 18)}${label}</button>
-      <button class="btn line-danger" data-action="dispute" data-id="${b.id}">Відкрити спір</button>
-    </div>`;
   if (b.state === 'paid') {
     const t = cancelTerms(b);
     const canMove = t.inWindow && (b.moves?.length ?? 0) < MOVE_LIMIT && myReliability().movesLeft > 0;
@@ -1422,11 +1422,12 @@ function bookingCard(b, highlight) {
           <button class="btn primary" data-action="extra-ok" data-id="${b.id}">Погодитися й доплатити</button>
           <button class="btn" data-action="extra-no" data-id="${b.id}">Відхилити</button>
         </div></div>` : ''}
-      ${started ? `<div class="notice">Коли заберете авто, підтвердьте виконання — точка отримає підтвердження автоматично.
-        Гроші будуть заморожені ще ${PAYMENT.freezeHours} год, і весь цей час можна відкрити спір.</div>
-        ${confirmBtns('Підтвердити виконання')}
-        ${p ? `<a class="btn" href="${tel(p)}">${icon('phone', 18)}Зателефонувати</a>` : ''}`
-      : `<div class="notice ic-row">${icon('shield', 18)}Гроші утримуються, доки ви не підтвердите виконання. Після візиту тут зʼявиться кнопка «Підтвердити виконання».</div>
+      ${started ? `<div class="notice ic-row">${icon('clock', 18)}Мийка підтвердить виконання, щойно авто буде готове. Після цього тут можна буде залишити відгук.</div>
+        <div class="grid2">
+          ${p ? `<a class="btn" href="${tel(p)}">${icon('phone', 18)}Зателефонувати</a>` : ''}
+          <button class="btn line-danger" data-action="dispute" data-id="${b.id}">Відкрити спір</button>
+        </div>`
+      : `<div class="notice ic-row">${icon('shield', 18)}Оплачено. Після візиту мийка підтвердить виконання, а ви зможете залишити відгук або відкрити спір.</div>
       <div class="grid2">
         ${canMove ? `<a class="btn" href="#/move/${b.id}">${icon('calendar', 18)}Перенести</a>` : ''}
         <button class="btn" data-action="ics" data-id="${b.id}">${icon('calendar', 18)}У календар</button>
@@ -1444,17 +1445,13 @@ function bookingCard(b, highlight) {
         <div class="il strong">${when}</div>
         <div>${esc(b.car)} · ${b.services.map(esc).join(', ')}</div>
       </div>
-      <div class="notice ok">${icon('checkCircle', 22)}<div><b>Машина готова!</b>Перевірте результат і підтвердіть або відкрийте спір до
-        ${fmtTime(b.doneAt + PAYMENT.autoReleaseHours * HOUR)}, інакше замовлення підтвердиться автоматично.</div></div>
-      ${b.remindedAt ? `<p class="small muted" style="margin:0">Точка нагадала ${fmtTime(b.remindedAt)}: підтвердьте виконання, щоб вона отримала оплату.</p>` : ''}
-      ${result(b)}
-      ${confirmBtns('Усе добре')}`;
+      ${result(b)}`;
   } else if (b.state === 'dispute') {
     body += `<div class="notice warn"><div class="label">Ваша скарга</div>«${esc(b.disputeReason)}». Модератор перевірить і вирішить, кому передати гроші.</div>${result(b)}`;
   } else if (b.state === 'completed') {
     body += result(b);
     if (isFrozen(b)) {
-      body += `<div class="notice">Гроші точці заморожені до ${fmtTime(b.unfreezeAt)}. Якщо щось не так — ще можна відкрити спір.</div>
+      body += `<div class="notice ic-row">${icon('checkCircle', 18)}Мийка підтвердила виконання. Якщо щось не так — відкрийте спір до ${fmtTime(b.unfreezeAt)}.</div>
         <button class="btn line-danger" data-action="dispute" data-id="${b.id}">Відкрити спір</button>`;
     }
     body += reviewBlock(b);
@@ -1988,7 +1985,7 @@ const needsAction = (b) => (b.state === 'completed' && !reviews.some((r) => r.bo
 
 function doneItem(b, highlight) {
   const p = placeById(b.placeId);
-  const [, label] = isFrozen(b) ? ['go', 'Виконано'] : STATE_LABEL[b.state];
+  const [, label] = STATE_LABEL[b.state];
   // Розгорнуте лишається розгорнутим після оновлення сторінки (відгук, повтор, регулярний запис).
   const open = highlight || needsAction(b) || ui.doneOpen?.has(b.id);
   return `<details class="done-item st-${b.state}" data-id="${b.id}" ${open ? 'open' : ''}>
@@ -2309,7 +2306,9 @@ async function finishJob(form) {
   const f = new FormData(form);
   const files = f.getAll('photos').filter((x) => x.size).slice(0, 3);
   const photos = (await Promise.all(files.map(shrinkPhoto))).filter(Boolean);
-  Object.assign(b, { photos, note: f.get('note').trim() || null, km: Number(f.get('km')) || null, state: 'done', doneAt: Date.now() });
+  // Виконання підтверджує мийка: запис одразу виконаний, гроші заморожені на час для спору.
+  Object.assign(b, { photos, note: f.get('note').trim() || null, km: Number(f.get('km')) || null, doneAt: Date.now() });
+  complete(b);
   const dropped = !save() && photos.length > 0;
   if (dropped) { b.photos = []; save(); }
   location.hash = '#/partner';
@@ -2362,10 +2361,6 @@ const bookingActions = {
   'extra-no'(b) {
     delete b.extra;
     b.extraDeclined = true;
-  },
-  'client-ok'(b) {
-    complete(b);
-    toast('Дякуємо! Виконання підтверджено');
   },
   dispute(b) {
     const reason = prompt('Що пішло не так?')?.trim();
@@ -2451,6 +2446,8 @@ function route() {
   else if (page === 'garage') {
     // «Додати авто» з головної відкриває форму в гаражі.
     ui.addCar = arg === 'add';
+    // Додали авто з екрана запису — після збереження повертаємось до запису.
+    if (ui.addCar) ui.addReturn = sub === 'book' && draft ? `#/book/${draft.placeId}` : null;
     view.innerHTML = arg && arg !== 'add' ? viewCar(arg) : viewGarage();
   }
   else if (page === 'partner') view.innerHTML = arg ? viewPartnerJob(arg) : viewPartner();
@@ -2750,7 +2747,7 @@ document.addEventListener('change', (e) => {
     if (t.value === '__add') { location.hash = '#/garage/add'; return; }
     pickCar(t.value);
     renderList();
-  } else if (t.id === 'car') {
+  } else if (t.name === 'bookcar') {
     draft.carId = t.value;
     pickCar(t.value);
     renderBook();
@@ -2985,7 +2982,7 @@ document.addEventListener('submit', async (e) => {
   store.set('cars', cars);
   // Нове авто стає основним: для нього ціни на головній і з нього починається запис.
   pickCar(car.id);
-  if (location.hash === '#/garage/add') location.hash = '#/garage'; else route();
+  if (location.hash.startsWith('#/garage/add')) location.hash = ui.addReturn ?? '#/garage'; else route();
   toast('Авто додано');
 });
 

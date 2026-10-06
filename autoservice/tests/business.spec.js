@@ -22,6 +22,16 @@ test.afterEach(async ({ page }) => {
 
 const PANEL = '/business.html';
 
+// Мийка підтверджує виконання («Машина готова») у кабінеті точки; клієнт відкриває завершені записи.
+async function washDone(page, place = 'Автомийка «Хвиля»') {
+  await page.goto('/#/partner');
+  await page.getByLabel('Точка').selectOption({ label: place });
+  await page.locator('a.prow').first().click();
+  await page.getByRole('button', { name: 'Машина готова' }).click();
+  await page.goto('/#/bookings');
+  await page.getByRole('button', { name: /^Завершені/ }).click();
+}
+
 // На телефоні розділи панелі — у меню «Ще» нижньої панелі.
 async function openNav(page) {
   const more = page.locator('#tabbar [data-action="menu-open"]');
@@ -262,8 +272,7 @@ test('відповідь на відгук видно на сторінці то
   await page.locator('[data-action="confirm"]').click();
   await page.getByRole('button', { name: 'Оплатити 900 ₴' }).click();
   await page.clock.setFixedTime(new Date(2026, 9, 5, 21, 30));
-  await page.goto('/#/bookings');
-  await page.getByRole('button', { name: 'Підтвердити виконання' }).click();
+  await washDone(page);
   await page.locator('.star-input label').nth(4).click();
   await page.getByRole('button', { name: 'Надіслати відгук' }).click();
 
@@ -292,13 +301,11 @@ test('фінанси: замовлення через CARCAR, заморожув
   const row = page.locator('tbody tr', { hasText: 'Комплекс преміум' });
   await expect(row).toContainText('У роботі');
 
-  // Майстер позначає «Машина готова» з журналу, клієнт підтверджує в застосунку.
+  // Майстер позначає «Машина готова» з журналу — це й підтвердження виконання.
   await page.clock.setFixedTime(new Date(2026, 9, 5, 21, 30));
   await page.goto(`${PANEL}#/schedule/2026-10-05`);
   await page.locator('.slot-block').first().click();
   await page.getByRole('dialog').getByRole('button', { name: 'Машина готова' }).click();
-  await page.goto('/#/bookings');
-  await page.getByRole('button', { name: 'Усе добре' }).click();
 
   await page.goto(`${PANEL}#/finance`);
   await expect(row).toContainText('Заморожено до 7 жовтня о 21:30');
@@ -559,7 +566,7 @@ test('витрати й звіт про прибутки: разові й щом
   await expect(page.locator('#toast')).toHaveText('Щомісячний платіж зупинено');
 });
 
-test('нагадування клієнту підтвердити виконання', async ({ page }) => {
+test('мийка підтверджує виконання з журналу — клієнту лишається відгук і спір', async ({ page }) => {
   await page.goto('/#/book/hvylia');
   await page.getByLabel(/Комплекс преміум/).check();
   await page.locator('[data-action="to-time"]').click();
@@ -574,15 +581,18 @@ test('нагадування клієнту підтвердити викона�
   await page.locator('.slot-block').first().click();
   const drawer = page.getByRole('dialog');
   await expect(drawer.locator('.notice.warn')).toContainText('Час візиту минув');
+  await expect(drawer).toContainText('Так ви підтверджуєте виконання');
   await drawer.getByRole('button', { name: 'Машина готова' }).click();
   await page.locator('.slot-block').first().click();
-  await drawer.getByRole('button', { name: 'Нагадати клієнту' }).click();
-  await expect(page.locator('#toast')).toHaveText('Клієнт отримав нагадування підтвердити виконання');
-  await expect(drawer).toContainText('Останнє нагадування');
+  await expect(drawer).toContainText('Виконано');
+  await expect(drawer.getByRole('button', { name: 'Нагадати клієнту' })).toHaveCount(0);
 
   await page.goto('/#/bookings');
-  await expect(page.getByText(/Точка нагадала/)).toBeVisible();
-  await page.getByRole('button', { name: 'Усе добре' }).click();
+  const card = page.locator('article').first();
+  await expect(card).toContainText('Мийка підтвердила виконання');
+  await expect(card.getByRole('button', { name: /Усе добре|Підтвердити виконання/ })).toHaveCount(0);
+  await expect(card.getByRole('button', { name: 'Відкрити спір' })).toBeVisible();
+  await expect(card.locator('.review-form')).toBeVisible();
   await page.goto(`${PANEL}#/finance`);
   await expect(page.locator('tbody tr', { hasText: 'Комплекс преміум' })).toContainText('Заморожено');
 });

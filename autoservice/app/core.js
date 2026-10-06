@@ -471,7 +471,7 @@ export function promoCheck(pr, { place, items, mine, all }) {
   return { ok: true, amount };
 }
 
-// Клієнт підтвердив (або мовчав після «Машина готова»): замовлення завершене,
+// Мийка підтвердила виконання («Машина готова»): замовлення завершене,
 // гроші точці заморожені ще на freezeHours, щоб клієнт встиг відкрити спір.
 export function complete(b, at = Date.now()) {
   Object.assign(b, { state: 'completed', completedAt: at, unfreezeAt: at + PAYMENT.freezeHours * HOUR });
@@ -503,12 +503,13 @@ export function balanceFor(placeId, bookings, payouts) {
   return { available: earned + passEarned - withdrawn, frozen: frozen + passFrozen, next, withdrawn };
 }
 
-// Якщо клієнт мовчить після «Машина готова», замовлення підтверджується саме.
+// Виконання підтверджує мийка («Машина готова»). Записи зі старим проміжним станом «done»
+// (чекали підтвердження клієнта) вважаються виконаними з моменту, коли мийка їх закрила.
 export function settleAll(bookings) {
   let changed = false;
   for (const b of bookings) {
-    if (b.state === 'done' && Date.now() - b.doneAt >= PAYMENT.autoReleaseHours * HOUR) {
-      complete(b, b.doneAt + PAYMENT.autoReleaseHours * HOUR);
+    if (b.state === 'done') {
+      complete(b, b.doneAt ?? Date.now());
       changed = true;
     }
   }

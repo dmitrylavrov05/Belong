@@ -71,7 +71,7 @@ export function chatTimeline(b) {
   const msgs = b.chat ?? [];
   const fallback = msgs.at(-1)?.at ?? b.createdAt ?? Date.now();
   const marks = [];
-  if (b.doneAt) marks.push({ at: b.doneAt, kind: 'done', text: 'Мийка завершила роботу' });
+  // Виконання підтверджує мийка — одразу «Запис завершено», без проміжної позначки.
   if (b.state === 'completed') marks.push({ at: b.completedAt ?? fallback, kind: 'end', text: 'Запис завершено' });
   else if (b.state === 'cancelled') marks.push({ at: b.closedAt ?? fallback, kind: 'closed', text: 'Запис скасовано' });
   else if (b.state === 'noshow') marks.push({ at: b.closedAt ?? fallback, kind: 'closed', text: b.lateForfeit ? 'Запис закрито: запізнення' : 'Запис закрито: неявка' });

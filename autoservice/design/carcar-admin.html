@@ -1015,6 +1015,17 @@ a.chat-pin { color: var(--muted); text-decoration: none; }
 .done-item > .bk { border: 0; border-radius: 0; box-shadow: none; padding-left: 16px; }
 .done-item > .bk::before { display: none; }
 .done-more { margin-top: 14px; }
+.steps.two { grid-template-columns: repeat(2, 1fr); }
+
+/* Вибір авто з гаража під час запису — великі кнопки, видно всі одразу */
+.car-choice { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 2px 16px 4px; }
+.car-choice::-webkit-scrollbar { display: none; }
+.car-opt { flex: none; display: inline-flex; align-items: center; gap: 8px; min-height: 52px; padding: 8px 14px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--bg); color: var(--text); font-weight: 600; cursor: pointer; text-decoration: none; }
+.car-opt span { display: grid; line-height: 1.2; }
+.car-opt small { font-size: 12px; font-weight: 500; color: var(--muted); }
+.car-opt:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-hover); }
+.car-opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.car-opt.add { border-style: dashed; color: var(--muted); }
 </style>
   <style>
 /* Панель для бізнесу CARCAR: десктоп-перший макет поверх токенів і компонентів styles.css. */
@@ -2283,7 +2294,7 @@ function promoCheck(pr, { place, items, mine, all }) {
   return { ok: true, amount };
 }
 
-// Клієнт підтвердив (або мовчав після «Машина готова»): замовлення завершене,
+// Мийка підтвердила виконання («Машина готова»): замовлення завершене,
 // гроші точці заморожені ще на freezeHours, щоб клієнт встиг відкрити спір.
 function complete(b, at = Date.now()) {
   Object.assign(b, { state: 'completed', completedAt: at, unfreezeAt: at + PAYMENT.freezeHours * HOUR });
@@ -2315,12 +2326,13 @@ function balanceFor(placeId, bookings, payouts) {
   return { available: earned + passEarned - withdrawn, frozen: frozen + passFrozen, next, withdrawn };
 }
 
-// Якщо клієнт мовчить після «Машина готова», замовлення підтверджується саме.
+// Виконання підтверджує мийка («Машина готова»). Записи зі старим проміжним станом «done»
+// (чекали підтвердження клієнта) вважаються виконаними з моменту, коли мийка їх закрила.
 function settleAll(bookings) {
   let changed = false;
   for (const b of bookings) {
-    if (b.state === 'done' && Date.now() - b.doneAt >= PAYMENT.autoReleaseHours * HOUR) {
-      complete(b, b.doneAt + PAYMENT.autoReleaseHours * HOUR);
+    if (b.state === 'done') {
+      complete(b, b.doneAt ?? Date.now());
       changed = true;
     }
   }

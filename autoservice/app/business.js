@@ -6,7 +6,7 @@ import {
   store, icon, esc, uah, pad, hhmm, toMin, isoDate, parseDate, uid, placeById, plural, duration, dayLabel, rating,
   fmtTime, fmtDate, hash, bookingStart, hoursFor, scheduleOf, widestRange, inBreak, rangeText, WEEKDAYS, WEEKDAY_NAMES,
   weekdayOf, phoneKey, offersOf, offerAsService, EXPENSE_CATS, PAY_METHODS, expensesIn, serviceCat, catById, shrinkPhoto, applyOverrides, saveOverride,
-  ACTIVE, BLOCKING, HOUR, reliability, isCarcar, price, isFrozen, balanceFor, settleAll, ratingFor,
+  ACTIVE, BLOCKING, HOUR, reliability, isCarcar, price, complete, isFrozen, balanceFor, settleAll, ratingFor,
   PARTNER_STATUS, partnerOf, savePartner, payoutReady, maskIban, commissionFor, addCustomPlace,
   ROLES, staffOf, workBase, POWER, powerOf, setPower, TICKET_TOPICS, PLACE_TOPICS, TICKET_STATUS, ticketsAll, openTicket, ticketReply, setTicket, mobileOn, spanOf, MOBILE_ROAD,
   enterView,
@@ -2256,7 +2256,7 @@ function bookingDrawer(id) {
         <button class="btn text-danger" data-action="crm-cancel" data-id="${b.id}">Скасувати запис</button>
       </div>`;
   } else if (b.state === 'paid') {
-    actions = `${isPast(b) ? '<p class="notice warn">Час візиту минув. Позначте «Машина готова» — клієнт підтвердить виконання, і гроші надійдуть на ваш баланс.</p>' : ''}
+    actions = `${isPast(b) ? '<p class="notice warn">Час візиту минув. Натисніть «Машина готова» — так ви підтверджуєте виконання.</p>' : ''}
       <form class="stack ready-form" id="ready-form" data-id="${b.id}">
         <label class="dropzone">${icon('camera', 24)}Додати фото результату (до 3)
           <span class="photo-count" aria-live="polite"></span>
@@ -2266,7 +2266,7 @@ function bookingDrawer(id) {
           <label class="field"><span>Коментар для клієнта</span><input name="note" autocomplete="off"></label>
         </div>
         <button class="btn primary" type="submit">Машина готова</button>
-        <p class="fine">Клієнт підтвердить виконання в застосунку — тоді гроші заморозяться на ${PAYMENT.freezeHours} год і стануть доступні до виведення.</p>
+        <p class="fine">Так ви підтверджуєте виконання. Клієнт отримає сповіщення й зможе залишити відгук; ${PAYMENT.freezeHours} год він може відкрити спір, після цього гроші стануть доступні до виведення.</p>
       </form>
       ${Date.now() > bookingStart(b).getTime() + PAYMENT.lateMinutes * 60000 ? `<div class="notice late-box"><b>Клієнт запізнюється понад ${PAYMENT.lateMinutes} хв?</b>За правилами CARCAR це неявка: оплата ${uah(price(b))} зараховується вам.
         <button class="btn" data-action="late-forfeit" data-id="${b.id}" style="margin-top:8px">Запізнення понад ${PAYMENT.lateMinutes} хв — оплата нам</button></div>` : ''}
@@ -2277,10 +2277,6 @@ function bookingDrawer(id) {
       ${t ? `<a class="btn" href="#/support/${t.id}" data-action="close-drawer-nav">Ваше пояснення: звернення №${t.no}</a>` : `<form class="stack" id="dispute-note" data-id="${b.id}" style="gap:8px">
         <label class="field"><span>Пояснення для модератора</span><textarea name="text" rows="3" required maxlength="1000" placeholder="Що було зроблено, фото, домовленості з клієнтом"></textarea></label>
         <button class="btn" type="submit" style="align-self:flex-start">Надіслати модератору</button></form>`}`;
-  } else if (b.state === 'done') {
-    actions = `<p class="notice">Чекаємо підтвердження клієнта. Якщо він не відповість, замовлення підтвердиться автоматично ${fmtTime(b.doneAt + PAYMENT.autoReleaseHours * HOUR)}.</p>
-      <button class="btn" data-action="remind" data-id="${b.id}">${icon('chat', 18)}Нагадати клієнту</button>
-      ${b.remindedAt ? `<p class="small muted" style="margin:0">Останнє нагадування: ${fmtTime(b.remindedAt)}</p>` : ''}`;
   } else if (b.state === 'completed' && isCarcar(b)) {
     actions = `<p class="notice">${isFrozen(b) ? `Гроші заморожені до ${fmtTime(b.unfreezeAt)}.` : 'Гроші доступні до виведення у «Фінансах».'}</p>`;
   }
@@ -2989,12 +2985,6 @@ document.addEventListener('click', (e) => {
     const r = pnl(range);
     downloadCsv(`carcar-pnl-${ui.place}-${range[0]}-${range[1]}.csv`, [['Стаття', 'Сума, ₴'], ...pnlRows(r).map(([n, v]) => [n, v ?? '']),
       ['Прибуток', r.profit], ['Маржа, %', Math.round(r.margin)]]);
-  } else if (action === 'remind') {
-    const b = bookings.find((x) => x.id === id);
-    b.remindedAt = Date.now();
-    save();
-    bookingDrawer(id);
-    toast('Клієнт отримав нагадування підтвердити виконання');
   } else if (action === 'client-new') clientDrawer(null);
   else if (action === 'client-edit') clientDrawer(el.dataset.key);
   else if (action === 'offer-add') offerDrawer(el.dataset.key);
@@ -3392,7 +3382,9 @@ document.addEventListener('submit', async (e) => {
     const d = new FormData(f);
     const files = d.getAll('photos').filter((x) => x.size).slice(0, 3);
     const photos = (await Promise.all(files.map(shrinkPhoto))).filter(Boolean);
-    Object.assign(b, { photos, note: d.get('note').trim() || null, km: Number(d.get('km')) || null, state: 'done', doneAt: Date.now() });
+    // Мийка сама підтверджує виконання: запис одразу виконаний, гроші заморожені на час для спору.
+    Object.assign(b, { photos, note: d.get('note').trim() || null, km: Number(d.get('km')) || null, doneAt: Date.now() });
+    complete(b);
     if (!store.set('bookings', bookings) && photos.length) { b.photos = []; save(); }
     closeDrawer();
     rerenderKeepScroll();

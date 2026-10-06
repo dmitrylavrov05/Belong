@@ -69,8 +69,8 @@ test('запис від вибору послуги до скасування', 
 
   await expect(page).toHaveURL(/#\/bookings\//);
   const card = page.locator('article', { hasText: 'Автомийка «Хвиля»' });
-  await expect(card).toContainText('Оплачено · гроші утримуються');
-  await expect(card).toContainText('Після візиту тут зʼявиться кнопка «Підтвердити виконання»');
+  await expect(card).toContainText('Оплачено');
+  await expect(card).toContainText('Після візиту мийка підтвердить виконання');
   await expect(card.getByRole('button', { name: 'Підтвердити виконання' })).toHaveCount(0);
   await expect(card).toContainText(time.trim());
 
@@ -122,7 +122,7 @@ test('на головній — вибір авто з гаража заміст
   await page.goto('/#/place/blysk');
   await expect(page.getByText('Для вашого авто Toyota Land Cruiser')).toBeVisible();
   await page.goto('/#/book/blysk');
-  await expect(page.locator('#car option:checked')).toHaveText('Toyota Land Cruiser');
+  await expect(page.getByRole('radio', { name: 'Toyota Land Cruiser' })).toBeChecked();
   await page.reload();
   await page.goto('/');
   await expect(pick.locator('option:checked')).toHaveText('Toyota Land Cruiser');
@@ -157,12 +157,14 @@ async function bookTomorrow(page) {
   await page.getByRole('button', { name: 'Оплатити 900 ₴' }).click();
 }
 
-// Переводить годинник на вечір дня візиту (після закриття точки) і підтверджує виконання як клієнт.
+// Вечір дня візиту: мийка підтверджує виконання («Машина готова»), клієнт відкриває завершені записи.
 async function confirmAfterVisit(page, day = 5) {
   await page.clock.setFixedTime(new Date(2026, 9, day, 21, 30));
+  await openJob(page, 'Автомийка «Хвиля»');
+  await page.getByRole('button', { name: 'Машина готова' }).click();
+  await expect(page.locator('#toast')).toHaveText('Клієнт отримав сповіщення «Машина готова»');
   await page.goto('/#/bookings');
-  await page.getByRole('button', { name: 'Підтвердити виконання' }).click();
-  await expect(page.locator('#toast')).toHaveText('Дякуємо! Виконання підтверджено');
+  await page.getByRole('button', { name: /^Завершені/ }).click();
 }
 
 async function openPartner(page, name) {
@@ -177,7 +179,7 @@ async function openJob(page, name) {
   await expect(page.getByRole('heading', { name: 'Запис клієнта' })).toBeVisible();
 }
 
-test('клієнт підтверджує кнопкою, гроші заморожені 48 годин, комісія під час виведення', async ({ page }) => {
+test('мийка підтверджує виконання, гроші заморожені 48 годин, комісія під час виведення', async ({ page }) => {
   await bookTomorrow(page);
   await openPartner(page, 'Автомийка «Хвиля»');
   const balance = page.getByRole('region', { name: 'Баланс' });
@@ -188,10 +190,12 @@ test('клієнт підтверджує кнопкою, гроші замор�
 
   await confirmAfterVisit(page);
   const card = page.locator('article').first();
-  await expect(card).toContainText('Виконано · гроші заморожені');
-  await expect(card).toContainText('Гроші точці заморожені до 7 жовтня о 21:30');
+  await expect(card).toContainText('Виконано');
+  await expect(card).toContainText('Мийка підтвердила виконання. Якщо щось не так — відкрийте спір до 7 жовтня о 21:30');
+  await expect(card).not.toContainText('Гроші точці');
+  await expect(card.locator('.steps li')).toHaveText(['Оплачено', 'Виконано']);
 
-  // У точки замовлення підтвердилось автоматично, але гроші ще заморожені.
+  // У точки замовлення виконане, але гроші ще заморожені на час для спору.
   await openPartner(page, 'Автомийка «Хвиля»');
   await expect(balance).toContainText('Доступно до виведення0 ₴');
   await expect(balance).toContainText('Заморожено900 ₴');
@@ -270,20 +274,26 @@ test('доплата на місці, спір і рішення модерат�
   await expect(page.locator('article').first()).toContainText('Повернено 1 050 ₴');
 });
 
-test('якщо клієнт мовчить, замовлення підтверджується через 24 години, а гроші — ще через 48', async ({ page }) => {
+test('виконання підтверджує мийка: у клієнта лише відгук і спір, гроші точці — через 48 годин', async ({ page }) => {
   await bookTomorrow(page);
+  // До «Машина готова» клієнт нічого не підтверджує.
+  await page.clock.setFixedTime(new Date(2026, 9, 5, 10, 30));
+  await page.goto('/#/bookings');
+  const card = page.locator('article').first();
+  await expect(card).toContainText('Мийка підтвердить виконання');
+  await expect(card.getByRole('button', { name: /Підтвердити виконання|Усе добре/ })).toHaveCount(0);
+
   await openJob(page, 'Автомийка «Хвиля»');
   await page.getByRole('button', { name: 'Машина готова' }).click();
   await page.goto('/#/bookings');
-  await expect(page.locator('article').first()).toContainText('Чекає вашого підтвердження');
-
-  await page.clock.setFixedTime(new Date(2026, 9, 5, 10, 1));
-  await page.reload();
-  await expect(page.locator('article').first()).toContainText('Виконано · гроші заморожені');
+  await expect(card).toContainText('Виконано');
+  await expect(card.locator('.review-form')).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Відкрити спір' })).toBeVisible();
+  await expect(card.getByRole('button', { name: /Підтвердити виконання|Усе добре/ })).toHaveCount(0);
   await openPartner(page, 'Автомийка «Хвиля»');
   await expect(page.getByRole('region', { name: 'Баланс' })).toContainText('Заморожено900 ₴');
 
-  await page.clock.setFixedTime(new Date(2026, 9, 7, 10, 1));
+  await page.clock.setFixedTime(new Date(2026, 9, 7, 10, 31));
   await page.reload();
   await expect(page.getByRole('region', { name: 'Баланс' })).toContainText('Доступно до виведення900 ₴');
 });
@@ -393,7 +403,7 @@ test('скасування за 1,5 год і раніше: уся сума на
   // Скасовуємо й виводимо повернення на картку.
   await page.goto('/#/bookings');
   page.once('dialog', (d) => d.accept());
-  await page.locator('article', { hasText: 'гроші утримуються' }).getByRole('button', { name: 'Скасувати', exact: true }).click();
+  await page.locator('article', { hasText: 'Оплачено. Після візиту' }).getByRole('button', { name: 'Скасувати', exact: true }).click();
   await page.goto('/#/wallet');
   await expect(balance.locator('.bonus-sum')).toHaveText('1 300 ₴');
   page.once('dialog', (d) => d.accept());
@@ -552,16 +562,13 @@ test('«Машина готова» з фото потрапляє клієнт�
   await page.getByLabel('Коментар для клієнта').fill('Літні шини здали на зберігання');
   await page.getByRole('button', { name: 'Машина готова' }).click();
   await expect(page.locator('#toast')).toHaveText('Клієнт отримав сповіщення «Машина готова»');
-  await expect(page.locator('.tabs a[data-tab="bookings"]')).toHaveAttribute('data-badge', '');
 
   await page.getByRole('link', { name: 'Мої записи' }).click();
   const card = page.locator('article').first();
-  await expect(card).toContainText('Машина готова!');
+  await expect(card).toContainText('Мийка підтвердила виконання');
   await expect(card.getByRole('img', { name: 'Фото результату 1' })).toBeVisible();
   await expect(card).toContainText('Літні шини здали на зберігання');
-  await card.getByRole('button', { name: 'Усе добре' }).click();
-  await expect(card).toContainText('Виконано · гроші заморожені');
-  await expect(page.locator('.tabs a[data-tab="bookings"]')).not.toHaveAttribute('data-badge');
+  await expect(card.getByRole('button', { name: 'Усе добре' })).toHaveCount(0);
 
   await page.goto('/#/garage');
   await page.getByRole('link', { name: /Skoda Octavia/ }).click();
