@@ -1,6 +1,6 @@
 // Спільна логіка застосунку клієнта (app.js) і панелі для бізнесу (business.js):
 // сховище, форматування, іконки, гроші, рейтинг і налаштування точок із CRM.
-import { CATEGORIES, PLACES, PAYMENT } from './data.js';
+import { CATEGORIES, PLACES, PAYMENT, RELIABILITY } from './data.js';
 
 // peek — для частого читання без змін: розбираємо JSON лише тоді, коли значення змінилося.
 // Повернений обʼєкт спільний — не змінюйте його, для змін є get/set.
@@ -401,6 +401,24 @@ export function expensesIn(placeId, from, to) {
 
 export const ACTIVE = ['paid', 'done', 'dispute'];
 export const HOUR = 3600000;
+
+// Надійність клієнта за його записами: скільки скасувань, неявок і перенесень, що ще дозволено.
+export function reliability(list, now = Date.now()) {
+  const R = RELIABILITY;
+  const since = now - R.days * 24 * HOUR;
+  const cancels = list.filter((b) => b.state === 'cancelled' && b.cancelBy === 'client' && (b.closedAt ?? 0) >= since);
+  const freeUsed = cancels.filter((b) => b.cancelKind === 'free').length;
+  const noshows = list.filter((b) => b.state === 'noshow' && (b.closedAt ?? bookingStart(b).getTime()) >= now - R.noShowDays * 24 * HOUR).length;
+  const moves = list.flatMap((b) => b.moves ?? []).filter((m) => m.at >= since).length;
+  const limited = noshows >= R.noShowLimit || cancels.length >= R.cancelLimit;
+  const freeLeft = limited ? 0 : Math.max(0, R.freeCancels - freeUsed);
+  const movesLeft = limited ? 0 : Math.max(0, R.moves - moves);
+  return {
+    cancels: cancels.length, freeUsed, freeLeft, noshows, moves, movesLeft, limited,
+    maxActive: limited ? 1 : R.maxActive,
+    level: limited ? 'limited' : !freeLeft || !movesLeft || noshows || cancels.length >= R.freeCancels ? 'warn' : 'ok',
+  };
+}
 // Стани, у яких запис займає бокс: оплачені через CARCAR і внесені в журнал точки.
 export const BLOCKING = [...ACTIVE, 'booked'];
 

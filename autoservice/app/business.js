@@ -6,7 +6,7 @@ import {
   store, icon, esc, uah, pad, hhmm, toMin, isoDate, parseDate, uid, placeById, plural, duration, dayLabel, rating,
   fmtTime, fmtDate, hash, bookingStart, hoursFor, scheduleOf, widestRange, inBreak, rangeText, WEEKDAYS, WEEKDAY_NAMES,
   weekdayOf, phoneKey, offersOf, offerAsService, EXPENSE_CATS, PAY_METHODS, expensesIn, serviceCat, catById, shrinkPhoto, applyOverrides, saveOverride,
-  ACTIVE, BLOCKING, HOUR, isCarcar, price, isFrozen, balanceFor, settleAll, ratingFor,
+  ACTIVE, BLOCKING, HOUR, reliability, isCarcar, price, isFrozen, balanceFor, settleAll, ratingFor,
   PARTNER_STATUS, partnerOf, savePartner, payoutReady, maskIban, commissionFor, addCustomPlace,
   ROLES, staffOf, workBase, POWER, powerOf, setPower, TICKET_TOPICS, PLACE_TOPICS, TICKET_STATUS, ticketsAll, openTicket, ticketReply, setTicket, mobileOn, spanOf, MOBILE_ROAD,
   enterView,
@@ -97,6 +97,18 @@ const STATUS = {
 const statusPill = (b) => `<span class="pill ${STATUS[b.state][1]}">${STATUS[b.state][0]}</span>`;
 
 // Клієнт: за телефоном (CRM), за авто з гаража (CARCAR) або окремий анонімний запис.
+// Надійність клієнта CARCAR за всіма його записами: точка бачить, якщо він часто скасовує чи не приходить.
+function relNotice(b) {
+  if (!isCarcar(b)) return '';
+  // Клієнт застосунку без телефону в демо — це «цей пристрій».
+  const who = (x) => (x.clientPhone ? phoneKey(x.clientPhone) : 'device');
+  const r = reliability(bookings.filter((x) => isCarcar(x) && who(x) === who(b)));
+  if (r.level === 'ok') return '';
+  const parts = [r.cancels && `${r.cancels} ${plural(r.cancels, 'скасування', 'скасування', 'скасувань')}`, r.moves && `${r.moves} ${plural(r.moves, 'перенесення', 'перенесення', 'перенесень')}`, r.noshows && `${r.noshows} ${plural(r.noshows, 'неявка', 'неявки', 'неявок')}`].filter(Boolean);
+  return `<p class="notice ${r.limited ? 'warn' : ''} rel-note">${icon('shield', 18)}<span><b>${r.limited ? 'Ненадійний клієнт — обмежений режим' : 'Клієнт часто змінює плани'}</b>
+    ${parts.join(' · ')} за останній місяць. ${r.limited ? 'CARCAR дозволяє йому лише один активний запис, а за скасування ви отримуєте компенсацію.' : 'Якщо він скасує — ви отримаєте компенсацію за зайнятий час, коли безкоштовні скасування вичерпано.'}</span></p>`;
+}
+
 function clientKey(b) {
   if (b.clientPhone) return phoneKey(b.clientPhone);
   if (b.carId) return `car:${b.car}`;
@@ -2232,6 +2244,7 @@ function bookingDrawer(id) {
   if (b.chatUnreadBiz || seen) { b.chatUnreadBiz = false; save(); renderChrome(location.hash.split('/')[1] ?? ''); }
   openDrawer(`${b.time} · ${esc(clientName(b))}`, `
     <div class="row">${channelPill(b)}${statusPill(b)}</div>
+    ${relNotice(b)}
     <dl class="kv">
       <dt>Дата</dt><dd>${dayLabel(b.date, { weekday: 'long', day: 'numeric', month: 'long' })}, ${b.time}–${hhmm(toMin(b.time) + b.minutes)}</dd>
       <dt>Клієнт</dt><dd><a href="#/clients/${encodeURIComponent(key)}" data-action="close-drawer-nav">${esc(clientName(b))}</a>${b.clientPhone ? ` · <a href="tel:${esc(b.clientPhone.replace(/[^+\d]/g, ''))}">${esc(b.clientPhone)}</a>` : ''}</dd>

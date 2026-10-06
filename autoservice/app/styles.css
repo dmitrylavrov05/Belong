@@ -942,3 +942,17 @@ a.chat-pin { color: var(--muted); text-decoration: none; }
 .photo-view { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: rgb(0 0 0 / 92%); padding: 16px; }
 .photo-view img { max-width: 100%; max-height: 100%; border-radius: 8px; }
 .photo-view .icon-btn { position: absolute; top: calc(10px + env(safe-area-inset-top)); right: 10px; color: #fff; }
+
+/* Надійність клієнта: ліміти скасувань і перенесень */
+.rel-card { display: grid; gap: 10px; }
+.rel-card .head b { display: inline-flex; align-items: center; gap: 6px; }
+.rel-badge { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--ok-soft); color: var(--ok); }
+.rel-badge.warn { background: var(--warn-soft); color: var(--warn); }
+.rel-badge.danger { background: var(--accent-soft); color: var(--danger); }
+.rel-stats { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.rel-stats li { display: grid; gap: 2px; padding: 10px; border-radius: 12px; background: var(--soft); text-align: center; }
+.rel-stats b { font-size: 17px; }
+.rel-stats span { font-size: 12px; color: var(--muted); }
+.rel-card .fine { margin: 0; }
+.rel-note { display: flex; gap: 10px; align-items: flex-start; }
+.rel-note > svg { flex: none; margin-top: 2px; }

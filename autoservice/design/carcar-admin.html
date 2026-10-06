@@ -952,6 +952,20 @@ a.chat-pin { color: var(--muted); text-decoration: none; }
 .photo-view { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: rgb(0 0 0 / 92%); padding: 16px; }
 .photo-view img { max-width: 100%; max-height: 100%; border-radius: 8px; }
 .photo-view .icon-btn { position: absolute; top: calc(10px + env(safe-area-inset-top)); right: 10px; color: #fff; }
+
+/* Надійність клієнта: ліміти скасувань і перенесень */
+.rel-card { display: grid; gap: 10px; }
+.rel-card .head b { display: inline-flex; align-items: center; gap: 6px; }
+.rel-badge { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--ok-soft); color: var(--ok); }
+.rel-badge.warn { background: var(--warn-soft); color: var(--warn); }
+.rel-badge.danger { background: var(--accent-soft); color: var(--danger); }
+.rel-stats { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.rel-stats li { display: grid; gap: 2px; padding: 10px; border-radius: 12px; background: var(--soft); text-align: center; }
+.rel-stats b { font-size: 17px; }
+.rel-stats span { font-size: 12px; color: var(--muted); }
+.rel-card .fine { margin: 0; }
+.rel-note { display: flex; gap: 10px; align-items: flex-start; }
+.rel-note > svg { flex: none; margin-top: 2px; }
 </style>
   <style>
 /* Панель для бізнесу CARCAR: десктоп-перший макет поверх токенів і компонентів styles.css. */
@@ -1609,6 +1623,14 @@ const PAYMENT = {
   installments: { minTotal: 3000, parts: [3, 4, 6] },
 };
 
+// Захист від зловживань переносами й скасуваннями (рахуємо за останні days днів).
+// Безкоштовних скасувань — freeCancels; далі мийці утримується компенсація cancelFeeShare від ціни
+// (не менше cancelFeeMin), решта повертається. Перенесень — moves на всі записи разом (і не більше
+// MOVE_LIMIT на один запис). Активних майбутніх записів — maxActive. Після noShowLimit неявок за
+// noShowDays днів або cancelLimit скасувань за days днів — обмежений режим: лише один активний запис
+// і жодних безкоштовних скасувань.
+const RELIABILITY = { days: 30, freeCancels: 3, cancelFeeShare: 0.2, cancelFeeMin: 50, moves: 4, maxActive: 3, noShowLimit: 2, noShowDays: 60, cancelLimit: 5 };
+
 // Нагадування в гаражі.
 const MAINTENANCE = {
   washDays: 14, // нагадати помити авто, якщо після останньої мийки минуло стільки днів
@@ -2024,6 +2046,24 @@ function expensesIn(placeId, from, to) {
 
 const ACTIVE = ['paid', 'done', 'dispute'];
 const HOUR = 3600000;
+
+// Надійність клієнта за його записами: скільки скасувань, неявок і перенесень, що ще дозволено.
+function reliability(list, now = Date.now()) {
+  const R = RELIABILITY;
+  const since = now - R.days * 24 * HOUR;
+  const cancels = list.filter((b) => b.state === 'cancelled' && b.cancelBy === 'client' && (b.closedAt ?? 0) >= since);
+  const freeUsed = cancels.filter((b) => b.cancelKind === 'free').length;
+  const noshows = list.filter((b) => b.state === 'noshow' && (b.closedAt ?? bookingStart(b).getTime()) >= now - R.noShowDays * 24 * HOUR).length;
+  const moves = list.flatMap((b) => b.moves ?? []).filter((m) => m.at >= since).length;
+  const limited = noshows >= R.noShowLimit || cancels.length >= R.cancelLimit;
+  const freeLeft = limited ? 0 : Math.max(0, R.freeCancels - freeUsed);
+  const movesLeft = limited ? 0 : Math.max(0, R.moves - moves);
+  return {
+    cancels: cancels.length, freeUsed, freeLeft, noshows, moves, movesLeft, limited,
+    maxActive: limited ? 1 : R.maxActive,
+    level: limited ? 'limited' : !freeLeft || !movesLeft || noshows || cancels.length >= R.freeCancels ? 'warn' : 'ok',
+  };
+}
 // Стани, у яких запис займає бокс: оплачені через CARCAR і внесені в журнал точки.
 const BLOCKING = [...ACTIVE, 'booked'];
 

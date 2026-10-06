@@ -242,6 +242,47 @@ test('чат: фото, «Прочитано / Не прочитано» і ми
   await expect(page.getByRole('dialog').locator('.thread .read-state')).toHaveText(/^Прочитано/);
 });
 
+test('захист від зловживань: 3 безкоштовні скасування, далі компенсація мийці й ліміт активних записів', async ({ page }) => {
+  const dialogs = [];
+  page.on('dialog', (d) => { dialogs.push(d.message()); d.accept(); });
+  const cancelFirst = async () => {
+    await page.goto('/#/bookings');
+    await page.getByRole('button', { name: /^Активні/ }).click();
+    await page.locator('article').first().getByRole('button', { name: /^Скасувати/ }).click();
+  };
+  for (let i = 0; i < 3; i++) {
+    await book(page, { pay: /Оплатити/ });
+    await cancelFirst();
+    await expect(page.locator('#toast')).toHaveText('Запис скасовано, 900 ₴ повернено на баланс');
+  }
+  expect(dialogs[0]).toContain('Безкоштовних скасувань лишиться 2 з 3 за 30 днів');
+  await page.goto('/#/garage');
+  const rel = page.getByRole('region', { name: 'Надійність' });
+  await expect(rel).toContainText('0 з 3');
+  await expect(rel).toContainText('Ліміти майже вичерпано');
+
+  // Четверте скасування: мийці 20% ціни за зайнятий час, решта — на баланс.
+  await book(page, { pay: /Оплатити/ });
+  await page.goto('/#/bookings');
+  await page.getByRole('button', { name: /^Активні/ }).click();
+  const card = page.locator('article').first();
+  await expect(card).toContainText('Безкоштовні скасування за 30 днів вичерпано');
+  await card.getByRole('button', { name: 'Скасувати (мийці 180 ₴)' }).click();
+  expect(dialogs.at(-1)).toContain('Мийка отримає 180 ₴ за зайнятий час, 720 ₴ повернемо на баланс CARCAR');
+  await expect(page.locator('#toast')).toHaveText('Запис скасовано: 720 ₴ на балансі, 180 ₴ — мийці');
+
+  // Не більше 3 активних записів одночасно.
+  for (const time of ['10:00', '11:00', '12:00']) await book(page, { time, pay: /Оплатити/ });
+  await page.goto('/#/book/blysk');
+  await expect(page.getByRole('heading', { name: 'Забагато активних записів' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Мої записи · 3' })).toBeVisible();
+
+  // Мийка бачить, що клієнт часто змінює плани.
+  await openInPanel(page, 'Автомийка «Хвиля»');
+  await expect(page.getByRole('dialog').locator('.rel-note')).toContainText('Клієнт часто змінює плани');
+  await expect(page.getByRole('dialog').locator('.rel-note')).toContainText('4 скасування');
+});
+
 test('кошторис СТО: клієнт погоджує пункти окремо, доплачує, гарантія потрапляє в сервісну книжку', async ({ page }) => {
   await page.goto('/#/garage');
   await page.getByLabel('Марка').fill('Skoda');
