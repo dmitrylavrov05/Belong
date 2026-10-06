@@ -505,7 +505,7 @@ test('клієнт не знайшов послугу: пише точці, то
   await chat.getByLabel('Повідомлення мийці').fill('Чи можете відрихтувати диск R17?');
   await chat.getByRole('button', { name: 'Надіслати' }).click();
   await expect(chat.locator('.bubble.me')).toContainText('Чи можете відрихтувати диск R17?');
-  await expect(chat.locator('.chat-who')).toContainText('Чекає відповіді точки');
+  await expect(chat.locator('.chat-pin')).toContainText('Чекає відповіді точки');
   // Контакти збережено — більше не питаємо, наступне повідомлення йде в той самий запит.
   await expect(chat.getByLabel('Ваше імʼя')).toHaveCount(0);
   await chat.getByLabel('Повідомлення мийці').fill('Можу підʼїхати завтра');

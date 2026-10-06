@@ -199,6 +199,49 @@ test('«Повідомлення»: завершений запис не змі�
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 });
 
+test('чат: фото, «Прочитано / Не прочитано» і мийка «у мережі»', async ({ page }) => {
+  await book(page);
+  await page.locator('article').first().getByRole('link', { name: 'Чат з мийкою' }).click();
+  const chat = page.getByRole('region', { name: 'Чат з Автомийка «Хвиля»' });
+  // Панель мийки ще не відкривали — вона не в мережі.
+  await expect(chat.locator('.chat-presence')).toHaveText('не в мережі');
+  await chat.getByLabel('Повідомлення мийці').fill('Ось подряпина на дверях');
+  await chat.getByLabel('Додати фото').setInputFiles({ name: 'door.png', mimeType: 'image/png', buffer: TILE });
+  const mine = chat.locator('.bubble.me');
+  await expect(mine.locator('img[alt="Фото"]')).toBeVisible();
+  await expect(mine).toContainText('Ось подряпина на дверях');
+  await expect(chat.locator('.read-state')).toHaveText('Не прочитано');
+  // Фото відкривається на весь екран і закривається Escape.
+  await mine.getByRole('button', { name: 'Відкрити фото' }).click();
+  await expect(page.getByRole('dialog', { name: 'Фото' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Фото' })).toHaveCount(0);
+
+  // Мийка відкриває запис: бачить фото, клієнтові — «Прочитано»; відповідає фото.
+  await openInPanel(page, 'Автомийка «Хвиля»');
+  const drawer = page.getByRole('dialog');
+  await expect(drawer.locator('.thread img[alt="Фото від клієнта"]')).toBeVisible();
+  await drawer.getByLabel('Додати фото для клієнта').setInputFiles({ name: 'done.png', mimeType: 'image/png', buffer: TILE });
+  await expect(page.locator('#toast')).toHaveText('Повідомлення надіслано клієнту');
+  await expect(drawer.locator('.thread .read-state')).toHaveText('Не прочитано');
+
+  await page.goto('/#/inbox');
+  await expect(page.locator('.convo').first()).toContainText('Фото');
+  await expect(page.locator('.convo .avatar.on')).toHaveCount(1);
+  await page.locator('.convo').first().click();
+  await expect(chat.locator('.chat-presence')).toHaveText('у мережі');
+  await expect(chat.locator('.read-state')).toHaveText('Прочитано 10:00');
+  await expect(chat.locator('.bubble.them img[alt="Фото"]')).toBeVisible();
+  expect((await new AxeBuilder({ page }).include('.chat-screen').analyze()).violations).toEqual([]);
+
+  // Через 25 хв без панелі — «була в мережі 25 хв тому»; мийка бачить, що клієнт прочитав.
+  await page.clock.setFixedTime(new Date(2026, 9, 4, 10, 25));
+  await page.reload();
+  await expect(chat.locator('.chat-presence')).toHaveText('була в мережі 25 хв тому');
+  await openInPanel(page, 'Автомийка «Хвиля»');
+  await expect(page.getByRole('dialog').locator('.thread .read-state')).toHaveText(/^Прочитано/);
+});
+
 test('кошторис СТО: клієнт погоджує пункти окремо, доплачує, гарантія потрапляє в сервісну книжку', async ({ page }) => {
   await page.goto('/#/garage');
   await page.getByLabel('Марка').fill('Skoda');

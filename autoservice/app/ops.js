@@ -60,8 +60,8 @@ export function openStarts(place, date, minutes, bookings, { lead = scheduleOf(p
 
 // Переписка клієнта й точки про конкретний оплачений візит: «приїду з причепом», «можна раніше?».
 // from: client, biz або sys (подія: перенесення, кошторис). Непрочитане позначаємо для іншої сторони.
-export function chatPost(b, from, text, notify = from === 'client' ? 'biz' : 'client') {
-  b.chat = [...(b.chat ?? []), { from, text, at: Date.now() }];
+export function chatPost(b, from, text, notify = from === 'client' ? 'biz' : 'client', photo = null) {
+  b.chat = [...(b.chat ?? []), { from, text, at: Date.now(), ...(photo ? { photo } : {}) }];
   if (notify === 'biz' || notify === 'both') b.chatUnreadBiz = true;
   if (notify === 'client' || notify === 'both') b.chatUnreadClient = true;
 }
@@ -78,6 +78,29 @@ export function chatTimeline(b) {
   else if (b.state === 'refunded') marks.push({ at: b.closedAt ?? fallback, kind: 'closed', text: 'Запис закрито за рішенням спору' });
   return [...msgs, ...marks.map((m) => ({ ...m, from: 'mark' }))].sort((x, y) => x.at - y.at);
 }
+// Позначка «прочитано»: співрозмовник відкрив чат — його непрочитані повідомлення отримують час прочитання.
+export function readMessages(list, from) {
+  let changed = false;
+  for (const m of list ?? []) if (m.from === from && !m.readAt) { m.readAt = Date.now(); changed = true; }
+  return changed;
+}
+// Короткий текст повідомлення для списків: фото без підпису — «Фото».
+export const msgPreview = (m) => m.text || (m.photo ? 'Фото' : '');
+
+// ---------- присутність точки ----------
+
+// Панель точки відкрита — раз на 30 с записуємо час. «У мережі» — якщо відмітка свіжіша за 2 хв.
+// У робочій версії це робить сервер; тут — спільний localStorage вкладок одного браузера.
+export const PRESENCE_KEY = 'presence';
+export function touchPresence(placeId) {
+  if (!placeId) return;
+  store.set(PRESENCE_KEY, { ...store.get(PRESENCE_KEY, {}), [placeId]: Date.now() });
+}
+export function presenceOf(placeId) {
+  const at = store.get(PRESENCE_KEY, {})[placeId] ?? null;
+  return { at, online: !!at && Date.now() - at < 2 * 60000 };
+}
+
 export const CLIENT_QUICK = ['Можна приїхати раніше?', 'Приїду з багажником на даху', 'Залишу ключі адміністратору', 'Потрібен чек для компанії'];
 export const BIZ_QUICK = ['Так, чекаємо', 'Можна на 30 хв раніше', 'На жаль, ні — лише у ваш час', 'Майстер передзвонить'];
 

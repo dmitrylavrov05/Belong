@@ -9,7 +9,7 @@ import {
 import {
   CHANNELS, inboxFor, markRead, sendMessages, dealsOf, dealsOn, weeklyDealsOf, daysText, dealAt, dealPrice, dealCovers, hotDeals,
   checkWaitlist, openStarts, passesOf, sellPass, passActive, passLeft, usableSubs, findCert, redeemPass, restorePass,
-  chatPost, chatTimeline, CLIENT_QUICK, ITEM_KIND, itemSum, estimateTotal, warrantyUntil,
+  chatPost, chatTimeline, readMessages, msgPreview, presenceOf, PRESENCE_KEY, CLIENT_QUICK, ITEM_KIND, itemSum, estimateTotal, warrantyUntil,
 } from './ops.js';
 import { mountMap } from './map.js';
 import { lookupPlate, normPlate, DEMO_PLATES } from './vehicles.js';
@@ -711,12 +711,14 @@ function viewAsk(id) {
   const p = placeById(id);
   if (!p) return viewNotFound();
   const list = requestsOf(p.id).reverse();
-  const time = (at) => new Date(at).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
+  // Клієнт відкрив чат — відповіді мийки прочитані.
+  if (list.map((r) => readMessages(r.messages, 'biz')).some(Boolean)) saveRequests();
   const rows = list.flatMap((r) => [
     ...r.messages,
     ...(r.service ? [{ from: 'svc', at: r.service.at ?? r.messages.at(-1).at, service: r.service }] : []),
     ...(r.closed ? [{ from: 'mark', at: r.closedAt ?? r.messages.at(-1).at, text: 'Запит закрито' }] : []),
   ]);
+  const lastOwn = rows.findLast((m) => m.from === 'client');
   let lastDay = '';
   const items = rows.map((m) => {
     const day = isoDate(new Date(m.at));
@@ -728,16 +730,17 @@ function viewAsk(id) {
         <span>${m.service.personal ? 'Персональна послуга для вас' : 'Послугу додано до прайсу мийки'}</span>
         <a class="btn primary" href="#/book/${p.id}">Записатися</a></div></li>`;
     }
-    return `${sep}<li class="bubble ${m.from === 'client' ? 'me' : 'them'}"><span class="sr-only">${m.from === 'client' ? 'Ви' : p.name}: </span>${esc(m.text)}<time>${time(m.at)}</time></li>`;
+    return `${sep}${bubble(m, p.name)}${m === lastOwn ? readLine(m) : ''}`;
   }).join('');
   const needContact = !profile.name || !profile.phone;
   return `<section class="chat-screen" aria-label="Чат з ${esc(p.name)}">
     <header class="chat-head">
       <button class="icon-btn" data-action="chat-back" aria-label="Назад">${icon('chevL', 24)}</button>
-      ${avatar(p.name)}
-      <div class="chat-who"><h1>${esc(p.name)}</h1><small>Запит про послугу${list.length ? ` · ${reqStatus(list.at(-1))[1]}` : ''}</small></div>
+      ${avatar(p.name, presenceOf(p.id).online)}
+      <div class="chat-who"><h1>${esc(p.name)}</h1>${presenceLine(p.id)}</div>
       <a class="icon-btn" href="${tel(p)}" aria-label="Зателефонувати">${icon('phone', 20)}</a>
     </header>
+    <div class="chat-pin">${icon('chat', 16)}<span>Запит про послугу${list.length ? ` · ${reqStatus(list.at(-1))[1]}` : ''}</span></div>
     <ol class="chat-msgs" aria-label="Повідомлення">
       ${items || `<li class="chat-empty">${avatar(p.name)}<b>Не знайшли потрібну послугу?</b><span>Напишіть, що потрібно зробити. Мийка може додати послугу до прайсу або підготувати персональну ціну для вас.</span></li>`}
     </ol>
@@ -749,6 +752,7 @@ function viewAsk(id) {
           <label class="field"><span>Ваш телефон</span><input name="phone" type="tel" required autocomplete="tel" placeholder="+380" value="${esc(profile.phone)}"></label>
         </div>` : ''}
         <div class="chat-form">
+          ${attachBtn()}
           <input name="text" required maxlength="600" autocomplete="off" placeholder="Що потрібно зробити?" aria-label="Повідомлення мийці">
           <button class="send-btn" type="submit" aria-label="Надіслати">${icon('send', 20)}</button>
         </div>
@@ -758,10 +762,52 @@ function viewAsk(id) {
   </section>`;
 }
 
+// Швидке питання чи фото надсилаються одразу, але спершу потрібні імʼя й телефон, якщо їх ще немає.
+function askContactOk(form) {
+  const contact = [...form.querySelectorAll('.ask-contact input')];
+  const missing = contact.find((i) => !i.checkValidity());
+  if (missing) { missing.reportValidity(); return false; }
+  if (contact.length) {
+    profile = { ...profile, name: form.elements.name.value.trim(), phone: form.elements.phone.value.trim() };
+    store.set('profile', profile);
+  }
+  return true;
+}
+
+// Фото в чаті: зменшуємо до 720 px і надсилаємо разом із набраним текстом.
+async function sendPhoto(input) {
+  const file = input.files?.[0];
+  if (!file) return;
+  const form = input.closest('form');
+  if (form.matches('.ask-form') && !askContactOk(form)) { input.value = ''; return; }
+  const photo = await shrinkPhoto(file);
+  if (!photo) { toast('Не вдалося відкрити фото'); return; }
+  const text = form.elements.text.value.trim();
+  if (form.matches('.ask-form')) askSend(form.dataset.place, text, photo);
+  else sendChat(bookings.find((x) => x.id === form.dataset.id), text, photo);
+}
+
+// Перегляд фото на весь екран; закривається дотиком чи Escape.
+function openPhoto(src) {
+  const box = document.createElement('div');
+  box.className = 'photo-view';
+  box.setAttribute('role', 'dialog');
+  box.setAttribute('aria-modal', 'true');
+  box.setAttribute('aria-label', 'Фото');
+  box.innerHTML = `<img src="${esc(src)}" alt="Фото"><button class="icon-btn" type="button" aria-label="Закрити">${icon('x', 24)}</button>`;
+  const opener = document.activeElement;
+  const close = () => { box.remove(); document.removeEventListener('keydown', onKey); opener?.focus(); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  box.addEventListener('click', close);
+  document.addEventListener('keydown', onKey);
+  document.body.append(box);
+  box.querySelector('button').focus();
+}
+
 // Повідомлення мийці: дописуємо у відкритий запит або починаємо новий.
-function askSend(placeId, text) {
-  if (!text) return;
-  const msg = { from: 'client', text, at: Date.now() };
+function askSend(placeId, text, photo = null) {
+  if (!text && !photo) return;
+  const msg = { from: 'client', text, at: Date.now(), ...(photo ? { photo } : {}) };
   const open = requestsOf(placeId).find((r) => !r.closed && !r.service);
   if (open) {
     open.messages.push(msg);
@@ -1401,7 +1447,7 @@ function chatBlock(b) {
   return `<a class="btn chat-link${b.chatUnreadClient ? ' unread' : ''}" href="#/chat/${b.id}">${icon('chat', 18)}Чат з мийкою${b.chatUnreadClient ? '<span class="count" aria-label="нове повідомлення">1</span>' : ''}</a>`;
 }
 
-const avatar = (name) => `<span class="avatar" aria-hidden="true">${esc([...String(name).replace(/^(Автомийка|Детейлінг-мийка)\s*/, '').replace(/[«»"]/g, '')][0] ?? 'C')}</span>`;
+const avatar = (name, on = false) => `<span class="avatar${on ? ' on' : ''}" aria-hidden="true">${esc([...String(name).replace(/^(Автомийка|Детейлінг-мийка)\s*/, '').replace(/[«»"]/g, '')][0] ?? 'C')}</span>`;
 const shortTime = (at) => {
   const d = new Date(at);
   const today = isoDate(new Date());
@@ -1414,12 +1460,45 @@ const dayName = (iso) => {
 };
 
 // Повноекранний чат із мийкою щодо конкретного запису — як у месенджерах.
+// «У мережі» / «була в мережі …» — як у месенджерах. Мийка в мережі, поки відкрита її панель.
+function presenceText(placeId) {
+  const { at, online } = presenceOf(placeId);
+  if (online) return 'у мережі';
+  if (!at) return 'не в мережі';
+  const min = Math.round((Date.now() - at) / 60000);
+  if (min < 60) return `була в мережі ${min} хв тому`;
+  const d = new Date(at);
+  const t = msgTime(at);
+  if (isoDate(d) === isoDate(new Date())) return `була в мережі сьогодні о ${t}`;
+  if (isoDate(d) === isoDate(new Date(Date.now() - 86400000))) return `була в мережі вчора о ${t}`;
+  return `була в мережі ${d.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' })} о ${t}`;
+}
+const presenceLine = (placeId) => `<small class="chat-presence${presenceOf(placeId).online ? ' on' : ''}" data-place="${esc(placeId)}">${presenceText(placeId)}</small>`;
+
+const msgTime = (at) => new Date(at).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
+const safePhoto = (src) => (typeof src === 'string' && src.startsWith('data:image/') ? esc(src) : '');
+
+// Пузир повідомлення: текст і/або фото, час і галочки (✓ надіслано, ✓✓ прочитано).
+function bubble(m, them) {
+  const mine = m.from === 'client';
+  const photo = safePhoto(m.photo);
+  return `<li class="bubble ${mine ? 'me' : 'them'}${photo ? ' has-photo' : ''}"><span class="sr-only">${mine ? 'Ви' : esc(them)}: </span>${photo ? `<button class="chat-photo" type="button" data-action="photo-open" aria-label="Відкрити фото"><img src="${photo}" alt="Фото"></button>` : ''}${m.text ? `<span class="b-text">${esc(m.text)}</span>` : ''}<time>${msgTime(m.at)}${mine ? `<span class="ticks${m.readAt ? ' read' : ''}" aria-hidden="true">${m.readAt ? '✓✓' : '✓'}</span>` : ''}</time></li>`;
+}
+// Під останнім своїм повідомленням — «Прочитано» чи «Не прочитано».
+const readLine = (m) => `<li class="read-state${m.readAt ? ' read' : ''}">${m.readAt ? `Прочитано ${msgTime(m.readAt)}` : 'Не прочитано'}</li>`;
+
+// Кнопка фото в полі вводу.
+const attachBtn = () => `<label class="attach-btn">${icon('camera', 22)}<input class="sr-only chat-attach" type="file" accept="image/*" aria-label="Додати фото"></label>`;
+
 function viewChat(id) {
   const b = mine().find((x) => x.id === id);
   if (!b) return viewNotFound();
   const p = placeById(b.placeId);
-  if (b.chatUnreadClient) { b.chatUnreadClient = false; save(); }
+  // Клієнт відкрив чат — відповіді мийки прочитані.
+  const seen = readMessages(b.chat, 'biz');
+  if (b.chatUnreadClient || seen) { b.chatUnreadClient = false; save(); }
   const msgs = chatTimeline(b);
+  const lastOwn = msgs.findLast((m) => m.from === 'client');
   let lastDay = '';
   const items = msgs.map((m) => {
     const day = isoDate(new Date(m.at));
@@ -1427,22 +1506,24 @@ function viewChat(id) {
     lastDay = day;
     if (m.from === 'mark') return `${sep}<li class="chat-mark ${m.kind}">${icon(m.kind === 'closed' ? 'x' : 'check', 14)}<b>${esc(m.text)}</b><time>${new Date(m.at).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}</time></li>`;
     if (m.from === 'sys') return `${sep}<li class="bubble sys">${esc(m.text)}</li>`;
-    return `${sep}<li class="bubble ${m.from === 'client' ? 'me' : 'them'}"><span class="sr-only">${m.from === 'client' ? 'Ви' : p.name}: </span>${esc(m.text)}<time>${new Date(m.at).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}</time></li>`;
+    return `${sep}${bubble(m, p.name)}${m === lastOwn ? readLine(m) : ''}`;
   }).join('');
   const open = ACTIVE.includes(b.state);
   return `<section class="chat-screen" aria-label="Чат з ${esc(p.name)}">
     <header class="chat-head">
       <button class="icon-btn" data-action="chat-back" aria-label="Назад">${icon('chevL', 24)}</button>
-      ${avatar(p.name)}
-      <div class="chat-who"><h1>${esc(p.name)}</h1><small>${dayLabel(b.date, { weekday: 'short', day: 'numeric', month: 'short' })}, ${b.time} · ${esc(b.services[0])}${b.services.length > 1 ? ` +${b.services.length - 1}` : ''}</small></div>
+      ${avatar(p.name, presenceOf(p.id).online)}
+      <div class="chat-who"><h1>${esc(p.name)}</h1>${presenceLine(p.id)}</div>
       <a class="icon-btn" href="${tel(p)}" aria-label="Зателефонувати">${icon('phone', 20)}</a>
     </header>
+    <a class="chat-pin" href="#/bookings/${b.id}">${icon('calendar', 16)}<span>${dayLabel(b.date, { weekday: 'short', day: 'numeric', month: 'short' })}, ${b.time} · ${esc(b.services[0])}${b.services.length > 1 ? ` +${b.services.length - 1}` : ''}</span>${icon('chevR', 16)}</a>
     <ol class="chat-msgs" aria-label="Повідомлення">
       ${items || `<li class="chat-empty">${avatar(p.name)}<b>${esc(p.name)}</b><span>Напишіть мийці про цей візит: приїдете раніше, з багажником на даху чи потрібен чек.</span></li>`}
     </ol>
     ${open ? `<div class="chat-compose">
       <div class="quick" role="group" aria-label="Швидкі повідомлення">${CLIENT_QUICK.map((t) => `<button class="chip" data-action="chat-quick" data-id="${b.id}" data-text="${esc(t)}">${esc(t)}</button>`).join('')}</div>
       <form class="chat-form" data-id="${b.id}">
+        ${attachBtn()}
         <input name="text" required maxlength="500" autocomplete="off" placeholder="Повідомлення…" aria-label="Повідомлення мийці">
         <button class="send-btn" type="submit" aria-label="Надіслати">${icon('send', 20)}</button>
       </form>
@@ -1450,11 +1531,11 @@ function viewChat(id) {
   </section>`;
 }
 
-function sendChat(b, text) {
-  chatPost(b, 'client', text);
+function sendChat(b, text, photo = null) {
+  chatPost(b, 'client', text, 'biz', photo);
   save();
   route();
-  $('.chat-form input')?.focus();
+  $('.chat-form input[name="text"]')?.focus();
   track('chat', { placeId: b.placeId });
 }
 
@@ -1483,12 +1564,12 @@ function conversations() {
       const p = placeById(b.placeId);
       const st = visitState(b);
       return { at: last.at, href: `#/chat/${b.id}`, name: p?.name ?? 'Мийка', sub: `${dayLabel(b.date, { day: 'numeric', month: 'short' })}, ${b.time}`,
-        text: `${last.from === 'client' ? 'Ви: ' : ''}${last.text}`, unread: !!b.chatUnreadClient, status: st.label, over: st.over };
+        text: `${last.from === 'client' ? 'Ви: ' : ''}${msgPreview(last)}`, unread: !!b.chatUnreadClient, placeId: b.placeId, status: st.label, over: st.over };
     }),
     ...requests.map((r) => {
       const last = r.messages.at(-1);
       return { at: last.at, href: `#/ask/${r.placeId}`, name: placeById(r.placeId)?.name ?? 'Мийка', sub: `Запит про послугу · ${reqStatus(r)[1]}`,
-        text: `${last.from === 'client' ? 'Ви: ' : ''}${last.text}`, unread: !!r.unreadClient, over: !!r.closed && !r.unreadClient };
+        text: `${last.from === 'client' ? 'Ви: ' : ''}${msgPreview(last)}`, unread: !!r.unreadClient, placeId: r.placeId, over: !!r.closed && !r.unreadClient };
     }),
     ...myTickets().map((t) => {
       const last = t.messages.at(-1);
@@ -1497,7 +1578,7 @@ function conversations() {
   ].sort((a, c) => c.at - a.at);
   if (!rows.length) return '';
   const item = (r) => `<li><a class="convo${r.unread ? ' unread' : ''}${r.over ? ' over' : ''}" href="${r.href}">
-    ${r.support ? `<span class="avatar support" aria-hidden="true">${icon('shield', 20)}</span>` : avatar(r.name)}
+    ${r.support ? `<span class="avatar support" aria-hidden="true">${icon('shield', 20)}</span>` : avatar(r.name, !r.over && !!r.placeId && presenceOf(r.placeId).online)}
     <span class="convo-body"><span class="convo-top"><b>${esc(r.name)}</b><time>${shortTime(r.at)}</time></span>
       <span class="convo-text">${esc(r.text.length > 80 ? `${r.text.slice(0, 80).trimEnd()}…` : r.text)}</span>
       <small>${esc(r.sub)}${r.status ? ` · <span class="convo-state${r.over ? '' : ' live'}">${esc(r.status)}</span>` : ''}</small></span>
@@ -2467,16 +2548,10 @@ document.addEventListener('click', (e) => {
   } else if (action === 'chat-back') {
     if (history.length > 1) history.back(); else location.hash = '#/inbox';
   } else if (action === 'ask-quick') {
-    // Швидке питання надсилається одразу, але спершу потрібні імʼя й телефон, якщо їх ще немає.
     const form = $('.ask-form');
-    const contact = [...form.querySelectorAll('.ask-contact input')];
-    const missing = contact.find((i) => !i.checkValidity());
-    if (missing) { missing.reportValidity(); return; }
-    if (contact.length) {
-      profile = { ...profile, name: form.elements.name.value.trim(), phone: form.elements.phone.value.trim() };
-      store.set('profile', profile);
-    }
-    askSend(form.dataset.place, el.dataset.text);
+    if (askContactOk(form)) askSend(form.dataset.place, el.dataset.text);
+  } else if (action === 'photo-open') {
+    openPhoto(el.querySelector('img').src);
   } else if (action === 'chat-quick') {
     sendChat(bookings.find((x) => x.id === id), el.dataset.text);
   } else if (action === 'mode') {
@@ -2518,6 +2593,7 @@ document.addEventListener('scroll', (e) => {
 
 document.addEventListener('change', (e) => {
   const t = e.target;
+  if (t.matches('.chat-attach')) { sendPhoto(t); return; }
   if (t.matches('[data-action="svc"]')) {
     // Основна мийка — лише одна: обираючи іншу, знімаємо попередню.
     if (t.checked && t.dataset.main) {
@@ -2769,6 +2845,8 @@ window.addEventListener('hashchange', route);
 // Панель для бізнесу в іншій вкладці змінила записи, прайс чи години — перечитуємо й перемальовуємо.
 window.addEventListener('storage', (e) => {
   if (!e.key?.startsWith('carcar.')) return;
+  // Мийка відкрила чи закрила панель — оновлюємо лише «у мережі», без перемальовування.
+  if (e.key === `carcar.${PRESENCE_KEY}`) { refreshPresence(); return; }
   bookings = store.get('bookings', []);
   payouts = store.get('payouts', []);
   reviews = store.get('reviews', []);
@@ -2778,6 +2856,15 @@ window.addEventListener('storage', (e) => {
   applyOverrides();
   if (!draft?.paying) route();
 });
+function refreshPresence() {
+  for (const el of document.querySelectorAll('.chat-presence')) {
+    const on = presenceOf(el.dataset.place).online;
+    el.textContent = presenceText(el.dataset.place);
+    el.classList.toggle('on', on);
+    el.closest('.chat-head')?.querySelector('.avatar')?.classList.toggle('on', on);
+  }
+}
+setInterval(refreshPresence, 30000);
 acceptCampaign();
 track('session', { view: ui.view });
 route();

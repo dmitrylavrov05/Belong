@@ -1331,7 +1331,7 @@ document.addEventListener('submit', (e) => {
 
 // Застосунок чи панель в іншій вкладці змінили дані — перечитуємо.
 window.addEventListener('storage', (e) => {
-  if (!e.key?.startsWith('carcar.')) return;
+  if (!e.key?.startsWith('carcar.') || e.key === 'carcar.presence') return;
   load();
   rerender();
 });

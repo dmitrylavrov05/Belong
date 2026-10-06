@@ -15,7 +15,7 @@ import {
   CHANNELS, sendMessages, viberLink, telegramLink, dealsOf, weeklyDealsOf, daysText, queueOf, queueEnabled, saveQueue, queueEstimate, checkWaitlist,
   PASS_KIND, passesOf, savePasses, sellPass, passActive, passLeft, usableSubs, findCert, redeemPass, restorePass,
   clientKeyOf,
-  chatPost, chatTimeline, BIZ_QUICK, ITEM_KIND, itemSum, estimateTotal,
+  chatPost, chatTimeline, readMessages, msgPreview, touchPresence, PRESENCE_KEY, BIZ_QUICK, ITEM_KIND, itemSum, estimateTotal,
 } from './ops.js';
 import { ENTITY, TAX, DOCS, OFFER, codeValid, ibanValid, ibanBank, normIban, formatIban, missingSteps, offerHtml } from './partners.js';
 import { drawColumns, legend, tableView, hbars, hideTip } from './charts.js';
@@ -1179,13 +1179,14 @@ function viewRequests() {
   const all = ownRequests();
   const list = all.filter((r) => (ui.reqFilter === 'open' ? !r.closed && !r.service : true));
   // Точка відкрила розділ — нові повідомлення прочитані.
-  if (all.some((r) => r.unreadBiz)) { for (const r of all) r.unreadBiz = false; save(); }
+  const seen = all.map((r) => readMessages(r.messages, 'client')).some(Boolean);
+  if (all.some((r) => r.unreadBiz) || seen) { for (const r of all) r.unreadBiz = false; save(); }
   const chats = own().filter((b) => b.chat?.length).sort((a, b) => (b.chatUnreadBiz - a.chatUnreadBiz) || b.chat.at(-1).at - a.chat.at(-1).at).slice(0, 12);
   return `<h1>Запити клієнтів</h1>
     <p class="page-sub">Повідомлення за оплаченими записами й запити, коли клієнт не знайшов потрібну послугу.</p>
     ${chats.length ? `<section class="panel" aria-labelledby="h-chats" style="margin-bottom:16px"><h2 id="h-chats">Повідомлення за записами</h2>
       <ul class="special-list chat-list">${chats.map((b) => `<li${b.chatUnreadBiz ? ' class="unread"' : ''}><span><b>${esc(clientName(b))} · ${dayLabel(b.date, { day: 'numeric', month: 'short' })}, ${b.time}</b>
-        <small>${b.chat.at(-1).from === 'biz' ? 'Ви: ' : b.chat.at(-1).from === 'sys' ? '' : 'Клієнт: '}${esc(b.chat.at(-1).text)}</small></span>
+        <small>${b.chat.at(-1).from === 'biz' ? 'Ви: ' : b.chat.at(-1).from === 'sys' ? '' : 'Клієнт: '}${esc(msgPreview(b.chat.at(-1)))}</small></span>
         ${b.chatUnreadBiz ? '<span class="pill warn">Нове</span>' : ''}<button class="btn" data-action="open-booking" data-id="${b.id}">Відкрити запис</button></li>`).join('')}</ul></section>` : ''}
     <h2 style="margin-top:0">Не знайшли послугу</h2>
     <div class="filters"><div class="seg" role="group" aria-label="Які запити показати">
@@ -1200,9 +1201,9 @@ function viewRequests() {
         <div class="head"><div><b>${esc(r.clientName || 'Клієнт')}</b>
           <small class="muted" style="display:block">${r.clientPhone ? `<a href="tel:${esc(r.clientPhone.replace(/[^+\d]/g, ''))}">${esc(r.clientPhone)}</a>` : ''}${r.car ? ` · ${esc(r.car)}` : ''} · ${fmtTime(r.at)}</small></div>
           <span class="pill ${cls}">${label}</span></div>
-        <ol class="thread">${r.messages.map((m) => `<li class="msg ${m.from === 'biz' ? 'client' : 'biz'}"><span class="who">${m.from === 'biz' ? 'Ви' : 'Клієнт'} · ${fmtTime(m.at)}</span>${esc(m.text)}</li>`).join('')}</ol>
+        ${bizThread(r.messages)}
         ${r.closed ? '' : `<form class="req-answer inline-form" data-id="${r.id}"><label class="field"><span>Відповідь клієнту</span><input name="text" required maxlength="500" autocomplete="off" placeholder="Наприклад, так, робимо — 40 хвилин"></label>
-          <button class="btn" type="submit">Відповісти</button></form>
+          ${bizAttach('req')}<button class="btn" type="submit">Відповісти</button></form>
         <div class="row">
           <button class="btn primary" data-action="req-service" data-id="${r.id}">${icon('plus', 18)}Додати послугу</button>
           ${key && clientsList().some((c) => c.key === key) ? `<a class="btn" href="#/clients/${encodeURIComponent(key)}">Картка клієнта</a>` : ''}
@@ -2227,7 +2228,8 @@ function bookingDrawer(id) {
   }
   const key = clientKey(b);
   // Точка відкрила запис — повідомлення в чаті прочитані.
-  if (b.chatUnreadBiz) { b.chatUnreadBiz = false; save(); renderChrome(location.hash.split('/')[1] ?? ''); }
+  const seen = readMessages(b.chat, 'client');
+  if (b.chatUnreadBiz || seen) { b.chatUnreadBiz = false; save(); renderChrome(location.hash.split('/')[1] ?? ''); }
   openDrawer(`${b.time} · ${esc(clientName(b))}`, `
     <div class="row">${channelPill(b)}${statusPill(b)}</div>
     <dl class="kv">
@@ -2297,21 +2299,32 @@ function estimateDrawer(id) {
   </form>`);
 }
 
+// Стрічка переписки в панелі: фото, позначки ходу запису й «Прочитано» під останньою відповіддю точки.
+function bizThread(list) {
+  const lastOwn = list.findLast((m) => m.from === 'biz');
+  return `<ol class="thread">${list.map((m) => {
+    if (m.from === 'mark') return `<li class="msg sys mark">${esc(m.text)} · ${fmtTime(m.at)}</li>`;
+    const photo = typeof m.photo === 'string' && m.photo.startsWith('data:image/') ? esc(m.photo) : '';
+    return `<li class="msg ${m.from === 'biz' ? 'client' : m.from === 'sys' ? 'sys' : 'biz'}"><span class="who">${m.from === 'biz' ? 'Ви' : m.from === 'sys' ? 'CARCAR' : 'Клієнт'} · ${fmtTime(m.at)}</span>${photo ? `<a class="msg-photo" href="${photo}" download="foto.jpg"><img src="${photo}" alt="Фото від ${m.from === 'biz' ? 'вас' : 'клієнта'}"></a>` : ''}${esc(m.text)}${m === lastOwn ? `<span class="read-state${m.readAt ? ' read' : ''}">${m.readAt ? `Прочитано ${fmtTime(m.readAt)}` : 'Не прочитано'}</span>` : ''}</li>`;
+  }).join('')}</ol>`;
+}
+const bizAttach = (kind) => `<label class="btn attach-btn" title="Додати фото">${icon('camera', 18)}<span class="sr-only">Фото</span><input class="sr-only biz-attach" type="file" accept="image/*" data-kind="${kind}" aria-label="Додати фото для клієнта"></label>`;
+
 // Чат за записом: переписка з клієнтом про цей візит.
 function chatSection(b) {
   if (!isCarcar(b)) return '';
   return `<section class="stack bk-chat" aria-label="Чат з клієнтом" style="gap:8px"><b>Чат з клієнтом</b>
-    ${b.chat?.length ? `<ol class="thread">${chatTimeline(b).map((m) => m.from === 'mark' ? `<li class="msg sys mark">${esc(m.text)} · ${fmtTime(m.at)}</li>` : `<li class="msg ${m.from === 'biz' ? 'client' : m.from === 'sys' ? 'sys' : 'biz'}"><span class="who">${m.from === 'biz' ? 'Ви' : m.from === 'sys' ? 'CARCAR' : 'Клієнт'} · ${fmtTime(m.at)}</span>${esc(m.text)}</li>`).join('')}</ol>`
+    ${b.chat?.length ? bizThread(chatTimeline(b))
       : '<p class="small muted" style="margin:0">Повідомлень ще немає. Напишіть клієнту, якщо треба уточнити щось про візит.</p>'}
     ${ACTIVE.includes(b.state) ? `<div class="quick" role="group" aria-label="Швидкі відповіді">${BIZ_QUICK.map((t) => `<button class="chip" type="button" data-action="biz-quick" data-id="${b.id}" data-text="${esc(t)}">${esc(t)}</button>`).join('')}</div>
     <form class="inline-form" id="bk-chat-form" data-id="${b.id}"><label class="field"><span>Повідомлення клієнту</span><input name="text" required maxlength="500" autocomplete="off"></label>
-      <button class="btn" type="submit">Надіслати</button></form>` : ''}
+      ${bizAttach('booking')}<button class="btn" type="submit">Надіслати</button></form>` : ''}
   </section>`;
 }
 
-function bizChat(b, text) {
-  chatPost(b, 'biz', text);
-  sendMessages([{ placeId: b.placeId, clientKey: 'device', channel: 'app', kind: 'chat', bookingId: b.id, text: `${place().name}: ${text}`, link: `#/chat/${b.id}` }]);
+function bizChat(b, text, photo = null) {
+  chatPost(b, 'biz', text, 'client', photo);
+  sendMessages([{ placeId: b.placeId, clientKey: 'device', channel: 'app', kind: 'chat', bookingId: b.id, text: `${place().name}: ${text || 'Фото'}`, link: `#/chat/${b.id}` }]);
   save();
   bookingDrawer(b.id);
   $('#bk-chat-form input')?.focus();
@@ -2559,6 +2572,9 @@ function demoFill() {
   save();
   demoOps(p, r, pool, out);
   route();
+// Панель відкрита — клієнти бачать мийку «у мережі».
+setInterval(() => { if (document.visibilityState === 'visible') touchPresence(ui.place); }, 30000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') touchPresence(ui.place); });
   toast(`Додано ${out.length} демо-записів за 90 днів`);
 }
 
@@ -2680,6 +2696,7 @@ function renderChrome(page) {
 
 function route() {
   hideTip();
+  touchPresence(ui.place);
   charts = {};
   const [, page = '', arg] = location.hash.replace(/^#/, '').split('/');
   if (page !== 'services') ui.svcDraft = null;
@@ -2980,6 +2997,20 @@ document.addEventListener('input', (e) => {
 
 document.addEventListener('change', async (e) => {
   const t = e.target;
+  if (t.matches('.biz-attach') && t.files?.[0]) {
+    const photo = await shrinkPhoto(t.files[0]);
+    if (!photo) { toast('Не вдалося відкрити фото'); return; }
+    const f = t.form;
+    const text = f.elements.text.value.trim();
+    if (t.dataset.kind === 'booking') { bizChat(bookings.find((x) => x.id === f.dataset.id), text, photo); return; }
+    const r = requests.find((x) => x.id === f.dataset.id);
+    r.messages.push({ from: 'biz', text, at: Date.now(), photo });
+    r.unreadClient = true;
+    save();
+    rerenderKeepScroll();
+    toast('Фото надіслано клієнту');
+    return;
+  }
   // Вимкнений день, перерва чи особлива дата — години не потрібні.
   const toggles = { 'brk-on': ['brk-o', 'brk-c'], closed: ['o', 'c'] };
   if (/^on-\d$/.test(t.name)) toggles[t.name] = [`o-${t.name.slice(3)}`, `c-${t.name.slice(3)}`];
@@ -3364,7 +3395,7 @@ document.addEventListener('submit', async (e) => {
 
 // Застосунок клієнта в іншій вкладці змінив записи чи відгуки — перечитуємо.
 window.addEventListener('storage', (e) => {
-  if (!e.key?.startsWith('carcar.') || $('.drawer')) return;
+  if (!e.key?.startsWith('carcar.') || e.key === `carcar.${PRESENCE_KEY}` || $('.drawer')) return;
   load();
   rerenderKeepScroll();
 });

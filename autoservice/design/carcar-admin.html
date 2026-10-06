@@ -920,15 +920,38 @@ body.in-chat .top, body.in-chat .tabs { display: none; }
 .convo-state.live { color: var(--ok); font-weight: 600; }
 .convo.over .avatar { filter: grayscale(.85); opacity: .75; }
 .convo.over .convo-top b { color: var(--muted); }
-.convo-archive, .note-archive { margin-top: 8px; }
-.msg-card.over { background: var(--soft); box-shadow: none; }
-.msg-card.over p { color: var(--muted); }
+.convo-archive { margin-top: 8px; }
 
 /* «Звільнився час» з листа очікування — єдине сповіщення в «Повідомленнях» */
 .wait-offer { display: flex; align-items: center; gap: 12px; }
 .wait-offer > svg { flex: none; color: var(--accent); }
 .wait-offer > div { flex: 1; min-width: 0; display: grid; gap: 2px; }
 .wait-offer.unread { border-color: var(--accent); }
+
+/* Фото в чатах, галочки й «Прочитано», «у мережі» */
+.avatar { position: relative; }
+.avatar.on::after { content: ''; position: absolute; right: 0; bottom: 0; width: 28%; height: 28%; min-width: 10px; min-height: 10px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 2px var(--bg); }
+.chat-presence.on { color: var(--ok); font-weight: 600; }
+.chat-pin { display: flex; align-items: center; gap: 8px; padding: 8px 14px; font-size: 13px; color: var(--muted); background: var(--soft); border-bottom: 1px solid var(--line); }
+.chat-pin span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+a.chat-pin { color: var(--muted); text-decoration: none; }
+.bubble.has-photo { padding: 4px 4px 22px; max-width: min(78%, 252px); }
+.bubble.has-photo .b-text { display: block; padding: 6px 9px 0; }
+.chat-photo { display: block; padding: 0; border: 0; background: none; cursor: zoom-in; border-radius: 16px; overflow: hidden; }
+.chat-photo img { display: block; width: 100%; max-width: 240px; max-height: 320px; object-fit: cover; }
+.bubble .ticks { margin-left: 4px; letter-spacing: -3px; }
+.read-state { align-self: flex-end; margin: -2px 6px 4px; font-size: 11px; color: var(--muted); list-style: none; }
+.read-state.read { color: var(--text); }
+.thread .read-state { display: block; margin: 4px 0 0; text-align: right; }
+.attach-btn { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; color: var(--muted); cursor: pointer; }
+.attach-btn:focus-within { outline: 2px solid var(--accent); }
+.chat-form { padding-left: 4px; }
+.btn.attach-btn { width: auto; height: auto; border-radius: 12px; color: inherit; }
+.msg-photo { display: block; margin: 4px 0; }
+.msg-photo img { display: block; max-width: 220px; max-height: 260px; border-radius: 10px; object-fit: cover; }
+.photo-view { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: rgb(0 0 0 / 92%); padding: 16px; }
+.photo-view img { max-width: 100%; max-height: 100%; border-radius: 8px; }
+.photo-view .icon-btn { position: absolute; top: calc(10px + env(safe-area-inset-top)); right: 10px; color: #fff; }
 </style>
   <style>
 /* Панель для бізнесу CARCAR: десктоп-перший макет поверх токенів і компонентів styles.css. */
@@ -3765,7 +3788,7 @@ document.addEventListener('submit', (e) => {
 
 // Застосунок чи панель в іншій вкладці змінили дані — перечитуємо.
 window.addEventListener('storage', (e) => {
-  if (!e.key?.startsWith('carcar.')) return;
+  if (!e.key?.startsWith('carcar.') || e.key === 'carcar.presence') return;
   load();
   rerender();
 });
