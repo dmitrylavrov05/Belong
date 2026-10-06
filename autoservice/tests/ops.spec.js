@@ -275,28 +275,18 @@ test('світло: точка відмічає генератор чи відс
   await expect(page.locator('.badge.power')).toHaveCount(0);
 });
 
-test('жива черга: клієнт бачить авто попереду, стає в чергу, точка бачить і веде її', async ({ page }) => {
+test('жива черга веде мийка в панелі, у застосунку клієнта її немає', async ({ page }) => {
   await panel(page, '#/queue', 'Автомийка «Блиск»');
   await page.getByLabel('Держномер чи авто').fill('KA0001AA');
   await page.getByRole('button', { name: 'Додати в чергу' }).click();
   await expect(page.locator('#toast')).toHaveText('Авто додано в чергу');
-
-  await page.goto('/#/place/blysk');
-  await page.locator('.queue-fold summary').click();
-  const q = page.getByRole('region', { name: 'Жива черга зараз' });
-  await expect(q).toContainText('Авто попереду1');
-  await q.getByRole('button', { name: 'Стати в чергу' }).click();
-  await expect(q).toContainText('Ви в черзі: 2-й');
-
-  await panel(page, '#/queue', 'Автомийка «Блиск»');
-  await expect(page.getByRole('region', { name: 'Чекають' })).toContainText('з застосунку');
   await page.getByRole('button', { name: 'У бокс: KA0001AA' }).click();
   await expect(page.getByRole('region', { name: 'У боксах' })).toContainText('KA0001AA');
 
   await page.goto('/#/place/blysk');
-  await expect(q).toContainText('Ви в черзі: 1-й');
-  await q.getByRole('button', { name: 'Вийти з черги' }).click();
-  await expect(page.locator('.queue-fold summary')).toContainText('0 авто попереду');
+  await expect(page.locator('h1')).toHaveText('Автомийка «Блиск»');
+  await expect(page.getByText('Без запису')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Стати в чергу' })).toHaveCount(0);
 });
 
 test('акт приймання з фото: точка фіксує стан, клієнт підтверджує', async ({ page }) => {

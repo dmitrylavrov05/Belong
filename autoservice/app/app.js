@@ -7,7 +7,7 @@ import {
   enterView,
 } from './core.js';
 import {
-  CHANNELS, inboxFor, markRead, sendMessages, dealsOf, dealsOn, weeklyDealsOf, daysText, dealAt, dealPrice, dealCovers, hotDeals, queueOf, queueEnabled, saveQueue, queueEstimate,
+  CHANNELS, inboxFor, markRead, sendMessages, dealsOf, dealsOn, weeklyDealsOf, daysText, dealAt, dealPrice, dealCovers, hotDeals,
   checkWaitlist, openStarts, passesOf, sellPass, passActive, passLeft, usableSubs, findCert, redeemPass, restorePass,
   chatPost, CLIENT_QUICK, ITEM_KIND, itemSum, estimateTotal, warrantyUntil,
 } from './ops.js';
@@ -630,7 +630,6 @@ function viewPlace(id) {
       </div>`).join('')}
     ${mobileOn(p) ? `<section class="card mobile-card" aria-label="Виїзд до вас">${icon('carSide', 22)}<div><b>Можемо приїхати до вас</b>
       <span class="small">У радіусі ${p.mobile.radiusKm} км, виїзд +${uah(p.mobile.fee)}. Оберіть «Виїзд до мене» під час запису.</span></div></section>` : ''}
-    ${queueBlock(p)}
     ${passesBlock(p)}
     <h2 class="big" id="reviews">Відгуки</h2>
     ${ratingSummary(p.id)}
@@ -671,40 +670,6 @@ function dayDealsBar(p, date) {
       <i style="left:0">${hhmm(h[0])}</i><i style="right:0">${hhmm(h[1])}</i></div>
     <p class="dd-text">${icon('bolt', 16)}${deals.map((d) => `−${d.pct}% з ${hhmm(d.from)} до ${hhmm(d.to)}${d.services?.length ? ' на окремі послуги' : ''}`).join(' · ')}</p>
   </div>`;
-}
-
-// ---------- жива черга ----------
-
-const myQueue = () => store.get('queue.mine', []);
-
-// Скільки авто попереду й скільки чекати, якщо приїхати без запису; можна стати в чергу з телефона.
-function queueBlock(p) {
-  if (!isListed(p) || !queueEnabled(p) || !isOpenNow(p)) return '';
-  const est = queueEstimate(p, bookings);
-  const mineIds = myQueue().map((x) => x.id);
-  const me = queueOf(p.id).find((q) => mineIds.includes(q.id) && (q.status === 'waiting' || q.status === 'working'));
-  const waiting = queueOf(p.id).filter((q) => q.status === 'waiting').sort((a, b) => a.joinedAt - b.joinedAt);
-  const now = new Date().getHours() * 60 + new Date().getMinutes();
-  let mine = '';
-  if (me?.status === 'working') mine = `<p class="notice ok" style="margin:0">${icon('checkCircle', 20)}<span><b>Ваше авто вже в боксі</b>Майстер працює з ${me.startedTime}.</span></p>`;
-  else if (me) {
-    const pos = waiting.findIndex((q) => q.id === me.id) + 1;
-    const eta = est.eta.get(me.id) ?? now;
-    mine = `<p class="notice ok" style="margin:0">${icon('checkCircle', 20)}<span><b>Ви в черзі: ${pos}-й</b>У боксі приблизно о ${hhmm(eta)} (≈ ${duration(Math.max(0, eta - now))}).</span></p>
-      <button class="btn" data-action="queue-leave" data-id="${me.id}" data-place="${p.id}">Вийти з черги</button>`;
-  }
-  const wait = est.waitMin < 5 ? 'одразу' : `≈ ${duration(Math.round(est.waitMin / 5) * 5)}`;
-  return `<details class="fold queue-fold" ${me ? 'open' : ''}><summary>${icon('list', 20)}Без запису<span class="fold-note">${est.ahead} авто попереду · ${wait}</span></summary>
-    <section class="queue-card stack" aria-label="Жива черга зараз" style="gap:10px">
-    <div class="tiles">
-      <div class="tile"><span>Авто попереду</span><b>${est.ahead}</b></div>
-      <div class="tile ${est.waitMin < 15 ? 'ok' : ''}"><span>Чекати без запису</span><b>${wait}</b></div>
-    </div>
-    ${mine || `<form id="queue-join" class="inline-form" data-place="${p.id}">
-      <label class="field"><span>Послуга</span><select name="service">${p.services.filter((x) => x.min <= 120).map((x) => `<option value="${x.id}">${esc(x.name)} · ${duration(x.min)}</option>`).join('')}</select></label>
-      <button class="btn primary" type="submit">Стати в чергу</button></form>
-      <p class="fine">Приїжджайте — вас покличуть за номером авто${cars[0]?.plate ? ` ${esc(cars[0].plate)}` : ''}.</p>`}
-    </section></details>`;
 }
 
 // ---------- абонементи й сертифікати ----------
@@ -2278,11 +2243,6 @@ document.addEventListener('click', (e) => {
     route();
     track('buy_pass', { placeId: p.id, kind: plan.kind, amount: plan.price });
     toast(plan.kind === 'cert' ? `Сертифікат куплено, код ${sold.code} — його можна подарувати` : 'Абонемент куплено — спишеться під час запису');
-  } else if (action === 'queue-leave') {
-    const list = store.get('biz.queue', {})[el.dataset.place] ?? [];
-    saveQueue(el.dataset.place, list.map((q) => (q.id === id ? { ...q, status: 'left' } : q)));
-    route();
-    toast('Ви вийшли з черги');
   } else if (action === 'wait-cancel') {
     store.set('waitlist', store.get('waitlist', []).map((w) => (w.id === id ? { ...w, status: 'cancelled' } : w)));
     route();
@@ -2605,21 +2565,6 @@ document.addEventListener('submit', async (e) => {
     renderBook();
     track('waitlist_join', { placeId: p.id });
     toast('Готово! Повідомимо, щойно звільниться час');
-    return;
-  }
-  if (e.target.id === 'queue-join') {
-    e.preventDefault();
-    const p = placeById(e.target.dataset.place);
-    const svc = p.services.find((x) => x.id === new FormData(e.target).get('service'));
-    const entry = {
-      id: uid(), day: isoDate(new Date()), plate: cars[0]?.plate || (cars[0] ? carLabel(cars[0]) : profile.name || 'Клієнт CARCAR'), car: cars[0] ? carLabel(cars[0]) : '',
-      service: svc.name, minutes: svc.min, status: 'waiting', joinedAt: Date.now(), source: 'app', clientName: profile.name, phone: profile.phone,
-    };
-    saveQueue(p.id, [...(store.get('biz.queue', {})[p.id] ?? []).filter((q) => q.day === entry.day), entry]);
-    store.set('queue.mine', [...myQueue(), { id: entry.id, placeId: p.id }]);
-    route();
-    track('queue_join', { placeId: p.id });
-    toast('Ви в черзі — точка бачить ваше авто');
     return;
   }
   if (e.target.id === 'askform' || e.target.matches('.req-reply')) {
