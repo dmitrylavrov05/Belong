@@ -43,7 +43,7 @@ let profile = { name: '', phone: '', optIn: false, ...store.get('profile', {}) }
 // Записи цього клієнта — те, що він бачить у «Мої записи».
 const mine = () => bookings.filter((b) => !b.source);
 
-const ui = { view: store.get('view', 'list'), cat: 'all', q: '', sort: 'rating', openNow: false, favOnly: false, cls: store.get('cls', 0), partner: store.get('partner', null) };
+const ui = { view: store.get('view', 'list'), cat: 'all', q: '', sort: 'rating', openNow: false, favOnly: false, cls: store.get('cls', 0), carId: store.get('carId', null), partner: store.get('partner', null) };
 let draft = null; // чернетка запису: { placeId, services: Set, date, time, carId, paying }
 
 // ---------- утиліти ----------
@@ -514,6 +514,17 @@ function renderList() {
   $('#count').textContent = `${list.length} ${plural(list.length, 'місце', 'місця', 'місць')}${where}`;
 }
 
+// Авто з гаража, для якого показуємо ціни на головній і з якого починається запис.
+const mainCar = () => cars.find((c) => c.id === ui.carId) ?? cars[0] ?? null;
+function pickCar(id) {
+  const car = cars.find((c) => c.id === id);
+  if (!car) return;
+  ui.carId = car.id;
+  ui.cls = car.cls;
+  store.set('carId', ui.carId);
+  store.set('cls', ui.cls);
+}
+
 function viewCatalog() {
   const chip = (label, attrs, on) => `<button class="chip" ${attrs} aria-pressed="${on}">${label}</button>`;
   return `<h1 class="sr-only">Автомийки Києва</h1>
@@ -537,9 +548,11 @@ function viewCatalog() {
     <div class="toolbar">
       <span class="small muted" id="count"></span>
       <span class="row">
-        <select id="cls" class="pill-select" aria-label="Клас авто для цін">
-          ${CAR_CLASSES.map((c, i) => `<option value="${i}" ${i === ui.cls ? 'selected' : ''}>${c}</option>`).join('')}
-        </select>
+        ${cars.length ? `<label class="car-pick">${icon('carSide', 18)}<select id="maincar" aria-label="Ваше авто — ціни для нього">
+          ${cars.map((c) => `<option value="${c.id}" ${c.id === mainCar().id ? 'selected' : ''}>${esc(carLabel(c))}</option>`).join('')}
+          <option value="__add">+ Додати авто</option>
+        </select></label>`
+          : `<a class="car-pick add" href="#/garage/add">${icon('plus', 18)}Додати своє авто</a>`}
         <select id="sort" class="pill-select" aria-label="Сортування">
           <option value="rating" ${ui.sort === 'rating' ? 'selected' : ''}>За рейтингом</option>
           <option value="price" ${ui.sort === 'price' ? 'selected' : ''}>Спочатку дешевші</option>
@@ -634,7 +647,7 @@ function viewPlace(id) {
         <span class="price">${uah(s.price[0])}</span></div>`).join('')}</div>` : ''}
     ${dealsCard(p)}
     <h2 class="big" id="services">Послуги та ціни</h2>
-    <p class="small muted" style="margin:-6px 0 0">Для класу «${CAR_CLASSES[ui.cls]}»</p>
+    <p class="small muted" style="margin:-6px 0 0">${mainCar() ? `Для вашого авто ${esc(carLabel(mainCar()))}` : `Для класу «${CAR_CLASSES[ui.cls]}» · <a href="#/garage/add">додайте своє авто</a>, щоб бачити ціни для нього`}</p>
     ${groups.map(([c, items]) => `
       ${groups.length > 1 ? `<h3 class="cat-label">${icon(c.icon, 15)}${c.name}</h3>` : ''}
       <div class="list" style="margin-top:10px">
@@ -882,7 +895,7 @@ function viewBook(id, date, time) {
   // Посилання з гарячого вікна чи листа очікування відкриває запис одразу на потрібний день і час.
   const prefill = date && bookingDays(p).includes(date);
   if (!draft || draft.placeId !== id || (prefill && draft.date !== date)) {
-    draft = { placeId: id, services: new Set(), date: prefill ? date : firstOpenDay(p), time: null, wantTime: prefill ? time : null, carId: cars[0]?.id ?? null };
+    draft = { placeId: id, services: new Set(), date: prefill ? date : firstOpenDay(p), time: null, wantTime: prefill ? time : null, carId: mainCar()?.id ?? null };
   }
   return `${back(`#/place/${p.id}`, p.name)}
     <h1>Запис</h1>
@@ -2169,7 +2182,7 @@ function viewGarage() {
         </a>`;
       }).join('')}
     </div>
-    <details class="fold add-car" ${cars.length ? '' : 'open'}><summary>${icon('plus', 20)}${cars.length ? 'Додати ще авто' : 'Додати авто'}</summary>
+    <details class="fold add-car" id="add-car" ${cars.length && !ui.addCar ? '' : 'open'}><summary>${icon('plus', 20)}${cars.length ? 'Додати ще авто' : 'Додати авто'}</summary>
     ${carForm('carform', `
       <div class="plate-row">
         <label class="field"><span>Держномер</span><input name="plate" placeholder="AA1234BB" autocomplete="off" aria-describedby="plate-result"></label>
@@ -2389,7 +2402,11 @@ function route() {
     if (sub === 'chat') { location.replace(`#/chat/${arg}`); return; }
     view.innerHTML = viewBookings(arg);
   } else if (page === 'move') { view.innerHTML = viewMove(arg); if ($('#move')) renderMove(); }
-  else if (page === 'garage') view.innerHTML = arg ? viewCar(arg) : viewGarage();
+  else if (page === 'garage') {
+    // «Додати авто» з головної відкриває форму в гаражі.
+    ui.addCar = arg === 'add';
+    view.innerHTML = arg && arg !== 'add' ? viewCar(arg) : viewGarage();
+  }
   else if (page === 'partner') view.innerHTML = arg ? viewPartnerJob(arg) : viewPartner();
   else if (page === 'disputes') view.innerHTML = viewDisputes();
   else if (page === 'invite') view.innerHTML = viewInvite();
@@ -2408,7 +2425,7 @@ function route() {
   // У чаті ховаємо шапку й меню, як у месенджерах, і показуємо останні повідомлення.
   document.body.classList.toggle('in-chat', page === 'chat' || page === 'ask');
   if (page === 'chat' || page === 'ask') { const list = $('.chat-msgs'); if (list) list.scrollTop = list.scrollHeight; return; }
-  const target = arg && page === 'bookings' ? $(`#b-${arg}`) : null;
+  const target = arg && page === 'bookings' ? $(`#b-${arg}`) : page === 'garage' && arg === 'add' ? $('#add-car') : null;
   if (target) target.scrollIntoView({ block: 'center' });
   else window.scrollTo(0, 0);
 }
@@ -2671,8 +2688,13 @@ document.addEventListener('change', (e) => {
     if (t.checked) draft.services.add(t.value); else draft.services.delete(t.value);
     draft.paying = false;
     renderBook();
+  } else if (t.id === 'maincar') {
+    if (t.value === '__add') { location.hash = '#/garage/add'; return; }
+    pickCar(t.value);
+    renderList();
   } else if (t.id === 'car') {
     draft.carId = t.value;
+    pickCar(t.value);
     renderBook();
   } else if (t.id === 'usesub') {
     draft.useSub = t.checked;
@@ -2903,8 +2925,9 @@ document.addEventListener('submit', async (e) => {
   };
   cars.push(car);
   store.set('cars', cars);
-  if (cars.length === 1) { ui.cls = car.cls; store.set('cls', ui.cls); }
-  route();
+  // Нове авто стає основним: для нього ціни на головній і з нього починається запис.
+  pickCar(car.id);
+  if (location.hash === '#/garage/add') location.hash = '#/garage'; else route();
   toast('Авто додано');
 });
 

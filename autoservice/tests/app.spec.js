@@ -88,6 +88,47 @@ test('запис від вибору послуги до скасування', 
   await expect(page.locator('article').first()).toContainText('Повернено 1 300 ₴');
 });
 
+test('на головній — вибір авто з гаража замість класу, ціни для обраного авто', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByLabel('Клас авто для цін')).toHaveCount(0);
+  const blysk = page.locator('.pcard', { hasText: 'Автомийка «Блиск»' });
+  await expect(blysk).toContainText('від 200 ₴');
+  await page.getByRole('link', { name: 'Додати своє авто' }).click();
+  await expect(page).toHaveURL(/#\/garage\/add/);
+  await page.getByLabel('Марка').fill('Toyota');
+  await page.getByLabel('Модель').fill('Land Cruiser');
+  await page.getByLabel('Клас').selectOption('2');
+  await page.getByRole('button', { name: 'Зберегти', exact: true }).click();
+  await expect(page.locator('#toast')).toHaveText('Авто додано');
+
+  await page.goto('/');
+  const pick = page.getByLabel('Ваше авто — ціни для нього');
+  await expect(pick.locator('option:checked')).toHaveText('Toyota Land Cruiser');
+  await expect(blysk).toContainText('від 300 ₴');
+
+  // Друге авто додаємо прямо з вибору — воно стає основним.
+  await pick.selectOption('__add');
+  await expect(page).toHaveURL(/#\/garage\/add/);
+  await page.getByLabel('Марка').fill('Skoda');
+  await page.getByLabel('Модель').fill('Fabia');
+  await page.getByRole('button', { name: 'Зберегти', exact: true }).click();
+  await page.goto('/');
+  await expect(pick.locator('option:checked')).toHaveText('Skoda Fabia');
+  await expect(blysk).toContainText('від 200 ₴');
+
+  // Перемикаємо авто — ціни й запис підлаштовуються.
+  await pick.selectOption({ label: 'Toyota Land Cruiser' });
+  await expect(blysk).toContainText('від 300 ₴');
+  await page.goto('/#/place/blysk');
+  await expect(page.getByText('Для вашого авто Toyota Land Cruiser')).toBeVisible();
+  await page.goto('/#/book/blysk');
+  await expect(page.locator('#car option:checked')).toHaveText('Toyota Land Cruiser');
+  await page.reload();
+  await page.goto('/');
+  await expect(pick.locator('option:checked')).toHaveText('Toyota Land Cruiser');
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+});
+
 test('авто з гаража задає ціни під час запису', async ({ page }) => {
   await page.goto('/#/garage');
   await page.getByLabel('Марка').fill('Toyota');
