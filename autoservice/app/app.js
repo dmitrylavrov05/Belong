@@ -696,36 +696,86 @@ const requestsOf = (placeId) => requests.filter((r) => r.placeId === placeId).so
 const reqStatus = (r) => (r.closed ? ['', 'Запит закрито'] : r.service ? ['go', 'Послугу додано']
   : r.messages.at(-1).from === 'biz' ? ['go', 'Точка відповіла'] : ['', 'Чекає відповіді точки']);
 
-const thread = (r) => `<ol class="thread">${r.messages.map((m) => `<li class="msg ${m.from}"><span class="who">${m.from === 'biz' ? 'Точка' : 'Ви'} · ${fmtTime(m.at)}</span>${esc(m.text)}</li>`).join('')}</ol>`;
+const ASK_QUICK = ['Чи робите хімчистку салону?', 'Чи можна помити автобудинок?', 'Чи відмиєте сліди фарби?', 'Чи є мийка двигуна?'];
 
+// Посилання на сторінці точки: відкриває окремий чат із мийкою.
 function askBlock(p) {
-  const list = requestsOf(p.id);
-  // Розгорнуто, якщо клієнт прийшов за посиланням «Напишіть точці» або вже листується з точкою.
-  const open = list.length || location.hash.endsWith('/ask');
-  return `<details class="ask fold" id="ask" ${open ? 'open' : ''}>
-    <summary>${icon('chat', 20)}Не знайшли потрібну послугу?</summary>
-    <p class="small muted" style="margin:0">Напишіть точці, що потрібно зробити. Вона може додати послугу до прайсу або підготувати персональну ціну для вас — відповідь зʼявиться тут.</p>
-    ${list.map((r) => {
-      const [cls, label] = reqStatus(r);
-      return `<article class="card req">
-        <div class="head"><span class="bk-status ${cls}">${label}</span>${r.unreadClient ? '<span class="badge personal">Нове</span>' : ''}</div>
-        ${thread(r)}
-        ${r.service ? `<div class="notice ok">${icon('checkCircle', 22)}<div><b>${esc(r.service.name)} — ${uah(r.service.price)}</b>${r.service.personal ? 'Персональна послуга для вас — вона вже є в записі.' : 'Послугу додано до прайсу точки.'}</div></div>
-          <a class="btn primary" href="#/book/${p.id}">Записатися</a>` : ''}
-        ${r.closed ? '' : `<form class="req-reply inline-form" data-id="${r.id}"><label class="field"><span>Відповісти точці</span><input name="text" required maxlength="500" autocomplete="off"></label>
-          <button class="btn" type="submit">Надіслати</button></form>`}
-      </article>`;
-    }).join('')}
-    <form id="askform" class="card stack" data-place="${p.id}">
-      <label class="field"><span>Що потрібно зробити?</span><textarea name="text" rows="3" required maxlength="600" placeholder="Наприклад, помити дах автобудинку чи відмити сліди фарби"></textarea></label>
-      <div class="grid2 pf">
-        <label class="field"><span>Ваше імʼя</span><input name="name" required autocomplete="name" value="${esc(profile.name)}"></label>
-        <label class="field"><span>Ваш телефон</span><input name="phone" type="tel" required autocomplete="tel" placeholder="+380" value="${esc(profile.phone)}"></label>
-      </div>
-      <button class="btn primary block" type="submit">${icon('chat', 18)}Надіслати точці</button>
-      <p class="fine">Точка побачить запит, імʼя й телефон у своїй панелі. Персональну ціну ви побачите за цим телефоном.</p>
-    </form>
-  </details>`;
+  const unread = requestsOf(p.id).some((r) => r.unreadClient);
+  return `<a class="card link-card ask-link" href="#/ask/${p.id}">${icon('chat', 22)}<span>Не знайшли потрібну послугу?
+    <small>Напишіть мийці в чат — відповідь прийде сюди й у «Повідомлення»</small></span>
+    ${unread ? '<span class="count" aria-label="нова відповідь">1</span>' : ''}${icon('chevR', 18)}</a>`;
+}
+
+// Окремий екран чату з мийкою про послугу, якої немає в прайсі. Усі запити до точки — однією стрічкою.
+function viewAsk(id) {
+  const p = placeById(id);
+  if (!p) return viewNotFound();
+  const list = requestsOf(p.id).reverse();
+  const time = (at) => new Date(at).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
+  const rows = list.flatMap((r) => [
+    ...r.messages,
+    ...(r.service ? [{ from: 'svc', at: r.service.at ?? r.messages.at(-1).at, service: r.service }] : []),
+    ...(r.closed ? [{ from: 'mark', at: r.closedAt ?? r.messages.at(-1).at, text: 'Запит закрито' }] : []),
+  ]);
+  let lastDay = '';
+  const items = rows.map((m) => {
+    const day = isoDate(new Date(m.at));
+    const sep = day !== lastDay ? `<li class="day-sep"><span>${dayName(day)}</span></li>` : '';
+    lastDay = day;
+    if (m.from === 'mark') return `${sep}<li class="chat-mark closed">${icon('x', 14)}<b>${esc(m.text)}</b></li>`;
+    if (m.from === 'svc') {
+      return `${sep}<li class="svc-offer">${icon('checkCircle', 22)}<div><b>${esc(m.service.name)} — ${uah(m.service.price)}</b>
+        <span>${m.service.personal ? 'Персональна послуга для вас' : 'Послугу додано до прайсу мийки'}</span>
+        <a class="btn primary" href="#/book/${p.id}">Записатися</a></div></li>`;
+    }
+    return `${sep}<li class="bubble ${m.from === 'client' ? 'me' : 'them'}"><span class="sr-only">${m.from === 'client' ? 'Ви' : p.name}: </span>${esc(m.text)}<time>${time(m.at)}</time></li>`;
+  }).join('');
+  const needContact = !profile.name || !profile.phone;
+  return `<section class="chat-screen" aria-label="Чат з ${esc(p.name)}">
+    <header class="chat-head">
+      <button class="icon-btn" data-action="chat-back" aria-label="Назад">${icon('chevL', 24)}</button>
+      ${avatar(p.name)}
+      <div class="chat-who"><h1>${esc(p.name)}</h1><small>Запит про послугу${list.length ? ` · ${reqStatus(list.at(-1))[1]}` : ''}</small></div>
+      <a class="icon-btn" href="${tel(p)}" aria-label="Зателефонувати">${icon('phone', 20)}</a>
+    </header>
+    <ol class="chat-msgs" aria-label="Повідомлення">
+      ${items || `<li class="chat-empty">${avatar(p.name)}<b>Не знайшли потрібну послугу?</b><span>Напишіть, що потрібно зробити. Мийка може додати послугу до прайсу або підготувати персональну ціну для вас.</span></li>`}
+    </ol>
+    <div class="chat-compose">
+      ${rows.length ? '' : `<div class="quick" role="group" aria-label="Швидкі питання">${ASK_QUICK.map((t) => `<button class="chip" type="button" data-action="ask-quick" data-text="${esc(t)}">${esc(t)}</button>`).join('')}</div>`}
+      <form class="ask-form" data-place="${p.id}">
+        ${needContact ? `<div class="ask-contact">
+          <label class="field"><span>Ваше імʼя</span><input name="name" required autocomplete="name" value="${esc(profile.name)}"></label>
+          <label class="field"><span>Ваш телефон</span><input name="phone" type="tel" required autocomplete="tel" placeholder="+380" value="${esc(profile.phone)}"></label>
+        </div>` : ''}
+        <div class="chat-form">
+          <input name="text" required maxlength="600" autocomplete="off" placeholder="Що потрібно зробити?" aria-label="Повідомлення мийці">
+          <button class="send-btn" type="submit" aria-label="Надіслати">${icon('send', 20)}</button>
+        </div>
+      </form>
+      ${needContact ? '<p class="fine" style="margin:0">Мийка побачить імʼя й телефон, щоб відповісти. Персональну ціну ви побачите за цим телефоном.</p>' : ''}
+    </div>
+  </section>`;
+}
+
+// Повідомлення мийці: дописуємо у відкритий запит або починаємо новий.
+function askSend(placeId, text) {
+  if (!text) return;
+  const msg = { from: 'client', text, at: Date.now() };
+  const open = requestsOf(placeId).find((r) => !r.closed && !r.service);
+  if (open) {
+    open.messages.push(msg);
+    open.unreadBiz = true;
+  } else {
+    requests.push({
+      id: uid(), placeId, clientName: profile.name, clientPhone: profile.phone,
+      car: cars[0] ? carLabel(cars[0]) : '', cls: cars[0]?.cls ?? ui.cls, messages: [msg], at: msg.at, unreadBiz: true,
+    });
+  }
+  saveRequests();
+  route();
+  $('.ask-form [name="text"]')?.focus();
+  track('ask', { placeId });
 }
 
 // Запити на сторінці «Мої записи»: де відповіли й куди повернутися.
@@ -736,7 +786,7 @@ function requestsCard() {
     <div class="stack" style="gap:8px">${list.map((r) => {
       const p = placeById(r.placeId);
       const [cls, label] = reqStatus(r);
-      return `<a class="card link-card" href="#/place/${r.placeId}/ask">${icon('chat', 22)}<span>${esc(p?.name ?? 'Точка')}
+      return `<a class="card link-card" href="#/ask/${r.placeId}">${icon('chat', 22)}<span>${esc(p?.name ?? 'Точка')}
         <small class="small muted" style="display:block;font-weight:400"><span class="bk-status ${cls}" style="display:inline">${label}</span> · ${esc(r.messages.at(-1).text.length > 60 ? `${r.messages.at(-1).text.slice(0, 60).trimEnd()}…` : r.messages.at(-1).text)}</small></span>
         ${r.unreadClient ? '<span class="count" aria-label="нова відповідь">1</span>' : ''}${icon('chevR', 18)}</a>`;
     }).join('')}</div>`;
@@ -930,7 +980,7 @@ function renderBook() {
     ${extras.length ? `<div class="sec-h"><h2>${split ? 'Додатково' : 'Послуги'}</h2><span>Можна кілька</span></div>
       ${groups.map((g) => `${groups.length > 1 ? `<h3 class="grp-h">${esc(g)}</h3>` : ''}
         <div class="list">${extras.filter((s) => (s.group ?? 'Інше') === g).map((s) => svcRow(s, cls, false)).join('')}</div>`).join('')}` : ''}
-    <p class="small" style="margin:12px 0 0"><a href="#/place/${p.id}/ask">Не знайшли потрібну послугу? Напишіть точці</a></p>
+    <p class="small" style="margin:12px 0 0"><a href="#/ask/${p.id}">Не знайшли потрібну послугу? Напишіть мийці</a></p>
     <div class="dock-space tall"></div>
     <div class="dock summary book-dock">
       <div class="total"><span>${main ? esc(main.name) : chosen.length ? `${chosen.length} ${plural(chosen.length, 'послуга', 'послуги', 'послуг')}` : 'Нічого не обрано'}
@@ -1419,7 +1469,7 @@ function conversations() {
     }),
     ...requests.map((r) => {
       const last = r.messages.at(-1);
-      return { at: last.at, href: `#/place/${r.placeId}/ask`, name: placeById(r.placeId)?.name ?? 'Мийка', sub: `Запит про послугу · ${reqStatus(r)[1]}`,
+      return { at: last.at, href: `#/ask/${r.placeId}`, name: placeById(r.placeId)?.name ?? 'Мийка', sub: `Запит про послугу · ${reqStatus(r)[1]}`,
         text: `${last.from === 'client' ? 'Ви: ' : ''}${last.text}`, unread: !!r.unreadClient };
     }),
     ...myTickets().map((t) => {
@@ -2154,12 +2204,15 @@ function route() {
     if (!ui.pos && !ui.locTried) { ui.locTried = true; locate(true); }
   }
   else if (page === 'place') {
+    // Старі посилання «Напишіть точці» ведуть на окремий чат.
+    if (sub === 'ask') { location.replace(`#/ask/${arg}`); return; }
     view.innerHTML = viewPlace(arg);
     if (!ui.pos && !ui.locTried) { ui.locTried = true; locate(true); }
   }
   else if (page === 'book') { view.innerHTML = viewBook(arg, sub, extra); if ($('#book')) renderBook(); }
   else if (page === 'inbox') view.innerHTML = viewInbox();
   else if (page === 'chat') view.innerHTML = viewChat(arg);
+  else if (page === 'ask') view.innerHTML = viewAsk(arg);
   else if (page === 'bookings') {
     // Старі посилання на чат у записі ведуть на окремий екран чату.
     if (sub === 'chat') { location.replace(`#/chat/${arg}`); return; }
@@ -2172,8 +2225,8 @@ function route() {
   else if (page === 'support') view.innerHTML = viewSupport(arg, sub);
   else view.innerHTML = viewNotFound();
 
-  // Клієнт відкрив сторінку точки — відповіді на його запити прочитані.
-  if (page === 'place' && requests.some((r) => r.placeId === arg && r.unreadClient)) {
+  // Клієнт відкрив чат із точкою — відповіді на його запити прочитані.
+  if (page === 'ask' && requests.some((r) => r.placeId === arg && r.unreadClient)) {
     for (const r of requests) if (r.placeId === arg) r.unreadClient = false;
     saveRequests();
   }
@@ -2181,9 +2234,9 @@ function route() {
   enterView(view, `${page}/${arg ?? ''}` !== ui.lastView);
   ui.lastView = `${page}/${arg ?? ''}`;
   // У чаті ховаємо шапку й меню, як у месенджерах, і показуємо останні повідомлення.
-  document.body.classList.toggle('in-chat', page === 'chat');
-  if (page === 'chat') { const list = $('.chat-msgs'); if (list) list.scrollTop = list.scrollHeight; return; }
-  const target = arg && page === 'bookings' ? $(`#b-${arg}`) : sub === 'ask' ? $('#ask') : null;
+  document.body.classList.toggle('in-chat', page === 'chat' || page === 'ask');
+  if (page === 'chat' || page === 'ask') { const list = $('.chat-msgs'); if (list) list.scrollTop = list.scrollHeight; return; }
+  const target = arg && page === 'bookings' ? $(`#b-${arg}`) : null;
   if (target) target.scrollIntoView({ block: 'center' });
   else window.scrollTo(0, 0);
 }
@@ -2390,6 +2443,17 @@ document.addEventListener('click', (e) => {
     confirmMove();
   } else if (action === 'chat-back') {
     if (history.length > 1) history.back(); else location.hash = '#/inbox';
+  } else if (action === 'ask-quick') {
+    // Швидке питання надсилається одразу, але спершу потрібні імʼя й телефон, якщо їх ще немає.
+    const form = $('.ask-form');
+    const contact = [...form.querySelectorAll('.ask-contact input')];
+    const missing = contact.find((i) => !i.checkValidity());
+    if (missing) { missing.reportValidity(); return; }
+    if (contact.length) {
+      profile = { ...profile, name: form.elements.name.value.trim(), phone: form.elements.phone.value.trim() };
+      store.set('profile', profile);
+    }
+    askSend(form.dataset.place, el.dataset.text);
   } else if (action === 'chat-quick') {
     sendChat(bookings.find((x) => x.id === id), el.dataset.text);
   } else if (action === 'mode') {
@@ -2618,27 +2682,14 @@ document.addEventListener('submit', async (e) => {
     toast('Готово! Повідомимо, щойно звільниться час');
     return;
   }
-  if (e.target.id === 'askform' || e.target.matches('.req-reply')) {
+  if (e.target.matches('.ask-form')) {
     e.preventDefault();
     const f = new FormData(e.target);
-    const msg = { from: 'client', text: f.get('text').trim(), at: Date.now() };
-    if (e.target.id === 'askform') {
+    if (f.has('name')) {
       profile = { ...profile, name: f.get('name').trim(), phone: f.get('phone').trim() };
       store.set('profile', profile);
-      requests.push({
-        id: uid(), placeId: e.target.dataset.place, clientName: profile.name, clientPhone: profile.phone,
-        car: cars[0] ? carLabel(cars[0]) : '', cls: cars[0]?.cls ?? ui.cls, messages: [msg], at: msg.at, unreadBiz: true,
-      });
-    } else {
-      const r = requests.find((x) => x.id === e.target.dataset.id);
-      r.messages.push(msg);
-      r.unreadBiz = true;
     }
-    saveRequests();
-    route();
-    $('#ask')?.scrollIntoView({ block: 'start' });
-    track('ask', { placeId: e.target.dataset.place ?? null });
-    toast('Повідомлення надіслано точці');
+    askSend(e.target.dataset.place, f.get('text').trim());
     return;
   }
   if (e.target.id === 'profileform') {

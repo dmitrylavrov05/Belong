@@ -903,6 +903,17 @@ body.in-chat .top, body.in-chat .tabs { display: none; }
 .chat-mark.end svg { background: var(--ok-soft); }
 .chat-mark time { color: var(--muted); }
 .thread .msg.sys.mark { border-style: solid; font-weight: 600; }
+
+/* Чат «Не знайшли послугу?»: посилання на сторінці мийки, картка доданої послуги, контакти над полем */
+.ask-link small { display: block; font-weight: 400; font-size: 13px; color: var(--muted); }
+.svc-offer { align-self: flex-start; max-width: 86%; display: flex; gap: 10px; padding: 12px 14px; border-radius: 20px; border-bottom-left-radius: 6px; background: var(--ok-soft); color: var(--text); }
+.svc-offer > svg { flex: none; color: var(--ok); }
+.svc-offer div { display: grid; gap: 4px; }
+.svc-offer span { font-size: 13px; color: var(--muted); }
+.svc-offer .btn { justify-self: start; margin-top: 4px; }
+.ask-form { display: grid; gap: 8px; }
+.ask-contact { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ask-contact .field input { height: 40px; }
 </style>
   <style>
 /* Панель для бізнесу CARCAR: десктоп-перший макет поверх токенів і компонентів styles.css. */
@@ -5641,7 +5652,7 @@ document.addEventListener('click', (e) => {
   else if (action === 'req-close') {
     if (!confirm('Закрити запит? Клієнт побачить, що його закрито.')) return;
     const r = requests.find((x) => x.id === id);
-    Object.assign(r, { closed: true, unreadClient: true });
+    Object.assign(r, { closed: true, closedAt: Date.now(), unreadClient: true });
     save();
     rerenderKeepScroll();
     toast('Запит закрито');
@@ -6045,7 +6056,7 @@ document.addEventListener('submit', async (e) => {
     }
     const note = d.get('note').trim();
     r.messages.push({ from: 'biz', text: `Додали послугу «${svc.name}» — ${uah(svc.price)}${personal ? ', персонально для вас' : ''}. Можна записатися в застосунку.${note ? ` ${note}` : ''}`, at: Date.now() });
-    Object.assign(r, { service: { ...svc, personal }, unreadClient: true });
+    Object.assign(r, { service: { ...svc, personal, at: Date.now() }, unreadClient: true });
     save();
     closeDrawer();
     rerenderKeepScroll();

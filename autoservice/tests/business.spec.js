@@ -494,15 +494,26 @@ test('нагадування клієнту підтвердити викона�
 
 test('клієнт не знайшов послугу: пише точці, точка відповідає й додає послугу', async ({ page }) => {
   await page.goto('/#/book/hvylia');
-  await page.getByRole('link', { name: 'Не знайшли потрібну послугу? Напишіть точці' }).click();
-  await expect(page).toHaveURL(/#\/place\/hvylia\/ask/);
-  const ask = page.locator('#askform');
-  await ask.getByLabel('Що потрібно зробити?').fill('Чи можете відрихтувати диск R17?');
-  await ask.getByLabel('Ваше імʼя').fill('Андрій Запит');
-  await ask.getByLabel('Ваш телефон').fill('063 555 44 33');
-  await ask.getByRole('button', { name: 'Надіслати точці' }).click();
-  await expect(page.locator('#toast')).toHaveText('Повідомлення надіслано точці');
-  await expect(page.locator('.req')).toContainText('Чекає відповіді точки');
+  await page.getByRole('link', { name: 'Не знайшли потрібну послугу? Напишіть мийці' }).click();
+  // Окремий екран чату, як у месенджерах: без нижнього меню, поле вводу внизу.
+  await expect(page).toHaveURL(/#\/ask\/hvylia/);
+  const chat = page.getByRole('region', { name: 'Чат з Автомийка «Хвиля»' });
+  await expect(page.locator('.tabs')).toBeHidden();
+  await expect(chat).toContainText('Не знайшли потрібну послугу?');
+  await chat.getByLabel('Ваше імʼя').fill('Андрій Запит');
+  await chat.getByLabel('Ваш телефон').fill('063 555 44 33');
+  await chat.getByLabel('Повідомлення мийці').fill('Чи можете відрихтувати диск R17?');
+  await chat.getByRole('button', { name: 'Надіслати' }).click();
+  await expect(chat.locator('.bubble.me')).toContainText('Чи можете відрихтувати диск R17?');
+  await expect(chat.locator('.chat-who')).toContainText('Чекає відповіді точки');
+  // Контакти збережено — більше не питаємо, наступне повідомлення йде в той самий запит.
+  await expect(chat.getByLabel('Ваше імʼя')).toHaveCount(0);
+  await chat.getByLabel('Повідомлення мийці').fill('Можу підʼїхати завтра');
+  await chat.getByRole('button', { name: 'Надіслати' }).click();
+  await expect(chat.locator('.bubble.me')).toHaveCount(2);
+  expect((await new AxeBuilder({ page }).include('.chat-screen').analyze()).violations).toEqual([]);
+  await chat.getByRole('button', { name: 'Назад' }).click();
+  await expect(page).toHaveURL(/#\/book\/hvylia/);
 
   // Точка бачить запит у панелі з лічильником і відповідає.
   await page.goto(PANEL);
@@ -533,17 +544,22 @@ test('клієнт не знайшов послугу: пише точці, то
   await page.goto('/#/inbox');
   await expect(page.locator('#inbox-tab .tab-count')).toHaveText('1');
   await page.getByRole('link', { name: /Автомийка «Хвиля».*Послугу додано/ }).click();
-  await expect(page.locator('.req .thread')).toContainText('Так, робимо, близько години');
-  await expect(page.locator('.req')).toContainText('Хімчистка сидінь R17 — 650 ₴');
+  await expect(page).toHaveURL(/#\/ask\/hvylia/);
+  await expect(page.locator('.bubble.them').first()).toContainText('Так, робимо, близько години');
+  await expect(page.locator('.svc-offer')).toContainText('Хімчистка сидінь R17 — 650 ₴');
+  await expect(page.locator('.svc-offer')).toContainText('Персональна послуга для вас');
+  await page.goto('/#/place/hvylia');
   await expect(page.locator('.personal-list')).toContainText('Хімчистка сидінь R17');
-  await page.locator('.req').getByRole('link', { name: 'Записатися' }).click();
+  await page.goto('/#/ask/hvylia');
+  await page.locator('.svc-offer').getByRole('link', { name: 'Записатися' }).click();
   await expect(page.getByLabel(/Хімчистка сидінь R17/)).toBeVisible();
 
   // Послуга для всіх потрапляє в загальний прайс.
   await page.goto('/#/place/blysk');
-  await page.locator('#ask summary').click();
-  await page.locator('#askform').getByLabel('Що потрібно зробити?').fill('Мийка даху автобудинку');
-  await page.locator('#askform').getByRole('button', { name: 'Надіслати точці' }).click();
+  await page.getByRole('link', { name: /Не знайшли потрібну послугу\?/ }).click();
+  // Швидке питання надсилається одним дотиком.
+  await page.getByRole('button', { name: 'Чи можна помити автобудинок?' }).click();
+  await expect(page.locator('.bubble.me')).toContainText('Чи можна помити автобудинок?');
   await page.goto(`${PANEL}#/requests`);
   await selectPlace(page, 'Автомийка «Блиск»');
   await page.getByRole('button', { name: 'Додати послугу' }).click();

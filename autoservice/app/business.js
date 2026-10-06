@@ -2935,7 +2935,7 @@ document.addEventListener('click', (e) => {
   else if (action === 'req-close') {
     if (!confirm('Закрити запит? Клієнт побачить, що його закрито.')) return;
     const r = requests.find((x) => x.id === id);
-    Object.assign(r, { closed: true, unreadClient: true });
+    Object.assign(r, { closed: true, closedAt: Date.now(), unreadClient: true });
     save();
     rerenderKeepScroll();
     toast('Запит закрито');
@@ -3339,7 +3339,7 @@ document.addEventListener('submit', async (e) => {
     }
     const note = d.get('note').trim();
     r.messages.push({ from: 'biz', text: `Додали послугу «${svc.name}» — ${uah(svc.price)}${personal ? ', персонально для вас' : ''}. Можна записатися в застосунку.${note ? ` ${note}` : ''}`, at: Date.now() });
-    Object.assign(r, { service: { ...svc, personal }, unreadClient: true });
+    Object.assign(r, { service: { ...svc, personal, at: Date.now() }, unreadClient: true });
     save();
     closeDrawer();
     rerenderKeepScroll();
