@@ -1351,10 +1351,13 @@ const STATE_LABEL = {
   refunded: ['', 'Гроші повернено'],
 };
 
+// Іконки статусів, щоб завершені записи розрізнялися з першого погляду.
+const STATE_ICON = { completed: 'checkCircle', cancelled: 'x', refunded: 'x', noshow: 'clock', dispute: 'info' };
+
 const cardHead = (b, title, sm, amount = b.paid) => {
   const [cls, label] = isFrozen(b) ? ['go', 'Виконано · гроші заморожені'] : STATE_LABEL[b.state];
   return `<div class="head">
-      <div><div class="bk-status ${cls}">${label}</div><h3 class="bk-title${sm ? ' sm' : ''}">${title}</h3></div>
+      <div><div class="bk-status ${cls}">${STATE_ICON[b.state] ? icon(STATE_ICON[b.state], 14) : ''}${label}</div><h3 class="bk-title${sm ? ' sm' : ''}">${title}</h3></div>
       <div class="bk-price">${uah(amount)}</div>
     </div>`;
 };
@@ -1460,7 +1463,7 @@ function bookingCard(b, highlight) {
       ? `<p class="small muted" style="margin:0">Повернено ${uah(b.refund ?? b.paid)} ${b.refundTo === 'balance' ? 'на баланс CARCAR' : 'на картку'}${b.bonusReturned ? ` і ${uah(b.bonus)} на бонусний рахунок` : ''}${b.placeAmount ? `, ${uah(b.placeAmount)} отримала точка` : ''}.</p>`
       : `<p class="small muted" style="margin:0">${b.lateForfeit ? `Запізнення понад ${PAYMENT.lateMinutes} хв` : b.state === 'noshow' ? 'Ви не приїхали' : `Запис скасовано пізніше ніж за ${cancelWindow()}`} — оплату ${uah(b.placeAmount)} зараховано точці за послугу.</p>`;
   }
-  return `<article class="bk${highlight ? ' hl' : ''}" id="b-${b.id}">
+  return `<article class="bk st-${b.state}${highlight ? ' hl' : ''}" id="b-${b.id}">
     ${cardHead(b, esc(p?.name ?? 'Сервіс'))}
     ${b.state === 'paid' ? visitBar(b) : ''}
     ${steps(b)}
@@ -1978,6 +1981,24 @@ function garageExtras() {
     </section>`).join('')}</div>`;
 }
 
+// Завершені — по місяцях, з підсумком: так довга історія не зливається в одну стрічку.
+function doneByMonth(list, highlightId) {
+  const groups = new Map();
+  for (const b of list) {
+    const key = b.date.slice(0, 7);
+    groups.set(key, [...(groups.get(key) ?? []), b]);
+  }
+  return [...groups].map(([key, items]) => {
+    const name = parseDate(`${key}-01`).toLocaleDateString('uk-UA', { month: 'long', year: 'numeric' }).replace(' р.', '');
+    const done = items.filter((b) => b.state === 'completed');
+    return `<section class="done-month" aria-label="${esc(name)}">
+      <div class="month-h"><h3>${esc(name[0].toUpperCase() + name.slice(1))}</h3>
+        <span>${done.length} ${plural(done.length, 'візит', 'візити', 'візитів')}${done.length ? ` · ${uah(done.reduce((a, b) => a + price(b), 0))}` : ''}</span></div>
+      <div class="stack done-list">${items.map((b) => bookingCard(b, b.id === highlightId)).join('')}</div>
+    </section>`;
+  }).join('');
+}
+
 function viewBookings(highlightId) {
   const list = mine();
   const sorted = [...list].sort((a, b) => bookingStart(a) - bookingStart(b));
@@ -1999,7 +2020,7 @@ function viewBookings(highlightId) {
     </div>
     ${tab === 'active'
       ? `${subsCard()}<h2 class="sr-only">Активні записи</h2><div class="stack" style="margin-top:12px">${active.length ? active.map((b) => bookingCard(b, b.id === highlightId)).join('') : empty('calendar', 'Активних записів немає.', '<a class="btn primary" href="#/">Записатися на мийку</a>')}</div>`
-      : `<h2 class="sr-only">Завершені записи</h2><div class="stack" style="margin-top:12px">${rest.length ? rest.map((b) => bookingCard(b, b.id === highlightId)).join('') : empty('calendar', 'Завершених записів ще немає.')}</div>${inviteCard()}`}`;
+      : `<h2 class="sr-only">Завершені записи</h2>${rest.length ? doneByMonth(rest, highlightId) : `<div class="stack" style="margin-top:12px">${empty('calendar', 'Завершених записів ще немає.')}</div>`}${inviteCard()}`}`;
 }
 
 // ---------- кабінет точки ----------
