@@ -11,10 +11,11 @@
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="business.css">
 </head>
-<body class="biz">
+<body class="biz crm">
   <div class="biz-shell">
     <aside class="biz-side">
       <a class="brand" href="#/" aria-label="CARCAR для бізнесу, огляд"><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#c8402b"/><path d="M15 10.5a6 6 0 1 0 0 11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/><path d="M24 10.5a6 6 0 1 0 0 11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".6"/></svg><span><span class="c1">CAR</span><span class="c2">CAR</span><small>для бізнесу</small></span></a>
+      <div class="sheet-head"><b>Усі розділи</b><button class="icon-btn" type="button" data-action="menu-close" aria-label="Закрити меню">✕</button></div>
       <nav class="biz-nav" id="nav" aria-label="Розділи панелі"></nav>
       <p class="keys-hint" id="keys-hint">Клавіші: <kbd>/</kbd> пошук · <kbd>N</kbd> новий запис · <kbd>T</kbd> сьогодні · <kbd>←</kbd><kbd>→</kbd> дні в розкладі</p>
       <a class="to-app" id="to-app" href="index.html#/partner"></a>
@@ -41,6 +42,7 @@
       <main id="view" tabindex="-1"></main>
     </div>
   </div>
+  <nav class="crm-tabs" id="tabbar" aria-label="Основні розділи"></nav>
   <div id="drawer-root"></div>
   <div class="tip" id="tip" hidden></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>

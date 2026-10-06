@@ -231,7 +231,7 @@ function todayPanel() {
   return `<section class="panel today" aria-labelledby="h-today">
     <div class="head"><h2 id="h-today">Сьогодні, ${parseDate(d).toLocaleDateString('uk-UA', { weekday: 'long' })}, ${parseDate(d).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })}</h2>
       <a class="btn" href="#/schedule/${d}">${icon('calendar', 18)}Розклад дня</a></div>
-    <div class="today-kpis">
+    <div class="today-kpis" tabindex="0" role="group" aria-label="Показники дня">
       <span><b>${inWork.length}</b>зараз у роботі</span>
       <span><b>${next.length}</b>ще сьогодні</span>
       <span><b>${done.length}</b>виконано</span>
@@ -2767,6 +2767,12 @@ function renderChrome(page) {
   const link = ([id, label, ic]) => `<a href="#/${id}" ${page === id ? 'aria-current="page"' : ''}>${icon(ic, 20)}${label}
     ${badge[id]?.[0] ? `<span class="count" aria-label="${badge[id][1]}: ${badge[id][0]}">${badge[id][0]}</span>` : ''}
     ${id === 'connect' && partnerOf(ui.place).status !== 'approved' ? `<span class="count" aria-label="${PARTNER_STATUS[partnerOf(ui.place).status][0]}">!</span>` : ''}</a>`;
+  // Нижнє меню на телефоні: головне під пальцем, решта — у «Ще».
+  const tabs = [['', 'Сьогодні', 'chart'], ['schedule', 'Розклад', 'calendar'], ['clients', 'Клієнти', 'users'], ['requests', 'Чати', 'chat']].filter(([id]) => can(id));
+  const inTabs = tabs.some(([id]) => id === page);
+  const rest = Object.entries(badge).filter(([id]) => !tabs.some(([t]) => t === id) && can(id)).reduce((a, [, [n]]) => a + n, 0);
+  $('#tabbar').innerHTML = `${tabs.map(([id, label, ic]) => `<a href="#/${id}" ${page === id ? 'aria-current="page"' : ''}>${icon(ic, 22)}<span>${label}</span>${badge[id]?.[0] ? `<span class="count" aria-label="${badge[id][1]}: ${badge[id][0]}">${badge[id][0]}</span>` : ''}</a>`).join('')}
+    <button type="button" data-action="menu-open" aria-expanded="${document.body.classList.contains('menu-open')}" ${inTabs ? '' : 'aria-current="page"'}>${icon('list', 22)}<span>Ще</span>${rest ? `<span class="count" aria-label="потребують уваги: ${rest}">${rest}</span>` : ''}</button>`;
   $('#nav').innerHTML = NAV.map(([group, items]) => {
     const visible = items.filter(([id]) => can(id));
     return visible.length ? `<div class="nav-group"><span class="nav-h" aria-hidden="true">${group}</span>${visible.map(link).join('')}</div>` : '';
@@ -2778,7 +2784,7 @@ function renderChrome(page) {
   $('#as').closest('label').hidden = !staff.length;
   const pw = powerOf(ui.place);
   const short = { grid: 'Світло є', generator: 'Працюємо від генератора', closed: 'Без світла, зачинено' };
-  $('#power').innerHTML = `<option value="">Не вказано</option>${Object.keys(POWER).map((k) => `<option value="${k}" ${pw?.state === k ? 'selected' : ''}>${short[k]}</option>`).join('')}`;
+  $('#power').innerHTML = `<option value="">Світло: не вказано</option>${Object.keys(POWER).map((k) => `<option value="${k}" ${pw?.state === k ? 'selected' : ''}>${short[k]}</option>`).join('')}`;
   $('#power').title = pw ? `Оновлено ${fmtTime(pw.at)}` : 'Відмітьте, чи є світло, — клієнти бачать це в застосунку';
   $('#new-booking').hidden = me().role === 'master';
   $('#place').innerHTML = `${PLACES.map((p) => {
@@ -2864,6 +2870,13 @@ document.addEventListener('click', (e) => {
     if (own().some((b) => b.source === 'demo') && !confirm('Замінити наявну демо-історію новою?')) return;
     demoFill();
   } else if (action === 'demo-clear') { $('#demo-menu').open = false; demoClear(); }
+  else if (action === 'menu-open') {
+    // «Ще» відкриває й закриває меню з усіма розділами.
+    const open = document.body.classList.toggle('menu-open');
+    el.setAttribute('aria-expanded', String(open));
+    if (open) $('#nav a')?.focus();
+  }
+  else if (action === 'menu-close') { document.body.classList.remove('menu-open'); $('[data-action="menu-open"]')?.setAttribute('aria-expanded', 'false'); }
   else if (action === 'new-booking') {
     const c = el.dataset.client ? clientsList().find((x) => x.key === el.dataset.client) : null;
     const last = c?.list.find((b) => b.clientName) ?? c?.list[0];
@@ -3072,6 +3085,7 @@ document.addEventListener('click', (e) => {
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && $('#biz-q-res:not([hidden])')) { closeSearch(); $('#biz-q').blur(); return; }
+  if (e.key === 'Escape' && document.body.classList.contains('menu-open')) { document.body.classList.remove('menu-open'); $('[data-action="menu-open"]')?.focus(); return; }
   if (e.key === 'Escape' && $('.drawer')) closeDrawer();
   // Гарячі клавіші, коли курсор не в полі вводу: / — пошук, N — новий запис, T — сьогодні, ←/→ — дні в розкладі.
   const typing = e.target.closest?.('input, textarea, select, [contenteditable]');
@@ -3520,6 +3534,6 @@ window.addEventListener('storage', (e) => {
 
 $('#new-booking').innerHTML = `${icon('plus', 18)}Новий запис`;
 $('#to-app').innerHTML = `${icon('chevL', 18)}Застосунок клієнта`;
-window.addEventListener('hashchange', () => { closeDrawerSilently(); route(); window.scrollTo(0, 0); });
+window.addEventListener('hashchange', () => { document.body.classList.remove('menu-open'); closeDrawerSilently(); route(); window.scrollTo(0, 0); });
 function closeDrawerSilently() { $('#drawer-root').innerHTML = ''; }
 route();

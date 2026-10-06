@@ -480,3 +480,66 @@ table.t tr.off td { opacity: .55; }
   .today-row { grid-template-columns: 52px 1fr; }
   .t-act { grid-column: 1 / -1; justify-content: flex-end; }
 }
+
+/* ---------- CRM з телефону: нижнє меню, «Ще», кнопка нового запису під пальцем ---------- */
+.crm-tabs, .crm .sheet-head { display: none; }
+@media (max-width: 960px) {
+  .crm .biz-side { display: none; }
+  .crm.menu-open .biz-side {
+    display: flex; position: fixed; inset: 0; z-index: 18; flex-direction: column; align-items: stretch;
+    overflow-y: auto; padding: calc(12px + env(safe-area-inset-top)) 16px 96px; background: var(--bg); border: 0;
+  }
+  .crm.menu-open .biz-side .brand { display: none; }
+  .crm.menu-open .biz-nav, .crm.menu-open .nav-group { flex-direction: column; }
+  .crm.menu-open .nav-group + .nav-group { margin: 14px 0 0; }
+  .crm.menu-open .nav-h { display: block; }
+  .crm.menu-open .biz-nav a { min-height: 48px; font-size: 16px; }
+  .crm.menu-open .biz-side .to-app { margin-top: 16px; padding: 8px 12px; }
+  .crm .sheet-head { display: flex; justify-content: space-between; align-items: center; padding: 0 0 8px; font-size: 20px; }
+  .crm .biz-nav a[href="#/import"] { display: none; }
+
+  .crm-tabs {
+    display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; position: fixed; left: 0; right: 0; bottom: 0; z-index: 19;
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom)); background: var(--bg); border-top: 1px solid var(--line);
+  }
+  .crm-tabs a, .crm-tabs button {
+    position: relative; display: grid; justify-items: center; align-content: center; gap: 2px; min-height: 56px; padding: 4px 2px;
+    border: 0; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; text-decoration: none; cursor: pointer;
+  }
+  .crm-tabs [aria-current="page"] { color: var(--accent); }
+  .crm-tabs .count { position: absolute; top: 4px; left: calc(50% + 6px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 11px; display: grid; place-items: center; }
+
+  .crm .biz-top { position: sticky; top: 0; z-index: 12; padding: calc(8px + env(safe-area-inset-top)) 12px 8px; }
+  .crm #demo-menu { display: none; }
+  .crm #new-booking {
+    position: fixed; right: 16px; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 16;
+    min-height: 56px; padding: 0 22px; border-radius: 999px; font-size: 16px; box-shadow: 0 8px 24px rgb(200 64 43 / 35%);
+  }
+  .crm #view { padding-bottom: 160px; }
+}
+
+/* Телефон: компактніше — шапка у два рядки, кругла «+», показники дня в один рядок */
+@media (max-width: 960px) {
+  .crm .biz-top { display: grid; grid-template-columns: 1fr auto; gap: 6px 8px; }
+  .crm .biz-top .field { flex: none; min-width: 0; }
+  .crm .biz-top select { height: 40px; font-size: 15px; }
+  .crm .biz-top .power-field { justify-self: end; }
+  .crm .biz-top .power-field select { max-width: 150px; }
+  .crm .biz-top .power-field > span { display: none; }
+  .crm .biz-top .field:has(#as) { grid-column: 1 / -1; order: 11; }
+  .crm .biz-top .spacer { display: none; }
+  .crm .biz-search { grid-column: 1 / -1; order: 10; }
+  .crm .biz-search input { height: 40px; }
+  .crm #new-booking { width: 60px; height: 60px; min-height: 0; padding: 0; justify-content: center; font-size: 0; gap: 0; }
+  .crm #new-booking svg { width: 28px; height: 28px; }
+  .crm #view h1 { font-size: 26px; }
+  .crm .page-sub { font-size: 14px; }
+  .today-kpis { display: flex; overflow-x: auto; scrollbar-width: none; margin: 0 -4px; padding: 0 4px; }
+  .today-kpis::-webkit-scrollbar { display: none; }
+  .today-kpis span { flex: none; min-width: 112px; padding: 8px 10px; }
+  .today-kpis b { font-size: 18px; }
+  .today .head .btn { font-size: 0; gap: 0; width: 44px; padding: 0; justify-content: center; }
+  /* Те, що вже є в нижньому меню, у «Ще» не дублюємо. */
+  .crm .biz-nav a[href="#/"], .crm .biz-nav a[href="#/schedule"], .crm .biz-nav a[href="#/clients"], .crm .biz-nav a[href="#/requests"] { display: none; }
+  .crm .day-nav { flex-wrap: wrap; gap: 8px; }
+}

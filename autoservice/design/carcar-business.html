@@ -1459,12 +1459,76 @@ table.t tr.off td { opacity: .55; }
   .today-row { grid-template-columns: 52px 1fr; }
   .t-act { grid-column: 1 / -1; justify-content: flex-end; }
 }
+
+/* ---------- CRM з телефону: нижнє меню, «Ще», кнопка нового запису під пальцем ---------- */
+.crm-tabs, .crm .sheet-head { display: none; }
+@media (max-width: 960px) {
+  .crm .biz-side { display: none; }
+  .crm.menu-open .biz-side {
+    display: flex; position: fixed; inset: 0; z-index: 18; flex-direction: column; align-items: stretch;
+    overflow-y: auto; padding: calc(12px + env(safe-area-inset-top)) 16px 96px; background: var(--bg); border: 0;
+  }
+  .crm.menu-open .biz-side .brand { display: none; }
+  .crm.menu-open .biz-nav, .crm.menu-open .nav-group { flex-direction: column; }
+  .crm.menu-open .nav-group + .nav-group { margin: 14px 0 0; }
+  .crm.menu-open .nav-h { display: block; }
+  .crm.menu-open .biz-nav a { min-height: 48px; font-size: 16px; }
+  .crm.menu-open .biz-side .to-app { margin-top: 16px; padding: 8px 12px; }
+  .crm .sheet-head { display: flex; justify-content: space-between; align-items: center; padding: 0 0 8px; font-size: 20px; }
+  .crm .biz-nav a[href="#/import"] { display: none; }
+
+  .crm-tabs {
+    display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; position: fixed; left: 0; right: 0; bottom: 0; z-index: 19;
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom)); background: var(--bg); border-top: 1px solid var(--line);
+  }
+  .crm-tabs a, .crm-tabs button {
+    position: relative; display: grid; justify-items: center; align-content: center; gap: 2px; min-height: 56px; padding: 4px 2px;
+    border: 0; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; text-decoration: none; cursor: pointer;
+  }
+  .crm-tabs [aria-current="page"] { color: var(--accent); }
+  .crm-tabs .count { position: absolute; top: 4px; left: calc(50% + 6px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 11px; display: grid; place-items: center; }
+
+  .crm .biz-top { position: sticky; top: 0; z-index: 12; padding: calc(8px + env(safe-area-inset-top)) 12px 8px; }
+  .crm #demo-menu { display: none; }
+  .crm #new-booking {
+    position: fixed; right: 16px; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 16;
+    min-height: 56px; padding: 0 22px; border-radius: 999px; font-size: 16px; box-shadow: 0 8px 24px rgb(200 64 43 / 35%);
+  }
+  .crm #view { padding-bottom: 160px; }
+}
+
+/* Телефон: компактніше — шапка у два рядки, кругла «+», показники дня в один рядок */
+@media (max-width: 960px) {
+  .crm .biz-top { display: grid; grid-template-columns: 1fr auto; gap: 6px 8px; }
+  .crm .biz-top .field { flex: none; min-width: 0; }
+  .crm .biz-top select { height: 40px; font-size: 15px; }
+  .crm .biz-top .power-field { justify-self: end; }
+  .crm .biz-top .power-field select { max-width: 150px; }
+  .crm .biz-top .power-field > span { display: none; }
+  .crm .biz-top .field:has(#as) { grid-column: 1 / -1; order: 11; }
+  .crm .biz-top .spacer { display: none; }
+  .crm .biz-search { grid-column: 1 / -1; order: 10; }
+  .crm .biz-search input { height: 40px; }
+  .crm #new-booking { width: 60px; height: 60px; min-height: 0; padding: 0; justify-content: center; font-size: 0; gap: 0; }
+  .crm #new-booking svg { width: 28px; height: 28px; }
+  .crm #view h1 { font-size: 26px; }
+  .crm .page-sub { font-size: 14px; }
+  .today-kpis { display: flex; overflow-x: auto; scrollbar-width: none; margin: 0 -4px; padding: 0 4px; }
+  .today-kpis::-webkit-scrollbar { display: none; }
+  .today-kpis span { flex: none; min-width: 112px; padding: 8px 10px; }
+  .today-kpis b { font-size: 18px; }
+  .today .head .btn { font-size: 0; gap: 0; width: 44px; padding: 0; justify-content: center; }
+  /* Те, що вже є в нижньому меню, у «Ще» не дублюємо. */
+  .crm .biz-nav a[href="#/"], .crm .biz-nav a[href="#/schedule"], .crm .biz-nav a[href="#/clients"], .crm .biz-nav a[href="#/requests"] { display: none; }
+  .crm .day-nav { flex-wrap: wrap; gap: 8px; }
+}
 </style>
 </head>
-<body class="biz">
+<body class="biz crm">
   <div class="biz-shell">
     <aside class="biz-side">
       <a class="brand" href="#/" aria-label="CARCAR для бізнесу, огляд"><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#c8402b"/><path d="M15 10.5a6 6 0 1 0 0 11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/><path d="M24 10.5a6 6 0 1 0 0 11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".6"/></svg><span><span class="c1">CAR</span><span class="c2">CAR</span><small>для бізнесу</small></span></a>
+      <div class="sheet-head"><b>Усі розділи</b><button class="icon-btn" type="button" data-action="menu-close" aria-label="Закрити меню">✕</button></div>
       <nav class="biz-nav" id="nav" aria-label="Розділи панелі"></nav>
       <p class="keys-hint" id="keys-hint">Клавіші: <kbd>/</kbd> пошук · <kbd>N</kbd> новий запис · <kbd>T</kbd> сьогодні · <kbd>←</kbd><kbd>→</kbd> дні в розкладі</p>
       <a class="to-app" id="to-app" href="index.html#/partner"></a>
@@ -1491,6 +1555,7 @@ table.t tr.off td { opacity: .55; }
       <main id="view" tabindex="-1"></main>
     </div>
   </div>
+  <nav class="crm-tabs" id="tabbar" aria-label="Основні розділи"></nav>
   <div id="drawer-root"></div>
   <div class="tip" id="tip" hidden></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -3118,7 +3183,7 @@ function todayPanel() {
   return `<section class="panel today" aria-labelledby="h-today">
     <div class="head"><h2 id="h-today">Сьогодні, ${parseDate(d).toLocaleDateString('uk-UA', { weekday: 'long' })}, ${parseDate(d).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })}</h2>
       <a class="btn" href="#/schedule/${d}">${icon('calendar', 18)}Розклад дня</a></div>
-    <div class="today-kpis">
+    <div class="today-kpis" tabindex="0" role="group" aria-label="Показники дня">
       <span><b>${inWork.length}</b>зараз у роботі</span>
       <span><b>${next.length}</b>ще сьогодні</span>
       <span><b>${done.length}</b>виконано</span>
@@ -5654,6 +5719,12 @@ function renderChrome(page) {
   const link = ([id, label, ic]) => `<a href="#/${id}" ${page === id ? 'aria-current="page"' : ''}>${icon(ic, 20)}${label}
     ${badge[id]?.[0] ? `<span class="count" aria-label="${badge[id][1]}: ${badge[id][0]}">${badge[id][0]}</span>` : ''}
     ${id === 'connect' && partnerOf(ui.place).status !== 'approved' ? `<span class="count" aria-label="${PARTNER_STATUS[partnerOf(ui.place).status][0]}">!</span>` : ''}</a>`;
+  // Нижнє меню на телефоні: головне під пальцем, решта — у «Ще».
+  const tabs = [['', 'Сьогодні', 'chart'], ['schedule', 'Розклад', 'calendar'], ['clients', 'Клієнти', 'users'], ['requests', 'Чати', 'chat']].filter(([id]) => can(id));
+  const inTabs = tabs.some(([id]) => id === page);
+  const rest = Object.entries(badge).filter(([id]) => !tabs.some(([t]) => t === id) && can(id)).reduce((a, [, [n]]) => a + n, 0);
+  $('#tabbar').innerHTML = `${tabs.map(([id, label, ic]) => `<a href="#/${id}" ${page === id ? 'aria-current="page"' : ''}>${icon(ic, 22)}<span>${label}</span>${badge[id]?.[0] ? `<span class="count" aria-label="${badge[id][1]}: ${badge[id][0]}">${badge[id][0]}</span>` : ''}</a>`).join('')}
+    <button type="button" data-action="menu-open" aria-expanded="${document.body.classList.contains('menu-open')}" ${inTabs ? '' : 'aria-current="page"'}>${icon('list', 22)}<span>Ще</span>${rest ? `<span class="count" aria-label="потребують уваги: ${rest}">${rest}</span>` : ''}</button>`;
   $('#nav').innerHTML = NAV.map(([group, items]) => {
     const visible = items.filter(([id]) => can(id));
     return visible.length ? `<div class="nav-group"><span class="nav-h" aria-hidden="true">${group}</span>${visible.map(link).join('')}</div>` : '';
@@ -5665,7 +5736,7 @@ function renderChrome(page) {
   $('#as').closest('label').hidden = !staff.length;
   const pw = powerOf(ui.place);
   const short = { grid: 'Світло є', generator: 'Працюємо від генератора', closed: 'Без світла, зачинено' };
-  $('#power').innerHTML = `<option value="">Не вказано</option>${Object.keys(POWER).map((k) => `<option value="${k}" ${pw?.state === k ? 'selected' : ''}>${short[k]}</option>`).join('')}`;
+  $('#power').innerHTML = `<option value="">Світло: не вказано</option>${Object.keys(POWER).map((k) => `<option value="${k}" ${pw?.state === k ? 'selected' : ''}>${short[k]}</option>`).join('')}`;
   $('#power').title = pw ? `Оновлено ${fmtTime(pw.at)}` : 'Відмітьте, чи є світло, — клієнти бачать це в застосунку';
   $('#new-booking').hidden = me().role === 'master';
   $('#place').innerHTML = `${PLACES.map((p) => {
@@ -5751,6 +5822,13 @@ document.addEventListener('click', (e) => {
     if (own().some((b) => b.source === 'demo') && !confirm('Замінити наявну демо-історію новою?')) return;
     demoFill();
   } else if (action === 'demo-clear') { $('#demo-menu').open = false; demoClear(); }
+  else if (action === 'menu-open') {
+    // «Ще» відкриває й закриває меню з усіма розділами.
+    const open = document.body.classList.toggle('menu-open');
+    el.setAttribute('aria-expanded', String(open));
+    if (open) $('#nav a')?.focus();
+  }
+  else if (action === 'menu-close') { document.body.classList.remove('menu-open'); $('[data-action="menu-open"]')?.setAttribute('aria-expanded', 'false'); }
   else if (action === 'new-booking') {
     const c = el.dataset.client ? clientsList().find((x) => x.key === el.dataset.client) : null;
     const last = c?.list.find((b) => b.clientName) ?? c?.list[0];
@@ -5959,6 +6037,7 @@ document.addEventListener('click', (e) => {
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && $('#biz-q-res:not([hidden])')) { closeSearch(); $('#biz-q').blur(); return; }
+  if (e.key === 'Escape' && document.body.classList.contains('menu-open')) { document.body.classList.remove('menu-open'); $('[data-action="menu-open"]')?.focus(); return; }
   if (e.key === 'Escape' && $('.drawer')) closeDrawer();
   // Гарячі клавіші, коли курсор не в полі вводу: / — пошук, N — новий запис, T — сьогодні, ←/→ — дні в розкладі.
   const typing = e.target.closest?.('input, textarea, select, [contenteditable]');
@@ -6407,7 +6486,7 @@ window.addEventListener('storage', (e) => {
 
 $('#new-booking').innerHTML = `${icon('plus', 18)}Новий запис`;
 $('#to-app').innerHTML = `${icon('chevL', 18)}Застосунок клієнта`;
-window.addEventListener('hashchange', () => { closeDrawerSilently(); route(); window.scrollTo(0, 0); });
+window.addEventListener('hashchange', () => { document.body.classList.remove('menu-open'); closeDrawerSilently(); route(); window.scrollTo(0, 0); });
 function closeDrawerSilently() { $('#drawer-root').innerHTML = ''; }
 route();
 </script>

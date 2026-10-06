@@ -21,6 +21,13 @@ test.afterEach(async ({ page }) => {
 });
 
 const PANEL = '/business.html';
+
+// На телефоні розділи панелі — у меню «Ще» нижньої панелі.
+async function openNav(page) {
+  const more = page.locator('#tabbar [data-action="menu-open"]');
+  if (await more.isVisible() && (await more.getAttribute('aria-expanded')) !== 'true') await more.click();
+  return page.locator('#nav');
+}
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 
 async function panel(page, hash, place = 'Автомийка «Хвиля»') {
@@ -76,11 +83,11 @@ test('персонал і ролі: майстер на записі, зарпл
   await completeCash(page, 'Зарплата Тест');
 
   // 40% від 900 ₴ — 360 ₴ зарплати, автоматично у витратах.
-  await page.locator('#nav').getByRole('link', { name: 'Витрати' }).click();
+  await (await openNav(page)).getByRole('link', { name: 'Витрати' }).click();
   const row = page.getByRole('region', { name: 'Витрати', exact: true }).locator('tr', { hasText: 'Майстер Тест' });
   await expect(row).toContainText('360 ₴');
   await expect(row).toContainText('авто');
-  await page.locator('#nav').getByRole('link', { name: 'Персонал' }).click();
+  await (await openNav(page)).getByRole('link', { name: 'Персонал' }).click();
   await expect(page.getByRole('region', { name: 'Нарахування майстрам' })).toContainText('360 ₴');
 
   // Майстер не бачить фінансів, але бачить свій заробіток.
@@ -88,7 +95,7 @@ test('персонал і ролі: майстер на записі, зарпл
   await expect(page).toHaveURL(/#\/schedule/);
   await expect(page.locator('#nav')).not.toContainText('Фінанси');
   await expect(page.locator('#new-booking')).toBeHidden();
-  await page.locator('#nav').getByRole('link', { name: 'Мій заробіток' }).click();
+  await (await openNav(page)).getByRole('link', { name: 'Мій заробіток' }).click();
   await expect(page.locator('.kpi.hero .value')).toHaveText('360 ₴');
   await page.goto(`${PANEL}#/finance`);
   await expect(page.getByRole('heading', { name: 'Немає доступу' })).toBeVisible();
@@ -117,8 +124,8 @@ test('склад: списання за нормами, нагадування �
   await crmBooking(page, { name: 'Склад Два', phone: '+380 50 000 00 22', time: '13:00' });
   await completeCash(page, 'Склад Два');
 
-  await expect(page.locator('#nav').getByRole('link', { name: /Склад/ })).toContainText('1');
-  await page.locator('#nav').getByRole('link', { name: /Склад/ }).click();
+  await expect((await openNav(page)).getByRole('link', { name: /Склад/ })).toContainText('1');
+  await (await openNav(page)).getByRole('link', { name: /Склад/ }).click();
   const row = page.getByRole('region', { name: 'Залишки' }).locator('tr', { hasText: 'Монтажна паста' });
   await expect(row).toContainText('0,4 кг');
   await expect(row).toContainText('Закінчується');
@@ -132,7 +139,7 @@ test('склад: списання за нормами, нагадування �
   await expect(page.locator('#toast')).toContainText('700 ₴ у витратах');
   await expect(row).toContainText('2,4 кг');
   await expect(row).toContainText('Достатньо');
-  await page.locator('#nav').getByRole('link', { name: 'Витрати' }).click();
+  await (await openNav(page)).getByRole('link', { name: 'Витрати' }).click();
   await expect(page.getByRole('region', { name: 'Витрати', exact: true }).locator('tr', { hasText: 'Монтажна паста' })).toContainText('700 ₴');
 });
 
@@ -213,7 +220,7 @@ test('розсилка VIP-клієнтам у Viber доходить клієн
   await d.getByRole('button', { name: 'Додати клієнта' }).click();
   await page.getByRole('button', { name: 'VIP' }).click();
 
-  await page.locator('#nav').getByRole('link', { name: 'Розсилки' }).click();
+  await (await openNav(page)).getByRole('link', { name: 'Розсилки' }).click();
   await page.getByLabel('Кому').selectOption('vip');
   await page.getByLabel('Текст').fill('{імʼя}, для VIP — безкоштовний віск до кінця тижня!');
   await expect(page.locator('#mail-count')).toContainText('Отримають: 1');

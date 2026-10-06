@@ -21,6 +21,13 @@ test.afterEach(async ({ page }) => {
 });
 
 const PANEL = '/business.html';
+
+// У панелі точки на телефоні розділи — у меню «Ще» нижньої панелі.
+async function openNav(page) {
+  const more = page.locator('#tabbar [data-action="menu-open"]');
+  if (await more.isVisible() && (await more.getAttribute('aria-expanded')) !== 'true') await more.click();
+  return page.locator('#nav');
+}
 const ADMIN = '/admin.html';
 // Вигадані коди з правильними контрольними сумами.
 const RNOKPP = '1234567899';
@@ -62,7 +69,7 @@ test('нова точка: підключення ФОП, перевірка CAR
   await expect(page.getByRole('region', { name: 'Статус підключення' })).toContainText('Чернетка');
 
   // На інших екранах — нагадування, а клієнти точку ще не бачать.
-  await page.locator('#nav').getByRole('link', { name: 'Розклад' }).click();
+  await page.goto(`${PANEL}#/schedule`);
   await expect(page.locator('.status-banner')).toContainText('Клієнти ще не бачать цю точку');
   await page.goto('/');
   await expect(page.getByText('Автомийка «Хмаринка»')).toHaveCount(0);

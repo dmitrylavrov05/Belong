@@ -22,6 +22,13 @@ test.afterEach(async ({ page }) => {
 
 const PANEL = '/business.html';
 
+// На телефоні розділи панелі — у меню «Ще» нижньої панелі.
+async function openNav(page) {
+  const more = page.locator('#tabbar [data-action="menu-open"]');
+  if (await more.isVisible() && (await more.getAttribute('aria-expanded')) !== 'true') await more.click();
+  return page.locator('#nav');
+}
+
 async function selectPlace(page, name) {
   await page.getByLabel('Точка').selectOption({ label: name });
 }
@@ -46,6 +53,40 @@ async function addCrmBooking(page, { name, phone, service, date = '2026-10-05', 
   await form.getByRole('button', { name: 'Записати' }).click();
   await expect(page.locator('#toast')).toContainText(`Записано: ${name}`);
 }
+
+test('CRM з телефону: нижнє меню, «Ще» з усіма розділами, кнопка нового запису під пальцем', async ({ page }, info) => {
+  test.skip(info.project.name !== 'mobile', 'лише для телефона');
+  await fillDemo(page);
+  const tabs = page.getByRole('navigation', { name: 'Основні розділи' });
+  await expect(tabs).toBeVisible();
+  await expect(tabs.getByRole('link')).toHaveText(['Сьогодні', 'Розклад', 'Клієнти', 'Чати']);
+  await expect(page.locator('#demo-menu')).toBeHidden();
+  await expect(page.getByRole('navigation', { name: 'Розділи панелі' })).toBeHidden();
+
+  // Новий запис — кругла кнопка над нижнім меню, у зоні великого пальця.
+  const fab = page.locator('#new-booking');
+  const box = await fab.boundingBox();
+  const vp = page.viewportSize();
+  expect(box.y + box.height).toBeGreaterThan(vp.height - 160);
+  expect(box.x + box.width).toBeGreaterThan(vp.width - 40);
+
+  await tabs.getByRole('link', { name: 'Розклад' }).click();
+  await expect(page).toHaveURL(/#\/schedule/);
+  await expect(tabs.getByRole('link', { name: 'Розклад' })).toHaveAttribute('aria-current', 'page');
+
+  // «Ще» — усі інші розділи; імпорт CSV на телефоні прихований.
+  const more = tabs.getByRole('button', { name: 'Ще' });
+  await more.click();
+  await expect(more).toHaveAttribute('aria-expanded', 'true');
+  const nav = page.getByRole('navigation', { name: 'Розділи панелі' });
+  await expect(nav).toBeVisible();
+  await expect(nav.getByRole('link', { name: 'Імпорт даних' })).toBeHidden();
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await nav.getByRole('link', { name: 'Фінанси' }).click();
+  await expect(page.locator('#view h1')).toHaveText('Фінанси');
+  await expect(nav).toBeHidden();
+  await expect(more).toHaveAttribute('aria-current', 'page');
+});
 
 test('зручна CRM: «Сьогодні», швидкий пошук, запис кліком у розкладі, гарячі клавіші', async ({ page }) => {
   await page.clock.setFixedTime(new Date(2026, 9, 4, 8, 30));
@@ -182,7 +223,7 @@ test('виконаний запис зʼявляється в клієнтах �
   await page.getByRole('button', { name: /VIP · 1/ }).click();
   await expect(page.locator('#client-rows tr')).toHaveCount(1);
 
-  await page.locator('#nav').getByRole('link', { name: 'Огляд' }).click();
+  await page.goto(PANEL);
   await expect(page.locator('.kpi.hero')).toContainText('900 ₴');
   await expect(page.locator('.kpi.hero')).toContainText('на місці 900 ₴');
 });
@@ -380,7 +421,7 @@ test('персональна послуга з індивідуальною ці
   await expect(page.locator('.offer-list')).toContainText('у прайсі 900 ₴');
 
   // Клієнтські списки: імпорт ще не потрібен — клієнт є в базі без жодного запису.
-  await page.locator('#nav').getByRole('link', { name: 'Клієнти' }).click();
+  await page.goto(`${PANEL}#/clients`);
   await expect(page.locator('#client-rows tr', { hasText: 'Марина Постійна' })).toContainText('Toyota RAV4');
 
   // Інший телефон — персональної послуги не видно.
@@ -441,7 +482,7 @@ test('імпорт клієнтів, прайсу й записів з CSV ін�
   await page.getByRole('button', { name: /Імпортувати 4 рядки/ }).click();
   await expect(page.locator('#toast')).toHaveText('Імпорт завершено: додано 3, оновлено 0, пропущено 1');
 
-  await page.locator('#nav').getByRole('link', { name: 'Клієнти' }).click();
+  await page.goto(`${PANEL}#/clients`);
   const petro = page.locator('#client-rows tr', { hasText: 'Петро Імпорт' });
   await expect(petro).toContainText('Mazda CX-5 · KA1234AI');
   await expect(petro).toContainText('600 ₴');
@@ -496,7 +537,7 @@ test('витрати й звіт про прибутки: разові й щом
   await page.getByRole('dialog').getByLabel('Готівка').check();
   await page.getByRole('dialog').getByRole('button', { name: 'Виконано й оплачено' }).click();
 
-  await page.locator('#nav').getByRole('link', { name: 'Фінанси' }).click();
+  await (await openNav(page)).getByRole('link', { name: 'Фінанси' }).click();
   await page.getByRole('button', { name: '90 днів' }).click();
   const report = page.locator('table.pnl');
   await expect(report.locator('tr', { hasText: 'Разом доходи' })).toContainText('900 ₴');
@@ -572,8 +613,8 @@ test('клієнт не знайшов послугу: пише точці, то
   // Точка бачить запит у панелі з лічильником і відповідає.
   await page.goto(PANEL);
   await selectPlace(page, 'Автомийка «Хвиля»');
-  await expect(page.locator('#nav').getByRole('link', { name: /Запити клієнтів/ })).toContainText('1');
-  await page.locator('#nav').getByRole('link', { name: /Запити клієнтів/ }).click();
+  await expect(page.locator('#nav a[href="#/requests"] .count')).toHaveText('1');
+  await page.goto(`${PANEL}#/requests`);
   const req = page.locator('article.req', { hasText: 'Андрій Запит' });
   await expect(req).toContainText('Чи можете відрихтувати диск R17?');
   await expect(req).toContainText('Новий');
