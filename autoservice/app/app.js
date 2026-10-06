@@ -1458,19 +1458,37 @@ function sendChat(b, text) {
   track('chat', { placeId: b.placeId });
 }
 
+// Чи запис ще попереду: для позначок у списку переписок і в сповіщеннях.
+const visitStart = (b) => bookingStart(b).getTime();
+function visitState(b) {
+  if (!ACTIVE.includes(b.state)) return { over: true, label: isFrozen(b) ? 'Виконано' : STATE_LABEL[b.state]?.[1] ?? 'Завершено' };
+  if (b.state === 'paid' && Date.now() > visitStart(b) + (b.minutes ?? 60) * 60000) return { over: false, label: 'Візит минув' };
+  return { over: false, label: b.state === 'paid' ? 'Попереду' : STATE_LABEL[b.state][1] };
+}
+
+// Сповіщення застаріло: нагадування про візит, що вже почався, або повідомлення про запис, який потім закрили.
+function staleNote(m) {
+  const b = m.bookingId && bookings.find((x) => x.id === m.bookingId);
+  if (!b) return false;
+  if (m.kind === 'remind' && Date.now() >= visitStart(b)) return true;
+  if (ACTIVE.includes(b.state)) return false;
+  return m.at <= (b.completedAt ?? b.closedAt ?? b.doneAt ?? Date.now());
+}
+
 // Список переписок у «Повідомленнях»: чати за записами, запити до мийок і підтримка — новіші зверху.
 function conversations() {
   const rows = [
     ...mine().filter((b) => b.chat?.length).map((b) => {
       const last = chatTimeline(b).at(-1);
       const p = placeById(b.placeId);
+      const st = visitState(b);
       return { at: last.at, href: `#/chat/${b.id}`, name: p?.name ?? 'Мийка', sub: `${dayLabel(b.date, { day: 'numeric', month: 'short' })}, ${b.time}`,
-        text: `${last.from === 'client' ? 'Ви: ' : ''}${last.text}`, unread: !!b.chatUnreadClient };
+        text: `${last.from === 'client' ? 'Ви: ' : ''}${last.text}`, unread: !!b.chatUnreadClient, status: st.label, over: st.over };
     }),
     ...requests.map((r) => {
       const last = r.messages.at(-1);
       return { at: last.at, href: `#/ask/${r.placeId}`, name: placeById(r.placeId)?.name ?? 'Мийка', sub: `Запит про послугу · ${reqStatus(r)[1]}`,
-        text: `${last.from === 'client' ? 'Ви: ' : ''}${last.text}`, unread: !!r.unreadClient };
+        text: `${last.from === 'client' ? 'Ви: ' : ''}${last.text}`, unread: !!r.unreadClient, over: !!r.closed && !r.unreadClient };
     }),
     ...myTickets().map((t) => {
       const last = t.messages.at(-1);
@@ -1478,12 +1496,19 @@ function conversations() {
     }),
   ].sort((a, c) => c.at - a.at);
   if (!rows.length) return '';
-  return `<h2>Чати</h2><ul class="convos">${rows.map((r) => `<li><a class="convo${r.unread ? ' unread' : ''}" href="${r.href}">
+  const item = (r) => `<li><a class="convo${r.unread ? ' unread' : ''}${r.over ? ' over' : ''}" href="${r.href}">
     ${r.support ? `<span class="avatar support" aria-hidden="true">${icon('shield', 20)}</span>` : avatar(r.name)}
     <span class="convo-body"><span class="convo-top"><b>${esc(r.name)}</b><time>${shortTime(r.at)}</time></span>
       <span class="convo-text">${esc(r.text.length > 80 ? `${r.text.slice(0, 80).trimEnd()}…` : r.text)}</span>
-      <small>${esc(r.sub)}</small></span>
-    ${r.unread ? '<span class="dot" aria-label="непрочитане"></span>' : ''}</a></li>`).join('')}</ul>`;
+      <small>${esc(r.sub)}${r.status ? ` · <span class="convo-state${r.over ? '' : ' live'}">${esc(r.status)}</span>` : ''}</small></span>
+    ${r.unread ? '<span class="dot" aria-label="непрочитане"></span>' : ''}</a></li>`;
+  // Завершені записи й закриті запити — окремо й згорнуто, щоб не змішувались з актуальними.
+  const live = rows.filter((r) => !r.over);
+  const over = rows.filter((r) => r.over);
+  return `<h2>Чати</h2>
+    ${live.length ? `<ul class="convos">${live.map(item).join('')}</ul>` : '<p class="small muted">Активних переписок немає.</p>'}
+    ${over.length ? `<details class="fold convo-archive"><summary>${icon('checkCircle', 20)}Завершені<span class="fold-note">${over.length}</span></summary>
+      <ul class="convos">${over.map(item).join('')}</ul></details>` : ''}`;
 }
 
 // ---------- підтримка CARCAR ----------
@@ -1757,6 +1782,19 @@ function viewInbox() {
   // Відповіді мийки в чаті вже видно в «Чатах» — у сповіщеннях їх не дублюємо.
   const list = inboxFor(keys).filter((m) => m.kind !== 'chat');
   const waits = store.get('waitlist', []).filter((w) => w.mine && w.status === 'active');
+  // Нагадування й повідомлення про візити, що вже минули чи закриті, не змішуємо з актуальними.
+  const fresh = list.filter((m) => !staleNote(m));
+  const stale = list.filter(staleNote);
+  const note = (m) => {
+    const b = m.bookingId && bookings.find((x) => x.id === m.bookingId);
+    const old = staleNote(m);
+    return `<article class="card msg-card${m.read || old ? '' : ' unread'}${old ? ' over' : ''}">
+      <div class="head"><b>${esc(placeById(m.placeId)?.name ?? 'CARCAR')}</b><span class="small muted">${CHANNELS[m.channel] ?? ''} · ${fmtTime(m.at)}</span></div>
+      ${old && b ? `<span class="convo-state">${icon('checkCircle', 14)}${m.kind === 'remind' && !visitState(b).over ? 'Візит уже розпочався' : `Запис: ${visitState(b).label.toLowerCase()}`}</span>` : ''}
+      <p style="margin:6px 0 0">${esc(m.text)}</p>
+      ${m.link && !old ? `<a class="btn" href="${esc(m.link)}" style="margin-top:8px">${m.kind === 'waitlist' ? 'Записатися' : 'Відкрити'}</a>` : ''}
+    </article>`;
+  };
   const html = `<h1>Повідомлення</h1>
     ${keys.length ? '' : '<p class="notice">Вкажіть телефон у <a href="#/garage">профілі</a> — тоді сюди прийдуть пропозиції й нагадування точок.</p>'}
     ${waits.length ? `<h2>Лист очікування</h2><div class="stack" style="gap:8px">${waits.map((w) => `<div class="card head" style="align-items:center">
@@ -1764,11 +1802,9 @@ function viewInbox() {
       <button class="btn" data-action="wait-cancel" data-id="${w.id}">Вийти</button></div>`).join('')}</div>` : ''}
     ${conversations()}
     <h2>Сповіщення</h2>
-    ${list.length ? `<div class="stack" style="gap:8px">${list.map((m) => `<article class="card msg-card${m.read ? '' : ' unread'}">
-      <div class="head"><b>${esc(placeById(m.placeId)?.name ?? 'CARCAR')}</b><span class="small muted">${CHANNELS[m.channel] ?? ''} · ${fmtTime(m.at)}</span></div>
-      <p style="margin:6px 0 0">${esc(m.text)}</p>
-      ${m.link ? `<a class="btn" href="${esc(m.link)}" style="margin-top:8px">${m.kind === 'waitlist' ? 'Записатися' : 'Відкрити'}</a>` : ''}
-    </article>`).join('')}</div>` : empty('chat', 'Повідомлень поки немає.')}
+    ${fresh.length ? `<div class="stack" style="gap:8px">${fresh.map(note).join('')}</div>` : empty('chat', stale.length ? 'Нових сповіщень немає.' : 'Повідомлень поки немає.')}
+    ${stale.length ? `<details class="fold note-archive"><summary>${icon('clock', 20)}Минулі<span class="fold-note">${stale.length}</span></summary>
+      <div class="stack" style="gap:8px">${stale.map(note).join('')}</div></details>` : ''}
     <p class="note">Демо: розсилки, які точка надсилає у Viber чи Telegram, тут дублюються, щоб їх було видно в прототипі.</p>`;
   markRead(keys);
   return html;
@@ -1776,7 +1812,7 @@ function viewInbox() {
 
 // Лічильник на вкладці «Повідомлення»: непрочитані сповіщення й нові відповіді точок у чатах.
 function updateInboxBadge() {
-  const unread = inboxFor(myKeys()).filter((m) => !m.read && m.kind !== 'chat').length + requests.filter((r) => r.unreadClient).length + mine().filter((b) => b.chatUnreadClient).length + myTickets().filter((t) => t.unreadUser).length;
+  const unread = inboxFor(myKeys()).filter((m) => !m.read && m.kind !== 'chat' && !staleNote(m)).length + requests.filter((r) => r.unreadClient).length + mine().filter((b) => b.chatUnreadClient).length + myTickets().filter((t) => t.unreadUser).length;
   const count = $('#inbox-tab .tab-count');
   count.textContent = unread > 9 ? '9+' : unread;
   count.hidden = !unread;

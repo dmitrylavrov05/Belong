@@ -147,6 +147,8 @@ test('чат: коли запис завершено, у стрічці зʼяв
   await expect(page.locator('#toast')).toHaveText('Дякуємо! Виконання підтверджено');
 
   await page.locator('#inbox-tab').click();
+  // Завершена переписка переїжджає в згорнуті «Завершені».
+  await page.locator('details.convo-archive summary').click();
   const convo = page.locator('.convo', { hasText: 'Автомийка «Хвиля»' });
   await expect(convo).toContainText('Запис завершено');
   await convo.click();
@@ -164,6 +166,47 @@ test('чат: коли запис завершено, у стрічці зʼяв
   await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
   await page.locator('.slot-block', { hasText: 'Клієнт CARCAR' }).first().click();
   await expect(page.getByRole('dialog').locator('.thread .mark')).toContainText('Запис завершено');
+});
+
+test('«Повідомлення»: завершений запис і минулі нагадування не змішуються з актуальними', async ({ page }) => {
+  await book(page);
+  await page.locator('article').first().getByRole('link', { name: 'Чат з мийкою' }).click();
+  await page.getByRole('button', { name: 'Приїду з багажником на даху' }).click();
+  // Друга, майбутня переписка лишається серед актуальних.
+  await book(page, { place: 'blysk', service: /Експрес-мийка/, time: '12:00', pay: /Оплатити/ });
+  await page.locator('article', { hasText: 'Блиск' }).first().getByRole('link', { name: 'Чат з мийкою' }).click();
+  await page.getByRole('button', { name: 'Можна приїхати раніше?' }).click();
+
+  // За 2 години до візиту в «Хвилю» приходить нагадування — воно актуальне.
+  await page.clock.setFixedTime(new Date(2026, 9, 5, 8, 10));
+  await page.goto('/#/inbox');
+  const fresh = page.locator('.msg-card:not(.over)', { hasText: 'Ви вже їдете?' });
+  await expect(fresh.first()).toBeVisible();
+
+  // Увечері запис у «Хвилю» виконано й підтверджено.
+  await page.clock.setFixedTime(new Date(2026, 9, 5, 21, 30));
+  await page.goto('/#/bookings');
+  await page.locator('article', { hasText: 'Хвиля' }).getByRole('button', { name: 'Підтвердити виконання' }).click();
+  await page.locator('#inbox-tab').click();
+  await expect(page.locator('#inbox-tab .tab-count')).toBeHidden();
+
+  const live = page.locator('ul.convos').first();
+  await expect(live).toContainText('Автомийка «Блиск»');
+  await expect(live).not.toContainText('Хвиля');
+  const archive = page.locator('details.convo-archive');
+  await expect(archive.locator('summary')).toContainText('Завершені');
+  await archive.locator('summary').click();
+  await expect(archive.locator('.convo.over')).toContainText('Автомийка «Хвиля»');
+  await expect(archive.locator('.convo.over')).toContainText('Виконано');
+
+  // Нагадування про минулі візити — у згорнутих «Минулі», з поясненням і без кнопки.
+  await expect(page.locator('.msg-card:not(.over)', { hasText: 'Ви вже їдете?' })).toHaveCount(0);
+  const past = page.locator('details.note-archive');
+  await past.locator('summary').click();
+  const old = past.locator('.msg-card.over', { hasText: 'Автомийка «Хвиля»' }).first();
+  await expect(old).toContainText('Запис: виконано');
+  await expect(old.getByRole('link', { name: 'Відкрити' })).toHaveCount(0);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 });
 
 test('кошторис СТО: клієнт погоджує пункти окремо, доплачує, гарантія потрапляє в сервісну книжку', async ({ page }) => {

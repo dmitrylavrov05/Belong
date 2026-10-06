@@ -914,6 +914,15 @@ body.in-chat .top, body.in-chat .tabs { display: none; }
 .ask-form { display: grid; gap: 8px; }
 .ask-contact { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .ask-contact .field input { height: 40px; }
+
+/* Завершені переписки й минулі сповіщення: приглушені й згорнуті окремо від актуальних */
+.convo-state { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+.convo-state.live { color: var(--ok); font-weight: 600; }
+.convo.over .avatar { filter: grayscale(.85); opacity: .75; }
+.convo.over .convo-top b { color: var(--muted); }
+.convo-archive, .note-archive { margin-top: 8px; }
+.msg-card.over { background: var(--soft); box-shadow: none; }
+.msg-card.over p { color: var(--muted); }
 </style>
   <style>
 /* Панель для бізнесу CARCAR: десктоп-перший макет поверх токенів і компонентів styles.css. */
