@@ -222,9 +222,6 @@ test('розсилка VIP-клієнтам у Viber доходить клієн
   await expect(page.getByRole('region', { name: 'Надіслані' })).toContainText('VIP · Viber');
 
   await setProfilePhone(page, '+380 66 222 33 44');
-  await page.goto('/#/inbox');
-  await expect(page.locator('.msg-card')).toContainText('Віра, для VIP — безкоштовний віск');
-  await expect(page.locator('.msg-card')).toContainText('Viber');
 });
 
 test('гаряче вікно −20%: клієнт бачить пропозицію на головній і платить зі знижкою', async ({ page }) => {
@@ -348,8 +345,10 @@ test('лист очікування: час звільнився — клієн�
   page.once('dialog', (x) => x.accept());
   await page.getByRole('dialog').getByRole('button', { name: 'Скасувати запис' }).click();
 
+  await page.goto('/');
+  await expect(page.locator('#inbox-tab .tab-count')).toHaveText('1');
   await page.goto('/#/inbox');
-  await expect(page.locator('.msg-card')).toContainText('Автомийка «Хвиля»: звільнився час 5 жовтня о 10:00');
+  await expect(page.locator('.wait-offer')).toContainText('Автомийка «Хвиля»: звільнився час 5 жовтня о 10:00');
   await page.getByRole('link', { name: 'Записатися' }).click();
   await page.getByLabel(/Комплекс преміум/).check();
   await page.locator('[data-action="to-time"]').click();

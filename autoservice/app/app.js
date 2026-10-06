@@ -1779,40 +1779,27 @@ function intakeBlock(b) {
 
 function viewInbox() {
   const keys = myKeys();
-  // Відповіді мийки в чаті вже видно в «Чатах» — у сповіщеннях їх не дублюємо.
-  const list = inboxFor(keys).filter((m) => m.kind !== 'chat');
   const waits = store.get('waitlist', []).filter((w) => w.mine && w.status === 'active');
-  // Нагадування й повідомлення про візити, що вже минули чи закриті, не змішуємо з актуальними.
-  const fresh = list.filter((m) => !staleNote(m));
-  const stale = list.filter(staleNote);
-  const note = (m) => {
-    const b = m.bookingId && bookings.find((x) => x.id === m.bookingId);
-    const old = staleNote(m);
-    return `<article class="card msg-card${m.read || old ? '' : ' unread'}${old ? ' over' : ''}">
-      <div class="head"><b>${esc(placeById(m.placeId)?.name ?? 'CARCAR')}</b><span class="small muted">${CHANNELS[m.channel] ?? ''} · ${fmtTime(m.at)}</span></div>
-      ${old && b ? `<span class="convo-state">${icon('checkCircle', 14)}${m.kind === 'remind' && !visitState(b).over ? 'Візит уже розпочався' : `Запис: ${visitState(b).label.toLowerCase()}`}</span>` : ''}
-      <p style="margin:6px 0 0">${esc(m.text)}</p>
-      ${m.link && !old ? `<a class="btn" href="${esc(m.link)}" style="margin-top:8px">${m.kind === 'waitlist' ? 'Записатися' : 'Відкрити'}</a>` : ''}
-    </article>`;
-  };
+  // Сповіщень окремим блоком немає: нагадування видно на картці запису, відповіді — у чатах.
+  // Лишаємо тільки «звільнився час» з листа очікування — по ньому треба встигнути записатися.
+  const offers = inboxFor(keys).filter((m) => m.kind === 'waitlist' && !staleNote(m)).slice(0, 3);
+  const chats = conversations();
   const html = `<h1>Повідомлення</h1>
-    ${keys.length ? '' : '<p class="notice">Вкажіть телефон у <a href="#/garage">профілі</a> — тоді сюди прийдуть пропозиції й нагадування точок.</p>'}
-    ${waits.length ? `<h2>Лист очікування</h2><div class="stack" style="gap:8px">${waits.map((w) => `<div class="card head" style="align-items:center">
+    ${offers.length || waits.length ? `<h2>Лист очікування</h2><div class="stack" style="gap:8px">
+      ${offers.map((m) => `<article class="card wait-offer${m.read ? '' : ' unread'}">${icon('bolt', 22)}<div><p style="margin:0">${esc(m.text)}</p>
+        <span class="small muted">${fmtTime(m.at)}</span></div>
+        ${m.link ? `<a class="btn primary" href="${esc(m.link)}">Записатися</a>` : ''}</article>`).join('')}
+      ${waits.map((w) => `<div class="card head" style="align-items:center">
       <span><b>${esc(placeById(w.placeId)?.name ?? '')}</b><small class="small muted" style="display:block">${dayLabel(w.date, { day: 'numeric', month: 'long' })}, ${hhmm(w.from)}–${hhmm(w.to)} · ${esc(w.services.join(', '))}</small></span>
       <button class="btn" data-action="wait-cancel" data-id="${w.id}">Вийти</button></div>`).join('')}</div>` : ''}
-    ${conversations()}
-    <h2>Сповіщення</h2>
-    ${fresh.length ? `<div class="stack" style="gap:8px">${fresh.map(note).join('')}</div>` : empty('chat', stale.length ? 'Нових сповіщень немає.' : 'Повідомлень поки немає.')}
-    ${stale.length ? `<details class="fold note-archive"><summary>${icon('clock', 20)}Минулі<span class="fold-note">${stale.length}</span></summary>
-      <div class="stack" style="gap:8px">${stale.map(note).join('')}</div></details>` : ''}
-    <p class="note">Демо: розсилки, які точка надсилає у Viber чи Telegram, тут дублюються, щоб їх було видно в прототипі.</p>`;
+    ${chats || (offers.length || waits.length ? '' : empty('chat', 'Переписок поки немає. Напишіть мийці з картки запису або зі сторінки мийки.'))}`;
   markRead(keys);
   return html;
 }
 
 // Лічильник на вкладці «Повідомлення»: непрочитані сповіщення й нові відповіді точок у чатах.
 function updateInboxBadge() {
-  const unread = inboxFor(myKeys()).filter((m) => !m.read && m.kind !== 'chat' && !staleNote(m)).length + requests.filter((r) => r.unreadClient).length + mine().filter((b) => b.chatUnreadClient).length + myTickets().filter((t) => t.unreadUser).length;
+  const unread = inboxFor(myKeys()).filter((m) => !m.read && m.kind === 'waitlist' && !staleNote(m)).length + requests.filter((r) => r.unreadClient).length + mine().filter((b) => b.chatUnreadClient).length + myTickets().filter((t) => t.unreadUser).length;
   const count = $('#inbox-tab .tab-count');
   count.textContent = unread > 9 ? '9+' : unread;
   count.hidden = !unread;

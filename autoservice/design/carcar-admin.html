@@ -923,6 +923,12 @@ body.in-chat .top, body.in-chat .tabs { display: none; }
 .convo-archive, .note-archive { margin-top: 8px; }
 .msg-card.over { background: var(--soft); box-shadow: none; }
 .msg-card.over p { color: var(--muted); }
+
+/* «Звільнився час» з листа очікування — єдине сповіщення в «Повідомленнях» */
+.wait-offer { display: flex; align-items: center; gap: 12px; }
+.wait-offer > svg { flex: none; color: var(--accent); }
+.wait-offer > div { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.wait-offer.unread { border-color: var(--accent); }
 </style>
   <style>
 /* Панель для бізнесу CARCAR: десктоп-перший макет поверх токенів і компонентів styles.css. */

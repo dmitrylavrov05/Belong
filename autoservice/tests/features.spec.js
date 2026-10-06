@@ -168,7 +168,7 @@ test('чат: коли запис завершено, у стрічці зʼяв
   await expect(page.getByRole('dialog').locator('.thread .mark')).toContainText('Запис завершено');
 });
 
-test('«Повідомлення»: завершений запис і минулі нагадування не змішуються з актуальними', async ({ page }) => {
+test('«Повідомлення»: завершений запис не змішується з актуальними, блоку сповіщень немає', async ({ page }) => {
   await book(page);
   await page.locator('article').first().getByRole('link', { name: 'Чат з мийкою' }).click();
   await page.getByRole('button', { name: 'Приїду з багажником на даху' }).click();
@@ -176,12 +176,6 @@ test('«Повідомлення»: завершений запис і мину�
   await book(page, { place: 'blysk', service: /Експрес-мийка/, time: '12:00', pay: /Оплатити/ });
   await page.locator('article', { hasText: 'Блиск' }).first().getByRole('link', { name: 'Чат з мийкою' }).click();
   await page.getByRole('button', { name: 'Можна приїхати раніше?' }).click();
-
-  // За 2 години до візиту в «Хвилю» приходить нагадування — воно актуальне.
-  await page.clock.setFixedTime(new Date(2026, 9, 5, 8, 10));
-  await page.goto('/#/inbox');
-  const fresh = page.locator('.msg-card:not(.over)', { hasText: 'Ви вже їдете?' });
-  await expect(fresh.first()).toBeVisible();
 
   // Увечері запис у «Хвилю» виконано й підтверджено.
   await page.clock.setFixedTime(new Date(2026, 9, 5, 21, 30));
@@ -199,13 +193,9 @@ test('«Повідомлення»: завершений запис і мину�
   await expect(archive.locator('.convo.over')).toContainText('Автомийка «Хвиля»');
   await expect(archive.locator('.convo.over')).toContainText('Виконано');
 
-  // Нагадування про минулі візити — у згорнутих «Минулі», з поясненням і без кнопки.
-  await expect(page.locator('.msg-card:not(.over)', { hasText: 'Ви вже їдете?' })).toHaveCount(0);
-  const past = page.locator('details.note-archive');
-  await past.locator('summary').click();
-  const old = past.locator('.msg-card.over', { hasText: 'Автомийка «Хвиля»' }).first();
-  await expect(old).toContainText('Запис: виконано');
-  await expect(old.getByRole('link', { name: 'Відкрити' })).toHaveCount(0);
+  // Окремого блоку сповіщень немає: нагадування видно на картці запису.
+  await expect(page.getByRole('heading', { name: 'Сповіщення' })).toHaveCount(0);
+  await expect(page.locator('.msg-card')).toHaveCount(0);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 });
 

@@ -42,20 +42,15 @@ test('нагадування напередодні й за 2 години, «З
 
   await page.clock.setFixedTime(new Date(2026, 9, 4, 18, 30));
   await page.goto('/#/bookings');
-  await expect(page.locator('#inbox-tab .tab-count')).toHaveText('1');
   const bar = page.getByRole('group', { name: 'Візит завтра о 10:00' });
   await expect(bar.getByRole('button', { name: 'Їду' })).toHaveCount(0);
   await expect(bar).toContainText('більше ніж на 15 хв, візит вважається неявкою');
   await bar.getByRole('button', { name: 'Запізнююсь на 15 хв' }).click();
   await expect(page.locator('#toast')).toHaveText('Мийка знає: запізнюєтесь на 15 хв');
   await expect(bar.getByRole('button', { name: /Запізнююсь/ })).toHaveCount(0);
-  await page.goto('/#/inbox');
-  await expect(page.locator('.msg-card').first()).toContainText('Нагадуємо: завтра о 10:00 — Автомийка «Хвиля»');
 
   await page.clock.setFixedTime(new Date(2026, 9, 5, 8, 15));
   await page.goto('/#/bookings');
-  await page.goto('/#/inbox');
-  await expect(page.locator('.msg-card').first()).toContainText('Через 1 год 45 хв — Автомийка «Хвиля», 10:00');
 
   await page.goto(`${PANEL}#/schedule/2026-10-05`);
   await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
@@ -76,8 +71,6 @@ test('запізнення понад 15 хв: мийка зараховує о�
   await page.goto('/#/bookings');
   await expect(page.getByRole('button', { name: /Завершені/ })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('article').first()).toContainText('Запізнення понад 15 хв — оплату 900 ₴ зараховано точці за послугу');
-  await page.goto('/#/inbox');
-  await expect(page.locator('.msg-card').first()).toContainText('ви запізнилися більше ніж на 15 хв');
 });
 
 test('мої записи: вкладки «Активні» й «Завершені» з лічильниками', async ({ page }) => {
@@ -126,8 +119,6 @@ test('регулярна мийка кожні 2 тижні в суботу о 1
   const card = page.locator('.sub-card');
   await expect(card).toContainText('Кожні 2 тижні у суботу о 10:00');
   await expect(card).toContainText('Найближчий: сб, 10 жовтня, 10:00');
-  await page.goto('/#/inbox');
-  await expect(page.locator('.msg-card').first()).toContainText('Регулярний запис: Автомийка «Блиск», сб, 10 жовтня о 10:00. Оплачено 250 ₴ з картки.');
 
   // Через тиждень нового запису немає (через 2 тижні — є).
   await page.clock.setFixedTime(new Date(2026, 9, 11, 10, 0));
@@ -163,10 +154,7 @@ test('відгук із фото й відповідь точки в спові�
   await page.getByRole('button', { name: 'Відповісти' }).click();
 
   await page.goto('/#/bookings');
-  await expect(page.locator('#inbox-tab .tab-count')).not.toHaveCount(0);
   await expect(page.locator('.my-review .reply')).toContainText('Дякуємо, чекаємо навесні!');
-  await page.goto('/#/inbox');
-  await expect(page.locator('.msg-card', { hasText: 'відповіла на ваш відгук' })).toContainText('«Дякуємо, чекаємо навесні!»');
 });
 
 test('перевірка авто за номером: регіон, марка, рік і поліс підставляються у форму', async ({ page }) => {
