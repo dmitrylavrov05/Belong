@@ -1345,18 +1345,57 @@ function warrantiesOf(car) {
 
 // ---------- чат за записом ----------
 
+// Кнопка в картці запису: чат відкривається окремим екраном.
 function chatBlock(b) {
   if (!ACTIVE.includes(b.state) && !b.chat?.length) return '';
-  const open = ui.chatFor === b.id;
-  const n = b.chat?.length ?? 0;
-  const head = `<button class="btn chat-toggle${b.chatUnreadClient ? ' unread' : ''}" data-action="chat-open" data-id="${b.id}" aria-expanded="${open}">${icon('chat', 18)}${open ? 'Згорнути чат' : `Чат з точкою${n ? ` · ${n}` : ''}`}${b.chatUnreadClient && !open ? '<span class="count">нове</span>' : ''}</button>`;
-  if (!open) return head;
-  return `${head}<section class="bk-chat" aria-label="Чат з точкою про цей запис">
-    ${n ? `<ol class="thread">${b.chat.map((m) => `<li class="msg ${m.from}"><span class="who">${m.from === 'biz' ? 'Точка' : m.from === 'sys' ? 'CARCAR' : 'Ви'} · ${fmtTime(m.at)}</span>${esc(m.text)}</li>`).join('')}</ol>`
-      : '<p class="small muted" style="margin:0">Напишіть точці про цей візит: приїдете з причепом, хочете раніше чи потрібен чек.</p>'}
-    ${ACTIVE.includes(b.state) ? `<div class="quick" role="group" aria-label="Швидкі повідомлення">${CLIENT_QUICK.map((t) => `<button class="chip" data-action="chat-quick" data-id="${b.id}" data-text="${esc(t)}">${esc(t)}</button>`).join('')}</div>
-    <form class="chat-form inline-form" data-id="${b.id}"><label class="field"><span>Повідомлення точці</span><input name="text" required maxlength="500" autocomplete="off"></label>
-      <button class="btn primary" type="submit">Надіслати</button></form>` : ''}
+  return `<a class="btn chat-link${b.chatUnreadClient ? ' unread' : ''}" href="#/chat/${b.id}">${icon('chat', 18)}Чат з мийкою${b.chatUnreadClient ? '<span class="count" aria-label="нове повідомлення">1</span>' : ''}</a>`;
+}
+
+const avatar = (name) => `<span class="avatar" aria-hidden="true">${esc([...String(name).replace(/^(Автомийка|Детейлінг-мийка)\s*/, '').replace(/[«»"]/g, '')][0] ?? 'C')}</span>`;
+const shortTime = (at) => {
+  const d = new Date(at);
+  const today = isoDate(new Date());
+  return isoDate(d) === today ? d.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' });
+};
+const dayName = (iso) => {
+  const t = new Date();
+  const y = new Date(t.getFullYear(), t.getMonth(), t.getDate() - 1);
+  return iso === isoDate(t) ? 'Сьогодні' : iso === isoDate(y) ? 'Вчора' : dayLabel(iso, { day: 'numeric', month: 'long' });
+};
+
+// Повноекранний чат із мийкою щодо конкретного запису — як у месенджерах.
+function viewChat(id) {
+  const b = mine().find((x) => x.id === id);
+  if (!b) return viewNotFound();
+  const p = placeById(b.placeId);
+  if (b.chatUnreadClient) { b.chatUnreadClient = false; save(); }
+  const msgs = b.chat ?? [];
+  let lastDay = '';
+  const items = msgs.map((m) => {
+    const day = isoDate(new Date(m.at));
+    const sep = day !== lastDay ? `<li class="day-sep"><span>${dayName(day)}</span></li>` : '';
+    lastDay = day;
+    if (m.from === 'sys') return `${sep}<li class="bubble sys">${esc(m.text)}</li>`;
+    return `${sep}<li class="bubble ${m.from === 'client' ? 'me' : 'them'}"><span class="sr-only">${m.from === 'client' ? 'Ви' : p.name}: </span>${esc(m.text)}<time>${new Date(m.at).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}</time></li>`;
+  }).join('');
+  const open = ACTIVE.includes(b.state);
+  return `<section class="chat-screen" aria-label="Чат з ${esc(p.name)}">
+    <header class="chat-head">
+      <button class="icon-btn" data-action="chat-back" aria-label="Назад">${icon('chevL', 24)}</button>
+      ${avatar(p.name)}
+      <div class="chat-who"><h1>${esc(p.name)}</h1><small>${dayLabel(b.date, { weekday: 'short', day: 'numeric', month: 'short' })}, ${b.time} · ${esc(b.services[0])}${b.services.length > 1 ? ` +${b.services.length - 1}` : ''}</small></div>
+      <a class="icon-btn" href="${tel(p)}" aria-label="Зателефонувати">${icon('phone', 20)}</a>
+    </header>
+    <ol class="chat-msgs" aria-label="Повідомлення">
+      ${items || `<li class="chat-empty">${avatar(p.name)}<b>${esc(p.name)}</b><span>Напишіть мийці про цей візит: приїдете раніше, з багажником на даху чи потрібен чек.</span></li>`}
+    </ol>
+    ${open ? `<div class="chat-compose">
+      <div class="quick" role="group" aria-label="Швидкі повідомлення">${CLIENT_QUICK.map((t) => `<button class="chip" data-action="chat-quick" data-id="${b.id}" data-text="${esc(t)}">${esc(t)}</button>`).join('')}</div>
+      <form class="chat-form" data-id="${b.id}">
+        <input name="text" required maxlength="500" autocomplete="off" placeholder="Повідомлення…" aria-label="Повідомлення мийці">
+        <button class="send-btn" type="submit" aria-label="Надіслати">${icon('send', 20)}</button>
+      </form>
+    </div>` : '<p class="chat-closed">Запис завершено — листування лише для читання.</p>'}
   </section>`;
 }
 
@@ -1364,21 +1403,36 @@ function sendChat(b, text) {
   chatPost(b, 'client', text);
   save();
   route();
-  $(`#b-${b.id} .chat-form input`)?.focus();
+  $('.chat-form input')?.focus();
   track('chat', { placeId: b.placeId });
-  toast('Повідомлення надіслано точці');
 }
 
-// Чати за записами в «Повідомленнях»: останнє повідомлення й позначка нового.
-function bookingChatsCard() {
-  const list = mine().filter((b) => b.chat?.length).sort((a, c) => c.chat.at(-1).at - a.chat.at(-1).at).slice(0, 8);
-  if (!list.length) return '';
-  return `<h2>Чати за записами</h2><div class="stack" style="gap:8px">${list.map((b) => {
-    const last = b.chat.at(-1);
-    return `<a class="card link-card" href="#/bookings/${b.id}/chat">${icon('chat', 22)}<span>${esc(placeById(b.placeId)?.name ?? 'Точка')} · ${dayLabel(b.date, { day: 'numeric', month: 'short' })}, ${b.time}
-      <small class="small muted" style="display:block;font-weight:400">${last.from === 'biz' ? 'Точка: ' : last.from === 'client' ? 'Ви: ' : ''}${esc(last.text.length > 70 ? `${last.text.slice(0, 70).trimEnd()}…` : last.text)}</small></span>
-      ${b.chatUnreadClient ? '<span class="count" aria-label="нове повідомлення">1</span>' : ''}${icon('chevR', 18)}</a>`;
-  }).join('')}</div>`;
+// Список переписок у «Повідомленнях»: чати за записами, запити до мийок і підтримка — новіші зверху.
+function conversations() {
+  const rows = [
+    ...mine().filter((b) => b.chat?.length).map((b) => {
+      const last = b.chat.at(-1);
+      const p = placeById(b.placeId);
+      return { at: last.at, href: `#/chat/${b.id}`, name: p?.name ?? 'Мийка', sub: `${dayLabel(b.date, { day: 'numeric', month: 'short' })}, ${b.time}`,
+        text: `${last.from === 'client' ? 'Ви: ' : ''}${last.text}`, unread: !!b.chatUnreadClient };
+    }),
+    ...requests.map((r) => {
+      const last = r.messages.at(-1);
+      return { at: last.at, href: `#/place/${r.placeId}/ask`, name: placeById(r.placeId)?.name ?? 'Мийка', sub: `Запит про послугу · ${reqStatus(r)[1]}`,
+        text: `${last.from === 'client' ? 'Ви: ' : ''}${last.text}`, unread: !!r.unreadClient };
+    }),
+    ...myTickets().map((t) => {
+      const last = t.messages.at(-1);
+      return { at: last.at, href: `#/support/t/${t.id}`, name: 'Підтримка CARCAR', sub: `№${t.no}`, text: `${last.from === 'client' ? 'Ви: ' : ''}${last.text}`, unread: !!t.unreadUser, support: true };
+    }),
+  ].sort((a, c) => c.at - a.at);
+  if (!rows.length) return '';
+  return `<h2>Чати</h2><ul class="convos">${rows.map((r) => `<li><a class="convo${r.unread ? ' unread' : ''}" href="${r.href}">
+    ${r.support ? `<span class="avatar support" aria-hidden="true">${icon('shield', 20)}</span>` : avatar(r.name)}
+    <span class="convo-body"><span class="convo-top"><b>${esc(r.name)}</b><time>${shortTime(r.at)}</time></span>
+      <span class="convo-text">${esc(r.text.length > 80 ? `${r.text.slice(0, 80).trimEnd()}…` : r.text)}</span>
+      <small>${esc(r.sub)}</small></span>
+    ${r.unread ? '<span class="dot" aria-label="непрочитане"></span>' : ''}</a></li>`).join('')}</ul>`;
 }
 
 // ---------- підтримка CARCAR ----------
@@ -1649,16 +1703,15 @@ function intakeBlock(b) {
 
 function viewInbox() {
   const keys = myKeys();
-  const list = inboxFor(keys);
+  // Відповіді мийки в чаті вже видно в «Чатах» — у сповіщеннях їх не дублюємо.
+  const list = inboxFor(keys).filter((m) => m.kind !== 'chat');
   const waits = store.get('waitlist', []).filter((w) => w.mine && w.status === 'active');
   const html = `<h1>Повідомлення</h1>
     ${keys.length ? '' : '<p class="notice">Вкажіть телефон у <a href="#/garage">профілі</a> — тоді сюди прийдуть пропозиції й нагадування точок.</p>'}
     ${waits.length ? `<h2>Лист очікування</h2><div class="stack" style="gap:8px">${waits.map((w) => `<div class="card head" style="align-items:center">
       <span><b>${esc(placeById(w.placeId)?.name ?? '')}</b><small class="small muted" style="display:block">${dayLabel(w.date, { day: 'numeric', month: 'long' })}, ${hhmm(w.from)}–${hhmm(w.to)} · ${esc(w.services.join(', '))}</small></span>
       <button class="btn" data-action="wait-cancel" data-id="${w.id}">Вийти</button></div>`).join('')}</div>` : ''}
-    ${myTickets().length ? `<h2>Підтримка CARCAR</h2><div class="stack" style="gap:8px">${myTickets().slice(0, 3).map((t) => ticketCard(t, false)).join('')}</div>` : ''}
-    ${bookingChatsCard()}
-    ${requestsCard()}
+    ${conversations()}
     <h2>Сповіщення</h2>
     ${list.length ? `<div class="stack" style="gap:8px">${list.map((m) => `<article class="card msg-card${m.read ? '' : ' unread'}">
       <div class="head"><b>${esc(placeById(m.placeId)?.name ?? 'CARCAR')}</b><span class="small muted">${CHANNELS[m.channel] ?? ''} · ${fmtTime(m.at)}</span></div>
@@ -1672,7 +1725,7 @@ function viewInbox() {
 
 // Лічильник на вкладці «Повідомлення»: непрочитані сповіщення й нові відповіді точок у чатах.
 function updateInboxBadge() {
-  const unread = inboxFor(myKeys()).filter((m) => !m.read).length + requests.filter((r) => r.unreadClient).length + mine().filter((b) => b.chatUnreadClient).length + myTickets().filter((t) => t.unreadUser).length;
+  const unread = inboxFor(myKeys()).filter((m) => !m.read && m.kind !== 'chat').length + requests.filter((r) => r.unreadClient).length + mine().filter((b) => b.chatUnreadClient).length + myTickets().filter((t) => t.unreadUser).length;
   const count = $('#inbox-tab .tab-count');
   count.textContent = unread > 9 ? '9+' : unread;
   count.hidden = !unread;
@@ -2076,7 +2129,7 @@ const bookingActions = {
 function route() {
   const [, page = '', arg, sub, extra] = location.hash.replace(/^#/, '').split('/');
   const view = $('#view');
-  const tab = ['partner', 'disputes', 'invite'].includes(page) ? '' : page === 'support' ? 'garage' : page === 'move' ? 'bookings' : ['bookings', 'garage', 'inbox'].includes(page) ? page : 'catalog';
+  const tab = ['partner', 'disputes', 'invite'].includes(page) ? '' : page === 'support' ? 'garage' : page === 'move' ? 'bookings' : page === 'chat' ? 'inbox' : ['bookings', 'garage', 'inbox'].includes(page) ? page : 'catalog';
   settle();
   // Хтось скасував запис — можливо, звільнився час для листа очікування.
   checkWaitlist(bookings);
@@ -2105,11 +2158,10 @@ function route() {
   }
   else if (page === 'book') { view.innerHTML = viewBook(arg, sub, extra); if ($('#book')) renderBook(); }
   else if (page === 'inbox') view.innerHTML = viewInbox();
+  else if (page === 'chat') view.innerHTML = viewChat(arg);
   else if (page === 'bookings') {
-    // Відкрили чат запису: його повідомлення прочитані.
-    if (sub === 'chat') ui.chatFor = arg;
-    const open = bookings.find((b) => b.id === ui.chatFor && b.chatUnreadClient);
-    if (open) { open.chatUnreadClient = false; save(); }
+    // Старі посилання на чат у записі ведуть на окремий екран чату.
+    if (sub === 'chat') { location.replace(`#/chat/${arg}`); return; }
     view.innerHTML = viewBookings(arg);
   } else if (page === 'move') { view.innerHTML = viewMove(arg); if ($('#move')) renderMove(); }
   else if (page === 'garage') view.innerHTML = arg ? viewCar(arg) : viewGarage();
@@ -2127,6 +2179,9 @@ function route() {
   updateInboxBadge();
   enterView(view, `${page}/${arg ?? ''}` !== ui.lastView);
   ui.lastView = `${page}/${arg ?? ''}`;
+  // У чаті ховаємо шапку й меню, як у месенджерах, і показуємо останні повідомлення.
+  document.body.classList.toggle('in-chat', page === 'chat');
+  if (page === 'chat') { const list = $('.chat-msgs'); if (list) list.scrollTop = list.scrollHeight; return; }
   const target = arg && page === 'bookings' ? $(`#b-${arg}`) : sub === 'ask' ? $('#ask') : null;
   if (target) target.scrollIntoView({ block: 'center' });
   else window.scrollTo(0, 0);
@@ -2332,13 +2387,8 @@ document.addEventListener('click', (e) => {
     $(action === 'move-day' ? `[data-action="move-day"][data-date="${move.date}"]` : '[data-action="move-confirm"]')?.focus();
   } else if (action === 'move-confirm') {
     confirmMove();
-  } else if (action === 'chat-open') {
-    ui.chatFor = ui.chatFor === id ? null : id;
-    const b = bookings.find((x) => x.id === id);
-    if (b.chatUnreadClient) { b.chatUnreadClient = false; save(); }
-    route();
-    $(`#b-${id}`)?.scrollIntoView({ block: 'start' });
-    $(`#b-${id} .chat-form input`)?.focus();
+  } else if (action === 'chat-back') {
+    if (history.length > 1) history.back(); else location.hash = '#/inbox';
   } else if (action === 'chat-quick') {
     sendChat(bookings.find((x) => x.id === id), el.dataset.text);
   } else if (action === 'mode') {

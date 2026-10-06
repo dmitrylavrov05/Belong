@@ -2311,7 +2311,7 @@ function chatSection(b) {
 
 function bizChat(b, text) {
   chatPost(b, 'biz', text);
-  sendMessages([{ placeId: b.placeId, clientKey: 'device', channel: 'app', kind: 'chat', bookingId: b.id, text: `${place().name}: ${text}`, link: `#/bookings/${b.id}/chat` }]);
+  sendMessages([{ placeId: b.placeId, clientKey: 'device', channel: 'app', kind: 'chat', bookingId: b.id, text: `${place().name}: ${text}`, link: `#/chat/${b.id}` }]);
   save();
   bookingDrawer(b.id);
   $('#bk-chat-form input')?.focus();

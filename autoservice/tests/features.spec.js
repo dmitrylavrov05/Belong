@@ -93,13 +93,18 @@ test('перенесення недоступне пізніше ніж за 1,5
 
 test('чат за записом: клієнт пише «Приїду з багажником на даху», точка відповідає, відповідь приходить у «Повідомлення»', async ({ page }) => {
   await book(page);
-  const card = page.locator('article').first();
-  await card.getByRole('button', { name: 'Чат з точкою' }).click();
-  await card.getByRole('button', { name: 'Приїду з багажником на даху' }).click();
-  await expect(page.locator('#toast')).toHaveText('Повідомлення надіслано точці');
-  await card.getByLabel('Повідомлення точці').fill('І ще: можна зберегти старі шини?');
-  await card.getByRole('button', { name: 'Надіслати' }).click();
-  await expect(card.locator('.thread .msg')).toHaveCount(2);
+  await page.locator('article').first().getByRole('link', { name: 'Чат з мийкою' }).click();
+  // Окремий екран чату: без нижнього меню, з полем унизу, як у месенджерах.
+  const chat = page.getByRole('region', { name: 'Чат з Автомийка «Хвиля»' });
+  await expect(chat).toBeVisible();
+  await expect(page.locator('.tabs')).toBeHidden();
+  await chat.getByRole('button', { name: 'Приїду з багажником на даху' }).click();
+  await chat.getByLabel('Повідомлення мийці').fill('І ще: можна зберегти старі шини?');
+  await chat.getByRole('button', { name: 'Надіслати' }).click();
+  await expect(chat.locator('.bubble.me')).toHaveCount(2);
+  await expect(chat.locator('.bubble.me').last()).toContainText('І ще: можна зберегти старі шини?');
+  await chat.getByRole('button', { name: 'Назад' }).click();
+  await expect(page.locator('.tabs')).toBeVisible();
 
   await page.goto(`${PANEL}#/requests`);
   await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
@@ -115,12 +120,15 @@ test('чат за записом: клієнт пише «Приїду з баг
   await expect(page.locator('#nav a[href="#/requests"] .count')).toHaveCount(0);
 
   await page.goto('/');
-  await expect(page.locator('#inbox-tab .tab-count')).toHaveText('2');
+  // Одна нова відповідь у чаті — один лічильник, без дубля в сповіщеннях.
+  await expect(page.locator('#inbox-tab .tab-count')).toHaveText('1');
   await page.locator('#inbox-tab').click();
-  const list = page.locator('h2', { hasText: 'Чати за записами' }).locator('xpath=following-sibling::div[1]');
-  await expect(list).toContainText('Точка: Так, чекаємо');
-  await list.getByRole('link', { name: /Автомийка «Хвиля»/ }).click();
-  await expect(page.locator('.bk-chat .thread')).toContainText('Так, чекаємо');
+  // Переписки списком, як в Instagram: остання репліка, час і позначка нового.
+  const convo = page.locator('.convo', { hasText: 'Автомийка «Хвиля»' });
+  await expect(convo).toContainText('Так, чекаємо');
+  await expect(convo).toHaveClass(/unread/);
+  await convo.click();
+  await expect(page.locator('.bubble.them')).toContainText('Так, чекаємо');
   await page.goto('/');
   await expect(page.locator('#inbox-tab .tab-count')).toBeHidden();
 });
@@ -369,7 +377,7 @@ const PAGES = {
     await page.getByLabel('Ціна за одиницю, ₴, пункт 1').fill('700');
     await page.getByRole('button', { name: 'Надіслати клієнту' }).click();
     await page.goto('/#/bookings');
-    await page.locator('article').first().getByRole('button', { name: /Чат з точкою/ }).click();
+    await page.locator('article').first().getByRole('link', { name: /Чат з мийкою/ }).click();
   },
   'кошторис і чат у панелі': async (page) => {
     await book(page, { place: 'pina', service: /Мийка днища й арок/, pay: 'Оплатити 500 ₴' });

@@ -848,6 +848,52 @@ label.item { cursor: pointer; padding: 10px 14px; }
 .book-tabs button span { min-width: 22px; padding: 1px 7px; border-radius: 999px; background: var(--bg); font-size: 12px; color: var(--muted); }
 .book-tabs button[aria-pressed="true"] { background: var(--bg); color: var(--text); box-shadow: var(--shadow-1); }
 .book-tabs button[aria-pressed="true"] span { background: var(--accent); color: var(--on-accent); }
+
+/* ---------- чат на весь екран і список переписок ---------- */
+body.in-chat .top, body.in-chat .tabs { display: none; }
+.chat-screen { position: fixed; inset: 0; z-index: 8; display: flex; flex-direction: column; background: var(--bg); max-width: 720px; margin: 0 auto; }
+.chat-head { display: flex; align-items: center; gap: 10px; padding: calc(8px + env(safe-area-inset-top)) 10px 8px; border-bottom: 1px solid var(--line); background: var(--bg); }
+.chat-head .icon-btn { width: 42px; height: 42px; border: 0; border-radius: 50%; background: transparent; color: var(--text); display: grid; place-items: center; cursor: pointer; flex: none; }
+.chat-who { flex: 1; min-width: 0; }
+.chat-who h1 { margin: 0; font-size: 16px; font-weight: 800; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chat-who small { display: block; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.avatar { width: 40px; height: 40px; border-radius: 50%; flex: none; display: grid; place-items: center; font-weight: 800; font-size: 17px; color: #fff;
+  background: linear-gradient(135deg, #f6a05a, var(--accent) 55%, #8f2414); box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px color-mix(in srgb, var(--accent) 35%, transparent); }
+.avatar.support { background: linear-gradient(135deg, #3b82f6, var(--navy)); box-shadow: none; }
+.chat-msgs { flex: 1; overflow-y: auto; list-style: none; margin: 0; padding: 14px 12px; display: flex; flex-direction: column; gap: 4px; overscroll-behavior: contain; }
+.bubble { position: relative; max-width: 78%; padding: 9px 13px 18px; border-radius: 20px; font-size: 15px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
+.bubble time { position: absolute; right: 12px; bottom: 4px; font-size: 10px; opacity: .7; }
+.bubble.me { align-self: flex-end; background: linear-gradient(135deg, #e2553d, var(--accent)); color: #fff; border-bottom-right-radius: 6px; }
+.bubble.them { align-self: flex-start; background: var(--soft); color: var(--text); border-bottom-left-radius: 6px; }
+.bubble.me + .bubble.me, .bubble.them + .bubble.them { margin-top: -1px; }
+.bubble.sys { align-self: center; max-width: 90%; padding: 6px 12px; border-radius: 999px; font-size: 12px; color: var(--muted); background: transparent; border: 1px dashed var(--line); text-align: center; }
+.day-sep { align-self: center; margin: 10px 0 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.chat-empty { margin: auto; display: grid; justify-items: center; gap: 8px; text-align: center; color: var(--muted); max-width: 280px; }
+.chat-empty .avatar { width: 72px; height: 72px; font-size: 30px; }
+.chat-empty b { color: var(--text); font-size: 17px; }
+.chat-compose { padding: 8px 10px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--bg); display: grid; gap: 8px; }
+.chat-compose .quick { display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -10px; padding: 0 10px; }
+.chat-compose .quick::-webkit-scrollbar { display: none; }
+.chat-compose .quick .chip { flex: none; }
+.chat-form { display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 16px; border-radius: 999px; background: var(--soft); }
+.chat-form input { flex: 1; min-width: 0; height: 40px; border: 0; outline: 0; background: transparent; font: inherit; font-size: 15px; color: var(--text); }
+.chat-form:focus-within { outline: 2px solid var(--accent); }
+.send-btn { width: 40px; height: 40px; border: 0; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; cursor: pointer; flex: none; }
+.chat-closed { margin: 0; padding: 12px; text-align: center; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); }
+.chat-link { justify-content: flex-start; gap: 8px; }
+.chat-link .count { margin-left: auto; }
+.convos { list-style: none; margin: 0; padding: 0; display: grid; }
+.convo { display: flex; align-items: center; gap: 12px; padding: 10px 4px; color: var(--text); border-radius: 14px; }
+.convo:hover { background: var(--soft); }
+.convo .avatar { width: 52px; height: 52px; font-size: 20px; }
+.convo-body { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.convo-top { display: flex; justify-content: space-between; gap: 8px; }
+.convo-top b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.convo-top time { font-size: 12px; color: var(--muted); flex: none; }
+.convo-text { font-size: 14px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.convo small { font-size: 12px; color: var(--muted); }
+.convo.unread .convo-text { color: var(--text); font-weight: 600; }
+.convo .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); flex: none; }
 </style>
   <style>
     /* Заставка під час запуску: піна, бульбашки, логотип із відблиском і розкриття застосунку колом.
@@ -1236,6 +1282,7 @@ const ICONS = {
   copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/>',
   chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
   users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>',
+  send: '<path d="M4 12 20 4l-6 16-3-7z"/><path d="m11 13 9-9"/>',
   clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
   map: '<path d="M9 4.5 3.5 6.5v13l5.5-2 6 2 5.5-2v-13l-5.5 2z"/><path d="M9 4.5v13M15 6.5v13"/>',
   list: '<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>',
@@ -3676,18 +3723,57 @@ function warrantiesOf(car) {
 
 // ---------- чат за записом ----------
 
+// Кнопка в картці запису: чат відкривається окремим екраном.
 function chatBlock(b) {
   if (!ACTIVE.includes(b.state) && !b.chat?.length) return '';
-  const open = ui.chatFor === b.id;
-  const n = b.chat?.length ?? 0;
-  const head = `<button class="btn chat-toggle${b.chatUnreadClient ? ' unread' : ''}" data-action="chat-open" data-id="${b.id}" aria-expanded="${open}">${icon('chat', 18)}${open ? 'Згорнути чат' : `Чат з точкою${n ? ` · ${n}` : ''}`}${b.chatUnreadClient && !open ? '<span class="count">нове</span>' : ''}</button>`;
-  if (!open) return head;
-  return `${head}<section class="bk-chat" aria-label="Чат з точкою про цей запис">
-    ${n ? `<ol class="thread">${b.chat.map((m) => `<li class="msg ${m.from}"><span class="who">${m.from === 'biz' ? 'Точка' : m.from === 'sys' ? 'CARCAR' : 'Ви'} · ${fmtTime(m.at)}</span>${esc(m.text)}</li>`).join('')}</ol>`
-      : '<p class="small muted" style="margin:0">Напишіть точці про цей візит: приїдете з причепом, хочете раніше чи потрібен чек.</p>'}
-    ${ACTIVE.includes(b.state) ? `<div class="quick" role="group" aria-label="Швидкі повідомлення">${CLIENT_QUICK.map((t) => `<button class="chip" data-action="chat-quick" data-id="${b.id}" data-text="${esc(t)}">${esc(t)}</button>`).join('')}</div>
-    <form class="chat-form inline-form" data-id="${b.id}"><label class="field"><span>Повідомлення точці</span><input name="text" required maxlength="500" autocomplete="off"></label>
-      <button class="btn primary" type="submit">Надіслати</button></form>` : ''}
+  return `<a class="btn chat-link${b.chatUnreadClient ? ' unread' : ''}" href="#/chat/${b.id}">${icon('chat', 18)}Чат з мийкою${b.chatUnreadClient ? '<span class="count" aria-label="нове повідомлення">1</span>' : ''}</a>`;
+}
+
+const avatar = (name) => `<span class="avatar" aria-hidden="true">${esc([...String(name).replace(/^(Автомийка|Детейлінг-мийка)\s*/, '').replace(/[«»"]/g, '')][0] ?? 'C')}</span>`;
+const shortTime = (at) => {
+  const d = new Date(at);
+  const today = isoDate(new Date());
+  return isoDate(d) === today ? d.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' });
+};
+const dayName = (iso) => {
+  const t = new Date();
+  const y = new Date(t.getFullYear(), t.getMonth(), t.getDate() - 1);
+  return iso === isoDate(t) ? 'Сьогодні' : iso === isoDate(y) ? 'Вчора' : dayLabel(iso, { day: 'numeric', month: 'long' });
+};
+
+// Повноекранний чат із мийкою щодо конкретного запису — як у месенджерах.
+function viewChat(id) {
+  const b = mine().find((x) => x.id === id);
+  if (!b) return viewNotFound();
+  const p = placeById(b.placeId);
+  if (b.chatUnreadClient) { b.chatUnreadClient = false; save(); }
+  const msgs = b.chat ?? [];
+  let lastDay = '';
+  const items = msgs.map((m) => {
+    const day = isoDate(new Date(m.at));
+    const sep = day !== lastDay ? `<li class="day-sep"><span>${dayName(day)}</span></li>` : '';
+    lastDay = day;
+    if (m.from === 'sys') return `${sep}<li class="bubble sys">${esc(m.text)}</li>`;
+    return `${sep}<li class="bubble ${m.from === 'client' ? 'me' : 'them'}"><span class="sr-only">${m.from === 'client' ? 'Ви' : p.name}: </span>${esc(m.text)}<time>${new Date(m.at).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}</time></li>`;
+  }).join('');
+  const open = ACTIVE.includes(b.state);
+  return `<section class="chat-screen" aria-label="Чат з ${esc(p.name)}">
+    <header class="chat-head">
+      <button class="icon-btn" data-action="chat-back" aria-label="Назад">${icon('chevL', 24)}</button>
+      ${avatar(p.name)}
+      <div class="chat-who"><h1>${esc(p.name)}</h1><small>${dayLabel(b.date, { weekday: 'short', day: 'numeric', month: 'short' })}, ${b.time} · ${esc(b.services[0])}${b.services.length > 1 ? ` +${b.services.length - 1}` : ''}</small></div>
+      <a class="icon-btn" href="${tel(p)}" aria-label="Зателефонувати">${icon('phone', 20)}</a>
+    </header>
+    <ol class="chat-msgs" aria-label="Повідомлення">
+      ${items || `<li class="chat-empty">${avatar(p.name)}<b>${esc(p.name)}</b><span>Напишіть мийці про цей візит: приїдете раніше, з багажником на даху чи потрібен чек.</span></li>`}
+    </ol>
+    ${open ? `<div class="chat-compose">
+      <div class="quick" role="group" aria-label="Швидкі повідомлення">${CLIENT_QUICK.map((t) => `<button class="chip" data-action="chat-quick" data-id="${b.id}" data-text="${esc(t)}">${esc(t)}</button>`).join('')}</div>
+      <form class="chat-form" data-id="${b.id}">
+        <input name="text" required maxlength="500" autocomplete="off" placeholder="Повідомлення…" aria-label="Повідомлення мийці">
+        <button class="send-btn" type="submit" aria-label="Надіслати">${icon('send', 20)}</button>
+      </form>
+    </div>` : '<p class="chat-closed">Запис завершено — листування лише для читання.</p>'}
   </section>`;
 }
 
@@ -3695,21 +3781,36 @@ function sendChat(b, text) {
   chatPost(b, 'client', text);
   save();
   route();
-  $(`#b-${b.id} .chat-form input`)?.focus();
+  $('.chat-form input')?.focus();
   track('chat', { placeId: b.placeId });
-  toast('Повідомлення надіслано точці');
 }
 
-// Чати за записами в «Повідомленнях»: останнє повідомлення й позначка нового.
-function bookingChatsCard() {
-  const list = mine().filter((b) => b.chat?.length).sort((a, c) => c.chat.at(-1).at - a.chat.at(-1).at).slice(0, 8);
-  if (!list.length) return '';
-  return `<h2>Чати за записами</h2><div class="stack" style="gap:8px">${list.map((b) => {
-    const last = b.chat.at(-1);
-    return `<a class="card link-card" href="#/bookings/${b.id}/chat">${icon('chat', 22)}<span>${esc(placeById(b.placeId)?.name ?? 'Точка')} · ${dayLabel(b.date, { day: 'numeric', month: 'short' })}, ${b.time}
-      <small class="small muted" style="display:block;font-weight:400">${last.from === 'biz' ? 'Точка: ' : last.from === 'client' ? 'Ви: ' : ''}${esc(last.text.length > 70 ? `${last.text.slice(0, 70).trimEnd()}…` : last.text)}</small></span>
-      ${b.chatUnreadClient ? '<span class="count" aria-label="нове повідомлення">1</span>' : ''}${icon('chevR', 18)}</a>`;
-  }).join('')}</div>`;
+// Список переписок у «Повідомленнях»: чати за записами, запити до мийок і підтримка — новіші зверху.
+function conversations() {
+  const rows = [
+    ...mine().filter((b) => b.chat?.length).map((b) => {
+      const last = b.chat.at(-1);
+      const p = placeById(b.placeId);
+      return { at: last.at, href: `#/chat/${b.id}`, name: p?.name ?? 'Мийка', sub: `${dayLabel(b.date, { day: 'numeric', month: 'short' })}, ${b.time}`,
+        text: `${last.from === 'client' ? 'Ви: ' : ''}${last.text}`, unread: !!b.chatUnreadClient };
+    }),
+    ...requests.map((r) => {
+      const last = r.messages.at(-1);
+      return { at: last.at, href: `#/place/${r.placeId}/ask`, name: placeById(r.placeId)?.name ?? 'Мийка', sub: `Запит про послугу · ${reqStatus(r)[1]}`,
+        text: `${last.from === 'client' ? 'Ви: ' : ''}${last.text}`, unread: !!r.unreadClient };
+    }),
+    ...myTickets().map((t) => {
+      const last = t.messages.at(-1);
+      return { at: last.at, href: `#/support/t/${t.id}`, name: 'Підтримка CARCAR', sub: `№${t.no}`, text: `${last.from === 'client' ? 'Ви: ' : ''}${last.text}`, unread: !!t.unreadUser, support: true };
+    }),
+  ].sort((a, c) => c.at - a.at);
+  if (!rows.length) return '';
+  return `<h2>Чати</h2><ul class="convos">${rows.map((r) => `<li><a class="convo${r.unread ? ' unread' : ''}" href="${r.href}">
+    ${r.support ? `<span class="avatar support" aria-hidden="true">${icon('shield', 20)}</span>` : avatar(r.name)}
+    <span class="convo-body"><span class="convo-top"><b>${esc(r.name)}</b><time>${shortTime(r.at)}</time></span>
+      <span class="convo-text">${esc(r.text.length > 80 ? `${r.text.slice(0, 80).trimEnd()}…` : r.text)}</span>
+      <small>${esc(r.sub)}</small></span>
+    ${r.unread ? '<span class="dot" aria-label="непрочитане"></span>' : ''}</a></li>`).join('')}</ul>`;
 }
 
 // ---------- підтримка CARCAR ----------
@@ -3980,16 +4081,15 @@ function intakeBlock(b) {
 
 function viewInbox() {
   const keys = myKeys();
-  const list = inboxFor(keys);
+  // Відповіді мийки в чаті вже видно в «Чатах» — у сповіщеннях їх не дублюємо.
+  const list = inboxFor(keys).filter((m) => m.kind !== 'chat');
   const waits = store.get('waitlist', []).filter((w) => w.mine && w.status === 'active');
   const html = `<h1>Повідомлення</h1>
     ${keys.length ? '' : '<p class="notice">Вкажіть телефон у <a href="#/garage">профілі</a> — тоді сюди прийдуть пропозиції й нагадування точок.</p>'}
     ${waits.length ? `<h2>Лист очікування</h2><div class="stack" style="gap:8px">${waits.map((w) => `<div class="card head" style="align-items:center">
       <span><b>${esc(placeById(w.placeId)?.name ?? '')}</b><small class="small muted" style="display:block">${dayLabel(w.date, { day: 'numeric', month: 'long' })}, ${hhmm(w.from)}–${hhmm(w.to)} · ${esc(w.services.join(', '))}</small></span>
       <button class="btn" data-action="wait-cancel" data-id="${w.id}">Вийти</button></div>`).join('')}</div>` : ''}
-    ${myTickets().length ? `<h2>Підтримка CARCAR</h2><div class="stack" style="gap:8px">${myTickets().slice(0, 3).map((t) => ticketCard(t, false)).join('')}</div>` : ''}
-    ${bookingChatsCard()}
-    ${requestsCard()}
+    ${conversations()}
     <h2>Сповіщення</h2>
     ${list.length ? `<div class="stack" style="gap:8px">${list.map((m) => `<article class="card msg-card${m.read ? '' : ' unread'}">
       <div class="head"><b>${esc(placeById(m.placeId)?.name ?? 'CARCAR')}</b><span class="small muted">${CHANNELS[m.channel] ?? ''} · ${fmtTime(m.at)}</span></div>
@@ -4003,7 +4103,7 @@ function viewInbox() {
 
 // Лічильник на вкладці «Повідомлення»: непрочитані сповіщення й нові відповіді точок у чатах.
 function updateInboxBadge() {
-  const unread = inboxFor(myKeys()).filter((m) => !m.read).length + requests.filter((r) => r.unreadClient).length + mine().filter((b) => b.chatUnreadClient).length + myTickets().filter((t) => t.unreadUser).length;
+  const unread = inboxFor(myKeys()).filter((m) => !m.read && m.kind !== 'chat').length + requests.filter((r) => r.unreadClient).length + mine().filter((b) => b.chatUnreadClient).length + myTickets().filter((t) => t.unreadUser).length;
   const count = $('#inbox-tab .tab-count');
   count.textContent = unread > 9 ? '9+' : unread;
   count.hidden = !unread;
@@ -4407,7 +4507,7 @@ const bookingActions = {
 function route() {
   const [, page = '', arg, sub, extra] = location.hash.replace(/^#/, '').split('/');
   const view = $('#view');
-  const tab = ['partner', 'disputes', 'invite'].includes(page) ? '' : page === 'support' ? 'garage' : page === 'move' ? 'bookings' : ['bookings', 'garage', 'inbox'].includes(page) ? page : 'catalog';
+  const tab = ['partner', 'disputes', 'invite'].includes(page) ? '' : page === 'support' ? 'garage' : page === 'move' ? 'bookings' : page === 'chat' ? 'inbox' : ['bookings', 'garage', 'inbox'].includes(page) ? page : 'catalog';
   settle();
   // Хтось скасував запис — можливо, звільнився час для листа очікування.
   checkWaitlist(bookings);
@@ -4436,11 +4536,10 @@ function route() {
   }
   else if (page === 'book') { view.innerHTML = viewBook(arg, sub, extra); if ($('#book')) renderBook(); }
   else if (page === 'inbox') view.innerHTML = viewInbox();
+  else if (page === 'chat') view.innerHTML = viewChat(arg);
   else if (page === 'bookings') {
-    // Відкрили чат запису: його повідомлення прочитані.
-    if (sub === 'chat') ui.chatFor = arg;
-    const open = bookings.find((b) => b.id === ui.chatFor && b.chatUnreadClient);
-    if (open) { open.chatUnreadClient = false; save(); }
+    // Старі посилання на чат у записі ведуть на окремий екран чату.
+    if (sub === 'chat') { location.replace(`#/chat/${arg}`); return; }
     view.innerHTML = viewBookings(arg);
   } else if (page === 'move') { view.innerHTML = viewMove(arg); if ($('#move')) renderMove(); }
   else if (page === 'garage') view.innerHTML = arg ? viewCar(arg) : viewGarage();
@@ -4458,6 +4557,9 @@ function route() {
   updateInboxBadge();
   enterView(view, `${page}/${arg ?? ''}` !== ui.lastView);
   ui.lastView = `${page}/${arg ?? ''}`;
+  // У чаті ховаємо шапку й меню, як у месенджерах, і показуємо останні повідомлення.
+  document.body.classList.toggle('in-chat', page === 'chat');
+  if (page === 'chat') { const list = $('.chat-msgs'); if (list) list.scrollTop = list.scrollHeight; return; }
   const target = arg && page === 'bookings' ? $(`#b-${arg}`) : sub === 'ask' ? $('#ask') : null;
   if (target) target.scrollIntoView({ block: 'center' });
   else window.scrollTo(0, 0);
@@ -4663,13 +4765,8 @@ document.addEventListener('click', (e) => {
     $(action === 'move-day' ? `[data-action="move-day"][data-date="${move.date}"]` : '[data-action="move-confirm"]')?.focus();
   } else if (action === 'move-confirm') {
     confirmMove();
-  } else if (action === 'chat-open') {
-    ui.chatFor = ui.chatFor === id ? null : id;
-    const b = bookings.find((x) => x.id === id);
-    if (b.chatUnreadClient) { b.chatUnreadClient = false; save(); }
-    route();
-    $(`#b-${id}`)?.scrollIntoView({ block: 'start' });
-    $(`#b-${id} .chat-form input`)?.focus();
+  } else if (action === 'chat-back') {
+    if (history.length > 1) history.back(); else location.hash = '#/inbox';
   } else if (action === 'chat-quick') {
     sendChat(bookings.find((x) => x.id === id), el.dataset.text);
   } else if (action === 'mode') {

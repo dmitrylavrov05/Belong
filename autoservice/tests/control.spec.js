@@ -73,7 +73,7 @@ test('підтримка: клієнт пише про запис, модера�
   await page.goto('/');
   await expect(page.locator('#inbox-tab .tab-count')).toHaveText('1');
   await page.locator('#inbox-tab').click();
-  await page.getByRole('link', { name: 'Нова відповідь — відкрити' }).click();
+  await page.locator('.convo.unread', { hasText: 'Підтримка CARCAR' }).click();
   await expect(page.locator('.thread')).toContainText('Рішення за спором: усю суму повернено вам на баланс CARCAR');
   await expect(page.locator('.ticket .pill-s')).toHaveText('Закрито');
   await page.goto('/#/bookings');
