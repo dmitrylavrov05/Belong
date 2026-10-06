@@ -190,10 +190,65 @@ window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTi
 
 // ---------- огляд ----------
 
+// Авто й номер без повторів (у записах CARCAR номер уже є в назві авто).
+const carText = (b) => {
+  const car = b.car && b.car !== CAR_CLASSES[b.cls] ? b.car : CAR_CLASSES[b.cls];
+  return b.plate && !car.includes(b.plate) ? `${car} · ${b.plate}` : car;
+};
+
+// «Сьогодні» — перше, що бачить адміністратор: хто зараз у боксах, хто наступний і що чекає на відповідь.
+function todayPanel() {
+  const p = place();
+  const d = today();
+  const now = Date.now();
+  const list = own().filter((b) => b.date === d && !['cancelled', 'refunded'].includes(b.state)).sort((a, b) => toMin(a.time) - toMin(b.time));
+  const start = (b) => bookingStart(b).getTime();
+  const end = (b) => start(b) + b.minutes * 60000;
+  const inWork = list.filter((b) => BLOCKING.includes(b.state) && start(b) <= now && end(b) > now);
+  const next = list.filter((b) => BLOCKING.includes(b.state) && start(b) > now);
+  const late = list.filter((b) => BLOCKING.includes(b.state) && end(b) <= now && b.state !== 'done');
+  const done = list.filter((b) => b.state === 'completed');
+  const hours = hoursFor(p, d);
+  const busy = list.filter((b) => BLOCKING.includes(b.state) || b.state === 'completed').reduce((a, b) => a + b.minutes, 0);
+  const freeH = hours ? Math.max(0, capacity(p, [d, d]) - busy) / 60 : 0;
+  const attention = [
+    [own().filter((b) => b.chatUnreadBiz).length, 'нових повідомлень у чатах', '#/requests', 'chat'],
+    [ownRequests().filter((r) => reqState(r) === 'new').length, 'запитів про послуги без відповіді', '#/requests', 'chat'],
+    [reviews.filter((r) => r.placeId === ui.place && !r.reply).length, 'відгуків без відповіді', '#/reviews', 'star'],
+    [late.length, 'записів, час яких минув — закрийте їх', null, 'clock'],
+    [lowStock().length, 'позицій на складі закінчуються', '#/stock', 'drop'],
+  ].filter(([n]) => n);
+  const row = (b, kind) => `<li class="today-row ${kind}">
+      <span class="t-time">${b.time}<small>${hhmm(toMin(b.time) + b.minutes)}</small></span>
+      <span class="t-main"><b>${esc(clientName(b))}</b><small>${esc(carText(b))}</small>
+        <small>${esc(b.services.join(', '))}</small>
+        <span class="t-tags">${statusPill(b)}${etaText(b) ? `<span class="pill ok">${etaText(b)}</span>` : ''}${b.chatUnreadBiz ? '<span class="pill warn">нове повідомлення</span>' : ''}${b.mobile ? `<span class="pill">${icon('carSide', 12)} виїзд</span>` : ''}</span></span>
+      <span class="t-act">
+        ${b.clientPhone ? `<a class="btn icon-only" href="tel:${esc(b.clientPhone.replace(/[^+\d]/g, ''))}" aria-label="Зателефонувати ${esc(clientName(b))}">${icon('phone', 18)}</a>` : ''}
+        <button class="btn" data-action="open-booking" data-id="${b.id}" aria-label="Відкрити запис ${b.time} ${esc(clientName(b))}">Відкрити</button>
+      </span></li>`;
+  const rows = [...late.map((b) => row(b, 'late')), ...inWork.map((b) => row(b, 'now')), ...next.slice(0, 6).map((b) => row(b, 'next'))];
+  return `<section class="panel today" aria-labelledby="h-today">
+    <div class="head"><h2 id="h-today">Сьогодні, ${parseDate(d).toLocaleDateString('uk-UA', { weekday: 'long' })}, ${parseDate(d).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })}</h2>
+      <a class="btn" href="#/schedule/${d}">${icon('calendar', 18)}Розклад дня</a></div>
+    <div class="today-kpis">
+      <span><b>${inWork.length}</b>зараз у роботі</span>
+      <span><b>${next.length}</b>ще сьогодні</span>
+      <span><b>${done.length}</b>виконано</span>
+      <span><b>${hours ? `${(Math.round(freeH * 10) / 10).toLocaleString('uk-UA')} год` : 'вихідний'}</b>вільно в боксах</span>
+      <span><b>${uah(done.reduce((a, b) => a + revenue(b), 0))}</b>виручка</span>
+    </div>
+    ${attention.length ? `<ul class="attention">${attention.map(([n, text, href, ic]) => `<li>${href ? `<a href="${href}">` : '<span>'}${icon(ic, 18)}<b>${n}</b> ${text}${href ? `${icon('chevR', 16)}</a>` : '</span>'}</li>`).join('')}</ul>` : ''}
+    ${rows.length ? `<ol class="today-list">${rows.join('')}</ol>${next.length > 6 ? `<p class="small muted">І ще ${next.length - 6} — у <a href="#/schedule/${d}">розкладі</a>.</p>` : ''}`
+      : `<p class="muted" style="margin:0">${hours ? 'На сьогодні більше записів немає.' : 'Сьогодні вихідний за графіком.'} <button class="link-btn" data-action="new-booking">Додати запис</button></p>`}
+  </section>`;
+}
+
 function viewOverview() {
   const p = place();
   if (!own().length) {
     return `<h1>Огляд</h1><p class="page-sub">${esc(p.name)}</p>
+      ${todayPanel()}
       <div class="empty-state">${icon('chart', 32)}<h2>Ще немає даних</h2>
         <p>Тут зʼявиться аналітика, щойно будуть записи — з застосунку CARCAR або внесені вами в журнал.
         Щоб подивитися, як це виглядає, заповніть демо-історію за 90 днів.</p>
@@ -252,10 +307,10 @@ function viewOverview() {
     'ch-wd': { title: 'Середня виручка за день тижня', cats: byWd, series: ['Середня виручка'], fmt: uah, height: 180 },
   };
 
-  const todayList = own().filter((b) => b.date === today() && b.state !== 'cancelled').sort((a, b) => a.time.localeCompare(b.time));
   const sh = (x) => `${Math.round((x / Math.max(1, cur.rev)) * 100)}%`;
 
   return `<h1>Огляд</h1><p class="page-sub">${esc(p.name)} · записи з CARCAR і з вашого журналу</p>
+    ${todayPanel()}
     <div class="filters">
       <div class="seg" role="group" aria-label="Період">
         ${[7, 30, 90].map((d) => `<button data-action="period" data-n="${d}" aria-pressed="${d === n}">${d} ${daysWord(d)}</button>`).join('')}
@@ -274,23 +329,13 @@ function viewOverview() {
       <div class="kpi"><span class="label">Рейтинг</span><span class="value">${r.count ? rating(r.avg) : '—'}</span><span class="kpi-note">${r.count ? `${r.count} ${plural(r.count, 'відгук', 'відгуки', 'відгуків')}` : 'ще немає відгуків'}</span></div>
     </section>
 
-    <div class="grid-3" style="margin-top:16px">
+    <div style="margin-top:16px">
       <section class="panel" aria-labelledby="h-rev">
         <h2 id="h-rev">Виручка по днях</h2>
         <p class="sub">Виконані замовлення й компенсації за неявки</p>
         ${legend(['Через CARCAR', 'На місці (каса)'])}
         <div class="chart" id="ch-rev"></div>
         ${tableView(['День', 'Через CARCAR', 'На місці', 'Разом'], byDay.map((x) => [x.label, uah(x.values[0]), uah(x.values[1]), uah(x.values[0] + x.values[1])]))}
-      </section>
-      <section class="panel" aria-labelledby="h-today">
-        <h2 id="h-today">Сьогодні</h2>
-        <p class="sub">${todayList.length} ${plural(todayList.length, 'запис', 'записи', 'записів')}</p>
-        <div class="stack" style="gap:8px">
-          ${todayList.length ? todayList.slice(0, 8).map((b) => `<button class="card today-item" data-action="open-booking" data-id="${b.id}" style="text-align:left;padding:10px 12px;gap:4px">
-            <span class="head"><b>${b.time} · ${esc(clientName(b))}</b>${statusPill(b)}</span>
-            <span class="small muted">${esc(b.services.join(', '))}</span></button>`).join('') : '<p class="muted" style="margin:0">Сьогодні записів немає.</p>'}
-          <a class="btn" href="#/schedule">${icon('calendar', 18)}Відкрити розклад</a>
-        </div>
       </section>
     </div>
 
@@ -406,7 +451,7 @@ function viewSchedule(day = today()) {
         ${Array.from({ length: crews }, (_, i) => `<div class="sched-col-head mobile">Виїзд${crews > 1 ? ` ${i + 1}` : ''}</div>`).join('')}
         ${overflow.length ? '<div class="sched-col-head">Понад місткість</div>' : ''}
         <div class="sched-times" style="height:${height}px">${times.join('')}</div>
-        ${Array.from({ length: p.boxes }, (_, i) => `<div class="sched-col" style="height:${height}px;${colBg}">
+        ${Array.from({ length: p.boxes }, (_, i) => `<div class="sched-col" data-day="${day}" data-o="${o}" title="Клацніть на вільне місце, щоб додати запис на цей час" style="height:${height}px;${colBg}">
           ${brk && hours ? `<div class="break-block" style="top:${((brk[0] - o) / 30) * ROW}px;height:${((brk[1] - brk[0]) / 30) * ROW}px">Перерва</div>` : ''}
           ${day === today() && nowMin >= o && nowMin <= c ? `<div class="now-line" style="top:${((nowMin - o) / 30) * ROW}px"></div>` : ''}
           ${placed.filter(([, k]) => k === i).map(([b]) => block(b)).join('')}</div>`).join('')}
@@ -415,6 +460,7 @@ function viewSchedule(day = today()) {
         ${overflow.length ? `<div class="sched-col" style="height:${height}px;${colBg}">${overflow.map(block).join('')}</div>` : ''}
       </div>
     </div>
+    <p class="small muted sched-hint">${icon('plus', 14)} Клацніть на вільне місце в боксі — відкриється новий запис на цей час.</p>
     <div class="legend-row"><span class="pill carcar"><i></i>Оплачено в CARCAR</span><span class="pill cash"><i></i>Оплата на місці</span><span class="pill muted">Завершені</span>${crews ? `<span class="small muted">Колонка «Виїзд» — бригада в клієнта, плюс ${MOBILE_ROAD} хв на дорогу</span>` : ''}</div>
     ${mineOnly ? '<p class="small muted">Показано лише ваші записи.</p>' : ''}
     ${waits.length ? `<section class="panel" aria-labelledby="h-wait" style="margin-top:16px"><h2 id="h-wait">Лист очікування на цей день</h2>
@@ -2417,6 +2463,8 @@ function renderNewBooking() {
   const minutes = chosen.reduce((a, s) => a + s.min, 0) || 30;
   const total = chosen.reduce((a, s) => a + s.price[nb.cls], 0);
   const starts = freeStarts(nb.date, minutes);
+  // Час, на який клацнули в розкладі, тримаємо, поки він вільний для обраних послуг.
+  if (nb.want && starts.includes(nb.want)) nb.time = nb.want;
   if (!starts.includes(nb.time)) nb.time = starts[0] ?? '';
   const subs = usableSubs(ui.place, [phoneKey(nb.clientPhone), nb.clientKey].filter(Boolean), chosen.map((s) => s.id));
   const covered = nbCovered(chosen, subs);
@@ -2667,6 +2715,38 @@ function downloadCsv(name, rows) {
 // ---------- роутер і події ----------
 
 // Меню згруповане за задачами; кожен бачить лише те, що дозволяє його роль.
+// ---------- швидкий пошук ----------
+
+// Пошук по клієнтах і записах точки: імʼя, телефон (будь-які цифри), номер авто чи марка.
+function searchHits(q) {
+  const text = q.trim().toLowerCase();
+  if (text.length < 2) return null;
+  const digits = text.replace(/\D/g, '');
+  const plate = text.replace(/[\s-]/g, '').toUpperCase();
+  const hit = (...vals) => vals.some((v) => v && String(v).toLowerCase().includes(text))
+    || (digits.length >= 3 && vals.some((v) => v && String(v).replace(/\D/g, '').includes(digits)));
+  const clients = clientsList().filter((c) => hit(c.name, c.phone, ...c.cars) || c.list.some((b) => b.plate && b.plate.replace(/[\s-]/g, '').toUpperCase().includes(plate))).slice(0, 6);
+  const upcoming = own().filter((b) => b.date >= today() && BLOCKING.includes(b.state) && (hit(clientName(b), b.clientPhone, b.car, b.plate) || (b.plate && b.plate.replace(/[\s-]/g, '').toUpperCase().includes(plate))))
+    .sort((a, b) => bookingStart(a) - bookingStart(b)).slice(0, 4);
+  return { clients, upcoming };
+}
+
+function renderSearch(q) {
+  const box = $('#biz-q-res');
+  const r = searchHits(q);
+  if (!r) { box.hidden = true; box.innerHTML = ''; return; }
+  const none = !r.clients.length && !r.upcoming.length;
+  box.innerHTML = none ? `<p class="muted small">Нічого не знайдено. <button class="link-btn" data-action="new-booking">Новий запис</button></p>`
+    : `${r.upcoming.length ? `<h3>Найближчі записи</h3><ul>${r.upcoming.map((b) => `<li><button data-action="open-booking" data-id="${b.id}">${icon('calendar', 16)}<span><b>${dayLabel(b.date, { day: 'numeric', month: 'short' })}, ${b.time} · ${esc(clientName(b))}</b><small>${esc(`${carText(b)} · ${b.services.join(', ')}`)}</small></span></button></li>`).join('')}</ul>` : ''}
+      ${r.clients.length ? `<h3>Клієнти</h3><ul>${r.clients.map((c) => `<li><a href="#/clients/${encodeURIComponent(c.key)}">${icon('users', 16)}<span><b>${esc(c.name)}</b><small>${esc([c.phone, [...c.cars].join(', '), c.visits ? `${c.visits} ${plural(c.visits, 'візит', 'візити', 'візитів')}` : ''].filter(Boolean).join(' · '))}</small></span></a></li>`).join('')}</ul>` : ''}`;
+  box.hidden = false;
+}
+
+function closeSearch() {
+  const box = $('#biz-q-res');
+  if (box && !box.hidden) box.hidden = true;
+}
+
 const NAV = [
   ['Робота', [['', 'Огляд', 'chart'], ['schedule', 'Розклад', 'calendar'], ['queue', 'Жива черга', 'list'], ['clients', 'Клієнти', 'users'],
     ['requests', 'Запити клієнтів', 'chat']]],
@@ -2710,6 +2790,7 @@ function renderChrome(page) {
 function route() {
   hideTip();
   touchPresence(ui.place);
+  if ($('#biz-q')?.value) { $('#biz-q').value = ''; closeSearch(); }
   charts = {};
   const [, page = '', arg] = location.hash.replace(/^#/, '').split('/');
   if (page !== 'services') ui.svcDraft = null;
@@ -2763,6 +2844,15 @@ function rerenderKeepScroll() {
 document.addEventListener('click', (e) => {
   const row = e.target.closest('tr.link-row[data-href]');
   if (row && !e.target.closest('a')) { location.hash = row.dataset.href; return; }
+  // Клік по вільному місцю в боксі — новий запис на цей день і час (крок 30 хв).
+  if (e.target.matches('.sched-col[data-day]') && me().role !== 'master') {
+    const min = Number(e.target.dataset.o) + Math.floor(e.offsetY / ROW) * 30;
+    const time = hhmm(min);
+    newBookingDrawer({ date: e.target.dataset.day, time, want: time });
+    return;
+  }
+  // Результати швидкого пошуку закриваються кліком поза ними.
+  if (!e.target.closest('.biz-search')) closeSearch();
   const el = e.target.closest('[data-action]');
   if (!el) return;
   const { action, id } = el.dataset;
@@ -2981,12 +3071,27 @@ document.addEventListener('click', (e) => {
 });
 
 document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && $('#biz-q-res:not([hidden])')) { closeSearch(); $('#biz-q').blur(); return; }
   if (e.key === 'Escape' && $('.drawer')) closeDrawer();
+  // Гарячі клавіші, коли курсор не в полі вводу: / — пошук, N — новий запис, T — сьогодні, ←/→ — дні в розкладі.
+  const typing = e.target.closest?.('input, textarea, select, [contenteditable]');
+  if (!typing && !e.ctrlKey && !e.metaKey && !e.altKey && !$('.drawer')) {
+    const page = location.hash.split('/')[1] ?? '';
+    if (e.key === '/') { e.preventDefault(); $('#biz-q').focus(); return; }
+    if (e.code === 'KeyN' && me().role !== 'master') { e.preventDefault(); newBookingDrawer(); return; }
+    if (e.code === 'KeyT') { location.hash = `#/schedule/${today()}`; return; }
+    if (page === 'schedule' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+      const day = location.hash.split('/')[2] || today();
+      location.hash = `#/schedule/${addDays(day, e.key === 'ArrowLeft' ? -1 : 1)}`;
+      return;
+    }
+  }
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('tr.link-row[data-href]')) location.hash = e.target.dataset.href;
 });
 
 document.addEventListener('input', (e) => {
   const t = e.target;
+  if (t.id === 'biz-q') { renderSearch(t.value); return; }
   if (t.id === 'mail-text') ui.mailText = t.value;
   if (t.closest?.('#connect-form')) {
     const type = $('#connect-form').elements.type.value;

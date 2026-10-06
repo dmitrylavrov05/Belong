@@ -16,6 +16,7 @@
     <aside class="biz-side">
       <a class="brand" href="#/" aria-label="CARCAR для бізнесу, огляд"><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#c8402b"/><path d="M15 10.5a6 6 0 1 0 0 11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/><path d="M24 10.5a6 6 0 1 0 0 11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".6"/></svg><span><span class="c1">CAR</span><span class="c2">CAR</span><small>для бізнесу</small></span></a>
       <nav class="biz-nav" id="nav" aria-label="Розділи панелі"></nav>
+      <p class="keys-hint" id="keys-hint">Клавіші: <kbd>/</kbd> пошук · <kbd>N</kbd> новий запис · <kbd>T</kbd> сьогодні · <kbd>←</kbd><kbd>→</kbd> дні в розкладі</p>
       <a class="to-app" id="to-app" href="index.html#/partner"></a>
     </aside>
     <div class="biz-main">
@@ -23,6 +24,10 @@
         <label class="field"><span>Точка</span><select id="place"></select></label>
         <label class="field"><span>Ви</span><select id="as"></select></label>
         <label class="field power-field"><span>Світло</span><select id="power"></select></label>
+        <div class="biz-search" role="search">
+          <label><span class="sr-only">Пошук клієнта</span><input id="biz-q" type="search" autocomplete="off" placeholder="Клієнт, телефон чи номер авто" aria-describedby="keys-hint" aria-controls="biz-q-res"></label>
+          <div class="search-res" id="biz-q-res" hidden></div>
+        </div>
         <span class="spacer"></span>
         <details class="menu" id="demo-menu">
           <summary class="btn">Демо-дані</summary>

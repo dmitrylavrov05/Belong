@@ -47,6 +47,60 @@ async function addCrmBooking(page, { name, phone, service, date = '2026-10-05', 
   await expect(page.locator('#toast')).toContainText(`Записано: ${name}`);
 }
 
+test('зручна CRM: «Сьогодні», швидкий пошук, запис кліком у розкладі, гарячі клавіші', async ({ page }) => {
+  await page.clock.setFixedTime(new Date(2026, 9, 4, 8, 30));
+  await page.goto(PANEL);
+  await selectPlace(page, 'Автомийка «Блиск»');
+  await addCrmBooking(page, { name: 'Олена Кравець', phone: '067 111 22 33', service: /Експрес-мийка/, date: '2026-10-04', time: '10:00' });
+  await addCrmBooking(page, { name: 'Петро Шевчук', phone: '063 444 55 66', service: /Експрес-мийка/, date: '2026-10-04', time: '12:00' });
+
+  // О 10:05 Олена вже в боксі, Петро — наступний.
+  await page.clock.setFixedTime(new Date(2026, 9, 4, 10, 5));
+  await page.goto(PANEL);
+  const todayBox = page.getByRole('region', { name: /^Сьогодні, неділя, 4 жовтня/ });
+  await expect(todayBox.locator('.today-kpis')).toContainText('1зараз у роботі');
+  await expect(todayBox.locator('.today-kpis')).toContainText('1ще сьогодні');
+  await expect(todayBox.locator('.today-row.now')).toContainText('Олена Кравець');
+  await expect(todayBox.locator('.today-row.next')).toContainText('Петро Шевчук');
+  await todayBox.getByRole('button', { name: 'Відкрити запис 12:00 Петро Шевчук' }).click();
+  await expect(page.getByRole('dialog')).toContainText('Петро Шевчук');
+  await page.keyboard.press('Escape');
+
+  // «/» — пошук: за цифрами телефону знаходить клієнта й найближчий запис.
+  await page.keyboard.press('/');
+  await expect(page.locator('#biz-q')).toBeFocused();
+  await page.keyboard.type('111 22');
+  const res = page.locator('#biz-q-res');
+  await expect(res.getByRole('button', { name: /12:00|10:00/ })).toHaveCount(1);
+  await res.getByRole('link', { name: /Олена Кравець/ }).click();
+  await expect(page).toHaveURL(/#\/clients\//);
+  await expect(page.locator('#view h1')).toHaveText('Олена Кравець');
+  await expect(page.locator('#biz-q')).toHaveValue('');
+
+  // T — розклад на сьогодні, → — наступний день.
+  await page.locator('#view h1').click();
+  await page.keyboard.press('t');
+  await expect(page).toHaveURL(/#\/schedule\/2026-10-04/);
+  await page.keyboard.press('ArrowRight');
+  await expect(page).toHaveURL(/#\/schedule\/2026-10-05/);
+
+  // Клік по вільному місцю о 14:00 — новий запис на цей день і час.
+  const col = page.locator('.sched-col[data-day]').first();
+  const o = Number(await col.getAttribute('data-o'));
+  await col.click({ position: { x: 20, y: ((14 * 60 - o) / 30) * 40 + 8 } });
+  const form = page.locator('#nb-form');
+  await expect(form.getByLabel('Дата')).toHaveValue('2026-10-05');
+  await form.getByLabel(/Експрес-мийка/).check();
+  await expect(form.getByLabel('Час')).toHaveValue('14:00');
+  await page.keyboard.press('Escape');
+
+  // N — новий запис з будь-якого розділу.
+  await page.goto(`${PANEL}#/clients`);
+  await page.locator('#view h1').click();
+  await page.keyboard.press('n');
+  await expect(page.getByRole('dialog', { name: 'Новий запис' })).toBeVisible();
+});
+
 test('порожня панель пропонує демо-історію, а з нею показує аналітику', async ({ page }) => {
   await page.goto(PANEL);
   await expect(page.getByRole('heading', { name: 'Ще немає даних' })).toBeVisible();
