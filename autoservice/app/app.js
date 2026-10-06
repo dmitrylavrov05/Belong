@@ -206,13 +206,28 @@ function addMoney(amount, text) {
 const cancelWindow = () => duration(Math.round(PAYMENT.freeCancelHours * 60));
 
 // Баланс CARCAR: повернення за скасовані записи. Списується під час оплати, можна вивести на картку.
-const moneyCard = () => (wallet.money > 0 || wallet.history.some((h) => h.kind === 'money') ? `<section class="card balance-card" aria-label="Баланс CARCAR">
+const moneyCard = () => `<section class="card balance-card" aria-label="Баланс CARCAR">
     <div class="head"><span>Баланс CARCAR</span><b class="bonus-sum">${uah(wallet.money)}</b></div>
     <p class="fine">Сюди повертаються гроші за вчасно скасовані записи. Баланс списується автоматично під час наступної оплати, або його можна вивести на картку.</p>
     ${wallet.money > 0 ? `<button class="btn" data-action="money-out">${icon('card', 18)}Вивести ${uah(wallet.money)} на картку</button>` : ''}
     <ul class="ledger">${wallet.history.filter((h) => h.kind === 'money').slice(0, 5).map((h) => `<li><span>${esc(h.text)}<small>${fmtTime(h.at)}</small></span>
-      <b class="${h.amount > 0 ? 'plus' : ''}">${h.amount > 0 ? '+' : '−'}${uah(Math.abs(h.amount))}</b></li>`).join('')}</ul>
-  </section>` : '');
+      <b class="${h.amount > 0 ? 'plus' : ''}">${h.amount > 0 ? '+' : '−'}${uah(Math.abs(h.amount))}</b></li>`).join('') || '<li class="muted small">Операцій ще не було.</li>'}</ul>
+  </section>`;
+
+// Гаманець — окремий екран у профілі: баланс, бонуси й запрошення друзів.
+function viewWallet() {
+  return `${back('#/garage', 'Гараж')}<h1>Гаманець</h1>
+    ${moneyCard()}
+    <section class="card balance-card" aria-label="Бонуси" style="margin-top:12px">
+      <div class="head"><span>Бонуси</span><b class="bonus-sum">${uah(wallet.bonus)}</b></div>
+      <p class="fine">${wallet.bonus ? `Спишуться під час оплати замовлення від ${uah(REFERRAL.minOrder)}.` : 'Бонуси нараховуються за друзів, яких ви запросили.'}</p>
+    </section>
+    <div style="margin-top:12px">${inviteCard()}</div>`;
+}
+
+// Вхід у гаманець з профілю: одразу видно, скільки грошей і бонусів.
+const walletLink = () => `<a class="card link-card wallet-link" href="#/wallet">${icon('card', 24)}<span>Гаманець
+    <small>Баланс ${uah(wallet.money)}${wallet.bonus ? ` · бонуси ${uah(wallet.bonus)}` : ''}</small></span>${icon('chevR', 18)}</a>`;
 
 const inviteLink = () => `${location.origin}${location.pathname}?ref=${referral.code}`;
 
@@ -1956,7 +1971,7 @@ function viewBookings(highlightId) {
   const active = sorted.filter((b) => ACTIVE.includes(b.state));
   const rest = sorted.filter((b) => !ACTIVE.includes(b.state)).reverse();
   if (!list.length) {
-    return `<h1>Мої записи</h1>${empty('calendar', 'Записів поки немає.', '<a class="btn primary" href="#/">Знайти мийку</a>')}${moneyCard()}${inviteCard()}`;
+    return `<h1>Мої записи</h1>${empty('calendar', 'Записів поки немає.', '<a class="btn primary" href="#/">Знайти мийку</a>')}${inviteCard()}`;
   }
   // Відкриваємо вкладку з записом, про який ідеться (щойно оплачений, скасований чи з повідомлення).
   const focus = ui.bookFocus ?? (highlightId !== ui.tabFor ? highlightId : null);
@@ -1969,7 +1984,6 @@ function viewBookings(highlightId) {
       <button data-action="book-tab" data-tab="active" aria-pressed="${tab === 'active'}">Активні<span>${active.length}</span></button>
       <button data-action="book-tab" data-tab="done" aria-pressed="${tab === 'done'}">Завершені<span>${rest.length}</span></button>
     </div>
-    ${moneyCard()}
     ${tab === 'active'
       ? `${subsCard()}<h2 class="sr-only">Активні записи</h2><div class="stack" style="margin-top:12px">${active.length ? active.map((b) => bookingCard(b, b.id === highlightId)).join('') : empty('calendar', 'Активних записів немає.', '<a class="btn primary" href="#/">Записатися на мийку</a>')}</div>`
       : `<h2 class="sr-only">Завершені записи</h2><div class="stack" style="margin-top:12px">${rest.length ? rest.map((b) => bookingCard(b, b.id === highlightId)).join('') : empty('calendar', 'Завершених записів ще немає.')}</div>${inviteCard()}`}`;
@@ -2139,6 +2153,7 @@ function viewGarage() {
       <label class="check-row small"><input class="check" type="checkbox" name="optIn" ${profile.optIn ? 'checked' : ''}><span>Отримувати пропозиції точок, де я обслуговуюсь, у Viber чи Telegram</span></label>
       <button class="btn" type="submit">Зберегти профіль</button>
     </form>
+    ${walletLink()}
     ${supportCard()}
     ${reliabilityCard()}
     ${garageExtras()}
@@ -2334,7 +2349,7 @@ const bookingActions = {
 function route() {
   const [, page = '', arg, sub, extra] = location.hash.replace(/^#/, '').split('/');
   const view = $('#view');
-  const tab = ['partner', 'disputes', 'invite'].includes(page) ? '' : page === 'support' ? 'garage' : page === 'move' ? 'bookings' : page === 'chat' ? 'inbox' : ['bookings', 'garage', 'inbox'].includes(page) ? page : 'catalog';
+  const tab = ['partner', 'disputes', 'invite'].includes(page) ? '' : ['support', 'wallet'].includes(page) ? 'garage' : page === 'move' ? 'bookings' : page === 'chat' ? 'inbox' : ['bookings', 'garage', 'inbox'].includes(page) ? page : 'catalog';
   settle();
   // Хтось скасував запис — можливо, звільнився час для листа очікування.
   checkWaitlist(bookings);
@@ -2376,6 +2391,7 @@ function route() {
   else if (page === 'partner') view.innerHTML = arg ? viewPartnerJob(arg) : viewPartner();
   else if (page === 'disputes') view.innerHTML = viewDisputes();
   else if (page === 'invite') view.innerHTML = viewInvite();
+  else if (page === 'wallet') view.innerHTML = viewWallet();
   else if (page === 'support') view.innerHTML = viewSupport(arg, sub);
   else view.innerHTML = viewNotFound();
 

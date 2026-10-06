@@ -232,8 +232,9 @@ test('спір: модератор ділить суму, клієнт отри�
   await expect(page.locator('#toast')).toHaveText('Точці 600 ₴, решту повернено клієнту');
   await expect(page.getByRole('region', { name: 'Вирішені спори' })).toContainText('300 ₴');
 
-  await page.goto('/#/bookings');
+  await page.goto('/#/wallet');
   await expect(page.getByRole('region', { name: 'Баланс CARCAR' }).locator('.bonus-sum')).toHaveText('300 ₴');
+  await page.goto('/#/bookings');
   await expect(page.locator('article', { hasText: 'Автомийка «Хвиля»' })).toContainText('Повернено 300 ₴ на баланс CARCAR, 600 ₴ отримала точка');
   await page.goto('/#/partner');
   await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });

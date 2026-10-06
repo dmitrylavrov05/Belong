@@ -325,6 +325,11 @@ test('скасування за 1,5 год і раніше: уся сума на
   await page.getByRole('button', { name: 'Скасувати', exact: true }).click();
   await expect(page.locator('#toast')).toHaveText('Запис скасовано, 900 ₴ повернено на баланс');
   await expect(page.locator('article', { hasText: 'Скасовано' })).toContainText('Повернено 900 ₴ на баланс CARCAR');
+  // Баланс живе в профілі («Гараж» → «Гаманець»), а не в «Моїх записах».
+  await expect(page.getByRole('region', { name: 'Баланс CARCAR' })).toHaveCount(0);
+  await page.goto('/#/garage');
+  await expect(page.getByRole('link', { name: /Гаманець/ })).toContainText('Баланс 900 ₴');
+  await page.getByRole('link', { name: /Гаманець/ }).click();
   const balance = page.getByRole('region', { name: 'Баланс CARCAR' });
   await expect(balance.locator('.bonus-sum')).toHaveText('900 ₴');
 
@@ -341,11 +346,14 @@ test('скасування за 1,5 год і раніше: уся сума на
   await expect(page.getByRole('button', { name: 'Оплатити 1 300 ₴' })).toBeVisible();
   await page.getByLabel(/Баланс CARCAR/).check();
   await page.getByRole('button', { name: 'Оплатити 400 ₴' }).click();
+  await page.goto('/#/wallet');
   await expect(balance.locator('.bonus-sum')).toHaveText('0 ₴');
 
   // Скасовуємо й виводимо повернення на картку.
+  await page.goto('/#/bookings');
   page.once('dialog', (d) => d.accept());
   await page.locator('article', { hasText: 'гроші утримуються' }).getByRole('button', { name: 'Скасувати', exact: true }).click();
+  await page.goto('/#/wallet');
   await expect(balance.locator('.bonus-sum')).toHaveText('1 300 ₴');
   page.once('dialog', (d) => d.accept());
   await balance.getByRole('button', { name: 'Вивести 1 300 ₴ на картку' }).click();

@@ -355,7 +355,7 @@ test('лист очікування: час звільнився — клієн�
   await expect(page.locator('.slot[data-time="10:00"]')).toHaveAttribute('aria-pressed', 'true');
 });
 
-for (const path of [`${PANEL}#/staff`, `${PANEL}#/stock`, `${PANEL}#/passes`, `${PANEL}#/mailings`, `${PANEL}#/deals`, `${PANEL}#/queue`, '/#/inbox', '/#/garage', '/#/place/blysk']) {
+for (const path of [`${PANEL}#/staff`, `${PANEL}#/stock`, `${PANEL}#/passes`, `${PANEL}#/mailings`, `${PANEL}#/deals`, `${PANEL}#/queue`, '/#/inbox', '/#/garage', '/#/wallet', '/#/place/blysk']) {
   test(`доступність і верстка з демо-даними ${path}`, async ({ page }) => {
     await panel(page, '#/', 'Автомийка «Блиск»');
     await page.getByRole('button', { name: 'Заповнити демо-історію' }).click();

@@ -76,7 +76,7 @@ test('підтримка: клієнт пише про запис, модера�
   await page.locator('.convo.unread', { hasText: 'Підтримка CARCAR' }).click();
   await expect(page.locator('.thread')).toContainText('Рішення за спором: усю суму повернено вам на баланс CARCAR');
   await expect(page.locator('.ticket .pill-s')).toHaveText('Закрито');
-  await page.goto('/#/bookings');
+  await page.goto('/#/wallet');
   await expect(page.getByRole('region', { name: 'Баланс CARCAR' })).toContainText('900 ₴');
 });
 
