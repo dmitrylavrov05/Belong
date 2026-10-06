@@ -8,7 +8,7 @@ import {
   ratingFor, visibleReviews, ACTIVE, resolveDispute, settleAll, applyOverrides, promosAll, savePromos, promoUses, promoText,
   TICKET_TOPICS, TICKET_STATUS, ticketsAll, ticketReply, setTicket, ticketOverdue, slaHours, fraudState, saveFraud, staffOf, phoneKey,
   addCustomPlace, uid, hash,
-  enterView,
+  enterView, bizApps, APP_STATUS, approveBizApp, rejectBizApp,
 } from './core.js';
 import { ENTITY, TAX, DOCS, OFFER, codeValid, ibanValid, ibanBank, formatIban, missingSteps } from './partners.js';
 import { drawColumns, legend, tableView, hbars, hideTip } from './charts.js';
@@ -1130,6 +1130,7 @@ function statsDemo() {
 const NAV = [
   ['', 'Огляд', 'chart'],
   ['stats', 'Статистика застосунку', 'users'],
+  ['applications', 'Заявки бізнесу', 'users'],
   ['places', 'Точки', 'shield'],
   ['reviews', 'Відгуки', 'star'],
   ['disputes', 'Спори', 'scale'],
@@ -1140,16 +1141,40 @@ const NAV = [
   ['marketing', 'Маркетинг і CAC', 'chart'],
 ];
 
+// ---------- заявки бізнесу ----------
+
+// Мийки реєструються в застосунку; адміністрація перевіряє дані й видає логін і пароль до кабінету.
+function viewApplications() {
+  const list = [...bizApps()].sort((a, b) => (a.status === 'new' ? -1 : 0) - (b.status === 'new' ? -1 : 0) || b.at - a.at);
+  return `<h1>Заявки бізнесу</h1><p class="page-sub">Перевірте дані мийки. Після схвалення точка зʼявиться в каталозі, а мийка отримає логін і пароль до кабінету.</p>
+    ${list.length ? `<div class="stack" style="gap:12px">${list.map((a) => {
+      const [label, cls] = APP_STATUS[a.status];
+      return `<article class="panel stack" style="gap:10px" aria-label="Заявка ${esc(a.name)}">
+        <div class="head"><div><b>${esc(a.name)}</b><small class="muted" style="display:block">${esc(a.district)} · ${esc(a.address)} · ${a.boxes} ${plural(Number(a.boxes), 'бокс', 'бокси', 'боксів')}</small></div>
+          <span class="pill ${cls}">${label}</span></div>
+        <dl class="kv"><dt>Контакт</dt><dd>${esc(a.contact)} · <a href="tel:${esc(a.phone.replace(/[^+\d]/g, ''))}">${esc(a.phone)}</a>${a.email ? ` · ${esc(a.email)}` : ''}</dd>
+          <dt>Бізнес</dt><dd>${a.type === 'tov' ? 'ТОВ, ЄДРПОУ' : 'ФОП, ІПН'} ${esc(a.code)}</dd><dt>Подано</dt><dd>${fmtTime(a.at)}</dd></dl>
+        ${a.status === 'new' ? `<div class="row"><button class="btn primary" data-action="app-approve" data-id="${a.id}">Схвалити й видати доступ</button>
+          <button class="btn" data-action="app-reject" data-id="${a.id}">Відхилити</button></div>` : ''}
+        ${a.status === 'approved' ? `<div class="notice ok"><b>Доступ до кабінету видано</b>Логін <b class="code">${esc(a.issued.login)}</b>, пароль <b class="code">${esc(a.issued.password)}</b>.
+          У робочій версії вони йдуть мийці в SMS автоматично, а пароль ніде не зберігається у відкритому вигляді.</div>
+          <a class="btn" href="#/places/${a.placeId}">Картка точки</a>` : ''}
+        ${a.status === 'rejected' ? `<p class="small muted" style="margin:0">Причина: ${esc(a.reason || '—')}</p>` : ''}
+      </article>`;
+    }).join('')}</div>` : `<div class="empty-state">${icon('users', 32)}<h2>Заявок поки немає</h2><p>Мийки подають заявку в застосунку: «Гараж» → «Для бізнесу» → «Зареєструвати бізнес».</p></div>`}`;
+}
+
 function route() {
   hideTip();
   charts = {};
   const [, page = '', arg] = location.hash.replace(/^#/, '').split('/');
   const q = queues();
-  const count = { places: q.places, reviews: q.reviews, disputes: q.disputes, support: q.support, fraud: q.fraud };
+  const count = { applications: bizApps().filter((a) => a.status === 'new').length, places: q.places, reviews: q.reviews, disputes: q.disputes, support: q.support, fraud: q.fraud };
   $('#nav').innerHTML = NAV.map(([id, label, ic]) => `<a href="#/${id}" ${page === id ? 'aria-current="page"' : ''}>${icon(ic, 20)}${label}
     ${count[id] ? `<span class="count" aria-label="чекають рішення: ${count[id]}">${count[id]}</span>` : ''}</a>`).join('');
   const view = $('#view');
   if (page === '') view.innerHTML = viewOverview();
+  else if (page === 'applications') view.innerHTML = viewApplications();
   else if (page === 'places') view.innerHTML = arg ? viewPlace(arg) : viewPlaces();
   else if (page === 'reviews') view.innerHTML = viewReviews();
   else if (page === 'disputes') view.innerHTML = viewDisputes();
@@ -1177,6 +1202,18 @@ document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-action]');
   if (!el) return;
   const { action, id } = el.dataset;
+  if (action === 'app-approve') {
+    approveBizApp(id).then((r) => { if (r) { applyOverrides(); rerender(); toast(`Доступ видано: логін ${r.login}`); } });
+    return;
+  }
+  if (action === 'app-reject') {
+    const reason = prompt('Причина відмови (її побачить мийка)')?.trim();
+    if (!reason) return;
+    rejectBizApp(id, reason);
+    rerender();
+    toast('Заявку відхилено');
+    return;
+  }
   if (action === 'period') { ui.period = Number(el.dataset.n); rerender(); }
   else if (action === 'stats-demo') {
     const n = statsDemo();

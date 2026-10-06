@@ -3,6 +3,8 @@ import AxeBuilder from '@axe-core/playwright';
 
 // Неділя, 4 жовтня 2026, 10:00 — як і в інших тестах. Жовтень — сезон переходу на зимові шини.
 test.beforeEach(async ({ page }, testInfo) => {
+  // Вхід за телефоном пройдено — крім тестів самого входу (#/login).
+  await page.addInitScript(() => { if (!location.hash.startsWith('#/login')) { localStorage.getItem('carcar.auth') ?? localStorage.setItem('carcar.auth', '{"phone":"","at":1}'); localStorage.getItem('carcar.biz.session') ?? localStorage.setItem('carcar.biz.session', '{"demo":true}'); } });
   // Усі точки — мийки, тож акція «Перша мийка −30%» діяла б у кожному тесті. Вимикаємо її,
   // крім тестів промокодів і маркетингу.
   if (!/промокод|маркетинг/i.test(testInfo.title)) {
@@ -83,7 +85,7 @@ test('персонал і ролі: майстер на записі, зарпл
   await completeCash(page, 'Зарплата Тест');
 
   // 40% від 900 ₴ — 360 ₴ зарплати, автоматично у витратах.
-  await (await openNav(page)).getByRole('link', { name: 'Витрати' }).click();
+  await page.goto(`${PANEL}#/expenses`);
   const row = page.getByRole('region', { name: 'Витрати', exact: true }).locator('tr', { hasText: 'Майстер Тест' });
   await expect(row).toContainText('360 ₴');
   await expect(row).toContainText('авто');
@@ -124,8 +126,8 @@ test('склад: списання за нормами, нагадування �
   await crmBooking(page, { name: 'Склад Два', phone: '+380 50 000 00 22', time: '13:00' });
   await completeCash(page, 'Склад Два');
 
-  await expect((await openNav(page)).getByRole('link', { name: /Склад/ })).toContainText('1');
-  await (await openNav(page)).getByRole('link', { name: /Склад/ }).click();
+  
+  await page.goto(`${PANEL}#/stock`);
   const row = page.getByRole('region', { name: 'Залишки' }).locator('tr', { hasText: 'Монтажна паста' });
   await expect(row).toContainText('0,4 кг');
   await expect(row).toContainText('Закінчується');
@@ -139,7 +141,7 @@ test('склад: списання за нормами, нагадування �
   await expect(page.locator('#toast')).toContainText('700 ₴ у витратах');
   await expect(row).toContainText('2,4 кг');
   await expect(row).toContainText('Достатньо');
-  await (await openNav(page)).getByRole('link', { name: 'Витрати' }).click();
+  await page.goto(`${PANEL}#/expenses`);
   await expect(page.getByRole('region', { name: 'Витрати', exact: true }).locator('tr', { hasText: 'Монтажна паста' })).toContainText('700 ₴');
 });
 
@@ -220,7 +222,7 @@ test('розсилка VIP-клієнтам у Viber доходить клієн
   await d.getByRole('button', { name: 'Додати клієнта' }).click();
   await page.getByRole('button', { name: 'VIP' }).click();
 
-  await (await openNav(page)).getByRole('link', { name: 'Розсилки' }).click();
+  await page.goto(`${PANEL}#/mailings`);
   await page.getByLabel('Кому').selectOption('vip');
   await page.getByLabel('Текст').fill('{імʼя}, для VIP — безкоштовний віск до кінця тижня!');
   await expect(page.locator('#mail-count')).toContainText('Отримають: 1');

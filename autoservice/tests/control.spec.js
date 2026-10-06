@@ -3,6 +3,8 @@ import AxeBuilder from '@axe-core/playwright';
 
 // Неділя, 4 жовтня 2026, 10:00. Завтра — понеділок.
 test.beforeEach(async ({ page }, testInfo) => {
+  // Вхід за телефоном пройдено — крім тестів самого входу (#/login).
+  await page.addInitScript(() => { if (!location.hash.startsWith('#/login')) { localStorage.getItem('carcar.auth') ?? localStorage.setItem('carcar.auth', '{"phone":"","at":1}'); localStorage.getItem('carcar.biz.session') ?? localStorage.setItem('carcar.biz.session', '{"demo":true}'); } });
   // Усі точки — мийки, тож акція «Перша мийка −30%» діяла б у кожному тесті. Вимикаємо її,
   // крім тестів промокодів і маркетингу.
   if (!/промокод|маркетинг/i.test(testInfo.title)) {
@@ -275,4 +277,105 @@ test('без анімацій, якщо людина просить зменши
   await page.goto('/#/garage');
   await page.goto('/#/bookings');
   await expect(page.locator('#view')).not.toHaveClass(/view-enter/);
+});
+
+test('вхід за номером телефону: номер → код із SMS → застосунок, номер потрапляє в профіль', async ({ page }) => {
+  await page.goto('/#/login');
+  await expect(page.locator('.tabs')).toBeHidden();
+  await expect(page.getByRole('heading', { name: 'Вхід у CARCAR' })).toBeVisible();
+  // Неповний номер не пропускаємо.
+  await page.getByLabel('Номер телефону').fill('67 12');
+  await page.getByRole('button', { name: 'Отримати код' }).click();
+  await expect(page.getByRole('alert')).toContainText('9 цифр');
+  await page.getByLabel('Номер телефону').fill('0671234567');
+  await expect(page.getByLabel('Номер телефону')).toHaveValue('67 123 45 67');
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.getByRole('button', { name: 'Отримати код' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Код із SMS' })).toBeVisible();
+  await expect(page.locator('.auth-card')).toContainText('+380 67 123 45 67');
+  const code = (await page.locator('.auth-card .code').textContent()).trim();
+  // Неправильний код — помилка; правильний вводиться по цифрі й підтверджується сам.
+  await page.getByLabel('Цифра 1').fill('0');
+  await page.keyboard.type('000');
+  await expect(page.getByRole('alert')).toContainText('Невірний код');
+  await page.getByLabel('Цифра 1').fill(code[0]);
+  await page.keyboard.type(code.slice(1));
+  await expect(page.getByRole('heading', { name: 'Готово!' })).toBeVisible();
+  await expect(page.locator('.tabs')).toBeVisible();
+  await expect(page).toHaveURL(/#\/$/);
+  await page.goto('/#/garage');
+  await expect(page.getByLabel('Телефон')).toHaveValue('+380 67 123 45 67');
+  // Сесія зберігається: після перезавантаження входити знову не треба.
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Гараж' })).toBeVisible();
+});
+
+test('бізнес: умови й заявка в застосунку → адміністрація видає логін і пароль → вхід у кабінет мийки', async ({ page }) => {
+  await page.goto('/#/garage');
+  await page.getByRole('link', { name: /Для бізнесу/ }).click();
+  await expect(page.getByRole('heading', { name: 'CARCAR для бізнесу' })).toBeVisible();
+  await expect(page.locator('.biz-terms')).toContainText('Комісія 7%');
+  await expect(page.locator('.biz-terms')).toContainText('Машина готова');
+  await expect(page.getByRole('link', { name: 'Увійти в кабінет бізнесу' })).toHaveAttribute('href', 'business.html');
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.getByRole('link', { name: 'Зареєструвати бізнес' }).click();
+
+  await page.getByLabel('Назва мийки').fill('Автомийка «Хмаринка»');
+  await page.getByLabel('Адреса').fill('вул. Хрещатик, 1');
+  await page.getByLabel('Кількість боксів').fill('3');
+  await page.getByLabel('Контактна особа').fill('Ігор Вигаданий');
+  await page.getByLabel('Телефон').fill('+380 67 000 11 22');
+  await page.getByLabel('ІПН (ФОП) або ЄДРПОУ (ТОВ)').fill('1234567890');
+  await page.getByLabel(/Погоджуюсь з умовами/).check();
+  await page.getByRole('button', { name: 'Надіслати заявку' }).click();
+  await expect(page.locator('#toast')).toHaveText('Заявку надіслано — перевіримо до 2 робочих днів');
+  await expect(page.getByRole('region', { name: 'Ваша заявка' })).toContainText('На перевірці');
+  await expect(page.getByRole('link', { name: 'Зареєструвати бізнес' })).toHaveCount(0);
+
+  // Адміністрація схвалює й видає доступ.
+  await page.goto('/admin.html#/applications');
+  await expect(page.locator('#nav a[href="#/applications"] .count')).toHaveText('1');
+  const app = page.getByRole('article', { name: 'Заявка Автомийка «Хмаринка»' });
+  await expect(app).toContainText('ФОП, ІПН 1234567890');
+  await app.getByRole('button', { name: 'Схвалити й видати доступ' }).click();
+  await expect(app).toContainText('Доступ до кабінету видано');
+  const login = (await app.locator('.code').first().textContent()).trim();
+  const pass = (await app.locator('.code').nth(1).textContent()).trim();
+  expect(login).toBe('khmarynka');
+  expect(pass).toMatch(/^[a-z0-9]{8}$/);
+
+  // Мийка бачить доступ у застосунку, а точка — у каталозі.
+  await page.goto('/#/business');
+  await expect(page.getByRole('region', { name: 'Ваша заявка' })).toContainText(login);
+  await page.goto('/');
+  await expect(page.locator('#list article')).toHaveCount(10);
+
+  // Окремий вхід у кабінет: невірний пароль — помилка, вірний — CRM лише цієї мийки.
+  await page.evaluate(() => localStorage.removeItem('carcar.biz.session'));
+  await page.goto('/business.html#/login');
+  await expect(page.getByRole('heading', { name: 'Вхід у кабінет мийки' })).toBeVisible();
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await expect(page.locator('#nav')).toBeHidden();
+  await page.getByLabel('Логін').fill(login);
+  await page.getByLabel('Пароль').fill('wrongpass');
+  await page.getByRole('button', { name: 'Увійти' }).click();
+  await expect(page.getByRole('alert')).toHaveText('Невірний логін або пароль.');
+  await page.getByLabel('Пароль').fill(pass);
+  await page.getByRole('button', { name: 'Увійти' }).click();
+  await expect(page.locator('#view h1')).toHaveText('Огляд');
+  await expect(page.locator('.page-sub').first()).toContainText('Автомийка «Хмаринка»');
+  await expect(page.getByLabel('Точка')).toBeHidden();
+  // Без зайвого: у меню немає черги, гарячих вікон, абонементів, розсилок, витрат, складу й імпорту.
+  const nav = page.locator('#nav');
+  for (const gone of ['Жива черга', 'Гарячі вікна', 'Абонементи', 'Розсилки', 'Витрати', 'Склад', 'Імпорт даних']) await expect(nav).not.toContainText(gone);
+  await expect(nav).toContainText('Розклад');
+  // Після перезавантаження сесія зберігається; «Вийти» повертає на екран входу.
+  await page.reload();
+  await expect(page.locator('#view h1')).toHaveText('Огляд');
+  page.once('dialog', (d) => d.accept());
+  const more = page.locator('#tabbar [data-action="menu-open"]');
+  if (await more.isVisible()) await more.click();
+  await page.locator('#logout').click();
+  await expect(page.getByRole('heading', { name: 'Вхід у кабінет мийки' })).toBeVisible();
 });

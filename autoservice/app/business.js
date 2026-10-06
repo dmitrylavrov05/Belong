@@ -7,7 +7,7 @@ import {
   fmtTime, fmtDate, hash, bookingStart, hoursFor, scheduleOf, widestRange, inBreak, rangeText, WEEKDAYS, WEEKDAY_NAMES,
   weekdayOf, phoneKey, offersOf, offerAsService, EXPENSE_CATS, PAY_METHODS, expensesIn, serviceCat, catById, shrinkPhoto, applyOverrides, saveOverride,
   ACTIVE, BLOCKING, HOUR, reliability, isCarcar, price, complete, isFrozen, balanceFor, settleAll, ratingFor,
-  PARTNER_STATUS, partnerOf, savePartner, payoutReady, maskIban, commissionFor, addCustomPlace,
+  PARTNER_STATUS, partnerOf, savePartner, payoutReady, maskIban, commissionFor, addCustomPlace, checkBizLogin,
   ROLES, staffOf, workBase, POWER, powerOf, setPower, TICKET_TOPICS, PLACE_TOPICS, TICKET_STATUS, ticketsAll, openTicket, ticketReply, setTicket, mobileOn, spanOf, MOBILE_ROAD,
   enterView,
 } from './core.js';
@@ -51,6 +51,30 @@ load();
 
 const ui = { place: store.get('partner', null), reqFilter: 'open', period: 30, finPeriod: 30, expPeriod: 30, clients: 'all', q: '', sort: 'last', svcDraft: null, imp: { type: 'clients', text: '', rows: null, map: {}, result: null } };
 if (!placeById(ui.place)) ui.place = PLACES[0].id;
+
+// Вхід у кабінет: логін і пароль видає адміністрація CARCAR після схвалення заявки.
+// Сесія акаунта привʼязана до однієї точки; демо-сесія (вигадані дані) — до всіх демо-точок.
+const session = () => store.get('biz.session', null);
+const lockedPlace = () => session()?.placeId ?? null;
+if (lockedPlace() && placeById(lockedPlace())) ui.place = lockedPlace();
+
+function viewBizLogin(error = '') {
+  return `<section class="biz-login" aria-label="Вхід у кабінет">
+    <div class="biz-login-card">
+      <a class="login-brand" href="index.html" aria-label="CARCAR для бізнесу"><svg width="44" height="44" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#c8402b"/><path d="M15 10.5a6 6 0 1 0 0 11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/><path d="M24 10.5a6 6 0 1 0 0 11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".6"/></svg><span aria-hidden="true"><b><span class="c1">CAR</span><span class="c2">CAR</span></b><small>для бізнесу</small></span></a>
+      <h1>Вхід у кабінет мийки</h1>
+      <p class="page-sub">Логін і пароль надсилає адміністрація CARCAR після схвалення заявки.</p>
+      <form class="stack" id="biz-login-form" style="gap:12px">
+        <label class="field"><span>Логін</span><input name="login" required autocomplete="username" autocapitalize="none" spellcheck="false"></label>
+        <label class="field"><span>Пароль</span><input name="password" type="password" required autocomplete="current-password"></label>
+        ${error ? `<p class="notice warn" role="alert" style="margin:0">${esc(error)}</p>` : ''}
+        <button class="btn primary" type="submit">Увійти</button>
+      </form>
+      <p class="small muted" style="margin:0">Ще не з CARCAR? <a href="index.html#/business">Умови й реєстрація мийки</a></p>
+      <button class="btn" type="button" data-action="demo-login">Переглянути демо-кабінет (вигадані дані)</button>
+    </div>
+  </section>`;
+}
 
 const place = () => placeById(ui.place);
 const own = () => bookings.filter((b) => b.placeId === ui.place);
@@ -216,7 +240,6 @@ function todayPanel() {
     [ownRequests().filter((r) => reqState(r) === 'new').length, 'запитів про послуги без відповіді', '#/requests', 'chat'],
     [reviews.filter((r) => r.placeId === ui.place && !r.reply).length, 'відгуків без відповіді', '#/reviews', 'star'],
     [late.length, 'записів, час яких минув — закрийте їх', null, 'clock'],
-    [lowStock().length, 'позицій на складі закінчуються', '#/stock', 'drop'],
   ].filter(([n]) => n);
   const row = (b, kind) => `<li class="today-row ${kind}">
       <span class="t-time">${b.time}<small>${hhmm(toMin(b.time) + b.minutes)}</small></span>
@@ -2743,14 +2766,14 @@ function closeSearch() {
   if (box && !box.hidden) box.hidden = true;
 }
 
+// CRM мийки — лише головне. Жива черга, гарячі вікна, абонементи, розсилки, витрати, склад
+// та імпорт з меню прибрано, щоб кабінет був простим.
 const NAV = [
-  ['Робота', [['', 'Огляд', 'chart'], ['schedule', 'Розклад', 'calendar'], ['queue', 'Жива черга', 'list'], ['clients', 'Клієнти', 'users'],
-    ['requests', 'Запити клієнтів', 'chat']]],
-  ['Продажі', [['services', 'Послуги й ціни', 'list'], ['deals', 'Гарячі вікна', 'bolt'], ['passes', 'Абонементи й сертифікати', 'gift'],
-    ['mailings', 'Розсилки', 'share'], ['reviews', 'Відгуки', 'star']]],
-  ['Гроші', [['finance', 'Фінанси', 'card'], ['expenses', 'Витрати', 'cash'], ['stock', 'Склад', 'drop'], ['staff', 'Персонал', 'users'], ['earnings', 'Мій заробіток', 'cash']]],
-  ['Точка', [['settings', 'Профіль точки', 'settings'], ['import', 'Імпорт даних', 'upload'], ['connect', 'Підключення', 'shield'], ['support', 'Підтримка CARCAR', 'info']]],
+  ['Робота', [['', 'Огляд', 'chart'], ['schedule', 'Розклад', 'calendar'], ['clients', 'Клієнти', 'users'], ['requests', 'Запити клієнтів', 'chat']]],
+  ['Мийка', [['services', 'Послуги й ціни', 'list'], ['reviews', 'Відгуки', 'star'], ['finance', 'Фінанси', 'card'], ['staff', 'Персонал', 'users'], ['earnings', 'Мій заробіток', 'cash']]],
+  ['Точка', [['settings', 'Профіль точки', 'settings'], ['connect', 'Реквізити й документи', 'shield'], ['support', 'Підтримка CARCAR', 'info']]],
 ];
+const inNav = (id) => NAV.some(([, items]) => items.some(([x]) => x === id));
 
 function renderChrome(page) {
   const unanswered = reviews.filter((r) => r.placeId === ui.place && !r.reply).length;
@@ -2766,7 +2789,7 @@ function renderChrome(page) {
   // Нижнє меню на телефоні: головне під пальцем, решта — у «Ще».
   const tabs = [['', 'Сьогодні', 'chart'], ['schedule', 'Розклад', 'calendar'], ['clients', 'Клієнти', 'users'], ['requests', 'Чати', 'chat']].filter(([id]) => can(id));
   const inTabs = tabs.some(([id]) => id === page);
-  const rest = Object.entries(badge).filter(([id]) => !tabs.some(([t]) => t === id) && can(id)).reduce((a, [, [n]]) => a + n, 0);
+  const rest = Object.entries(badge).filter(([id]) => !tabs.some(([t]) => t === id) && can(id) && inNav(id)).reduce((a, [, [n]]) => a + n, 0);
   $('#tabbar').innerHTML = `${tabs.map(([id, label, ic]) => `<a href="#/${id}" ${page === id ? 'aria-current="page"' : ''}>${icon(ic, 22)}<span>${label}</span>${badge[id]?.[0] ? `<span class="count" aria-label="${badge[id][1]}: ${badge[id][0]}">${badge[id][0]}</span>` : ''}</a>`).join('')}
     <button type="button" data-action="menu-open" aria-expanded="${document.body.classList.contains('menu-open')}" ${inTabs ? '' : 'aria-current="page"'}>${icon('list', 22)}<span>Ще</span>${rest ? `<span class="count" aria-label="потребують уваги: ${rest}">${rest}</span>` : ''}</button>`;
   $('#nav').innerHTML = NAV.map(([group, items]) => {
@@ -2783,7 +2806,10 @@ function renderChrome(page) {
   $('#power').innerHTML = `<option value="">Світло: не вказано</option>${Object.keys(POWER).map((k) => `<option value="${k}" ${pw?.state === k ? 'selected' : ''}>${short[k]}</option>`).join('')}`;
   $('#power').title = pw ? `Оновлено ${fmtTime(pw.at)}` : 'Відмітьте, чи є світло, — клієнти бачать це в застосунку';
   $('#new-booking').hidden = me().role === 'master';
-  $('#place').innerHTML = `${PLACES.map((p) => {
+  // Акаунт мийки бачить лише свою точку; перемикач точок — тільки в демо-кабінеті.
+  $('#place').closest('label').hidden = !!lockedPlace();
+  $('#logout').textContent = session()?.demo ? 'Вийти з демо' : `Вийти${session()?.login ? ` (${session().login})` : ''}`;
+  $('#place').innerHTML = `${PLACES.filter((p) => !lockedPlace() || p.id === lockedPlace()).map((p) => {
     const st = partnerOf(p.id).status;
     return `<option value="${p.id}" ${p.id === ui.place ? 'selected' : ''}>${esc(p.name)}${st === 'approved' ? '' : ` · ${PARTNER_STATUS[st][0]}`}</option>`;
   }).join('')}<option value="__new">+ Додати нову точку…</option>`;
@@ -2791,6 +2817,9 @@ function renderChrome(page) {
 
 function route() {
   hideTip();
+  // Без входу — лише екран логіна.
+  document.body.classList.toggle('locked', !session());
+  if (!session()) { $('#view').innerHTML = viewBizLogin(); $('#tabbar').innerHTML = ''; return; }
   touchPresence(ui.place);
   if ($('#biz-q')?.value) { $('#biz-q').value = ''; closeSearch(); }
   charts = {};
@@ -2866,6 +2895,14 @@ document.addEventListener('click', (e) => {
     if (own().some((b) => b.source === 'demo') && !confirm('Замінити наявну демо-історію новою?')) return;
     demoFill();
   } else if (action === 'demo-clear') { $('#demo-menu').open = false; demoClear(); }
+  else if (action === 'demo-login') { store.set('biz.session', { demo: true, at: Date.now() }); location.hash = '#/'; route(); }
+  else if (action === 'logout') {
+    if (!confirm('Вийти з кабінету?')) return;
+    store.set('biz.session', null);
+    document.body.classList.remove('menu-open');
+    location.hash = '#/';
+    route();
+  }
   else if (action === 'menu-open') {
     // «Ще» відкриває й закриває меню з усіма розділами.
     const open = document.body.classList.toggle('menu-open');
@@ -3257,6 +3294,17 @@ document.addEventListener('change', async (e) => {
 document.addEventListener('submit', async (e) => {
   const f = e.target;
   e.preventDefault();
+  if (f.id === 'biz-login-form') {
+    const d = new FormData(f);
+    const acc = await checkBizLogin(String(d.get('login')), String(d.get('password')));
+    if (!acc || !placeById(acc.placeId)) { $('#view').innerHTML = viewBizLogin('Невірний логін або пароль.'); $('#biz-login-form [name="login"]').value = String(d.get('login')); return; }
+    store.set('biz.session', { login: acc.login, placeId: acc.placeId, at: Date.now() });
+    ui.place = acc.placeId;
+    store.set('partner', ui.place);
+    location.hash = '#/';
+    route();
+    return;
+  }
   if (f.id === 'connect-form') { saveConnect(e.submitter?.value ?? 'save'); return; }
   if (f.id === 'ticket-form' || f.id === 'ticket-reply' || f.id === 'dispute-note') {
     const d = new FormData(f);

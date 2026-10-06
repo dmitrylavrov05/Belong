@@ -1026,6 +1026,71 @@ a.chat-pin { color: var(--muted); text-decoration: none; }
 .car-opt:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-hover); }
 .car-opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 .car-opt.add { border-style: dashed; color: var(--muted); }
+
+/* ---------- вхід за номером телефону ---------- */
+body.in-auth .top, body.in-auth .tabs { display: none; }
+body.in-auth #view { padding: 0; max-width: none; }
+.auth { min-height: 100dvh; display: flex; flex-direction: column; background: linear-gradient(170deg, #e2553d 0%, var(--accent) 38%, #8f2414 100%); }
+.auth-hero { position: relative; flex: 1; min-height: 280px; display: grid; place-items: center; overflow: hidden; }
+.auth-logo { position: relative; z-index: 2; border-radius: 24px; box-shadow: 0 18px 40px rgb(0 0 0 / 28%); }
+.auth-car { position: absolute; bottom: 26px; left: 50%; transform: translateX(-50%); opacity: .9; }
+.auth-bubble { position: absolute; border-radius: 50%; background: radial-gradient(circle at 35% 30%, rgb(255 255 255 / 95%), rgb(255 255 255 / 25%) 45%, rgb(255 255 255 / 10%) 70%, rgb(255 255 255 / 45%)); }
+.auth-bubble.b1 { width: 70px; height: 70px; left: 10%; top: 18%; }
+.auth-bubble.b2 { width: 34px; height: 34px; left: 72%; top: 14%; }
+.auth-bubble.b3 { width: 52px; height: 52px; left: 80%; top: 52%; }
+.auth-bubble.b4 { width: 24px; height: 24px; left: 22%; top: 62%; }
+.auth-bubble.b5 { width: 42px; height: 42px; left: 52%; top: 70%; }
+.auth-shine { position: absolute; inset: 0; background: linear-gradient(115deg, transparent 35%, rgb(255 255 255 / 22%) 50%, transparent 65%); }
+.auth-card { position: relative; z-index: 3; display: grid; gap: 14px; padding: 28px 20px calc(24px + env(safe-area-inset-bottom)); border-radius: 28px 28px 0 0; background: var(--bg); box-shadow: 0 -10px 40px rgb(0 0 0 / 18%); max-width: 520px; width: 100%; margin: 0 auto; }
+.auth-card h1 { margin: 0; font-size: 28px; }
+.auth-card p { margin: 0; color: var(--muted); }
+.auth-phone { display: flex; align-items: center; gap: 10px; height: 60px; padding: 0 16px; border: 1.5px solid var(--line); border-radius: 16px; background: var(--soft); font-size: 20px; font-weight: 600; }
+.auth-phone:focus-within { border-color: var(--accent); background: var(--bg); }
+.auth-phone .prefix { color: var(--muted); }
+.auth-phone input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font: inherit; color: var(--text); letter-spacing: .02em; }
+.code-cells { display: flex; gap: 10px; justify-content: center; }
+.code-cell { width: 60px; height: 68px; border: 1.5px solid var(--line); border-radius: 16px; background: var(--soft); text-align: center; font: inherit; font-size: 28px; font-weight: 800; color: var(--text); }
+.code-cell:focus { outline: 0; border-color: var(--accent); background: var(--bg); box-shadow: 0 0 0 4px var(--accent-soft); }
+.auth-error { color: var(--danger) !important; font-weight: 600; }
+.auth-card.done { justify-items: center; text-align: center; padding-top: 36px; }
+.auth-check { width: 84px; height: 84px; border-radius: 50%; display: grid; place-items: center; background: var(--ok); color: #fff; }
+.auth-card .fine { font-size: 13px; }
+.auth-card .code { color: var(--text); letter-spacing: .12em; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .auth-logo { animation: auth-pop .7s cubic-bezier(.2, 1.4, .4, 1) both, auth-float 4s 1s ease-in-out infinite; }
+  .auth-car { animation: auth-drive 1.1s .2s cubic-bezier(.2, .8, .2, 1) both; }
+  .auth-bubble { animation: auth-rise 6s ease-in-out infinite; }
+  .auth-bubble.b2 { animation-delay: -1.5s; animation-duration: 5s; }
+  .auth-bubble.b3 { animation-delay: -3s; animation-duration: 7s; }
+  .auth-bubble.b4 { animation-delay: -.8s; animation-duration: 4.5s; }
+  .auth-bubble.b5 { animation-delay: -2.2s; }
+  .auth-shine { animation: auth-shine 3.6s 1s ease-in-out infinite; }
+  .auth-card { animation: auth-card .55s .1s cubic-bezier(.2, .8, .2, 1) both; }
+  .auth-card.done .auth-check { animation: auth-pop .6s cubic-bezier(.2, 1.4, .4, 1) both; }
+  .auth-error { animation: auth-shake .4s both; }
+}
+@keyframes auth-pop { from { transform: scale(.4) rotate(-12deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes auth-float { 50% { transform: translateY(-8px); } }
+@keyframes auth-drive { from { transform: translateX(-160%); opacity: 0; } to { transform: translateX(-50%); opacity: .9; } }
+@keyframes auth-rise { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-22px) scale(1.08); } }
+@keyframes auth-shine { 0% { transform: translateX(-100%); } 60%, 100% { transform: translateX(100%); } }
+@keyframes auth-card { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes auth-shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+
+/* «Для бізнесу»: умови, кроки, статус заявки */
+.biz-terms { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.biz-terms li { display: flex; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 16px; }
+.biz-terms li > svg { flex: none; color: var(--accent); margin-top: 2px; }
+.biz-terms span { display: grid; gap: 4px; color: var(--muted); font-size: 14px; }
+.biz-terms b { color: var(--text); font-size: 16px; }
+.biz-need { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.biz-steps { margin: 0; padding: 0; list-style: none; counter-reset: st; display: grid; gap: 10px; }
+.biz-steps li { counter-increment: st; display: flex; gap: 12px; align-items: center; }
+.biz-steps li::before { content: counter(st); flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: #fff; font-weight: 800; font-size: 14px; }
+.biz-dock { display: grid; gap: 8px; }
+.app-status { margin-top: 12px; }
+.app-status.ok { border-color: var(--ok); }
 </style>
   <style>
 /* Панель для бізнесу CARCAR: десктоп-перший макет поверх токенів і компонентів styles.css. */
@@ -1573,6 +1638,23 @@ table.t tr.off td { opacity: .55; }
   .crm .biz-nav a[href="#/"], .crm .biz-nav a[href="#/schedule"], .crm .biz-nav a[href="#/clients"], .crm .biz-nav a[href="#/requests"] { display: none; }
   .crm .day-nav { flex-wrap: wrap; gap: 8px; }
 }
+
+/* ---------- вхід у кабінет мийки ---------- */
+body.locked .biz-side, body.locked .biz-top, body.locked .crm-tabs { display: none !important; }
+body.locked #view { padding: 0; }
+.biz-login { min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px; background: radial-gradient(1200px 500px at 50% -10%, var(--accent-soft), transparent), var(--soft); }
+.biz-login-card { width: min(420px, 100%); display: grid; gap: 14px; padding: 28px 24px; border: 1px solid var(--line); border-radius: 24px; background: var(--bg); box-shadow: 0 20px 50px rgb(16 24 40 / 12%); }
+.biz-login-card h1 { margin: 4px 0 0; font-size: 26px; }
+.biz-login-card .page-sub { margin: 0; }
+.biz-login-card .brand { padding: 0; }
+.biz-side .logout { margin-top: 8px; border: 0; background: none; padding: 8px 12px; text-align: left; color: var(--muted); font: inherit; font-size: 14px; cursor: pointer; border-radius: 10px; }
+.biz-side .logout:hover { background: var(--soft); color: var(--text); }
+.login-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.login-brand > span { display: grid; line-height: 1.1; }
+.login-brand b { font-size: 22px; font-weight: 800; letter-spacing: -.01em; }
+.login-brand .c1 { color: var(--accent); }
+.login-brand .c2 { color: var(--navy); }
+.login-brand small { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 </style>
 </head>
 <body class="biz crm">
@@ -1582,7 +1664,8 @@ table.t tr.off td { opacity: .55; }
       <div class="sheet-head"><b>Усі розділи</b><button class="icon-btn" type="button" data-action="menu-close" aria-label="Закрити меню">✕</button></div>
       <nav class="biz-nav" id="nav" aria-label="Розділи панелі"></nav>
       <p class="keys-hint" id="keys-hint">Клавіші: <kbd>/</kbd> пошук · <kbd>N</kbd> новий запис · <kbd>T</kbd> сьогодні · <kbd>←</kbd><kbd>→</kbd> дні в розкладі</p>
-      <a class="to-app" id="to-app" href="index.html#/partner"></a>
+      <button class="logout" id="logout" type="button" data-action="logout">Вийти</button>
+      <a class="to-app" id="to-app" href="index.html"></a>
     </aside>
     <div class="biz-main">
       <header class="biz-top">
@@ -2468,6 +2551,69 @@ function countUp(el) {
   requestAnimationFrame(step);
 }
 
+// ---------- заявки бізнесу й доступ до кабінету ----------
+
+// Мийка подає заявку в застосунку («Для бізнесу» → «Зареєструвати бізнес»). Адміністрація CARCAR
+// перевіряє її й видає логін і пароль до кабінету. У прототипі все в localStorage одного браузера;
+// у робочій версії заявки, акаунти й паролі (лише хеші) зберігає сервер, а доступ надходить у SMS чи на email.
+const bizApps = () => store.get('biz.applications', []);
+const saveBizApps = (list) => store.set('biz.applications', list);
+const bizAccounts = () => store.get('biz.accounts', []);
+const APP_STATUS = { new: ['На перевірці', 'warn'], approved: ['Схвалено', 'ok'], rejected: ['Відхилено', 'muted'] };
+
+async function hashPass(login, pass) {
+  const text = `carcar:${login.toLowerCase()}:${pass}`;
+  if (globalThis.crypto?.subtle) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+  let h = 5381;
+  for (const ch of text) h = (h * 33) ^ ch.charCodeAt(0);
+  return `x${(h >>> 0).toString(16)}`;
+}
+
+const TRANSLIT = { а: 'a', б: 'b', в: 'v', г: 'h', ґ: 'g', д: 'd', е: 'e', є: 'ie', ж: 'zh', з: 'z', и: 'y', і: 'i', ї: 'i', й: 'i', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'kh', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'shch', ь: '', ю: 'iu', я: 'ia', "'": '', 'ʼ': '' };
+const slug = (name) => [...name.toLowerCase().replace(/автомийка|мийка|детейлінг/g, '')].map((c) => TRANSLIT[c] ?? c).join('').replace(/[^a-z0-9]+/g, '').slice(0, 12) || 'wash';
+const randomPass = () => Array.from(crypto.getRandomValues(new Uint32Array(8)), (n) => 'abcdefghjkmnpqrstuvwxyz23456789'[n % 31]).join('');
+
+// Схвалити заявку: створюємо точку (підключену), акаунт кабінету й повертаємо логін і пароль.
+async function approveBizApp(id) {
+  const apps = bizApps();
+  const a = apps.find((x) => x.id === id);
+  if (!a || a.status === 'approved') return null;
+  const placeId = `p_${uid()}`;
+  const [lat, lng] = DISTRICTS[a.district] ?? Object.values(DISTRICTS)[0];
+  addCustomPlace({
+    id: placeId, custom: true, name: a.name, cats: ['wash'], district: a.district, address: a.address, phone: a.phone,
+    boxes: Math.max(1, Number(a.boxes) || 1), hours: [8, 21], lat, lng, tags: [], createdAt: Date.now(),
+    services: Object.entries(SERVICE_TEMPLATES.wash).map(([sid, x]) => ({ id: sid, ...x, price: [...x.price] })),
+  });
+  savePartner(placeId, {
+    status: 'approved', company: { type: a.type, code: a.code, name: a.legalName || a.contact },
+    history: [{ at: Date.now(), by: 'admin', status: 'approved', note: 'Заявку схвалено, доступ до кабінету видано' }],
+  });
+  let login = slug(a.name);
+  while (bizAccounts().some((x) => x.login === login)) login = `${slug(a.name)}${Math.floor(10 + Math.random() * 90)}`;
+  const password = randomPass();
+  store.set('biz.accounts', [...bizAccounts(), { login, hash: await hashPass(login, password), placeId, appId: id, createdAt: Date.now() }]);
+  Object.assign(a, { status: 'approved', placeId, decidedAt: Date.now(), issued: { login, password } });
+  saveBizApps(apps);
+  return { login, password, placeId };
+}
+
+function rejectBizApp(id, reason) {
+  const apps = bizApps();
+  const a = apps.find((x) => x.id === id);
+  if (a) Object.assign(a, { status: 'rejected', reason, decidedAt: Date.now() });
+  saveBizApps(apps);
+}
+
+// Вхід у кабінет: повертає акаунт або null.
+async function checkBizLogin(login, pass) {
+  const acc = bizAccounts().find((x) => x.login === login.trim().toLowerCase());
+  return acc && acc.hash === await hashPass(acc.login, pass) ? acc : null;
+}
+
 // Спільна логіка застосунку клієнта й панелі бізнесу для щоденної роботи точки:
 // гарячі вікна зі знижкою, жива черга, лист очікування, абонементи й сертифікати,
 // шинний готель і повідомлення клієнтам (розсилки, нагадування).
@@ -3056,6 +3202,30 @@ load();
 const ui = { place: store.get('partner', null), reqFilter: 'open', period: 30, finPeriod: 30, expPeriod: 30, clients: 'all', q: '', sort: 'last', svcDraft: null, imp: { type: 'clients', text: '', rows: null, map: {}, result: null } };
 if (!placeById(ui.place)) ui.place = PLACES[0].id;
 
+// Вхід у кабінет: логін і пароль видає адміністрація CARCAR після схвалення заявки.
+// Сесія акаунта привʼязана до однієї точки; демо-сесія (вигадані дані) — до всіх демо-точок.
+const session = () => store.get('biz.session', null);
+const lockedPlace = () => session()?.placeId ?? null;
+if (lockedPlace() && placeById(lockedPlace())) ui.place = lockedPlace();
+
+function viewBizLogin(error = '') {
+  return `<section class="biz-login" aria-label="Вхід у кабінет">
+    <div class="biz-login-card">
+      <a class="login-brand" href="index.html" aria-label="CARCAR для бізнесу"><svg width="44" height="44" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#c8402b"/><path d="M15 10.5a6 6 0 1 0 0 11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/><path d="M24 10.5a6 6 0 1 0 0 11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".6"/></svg><span aria-hidden="true"><b><span class="c1">CAR</span><span class="c2">CAR</span></b><small>для бізнесу</small></span></a>
+      <h1>Вхід у кабінет мийки</h1>
+      <p class="page-sub">Логін і пароль надсилає адміністрація CARCAR після схвалення заявки.</p>
+      <form class="stack" id="biz-login-form" style="gap:12px">
+        <label class="field"><span>Логін</span><input name="login" required autocomplete="username" autocapitalize="none" spellcheck="false"></label>
+        <label class="field"><span>Пароль</span><input name="password" type="password" required autocomplete="current-password"></label>
+        ${error ? `<p class="notice warn" role="alert" style="margin:0">${esc(error)}</p>` : ''}
+        <button class="btn primary" type="submit">Увійти</button>
+      </form>
+      <p class="small muted" style="margin:0">Ще не з CARCAR? <a href="index.html#/business">Умови й реєстрація мийки</a></p>
+      <button class="btn" type="button" data-action="demo-login">Переглянути демо-кабінет (вигадані дані)</button>
+    </div>
+  </section>`;
+}
+
 const place = () => placeById(ui.place);
 const own = () => bookings.filter((b) => b.placeId === ui.place);
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -3220,7 +3390,6 @@ function todayPanel() {
     [ownRequests().filter((r) => reqState(r) === 'new').length, 'запитів про послуги без відповіді', '#/requests', 'chat'],
     [reviews.filter((r) => r.placeId === ui.place && !r.reply).length, 'відгуків без відповіді', '#/reviews', 'star'],
     [late.length, 'записів, час яких минув — закрийте їх', null, 'clock'],
-    [lowStock().length, 'позицій на складі закінчуються', '#/stock', 'drop'],
   ].filter(([n]) => n);
   const row = (b, kind) => `<li class="today-row ${kind}">
       <span class="t-time">${b.time}<small>${hhmm(toMin(b.time) + b.minutes)}</small></span>
@@ -5747,14 +5916,14 @@ function closeSearch() {
   if (box && !box.hidden) box.hidden = true;
 }
 
+// CRM мийки — лише головне. Жива черга, гарячі вікна, абонементи, розсилки, витрати, склад
+// та імпорт з меню прибрано, щоб кабінет був простим.
 const NAV = [
-  ['Робота', [['', 'Огляд', 'chart'], ['schedule', 'Розклад', 'calendar'], ['queue', 'Жива черга', 'list'], ['clients', 'Клієнти', 'users'],
-    ['requests', 'Запити клієнтів', 'chat']]],
-  ['Продажі', [['services', 'Послуги й ціни', 'list'], ['deals', 'Гарячі вікна', 'bolt'], ['passes', 'Абонементи й сертифікати', 'gift'],
-    ['mailings', 'Розсилки', 'share'], ['reviews', 'Відгуки', 'star']]],
-  ['Гроші', [['finance', 'Фінанси', 'card'], ['expenses', 'Витрати', 'cash'], ['stock', 'Склад', 'drop'], ['staff', 'Персонал', 'users'], ['earnings', 'Мій заробіток', 'cash']]],
-  ['Точка', [['settings', 'Профіль точки', 'settings'], ['import', 'Імпорт даних', 'upload'], ['connect', 'Підключення', 'shield'], ['support', 'Підтримка CARCAR', 'info']]],
+  ['Робота', [['', 'Огляд', 'chart'], ['schedule', 'Розклад', 'calendar'], ['clients', 'Клієнти', 'users'], ['requests', 'Запити клієнтів', 'chat']]],
+  ['Мийка', [['services', 'Послуги й ціни', 'list'], ['reviews', 'Відгуки', 'star'], ['finance', 'Фінанси', 'card'], ['staff', 'Персонал', 'users'], ['earnings', 'Мій заробіток', 'cash']]],
+  ['Точка', [['settings', 'Профіль точки', 'settings'], ['connect', 'Реквізити й документи', 'shield'], ['support', 'Підтримка CARCAR', 'info']]],
 ];
+const inNav = (id) => NAV.some(([, items]) => items.some(([x]) => x === id));
 
 function renderChrome(page) {
   const unanswered = reviews.filter((r) => r.placeId === ui.place && !r.reply).length;
@@ -5770,7 +5939,7 @@ function renderChrome(page) {
   // Нижнє меню на телефоні: головне під пальцем, решта — у «Ще».
   const tabs = [['', 'Сьогодні', 'chart'], ['schedule', 'Розклад', 'calendar'], ['clients', 'Клієнти', 'users'], ['requests', 'Чати', 'chat']].filter(([id]) => can(id));
   const inTabs = tabs.some(([id]) => id === page);
-  const rest = Object.entries(badge).filter(([id]) => !tabs.some(([t]) => t === id) && can(id)).reduce((a, [, [n]]) => a + n, 0);
+  const rest = Object.entries(badge).filter(([id]) => !tabs.some(([t]) => t === id) && can(id) && inNav(id)).reduce((a, [, [n]]) => a + n, 0);
   $('#tabbar').innerHTML = `${tabs.map(([id, label, ic]) => `<a href="#/${id}" ${page === id ? 'aria-current="page"' : ''}>${icon(ic, 22)}<span>${label}</span>${badge[id]?.[0] ? `<span class="count" aria-label="${badge[id][1]}: ${badge[id][0]}">${badge[id][0]}</span>` : ''}</a>`).join('')}
     <button type="button" data-action="menu-open" aria-expanded="${document.body.classList.contains('menu-open')}" ${inTabs ? '' : 'aria-current="page"'}>${icon('list', 22)}<span>Ще</span>${rest ? `<span class="count" aria-label="потребують уваги: ${rest}">${rest}</span>` : ''}</button>`;
   $('#nav').innerHTML = NAV.map(([group, items]) => {
@@ -5787,7 +5956,10 @@ function renderChrome(page) {
   $('#power').innerHTML = `<option value="">Світло: не вказано</option>${Object.keys(POWER).map((k) => `<option value="${k}" ${pw?.state === k ? 'selected' : ''}>${short[k]}</option>`).join('')}`;
   $('#power').title = pw ? `Оновлено ${fmtTime(pw.at)}` : 'Відмітьте, чи є світло, — клієнти бачать це в застосунку';
   $('#new-booking').hidden = me().role === 'master';
-  $('#place').innerHTML = `${PLACES.map((p) => {
+  // Акаунт мийки бачить лише свою точку; перемикач точок — тільки в демо-кабінеті.
+  $('#place').closest('label').hidden = !!lockedPlace();
+  $('#logout').textContent = session()?.demo ? 'Вийти з демо' : `Вийти${session()?.login ? ` (${session().login})` : ''}`;
+  $('#place').innerHTML = `${PLACES.filter((p) => !lockedPlace() || p.id === lockedPlace()).map((p) => {
     const st = partnerOf(p.id).status;
     return `<option value="${p.id}" ${p.id === ui.place ? 'selected' : ''}>${esc(p.name)}${st === 'approved' ? '' : ` · ${PARTNER_STATUS[st][0]}`}</option>`;
   }).join('')}<option value="__new">+ Додати нову точку…</option>`;
@@ -5795,6 +5967,9 @@ function renderChrome(page) {
 
 function route() {
   hideTip();
+  // Без входу — лише екран логіна.
+  document.body.classList.toggle('locked', !session());
+  if (!session()) { $('#view').innerHTML = viewBizLogin(); $('#tabbar').innerHTML = ''; return; }
   touchPresence(ui.place);
   if ($('#biz-q')?.value) { $('#biz-q').value = ''; closeSearch(); }
   charts = {};
@@ -5870,6 +6045,14 @@ document.addEventListener('click', (e) => {
     if (own().some((b) => b.source === 'demo') && !confirm('Замінити наявну демо-історію новою?')) return;
     demoFill();
   } else if (action === 'demo-clear') { $('#demo-menu').open = false; demoClear(); }
+  else if (action === 'demo-login') { store.set('biz.session', { demo: true, at: Date.now() }); location.hash = '#/'; route(); }
+  else if (action === 'logout') {
+    if (!confirm('Вийти з кабінету?')) return;
+    store.set('biz.session', null);
+    document.body.classList.remove('menu-open');
+    location.hash = '#/';
+    route();
+  }
   else if (action === 'menu-open') {
     // «Ще» відкриває й закриває меню з усіма розділами.
     const open = document.body.classList.toggle('menu-open');
@@ -6261,6 +6444,17 @@ document.addEventListener('change', async (e) => {
 document.addEventListener('submit', async (e) => {
   const f = e.target;
   e.preventDefault();
+  if (f.id === 'biz-login-form') {
+    const d = new FormData(f);
+    const acc = await checkBizLogin(String(d.get('login')), String(d.get('password')));
+    if (!acc || !placeById(acc.placeId)) { $('#view').innerHTML = viewBizLogin('Невірний логін або пароль.'); $('#biz-login-form [name="login"]').value = String(d.get('login')); return; }
+    store.set('biz.session', { login: acc.login, placeId: acc.placeId, at: Date.now() });
+    ui.place = acc.placeId;
+    store.set('partner', ui.place);
+    location.hash = '#/';
+    route();
+    return;
+  }
   if (f.id === 'connect-form') { saveConnect(e.submitter?.value ?? 'save'); return; }
   if (f.id === 'ticket-form' || f.id === 'ticket-reply' || f.id === 'dispute-note') {
     const d = new FormData(f);

@@ -7,6 +7,8 @@ import { join } from 'node:path';
 
 // Фіксований час: неділя, 4 жовтня 2026, 10:00 — сезон перевзування.
 test.beforeEach(async ({ page }, testInfo) => {
+  // Вхід за телефоном пройдено — крім тестів самого входу (#/login).
+  await page.addInitScript(() => { if (!location.hash.startsWith('#/login')) { localStorage.getItem('carcar.auth') ?? localStorage.setItem('carcar.auth', '{"phone":"","at":1}'); localStorage.getItem('carcar.biz.session') ?? localStorage.setItem('carcar.biz.session', '{"demo":true}'); } });
   // Усі точки — мийки, тож акція «Перша мийка −30%» діяла б у кожному тесті. Вимикаємо її,
   // крім тестів промокодів і маркетингу.
   if (!/промокод|маркетинг/i.test(testInfo.title)) {
@@ -619,6 +621,12 @@ test('працює без збереження в localStorage', async ({ page }
     Object.defineProperty(window, 'localStorage', { get() { throw new Error('blocked'); } });
   });
   await page.goto('/');
+  // Вхід за телефоном працює й без памʼяті браузера — сесія живе до закриття вкладки.
+  await page.getByLabel('Номер телефону').fill('671234567');
+  await page.getByRole('button', { name: 'Отримати код' }).click();
+  const code = (await page.locator('.auth-card .code').textContent()).trim();
+  await page.getByLabel('Цифра 1').fill(code[0]);
+  await page.keyboard.type(code.slice(1));
   await expect(page.locator('#list article')).toHaveCount(9);
 });
 

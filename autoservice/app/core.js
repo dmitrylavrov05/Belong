@@ -1,6 +1,6 @@
 // Спільна логіка застосунку клієнта (app.js) і панелі для бізнесу (business.js):
 // сховище, форматування, іконки, гроші, рейтинг і налаштування точок із CRM.
-import { CATEGORIES, PLACES, PAYMENT, RELIABILITY } from './data.js';
+import { CATEGORIES, PLACES, PAYMENT, RELIABILITY, SERVICE_TEMPLATES, DISTRICTS } from './data.js';
 
 // peek — для частого читання без змін: розбираємо JSON лише тоді, коли значення змінилося.
 // Повернений обʼєкт спільний — не змінюйте його, для змін є get/set.
@@ -627,4 +627,67 @@ function countUp(el) {
     if (k < 1) requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
+}
+
+// ---------- заявки бізнесу й доступ до кабінету ----------
+
+// Мийка подає заявку в застосунку («Для бізнесу» → «Зареєструвати бізнес»). Адміністрація CARCAR
+// перевіряє її й видає логін і пароль до кабінету. У прототипі все в localStorage одного браузера;
+// у робочій версії заявки, акаунти й паролі (лише хеші) зберігає сервер, а доступ надходить у SMS чи на email.
+export const bizApps = () => store.get('biz.applications', []);
+export const saveBizApps = (list) => store.set('biz.applications', list);
+export const bizAccounts = () => store.get('biz.accounts', []);
+export const APP_STATUS = { new: ['На перевірці', 'warn'], approved: ['Схвалено', 'ok'], rejected: ['Відхилено', 'muted'] };
+
+export async function hashPass(login, pass) {
+  const text = `carcar:${login.toLowerCase()}:${pass}`;
+  if (globalThis.crypto?.subtle) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+  let h = 5381;
+  for (const ch of text) h = (h * 33) ^ ch.charCodeAt(0);
+  return `x${(h >>> 0).toString(16)}`;
+}
+
+const TRANSLIT = { а: 'a', б: 'b', в: 'v', г: 'h', ґ: 'g', д: 'd', е: 'e', є: 'ie', ж: 'zh', з: 'z', и: 'y', і: 'i', ї: 'i', й: 'i', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'kh', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'shch', ь: '', ю: 'iu', я: 'ia', "'": '', 'ʼ': '' };
+const slug = (name) => [...name.toLowerCase().replace(/автомийка|мийка|детейлінг/g, '')].map((c) => TRANSLIT[c] ?? c).join('').replace(/[^a-z0-9]+/g, '').slice(0, 12) || 'wash';
+const randomPass = () => Array.from(crypto.getRandomValues(new Uint32Array(8)), (n) => 'abcdefghjkmnpqrstuvwxyz23456789'[n % 31]).join('');
+
+// Схвалити заявку: створюємо точку (підключену), акаунт кабінету й повертаємо логін і пароль.
+export async function approveBizApp(id) {
+  const apps = bizApps();
+  const a = apps.find((x) => x.id === id);
+  if (!a || a.status === 'approved') return null;
+  const placeId = `p_${uid()}`;
+  const [lat, lng] = DISTRICTS[a.district] ?? Object.values(DISTRICTS)[0];
+  addCustomPlace({
+    id: placeId, custom: true, name: a.name, cats: ['wash'], district: a.district, address: a.address, phone: a.phone,
+    boxes: Math.max(1, Number(a.boxes) || 1), hours: [8, 21], lat, lng, tags: [], createdAt: Date.now(),
+    services: Object.entries(SERVICE_TEMPLATES.wash).map(([sid, x]) => ({ id: sid, ...x, price: [...x.price] })),
+  });
+  savePartner(placeId, {
+    status: 'approved', company: { type: a.type, code: a.code, name: a.legalName || a.contact },
+    history: [{ at: Date.now(), by: 'admin', status: 'approved', note: 'Заявку схвалено, доступ до кабінету видано' }],
+  });
+  let login = slug(a.name);
+  while (bizAccounts().some((x) => x.login === login)) login = `${slug(a.name)}${Math.floor(10 + Math.random() * 90)}`;
+  const password = randomPass();
+  store.set('biz.accounts', [...bizAccounts(), { login, hash: await hashPass(login, password), placeId, appId: id, createdAt: Date.now() }]);
+  Object.assign(a, { status: 'approved', placeId, decidedAt: Date.now(), issued: { login, password } });
+  saveBizApps(apps);
+  return { login, password, placeId };
+}
+
+export function rejectBizApp(id, reason) {
+  const apps = bizApps();
+  const a = apps.find((x) => x.id === id);
+  if (a) Object.assign(a, { status: 'rejected', reason, decidedAt: Date.now() });
+  saveBizApps(apps);
+}
+
+// Вхід у кабінет: повертає акаунт або null.
+export async function checkBizLogin(login, pass) {
+  const acc = bizAccounts().find((x) => x.login === login.trim().toLowerCase());
+  return acc && acc.hash === await hashPass(acc.login, pass) ? acc : null;
 }

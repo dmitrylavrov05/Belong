@@ -1,10 +1,10 @@
-import { CITY, CATEGORIES, CAR_CLASSES, PLACES, PAYMENT, MAINTENANCE, REFERRAL, RELIABILITY } from './data.js';
+import { CITY, CATEGORIES, CAR_CLASSES, PLACES, PAYMENT, MAINTENANCE, REFERRAL, RELIABILITY, DISTRICTS } from './data.js';
 import {
   store, icon, esc, uah, pad, hhmm, toMin, isoDate, parseDate, uid, placeById, plural, duration, dayLabel, rating, tel,
   hoursFor, scheduleOf, inBreak, rangeText, WEEKDAY_NAMES, weekdayOf, phoneKey, offersOf, offerAsService, isOpenNow, hoursText, bookingStart, fmtTime, fmtDate, km, serviceCat, catById, shrinkPhoto,
   applyOverrides, isListed, payoutReady, maskIban, commissionFor, resolveDispute, visibleReviews, ACTIVE, BLOCKING, HOUR, reliability, isCarcar, price, complete, isFrozen, placeShare, balanceFor, settleAll, ratingFor,
   POWER, powerOf, worksInBlackout, TICKET_TOPICS, CLIENT_TOPICS, TICKET_STATUS, ticketsAll, openTicket, ticketReply, setTicket, isBlocked, mobileOn, spanOf, laneCap, sameLane, MOBILE_ROAD, promosAll, promoCheck, promoText,
-  enterView,
+  enterView, bizApps, saveBizApps, APP_STATUS,
 } from './core.js';
 import {
   CHANNELS, inboxFor, markRead, sendMessages, dealsOf, dealsOn, weeklyDealsOf, daysText, dealAt, dealPrice, dealCovers, hotDeals,
@@ -1611,6 +1611,89 @@ function sendChat(b, text, photo = null) {
   track('chat', { placeId: b.placeId });
 }
 
+// ---------- вхід за номером телефону ----------
+
+// Номер → код із SMS → готово. У прототипі SMS не надсилаються: код показуємо на екрані.
+// У робочій версії код надсилає сервер (SMS-шлюз), а сесію зберігає токен.
+const login = { step: 'phone', phone: '', code: '', sentAt: 0, error: '' };
+const phoneDigits = (v) => v.replace(/\D/g, '').replace(/^(380|80|0)?/, '').slice(0, 9);
+const fmtPhone = (d) => `+380 ${d.slice(0, 2)} ${d.slice(2, 5)} ${d.slice(5, 7)} ${d.slice(7, 9)}`.trim();
+
+function viewLogin() {
+  const hero = `<div class="auth-hero" aria-hidden="true">
+      <span class="auth-bubble b1"></span><span class="auth-bubble b2"></span><span class="auth-bubble b3"></span><span class="auth-bubble b4"></span><span class="auth-bubble b5"></span>
+      <svg class="auth-logo" width="88" height="88" viewBox="0 0 32 32"><rect width="32" height="32" rx="9" fill="#c8402b"/><path d="M15 10.5a6 6 0 1 0 0 11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/><path d="M24 10.5a6 6 0 1 0 0 11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".6"/></svg>
+      <svg class="auth-car" width="150" height="56" viewBox="40 80 330 110"><path d="M60 168Q62 134 104 127L146 99Q157 90 176 90L252 90Q271 90 285 102L318 127Q348 131 352 156L354 166Q354 174 345 174L74 174Q60 174 60 168Z" fill="#fff" opacity=".95"/><circle cx="118" cy="174" r="20" fill="#1f2937"/><circle cx="300" cy="174" r="20" fill="#1f2937"/></svg>
+      <span class="auth-shine"></span>
+    </div>`;
+  if (login.step === 'done') {
+    return `<section class="auth" aria-label="Вхід">${hero}<div class="auth-card done">
+      <span class="auth-check" aria-hidden="true">${icon('check', 40)}</span>
+      <h1>Готово!</h1><p>Номер ${fmtPhone(login.phone)} підтверджено. Ласкаво просимо в CARCAR.</p></div></section>`;
+  }
+  if (login.step === 'code') {
+    const left = Math.max(0, 30 - Math.round((Date.now() - login.sentAt) / 1000));
+    return `<section class="auth" aria-label="Вхід">${hero}<form class="auth-card" id="code-form" novalidate>
+      <h1>Код із SMS</h1>
+      <p>Надіслали на <b>${fmtPhone(login.phone)}</b> · <button type="button" class="link-btn" data-action="login-back">змінити</button></p>
+      <div class="code-cells" role="group" aria-label="Код із SMS">
+        ${[0, 1, 2, 3].map((i) => `<input class="code-cell" inputmode="numeric" maxlength="1" autocomplete="${i ? 'off' : 'one-time-code'}" aria-label="Цифра ${i + 1}" value="${login.typed?.[i] ?? ''}">`).join('')}
+      </div>
+      ${login.error ? `<p class="auth-error" role="alert">${esc(login.error)}</p>` : ''}
+      <button class="btn primary block" type="submit">Підтвердити</button>
+      <p class="fine">Демо: SMS не надсилаються, ваш код — <b class="code">${login.code}</b>.
+        <span id="resend">${left ? `Надіслати знову можна через ${left} с.` : '<button type="button" class="link-btn" data-action="login-resend">Надіслати код знову</button>'}</span></p>
+    </form></section>`;
+  }
+  return `<section class="auth" aria-label="Вхід">${hero}<form class="auth-card" id="phone-form" novalidate>
+    <h1>Вхід у CARCAR</h1>
+    <p>Мийки Києва з онлайн-записом. Увійдіть за номером телефону — так мийка знатиме, хто приїде.</p>
+    <label class="auth-phone"><span class="sr-only">Номер телефону</span><span class="prefix" aria-hidden="true">+380</span>
+      <input id="login-phone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="67 123 45 67" value="${esc(login.phone ? fmtPhone(login.phone).slice(5) : '')}" aria-label="Номер телефону"></label>
+    ${login.error ? `<p class="auth-error" role="alert">${esc(login.error)}</p>` : ''}
+    <button class="btn primary block" type="submit">Отримати код</button>
+    <p class="fine">Натискаючи «Отримати код», ви погоджуєтесь з умовами сервісу. Номер бачить лише мийка, до якої ви записуєтесь.</p>
+  </form></section>`;
+}
+
+// Відлік до повторного SMS і Backspace у порожній клітинці коду.
+setInterval(() => {
+  const el = document.getElementById('resend');
+  if (!el || login.step !== 'code') return;
+  const left = Math.max(0, 30 - Math.round((Date.now() - login.sentAt) / 1000));
+  if (left) el.textContent = `Надіслати знову можна через ${left} с.`;
+  else if (!el.querySelector('button')) el.innerHTML = '<button type="button" class="link-btn" data-action="login-resend">Надіслати код знову</button>';
+}, 1000);
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Backspace' || !e.target.matches?.('.code-cell') || e.target.value) return;
+  const cells = [...document.querySelectorAll('.code-cell')];
+  cells[cells.indexOf(e.target) - 1]?.focus();
+});
+
+function loginSubmit(form) {
+  if (form.id === 'phone-form') {
+    const d = phoneDigits(form.querySelector('#login-phone').value);
+    if (d.length !== 9) { login.error = 'Введіть номер повністю: 9 цифр після +380.'; route(); return; }
+    Object.assign(login, { step: 'code', phone: d, code: String(Math.floor(1000 + Math.random() * 9000)), sentAt: Date.now(), error: '', typed: '' });
+    route();
+    return;
+  }
+  const typed = [...form.querySelectorAll('.code-cell')].map((i) => i.value).join('');
+  if (typed !== login.code) { Object.assign(login, { error: 'Невірний код. Перевірте й спробуйте ще раз.', typed: '' }); route(); return; }
+  login.step = 'done';
+  route();
+  // Коротка анімація успіху — і в застосунок.
+  setTimeout(() => {
+    // Без localStorage (приватний режим) сесія живе до закриття вкладки.
+    login.session = { phone: fmtPhone(login.phone), at: Date.now() };
+    store.set('auth', login.session);
+    profile = { ...profile, phone: fmtPhone(login.phone) };
+    store.set('profile', profile);
+    Object.assign(login, { step: 'phone', error: '' });
+    if (location.hash.startsWith('#/login')) location.hash = '#/'; else route();
+  }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 200 : 1100);
+}
+
 // Чи запис ще попереду: для позначок у списку переписок і в сповіщеннях.
 const visitStart = (b) => bookingStart(b).getTime();
 function visitState(b) {
@@ -1964,8 +2047,73 @@ function updateInboxBadge() {
 // ---------- гараж: абонементи ----------
 
 // Вхід для власників точок — у профілі, а не в нижньому меню: клієнтам він не потрібен.
-const businessEntry = () => `<a class="card link-card biz-entry" href="#/partner" style="margin-top:16px">${icon('chart', 22)}<span>Для бізнесу
-    <small class="small muted" style="display:block;font-weight:400">Маєте автомийку чи детейлінг-студію? Кабінет точки й панель із записами, клієнтами й фінансами</small></span>${icon('chevR', 18)}</a>`;
+const businessEntry = () => `<a class="card link-card biz-entry" href="#/business" style="margin-top:16px">${icon('chart', 22)}<span>Для бізнесу
+    <small class="small muted" style="display:block;font-weight:400">Маєте автомийку? Умови співпраці й реєстрація в CARCAR</small></span>${icon('chevR', 18)}</a>`;
+
+// «Для бізнесу»: умови роботи, заявка на реєстрацію і її статус. Вхід у кабінет — окремо, за логіном і паролем.
+const myApp = () => bizApps().filter((a) => a.device).sort((a, b) => b.at - a.at)[0] ?? null;
+
+function viewBusiness(sub) {
+  const head = `${back('#/garage', 'Гараж')}`;
+  const a = myApp();
+  if (sub === 'apply' && !(a && a.status !== 'rejected')) return `${head}<h1>Реєстрація мийки</h1>${bizApplyForm()}`;
+  const terms = [
+    ['cash', 'Комісія 7% — лише із замовлень через CARCAR', 'Без абонплати й плати за підключення. Записи з вашого журналу, телефону й «з вулиці» — безкоштовно.'],
+    ['card', 'Клієнт платить онлайн при записі', `Ви підтверджуєте виконання кнопкою «Машина готова». Через ${PAYMENT.freezeHours} год (час, щоб клієнт міг відкрити спір) гроші доступні до виведення на рахунок ФОП чи ТОВ.`],
+    ['shield', 'Захист від неявок і скасувань', `Скасування пізніше ніж за ${cancelWindow()} до візиту, неявка чи запізнення понад ${PAYMENT.lateMinutes} хв — оплата ваша. Після ${RELIABILITY.freeCancels} безкоштовних скасувань на місяць клієнт компенсує ${Math.round(RELIABILITY.cancelFeeShare * 100)}% ціни.`],
+    ['calendar', 'CRM для мийки безкоштовно', 'Розклад по боксах, клієнти з історією, чати й запити, прайс, відгуки, фінанси й персонал — з телефона чи компʼютера.'],
+    ['star', 'Чесний рейтинг', 'Відгуки залишають лише клієнти з підтвердженим візитом. На відгук можна відповісти публічно.'],
+  ];
+  return `${head}<h1>CARCAR для бізнесу</h1>
+    <p class="lead">Клієнти Києва записуються й платять онлайн, а ви отримуєте завантажені бокси без дзвінків.</p>
+    ${a ? bizAppStatus(a) : ''}
+    <h2>Умови роботи</h2>
+    <ul class="biz-terms">${terms.map(([ic, t, d]) => `<li>${icon(ic, 22)}<span><b>${t}</b>${d}</span></li>`).join('')}</ul>
+    <h2>Що потрібно</h2>
+    <ul class="biz-need"><li>ФОП або ТОВ і рахунок IBAN для виплат</li><li>Адреса й фото мийки, графік, кількість боксів</li><li>Прайс на послуги — шаблон заповнимо за вас</li></ul>
+    <h2>Як підключитися</h2>
+    <ol class="biz-steps"><li><span><b>Заявка</b> — 2 хвилини тут, у застосунку</span></li><li><span><b>Перевірка CARCAR</b> — до 2 робочих днів</span></li><li><span><b>Логін і пароль</b> до кабінету — у SMS на ваш номер</span></li><li><span><b>Вхід у кабінет</b> і перші записи</span></li></ol>
+    <div class="dock-space"></div>
+    <div class="dock biz-dock">
+      ${a && a.status !== 'rejected' ? '' : '<a class="btn primary block" href="#/business/apply">Зареєструвати бізнес</a>'}
+      <a class="btn block" href="business.html">${icon('shield', 18)}Увійти в кабінет бізнесу</a>
+    </div>`;
+}
+
+function bizAppStatus(a) {
+  const [label, cls] = APP_STATUS[a.status];
+  return `<section class="card app-status ${cls}" aria-label="Ваша заявка">
+    <div class="head"><b>Заявка: ${esc(a.name)}</b><span class="pill ${cls}">${label}</span></div>
+    ${a.status === 'new' ? '<p class="small muted" style="margin:0">Перевіримо дані й надішлемо логін і пароль до кабінету в SMS на ваш номер.</p>' : ''}
+    ${a.status === 'approved' ? `<p style="margin:0">Мийку підключено. Дані для входу в кабінет:</p>
+      <dl class="kv"><dt>Логін</dt><dd><b class="code">${esc(a.issued.login)}</b></dd><dt>Пароль</dt><dd><b class="code">${esc(a.issued.password)}</b></dd></dl>
+      <p class="fine" style="margin:0">Демо: у робочій версії вони приходять у SMS і ніде не показуються.</p>
+      <a class="btn primary" href="business.html">Увійти в кабінет</a>` : ''}
+    ${a.status === 'rejected' ? `<p class="small" style="margin:0">Причина: ${esc(a.reason || 'не вказано')}. Виправте дані й подайте заявку знову.</p>` : ''}
+  </section>`;
+}
+
+function bizApplyForm() {
+  return `<form class="stack" id="biz-apply" style="gap:14px">
+    <label class="field"><span>Назва мийки</span><input name="name" required maxlength="60" placeholder="Автомийка «Хмаринка»"></label>
+    <div class="grid2 pf">
+      <label class="field"><span>Район</span><select name="district">${Object.keys(DISTRICTS).map((d) => `<option>${d}</option>`).join('')}</select></label>
+      <label class="field"><span>Кількість боксів</span><input name="boxes" type="number" min="1" max="30" value="2" required></label>
+    </div>
+    <label class="field"><span>Адреса</span><input name="address" required maxlength="100" placeholder="вул. Хрещатик, 1"></label>
+    <div class="grid2 pf">
+      <label class="field"><span>Контактна особа</span><input name="contact" required autocomplete="name" value="${esc(profile.name)}"></label>
+      <label class="field"><span>Телефон</span><input name="phone" type="tel" required autocomplete="tel" value="${esc(profile.phone)}"></label>
+    </div>
+    <label class="field"><span>Email</span><input name="email" type="email" autocomplete="email" placeholder="wash@example.com"></label>
+    <fieldset class="radio-row"><legend>Форма бізнесу</legend>
+      <label><input type="radio" name="type" value="fop" checked> ФОП</label><label><input type="radio" name="type" value="tov"> ТОВ</label></fieldset>
+    <label class="field"><span>ІПН (ФОП) або ЄДРПОУ (ТОВ)</span><input name="code" required inputmode="numeric" pattern="\\d{8}|\\d{10}" title="8 цифр ЄДРПОУ або 10 цифр ІПН"></label>
+    <label class="check-row small"><input class="check" type="checkbox" name="agree" required><span>Погоджуюсь з умовами роботи CARCAR: комісія 7% із замовлень через застосунок, правила скасувань і спорів</span></label>
+    <button class="btn primary block" type="submit">Надіслати заявку</button>
+    <p class="fine">Заявку перевіряє адміністрація CARCAR. Після схвалення ви отримаєте логін і пароль до кабінету.</p>
+  </form>`;
+}
 
 function garageExtras() {
   const keys = myKeys();
@@ -2402,10 +2550,18 @@ const bookingActions = {
 
 function route() {
   const [, page = '', arg, sub, extra] = location.hash.replace(/^#/, '').split('/');
+  // Вхід за номером телефону — перед будь-яким екраном застосунку.
+  const authed = !!(store.get('auth', null) ?? login.session);
+  document.body.classList.toggle('in-auth', !authed);
+  if (!authed) {
+    $('#view').innerHTML = viewLogin();
+    $('#login-phone, .code-cell')?.focus();
+    return;
+  }
   // Вкладка «Мої записи» памʼятається лише поки клієнт у розділі: при новому вході — спершу активні.
   if (page !== 'bookings') { ui.bookTab = null; ui.doneLimit = null; }
   const view = $('#view');
-  const tab = ['partner', 'disputes', 'invite'].includes(page) ? '' : ['support', 'wallet'].includes(page) ? 'garage' : page === 'move' ? 'bookings' : page === 'chat' ? 'inbox' : ['bookings', 'garage', 'inbox'].includes(page) ? page : 'catalog';
+  const tab = ['partner', 'disputes', 'invite'].includes(page) ? '' : ['support', 'wallet', 'business'].includes(page) ? 'garage' : page === 'move' ? 'bookings' : page === 'chat' ? 'inbox' : ['bookings', 'garage', 'inbox'].includes(page) ? page : 'catalog';
   settle();
   // Хтось скасував запис — можливо, звільнився час для листа очікування.
   checkWaitlist(bookings);
@@ -2454,6 +2610,7 @@ function route() {
   else if (page === 'disputes') view.innerHTML = viewDisputes();
   else if (page === 'invite') view.innerHTML = viewInvite();
   else if (page === 'wallet') view.innerHTML = viewWallet();
+  else if (page === 'business') view.innerHTML = viewBusiness(arg);
   else if (page === 'support') view.innerHTML = viewSupport(arg, sub);
   else view.innerHTML = viewNotFound();
 
@@ -2463,11 +2620,23 @@ function route() {
     saveRequests();
   }
   updateInboxBadge();
+  // У чаті ховаємо шапку й меню, як у месенджерах, і одразу показуємо останні повідомлення.
+  // Без анимації появи: вона зсуває закріплений екран чату, і він «стрибає».
+  const inChat = page === 'chat' || page === 'ask';
+  document.body.classList.toggle('in-chat', inChat);
+  if (inChat) {
+    ui.lastView = `${page}/${arg ?? ''}`;
+    const list = $('.chat-msgs');
+    if (list) {
+      const toEnd = () => { list.scrollTop = list.scrollHeight; };
+      toEnd();
+      // Фото довантажуються пізніше й змінюють висоту — тримаємо низ стрічки.
+      for (const img of list.querySelectorAll('img')) if (!img.complete) img.addEventListener('load', toEnd, { once: true });
+    }
+    return;
+  }
   enterView(view, `${page}/${arg ?? ''}` !== ui.lastView);
   ui.lastView = `${page}/${arg ?? ''}`;
-  // У чаті ховаємо шапку й меню, як у месенджерах, і показуємо останні повідомлення.
-  document.body.classList.toggle('in-chat', page === 'chat' || page === 'ask');
-  if (page === 'chat' || page === 'ask') { const list = $('.chat-msgs'); if (list) list.scrollTop = list.scrollHeight; return; }
   const target = arg && page === 'bookings' ? $(`#b-${arg}`) : page === 'garage' && arg === 'add' ? $('#add-car') : null;
   if (target) target.scrollIntoView({ block: 'center' });
   else window.scrollTo(0, 0);
@@ -2678,6 +2847,12 @@ document.addEventListener('click', (e) => {
     $(action === 'move-day' ? `[data-action="move-day"][data-date="${move.date}"]` : '[data-action="move-confirm"]')?.focus();
   } else if (action === 'move-confirm') {
     confirmMove();
+  } else if (action === 'login-back') {
+    Object.assign(login, { step: 'phone', error: '' });
+    route();
+  } else if (action === 'login-resend') {
+    Object.assign(login, { code: String(Math.floor(1000 + Math.random() * 9000)), sentAt: Date.now(), error: '', typed: '' });
+    route();
   } else if (action === 'chat-back') {
     if (history.length > 1) history.back(); else location.hash = '#/inbox';
   } else if (action === 'ask-quick') {
@@ -2794,6 +2969,24 @@ document.addEventListener('change', (e) => {
 });
 
 document.addEventListener('input', (e) => {
+  // Номер друкується з пробілами, як на картці: 67 123 45 67.
+  if (e.target.id === 'login-phone') {
+    const d = phoneDigits(e.target.value);
+    e.target.value = [d.slice(0, 2), d.slice(2, 5), d.slice(5, 7), d.slice(7, 9)].filter(Boolean).join(' ');
+    return;
+  }
+  // Клітинки коду: після цифри — далі; вставка всього коду розкладається по клітинках; 4 цифри — підтверджуємо.
+  if (e.target.matches('.code-cell')) {
+    const cells = [...document.querySelectorAll('.code-cell')];
+    const digits = e.target.value.replace(/\D/g, '');
+    const i = cells.indexOf(e.target);
+    if (digits.length > 1) [...digits].slice(0, 4 - i).forEach((d, k) => { cells[i + k].value = d; });
+    else e.target.value = digits;
+    login.typed = cells.map((c) => c.value).join('');
+    const next = cells.find((c) => !c.value);
+    if (next) { if (e.target.value) next.focus(); } else $('#code-form').requestSubmit();
+    return;
+  }
   if (e.target.id === 'q') {
     ui.q = e.target.value;
     renderList();
@@ -2807,6 +3000,20 @@ document.addEventListener('input', (e) => {
 });
 
 document.addEventListener('submit', async (e) => {
+  if (e.target.id === 'biz-apply') {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const a = { id: uid(), device: true, at: Date.now(), status: 'new', ...Object.fromEntries(['name', 'district', 'boxes', 'address', 'contact', 'phone', 'email', 'type', 'code'].map((k) => [k, String(f.get(k) ?? '').trim()])) };
+    saveBizApps([...bizApps(), a]);
+    location.hash = '#/business';
+    toast('Заявку надіслано — перевіримо до 2 робочих днів');
+    return;
+  }
+  if (e.target.id === 'phone-form' || e.target.id === 'code-form') {
+    e.preventDefault();
+    loginSubmit(e.target);
+    return;
+  }
   if (e.target.matches('.ready-form')) {
     e.preventDefault();
     finishJob(e.target);

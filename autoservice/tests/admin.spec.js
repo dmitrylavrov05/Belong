@@ -3,6 +3,8 @@ import AxeBuilder from '@axe-core/playwright';
 
 // Той самий фіксований час, що й в інших тестах: неділя, 4 жовтня 2026, 10:00.
 test.beforeEach(async ({ page }, testInfo) => {
+  // Вхід за телефоном пройдено — крім тестів самого входу (#/login).
+  await page.addInitScript(() => { if (!location.hash.startsWith('#/login')) { localStorage.getItem('carcar.auth') ?? localStorage.setItem('carcar.auth', '{"phone":"","at":1}'); localStorage.getItem('carcar.biz.session') ?? localStorage.setItem('carcar.biz.session', '{"demo":true}'); } });
   // Усі точки — мийки, тож акція «Перша мийка −30%» діяла б у кожному тесті. Вимикаємо її,
   // крім тестів промокодів і маркетингу.
   if (!/промокод|маркетинг/i.test(testInfo.title)) {

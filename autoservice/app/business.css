@@ -543,3 +543,20 @@ table.t tr.off td { opacity: .55; }
   .crm .biz-nav a[href="#/"], .crm .biz-nav a[href="#/schedule"], .crm .biz-nav a[href="#/clients"], .crm .biz-nav a[href="#/requests"] { display: none; }
   .crm .day-nav { flex-wrap: wrap; gap: 8px; }
 }
+
+/* ---------- вхід у кабінет мийки ---------- */
+body.locked .biz-side, body.locked .biz-top, body.locked .crm-tabs { display: none !important; }
+body.locked #view { padding: 0; }
+.biz-login { min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px; background: radial-gradient(1200px 500px at 50% -10%, var(--accent-soft), transparent), var(--soft); }
+.biz-login-card { width: min(420px, 100%); display: grid; gap: 14px; padding: 28px 24px; border: 1px solid var(--line); border-radius: 24px; background: var(--bg); box-shadow: 0 20px 50px rgb(16 24 40 / 12%); }
+.biz-login-card h1 { margin: 4px 0 0; font-size: 26px; }
+.biz-login-card .page-sub { margin: 0; }
+.biz-login-card .brand { padding: 0; }
+.biz-side .logout { margin-top: 8px; border: 0; background: none; padding: 8px 12px; text-align: left; color: var(--muted); font: inherit; font-size: 14px; cursor: pointer; border-radius: 10px; }
+.biz-side .logout:hover { background: var(--soft); color: var(--text); }
+.login-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.login-brand > span { display: grid; line-height: 1.1; }
+.login-brand b { font-size: 22px; font-weight: 800; letter-spacing: -.01em; }
+.login-brand .c1 { color: var(--accent); }
+.login-brand .c2 { color: var(--navy); }
+.login-brand small { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
