@@ -255,7 +255,8 @@ test.describe('заставка', () => {
     await page.goto('/');
     const splash = page.locator('#splash');
     await expect(splash).toBeVisible();
-    await expect(splash).toContainText('Автомийки Києва');
+    await expect(splash).toContainText('CARCAR');
+    await expect(splash).not.toContainText('Автомийки Києва');
     await expect(splash).toHaveCount(0, { timeout: 5000 });
     await expect(page.locator('h1')).toHaveText('Автомийки Києва');
     await page.reload();

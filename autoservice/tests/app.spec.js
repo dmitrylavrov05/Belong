@@ -371,7 +371,7 @@ test.describe('поруч зі мною', () => {
     await expect(page.locator('#list article').first()).toContainText('Кераміка Про');
 
     await page.locator('#list article').first().getByRole('link').first().click();
-    await expect(page.getByText(/км від вас/)).toBeVisible();
+    await expect(page.locator('.travel')).toContainText(/\d+ хв · [\d,]+ км/);
     await expect(page.getByText('Керамічне покриття кузова')).toBeVisible();
   });
 });

@@ -87,15 +87,23 @@ function distanceKm(a, b) {
 
 const fmtDist = (d) => (d < 1 ? `${Math.max(50, Math.round((d * 1000) / 50) * 50)} м` : `${d.toLocaleString('uk-UA', { maximumFractionDigits: 1 })} км`);
 const distTo = (p) => (ui.pos ? distanceKm(ui.pos, p) : null);
+// Час у дорозі містом: дорога приблизно на третину довша за пряму, середня швидкість у Києві ~25 км/год.
+const driveMin = (d) => Math.max(2, Math.round(((d * 1.3) / 25) * 60) + 2);
+const travelText = (p) => {
+  const d = distTo(p);
+  return d === null ? '' : `${driveMin(d)} хв · <span class="badge dist">${fmtDist(d)}</span>${ui.posFallback ? ' від центру' : ''}`;
+};
 
 // Місце користувача тримаємо лише в памʼяті й нікуди не надсилаємо.
-function locate() {
+// silent — тихо, без підказки: так застосунок сам визначає місце, щоб показати відстань на картках.
+function locate(silent = false) {
   if (ui.locating) return;
   ui.locating = true;
   const done = (pos, fallback) => {
     Object.assign(ui, { pos, posFallback: fallback, locating: false });
     if ($('#list')) renderList();
-    if (fallback) toast('Не вдалося визначити ваше місце — рахуємо відстань від центру Києва');
+    else if (/^#\/place\//.test(location.hash)) route();
+    if (fallback && !silent) toast('Не вдалося визначити ваше місце — рахуємо відстань від центру Києва');
   };
   if (!navigator.geolocation) { done(CITY.center, true); return; }
   navigator.geolocation.getCurrentPosition(
@@ -107,7 +115,7 @@ function locate() {
 
 function setSort(value) {
   ui.sort = value;
-  if (value === 'near' && !ui.pos) locate();
+  if (value === 'near' && (!ui.pos || ui.posFallback)) locate();
   if ($('#sort')) $('#sort').value = value;
   const near = $('[data-action="near"]');
   if (near) near.setAttribute('aria-pressed', value === 'near');
@@ -387,7 +395,7 @@ function placeCard(p) {
     <div class="pc-info">
       <h2 class="pc-title">${esc(p.name)}${r.count ? `<span class="pc-rate">${icon('star', 14)}${rating(r.avg)}</span>` : ''}</h2>
       <span class="pc-line">${icon('clock', 14)}<span>${open ? '' : 'Зачинено · '}${hoursText(p)}</span><span>· від ${uah(minPrice(p, ui.cat, ui.cls))}</span></span>
-      ${d !== null ? `<span class="pc-line">${icon('carSide', 14)}${Math.max(3, Math.round((d / 25) * 60 + 2))} хв · <span class="badge dist">${fmtDist(d)}</span></span>` : ''}
+      ${d !== null ? `<span class="pc-line">${icon('carSide', 14)}${travelText(p)}</span>` : ''}
       <span class="pc-line">${icon('pin', 14)}${esc(p.address)}</span>
     </div>
   </article>`;
@@ -475,7 +483,7 @@ function renderMap(list) {
     $('#list').innerHTML = `<div class="map" id="map" tabindex="0" role="region" aria-label="Карта точок. Стрілки зсувають карту, плюс і мінус змінюють масштаб"></div>
       <div id="map-card" aria-live="polite"></div>`;
     mapApi = mountMap($('#map'), {
-      places: list.map(mapPin), pos: ui.pos, state: mapState, onLayer: (l) => store.set('mapLayer', l),
+      places: list.map(mapPin), pos: ui.posFallback ? null : ui.pos, state: mapState, onLayer: (l) => store.set('mapLayer', l),
       onSelect: (id) => { $('#map-card').innerHTML = mapCard(id); track('map_pin', { placeId: id }); },
     });
   } else mapApi.setPins(list.map(mapPin));
@@ -487,7 +495,7 @@ function renderList() {
   const list = filteredPlaces();
   if (ui.view === 'map') renderMap(list);
   else $('#list').innerHTML = list.length ? list.map(placeCard).join('') : empty('search', 'Нічого не знайшлося. Спробуйте змінити фільтри.');
-  const where = ui.locating ? ' · визначаємо ваше місце…' : ui.sort === 'near' && ui.pos ? ` · від ${ui.posFallback ? 'центру Києва' : 'вас'}` : '';
+  const where = ui.sort !== 'near' ? '' : ui.locating ? ' · визначаємо ваше місце…' : ui.pos ? ` · від ${ui.posFallback ? 'центру Києва' : 'вас'}` : '';
   $('#count').textContent = `${list.length} ${plural(list.length, 'місце', 'місця', 'місць')}${where}`;
 }
 
@@ -591,7 +599,7 @@ function viewPlace(id) {
     <h1>${esc(p.name)}</h1>
     ${list.length || ui.pos ? `<div class="meta lg" style="margin-top:-4px">
       ${ratingBadge(p.id)}
-      ${ui.pos ? `<span>${fmtDist(distTo(p))} від ${ui.posFallback ? 'центру' : 'вас'}</span>` : ''}
+      ${ui.pos ? `<span class="travel">${icon('carSide', 16)}${travelText(p)}</span>` : ''}
     </div>` : ''}
     <div class="badges lg" style="margin-top:12px">
       <span class="badge ${open ? 'open' : 'closed'}">${open ? 'Відчинено' : 'Зачинено'} · ${hoursText(p)}</span>
@@ -2115,8 +2123,16 @@ function route() {
 
   if (page === 'place') track('view_place', { placeId: arg });
   else if (page === 'book' && draft?.placeId !== arg) track('open_book', { placeId: arg, from: sub ? 'link' : 'page' });
-  if (page === '') { view.innerHTML = viewCatalog(); renderList(); }
-  else if (page === 'place') view.innerHTML = viewPlace(arg);
+  if (page === '') {
+    view.innerHTML = viewCatalog();
+    renderList();
+    // Один раз за запуск визначаємо місце, щоб на кожній мийці було видно відстань і час у дорозі.
+    if (!ui.pos && !ui.locTried) { ui.locTried = true; locate(true); }
+  }
+  else if (page === 'place') {
+    view.innerHTML = viewPlace(arg);
+    if (!ui.pos && !ui.locTried) { ui.locTried = true; locate(true); }
+  }
   else if (page === 'book') { view.innerHTML = viewBook(arg, sub, extra); if ($('#book')) renderBook(); }
   else if (page === 'inbox') view.innerHTML = viewInbox();
   else if (page === 'bookings') {

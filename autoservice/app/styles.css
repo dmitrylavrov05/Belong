@@ -829,3 +829,4 @@ label.item { cursor: pointer; padding: 10px 14px; }
 .cover-input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; z-index: 1; appearance: none; }
 #book[data-step] { margin-top: 4px; }
 #view > h1 + #book .step-head { margin-top: -4px; }
+.travel { display: inline-flex; align-items: center; gap: 6px; } .meta .badge.dist { background: none; padding: 0; font-size: inherit; color: inherit; }
