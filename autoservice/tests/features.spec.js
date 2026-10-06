@@ -133,6 +133,39 @@ test('чат за записом: клієнт пише «Приїду з баг
   await expect(page.locator('#inbox-tab .tab-count')).toBeHidden();
 });
 
+test('чат: коли запис завершено, у стрічці зʼявляється позначка, а поле вводу закривається', async ({ page }) => {
+  await book(page);
+  await page.locator('article').first().getByRole('link', { name: 'Чат з мийкою' }).click();
+  const chat = page.getByRole('region', { name: 'Чат з Автомийка «Хвиля»' });
+  await chat.getByRole('button', { name: 'Приїду з багажником на даху' }).click();
+  await expect(chat.locator('.chat-mark')).toHaveCount(0);
+
+  // Вечір дня візиту: клієнт підтверджує виконання.
+  await page.clock.setFixedTime(new Date(2026, 9, 5, 21, 30));
+  await page.goto('/#/bookings');
+  await page.getByRole('button', { name: 'Підтвердити виконання' }).click();
+  await expect(page.locator('#toast')).toHaveText('Дякуємо! Виконання підтверджено');
+
+  await page.locator('#inbox-tab').click();
+  const convo = page.locator('.convo', { hasText: 'Автомийка «Хвиля»' });
+  await expect(convo).toContainText('Запис завершено');
+  await convo.click();
+  const mark = chat.locator('.chat-mark.end');
+  await expect(mark).toContainText('Запис завершено');
+  await expect(mark).toContainText('21:30');
+  // Позначка йде після останнього повідомлення.
+  await expect(chat.locator('.chat-msgs > li').last()).toHaveClass(/chat-mark/);
+  await expect(chat.getByLabel('Повідомлення мийці')).toHaveCount(0);
+  await expect(chat).toContainText('листування лише для читання');
+  expect((await new AxeBuilder({ page }).include('.chat-screen').analyze()).violations).toEqual([]);
+
+  // Мийка бачить ту саму позначку в чаті запису.
+  await page.goto(`${PANEL}#/schedule/2026-10-05`);
+  await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
+  await page.locator('.slot-block', { hasText: 'Клієнт CARCAR' }).first().click();
+  await expect(page.getByRole('dialog').locator('.thread .mark')).toContainText('Запис завершено');
+});
+
 test('кошторис СТО: клієнт погоджує пункти окремо, доплачує, гарантія потрапляє в сервісну книжку', async ({ page }) => {
   await page.goto('/#/garage');
   await page.getByLabel('Марка').fill('Skoda');

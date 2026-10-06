@@ -9,7 +9,7 @@ import {
 import {
   CHANNELS, inboxFor, markRead, sendMessages, dealsOf, dealsOn, weeklyDealsOf, daysText, dealAt, dealPrice, dealCovers, hotDeals,
   checkWaitlist, openStarts, passesOf, sellPass, passActive, passLeft, usableSubs, findCert, redeemPass, restorePass,
-  chatPost, CLIENT_QUICK, ITEM_KIND, itemSum, estimateTotal, warrantyUntil,
+  chatPost, chatTimeline, CLIENT_QUICK, ITEM_KIND, itemSum, estimateTotal, warrantyUntil,
 } from './ops.js';
 import { mountMap } from './map.js';
 import { lookupPlate, normPlate, DEMO_PLATES } from './vehicles.js';
@@ -1369,12 +1369,13 @@ function viewChat(id) {
   if (!b) return viewNotFound();
   const p = placeById(b.placeId);
   if (b.chatUnreadClient) { b.chatUnreadClient = false; save(); }
-  const msgs = b.chat ?? [];
+  const msgs = chatTimeline(b);
   let lastDay = '';
   const items = msgs.map((m) => {
     const day = isoDate(new Date(m.at));
     const sep = day !== lastDay ? `<li class="day-sep"><span>${dayName(day)}</span></li>` : '';
     lastDay = day;
+    if (m.from === 'mark') return `${sep}<li class="chat-mark ${m.kind}">${icon(m.kind === 'closed' ? 'x' : 'check', 14)}<b>${esc(m.text)}</b><time>${new Date(m.at).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}</time></li>`;
     if (m.from === 'sys') return `${sep}<li class="bubble sys">${esc(m.text)}</li>`;
     return `${sep}<li class="bubble ${m.from === 'client' ? 'me' : 'them'}"><span class="sr-only">${m.from === 'client' ? 'Ви' : p.name}: </span>${esc(m.text)}<time>${new Date(m.at).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}</time></li>`;
   }).join('');
@@ -1395,7 +1396,7 @@ function viewChat(id) {
         <input name="text" required maxlength="500" autocomplete="off" placeholder="Повідомлення…" aria-label="Повідомлення мийці">
         <button class="send-btn" type="submit" aria-label="Надіслати">${icon('send', 20)}</button>
       </form>
-    </div>` : '<p class="chat-closed">Запис завершено — листування лише для читання.</p>'}
+    </div>` : '<p class="chat-closed">Чат закрито — листування лише для читання.</p>'}
   </section>`;
 }
 
@@ -1411,7 +1412,7 @@ function sendChat(b, text) {
 function conversations() {
   const rows = [
     ...mine().filter((b) => b.chat?.length).map((b) => {
-      const last = b.chat.at(-1);
+      const last = chatTimeline(b).at(-1);
       const p = placeById(b.placeId);
       return { at: last.at, href: `#/chat/${b.id}`, name: p?.name ?? 'Мийка', sub: `${dayLabel(b.date, { day: 'numeric', month: 'short' })}, ${b.time}`,
         text: `${last.from === 'client' ? 'Ви: ' : ''}${last.text}`, unread: !!b.chatUnreadClient };
@@ -2056,7 +2057,7 @@ const bookingActions = {
       ? `Скасувати запис? Повернемо ${uah(t.refund)} на баланс CARCAR.`
       : `До візиту менше ${cancelWindow()}, тому оплата ${uah(t.placeAmount)} зарахується точці за послугу — повернення не буде. Скасувати запис?`;
     if (!confirm(msg)) return false;
-    Object.assign(b, { state: 'cancelled', refund: t.refund, placeAmount: t.placeAmount });
+    Object.assign(b, { state: 'cancelled', refund: t.refund, placeAmount: t.placeAmount, closedAt: Date.now() });
     if (t.free) {
       b.refundTo = 'balance';
       if (t.refund) addMoney(t.refund, `Повернення: ${placeById(b.placeId)?.name ?? 'скасований запис'}`);
@@ -2109,7 +2110,7 @@ const bookingActions = {
   noshow(b) {
     const placeAmount = Math.round(price(b) * PAYMENT.noShowShare);
     if (!confirm(`Позначити неявку? Клієнт не скасував запис вчасно, тож точка отримає оплату ${uah(placeAmount)}.`)) return false;
-    Object.assign(b, { state: 'noshow', placeAmount, refund: price(b) - placeAmount });
+    Object.assign(b, { state: 'noshow', placeAmount, refund: price(b) - placeAmount, closedAt: Date.now() });
     location.hash = '#/partner';
   },
   'resolve-client'(b) {

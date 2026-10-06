@@ -883,3 +883,13 @@ body.in-chat .top, body.in-chat .tabs { display: none; }
 .convo small { font-size: 12px; color: var(--muted); }
 .convo.unread .convo-text { color: var(--text); font-weight: 600; }
 .convo .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); flex: none; }
+
+/* Позначки про хід запису в чаті: «Мийка завершила роботу», «Запис завершено», «Запис скасовано» */
+.chat-mark { align-self: stretch; display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 12px; color: var(--muted); }
+.chat-mark::before, .chat-mark::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.chat-mark b { font-weight: 600; }
+.chat-mark svg { flex: none; padding: 3px; border-radius: 50%; box-sizing: content-box; background: var(--soft); }
+.chat-mark.end, .chat-mark.end svg { color: var(--ok); }
+.chat-mark.end svg { background: var(--ok-soft); }
+.chat-mark time { color: var(--muted); }
+.thread .msg.sys.mark { border-style: solid; font-weight: 600; }

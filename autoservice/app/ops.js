@@ -65,6 +65,19 @@ export function chatPost(b, from, text, notify = from === 'client' ? 'biz' : 'cl
   if (notify === 'biz' || notify === 'both') b.chatUnreadBiz = true;
   if (notify === 'client' || notify === 'both') b.chatUnreadClient = true;
 }
+// Стрічка чату з позначками про хід запису: мийка закінчила роботу, запис завершено, скасовано чи закрито.
+// Позначки не зберігаються, а виводяться зі стану запису — тож з'являються, хоч би де змінився стан.
+export function chatTimeline(b) {
+  const msgs = b.chat ?? [];
+  const fallback = msgs.at(-1)?.at ?? b.createdAt ?? Date.now();
+  const marks = [];
+  if (b.doneAt) marks.push({ at: b.doneAt, kind: 'done', text: 'Мийка завершила роботу' });
+  if (b.state === 'completed') marks.push({ at: b.completedAt ?? fallback, kind: 'end', text: 'Запис завершено' });
+  else if (b.state === 'cancelled') marks.push({ at: b.closedAt ?? fallback, kind: 'closed', text: 'Запис скасовано' });
+  else if (b.state === 'noshow') marks.push({ at: b.closedAt ?? fallback, kind: 'closed', text: b.lateForfeit ? 'Запис закрито: запізнення' : 'Запис закрито: неявка' });
+  else if (b.state === 'refunded') marks.push({ at: b.closedAt ?? fallback, kind: 'closed', text: 'Запис закрито за рішенням спору' });
+  return [...msgs, ...marks.map((m) => ({ ...m, from: 'mark' }))].sort((x, y) => x.at - y.at);
+}
 export const CLIENT_QUICK = ['Можна приїхати раніше?', 'Приїду з багажником на даху', 'Залишу ключі адміністратору', 'Потрібен чек для компанії'];
 export const BIZ_QUICK = ['Так, чекаємо', 'Можна на 30 хв раніше', 'На жаль, ні — лише у ваш час', 'Майстер передзвонить'];
 

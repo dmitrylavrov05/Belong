@@ -330,7 +330,7 @@ export function resolveDispute(b, placePart, note = '') {
     return;
   }
   const refund = Math.min(b.paid, full - toPlace);
-  Object.assign(b, { state: 'refunded', refund, placeAmount: toPlace, refundTo: 'balance' });
+  Object.assign(b, { state: 'refunded', refund, placeAmount: toPlace, refundTo: 'balance', closedAt: Date.now() });
   if (refund) creditClient(refund, `Повернення за спором: ${name}`);
 }
 

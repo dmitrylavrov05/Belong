@@ -893,6 +893,16 @@ body.in-chat .top, body.in-chat .tabs { display: none; }
 .convo small { font-size: 12px; color: var(--muted); }
 .convo.unread .convo-text { color: var(--text); font-weight: 600; }
 .convo .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); flex: none; }
+
+/* Позначки про хід запису в чаті: «Мийка завершила роботу», «Запис завершено», «Запис скасовано» */
+.chat-mark { align-self: stretch; display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 12px; color: var(--muted); }
+.chat-mark::before, .chat-mark::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.chat-mark b { font-weight: 600; }
+.chat-mark svg { flex: none; padding: 3px; border-radius: 50%; box-sizing: content-box; background: var(--soft); }
+.chat-mark.end, .chat-mark.end svg { color: var(--ok); }
+.chat-mark.end svg { background: var(--ok-soft); }
+.chat-mark time { color: var(--muted); }
+.thread .msg.sys.mark { border-style: solid; font-weight: 600; }
 </style>
   <style>
 /* Панель для бізнесу CARCAR: десктоп-перший макет поверх токенів і компонентів styles.css. */
@@ -1903,7 +1913,7 @@ function resolveDispute(b, placePart, note = '') {
     return;
   }
   const refund = Math.min(b.paid, full - toPlace);
-  Object.assign(b, { state: 'refunded', refund, placeAmount: toPlace, refundTo: 'balance' });
+  Object.assign(b, { state: 'refunded', refund, placeAmount: toPlace, refundTo: 'balance', closedAt: Date.now() });
   if (refund) creditClient(refund, `Повернення за спором: ${name}`);
 }
 
@@ -2244,6 +2254,19 @@ function chatPost(b, from, text, notify = from === 'client' ? 'biz' : 'client') 
   b.chat = [...(b.chat ?? []), { from, text, at: Date.now() }];
   if (notify === 'biz' || notify === 'both') b.chatUnreadBiz = true;
   if (notify === 'client' || notify === 'both') b.chatUnreadClient = true;
+}
+// Стрічка чату з позначками про хід запису: мийка закінчила роботу, запис завершено, скасовано чи закрито.
+// Позначки не зберігаються, а виводяться зі стану запису — тож з'являються, хоч би де змінився стан.
+function chatTimeline(b) {
+  const msgs = b.chat ?? [];
+  const fallback = msgs.at(-1)?.at ?? b.createdAt ?? Date.now();
+  const marks = [];
+  if (b.doneAt) marks.push({ at: b.doneAt, kind: 'done', text: 'Мийка завершила роботу' });
+  if (b.state === 'completed') marks.push({ at: b.completedAt ?? fallback, kind: 'end', text: 'Запис завершено' });
+  else if (b.state === 'cancelled') marks.push({ at: b.closedAt ?? fallback, kind: 'closed', text: 'Запис скасовано' });
+  else if (b.state === 'noshow') marks.push({ at: b.closedAt ?? fallback, kind: 'closed', text: b.lateForfeit ? 'Запис закрито: запізнення' : 'Запис закрито: неявка' });
+  else if (b.state === 'refunded') marks.push({ at: b.closedAt ?? fallback, kind: 'closed', text: 'Запис закрито за рішенням спору' });
+  return [...msgs, ...marks.map((m) => ({ ...m, from: 'mark' }))].sort((x, y) => x.at - y.at);
 }
 const CLIENT_QUICK = ['Можна приїхати раніше?', 'Приїду з багажником на даху', 'Залишу ключі адміністратору', 'Потрібен чек для компанії'];
 const BIZ_QUICK = ['Так, чекаємо', 'Можна на 30 хв раніше', 'На жаль, ні — лише у ваш час', 'Майстер передзвонить'];
@@ -4984,7 +5007,7 @@ function estimateDrawer(id) {
 function chatSection(b) {
   if (!isCarcar(b)) return '';
   return `<section class="stack bk-chat" aria-label="Чат з клієнтом" style="gap:8px"><b>Чат з клієнтом</b>
-    ${b.chat?.length ? `<ol class="thread">${b.chat.map((m) => `<li class="msg ${m.from === 'biz' ? 'client' : m.from === 'sys' ? 'sys' : 'biz'}"><span class="who">${m.from === 'biz' ? 'Ви' : m.from === 'sys' ? 'CARCAR' : 'Клієнт'} · ${fmtTime(m.at)}</span>${esc(m.text)}</li>`).join('')}</ol>`
+    ${b.chat?.length ? `<ol class="thread">${chatTimeline(b).map((m) => m.from === 'mark' ? `<li class="msg sys mark">${esc(m.text)} · ${fmtTime(m.at)}</li>` : `<li class="msg ${m.from === 'biz' ? 'client' : m.from === 'sys' ? 'sys' : 'biz'}"><span class="who">${m.from === 'biz' ? 'Ви' : m.from === 'sys' ? 'CARCAR' : 'Клієнт'} · ${fmtTime(m.at)}</span>${esc(m.text)}</li>`).join('')}</ol>`
       : '<p class="small muted" style="margin:0">Повідомлень ще немає. Напишіть клієнту, якщо треба уточнити щось про візит.</p>'}
     ${ACTIVE.includes(b.state) ? `<div class="quick" role="group" aria-label="Швидкі відповіді">${BIZ_QUICK.map((t) => `<button class="chip" type="button" data-action="biz-quick" data-id="${b.id}" data-text="${esc(t)}">${esc(t)}</button>`).join('')}</div>
     <form class="inline-form" id="bk-chat-form" data-id="${b.id}"><label class="field"><span>Повідомлення клієнту</span><input name="text" required maxlength="500" autocomplete="off"></label>
@@ -5487,7 +5510,7 @@ document.addEventListener('click', (e) => {
   } else if (action === 'late-forfeit') {
     const b = bookings.find((x) => x.id === id);
     if (!confirm(`Клієнт запізнюється понад ${PAYMENT.lateMinutes} хв: зарахувати оплату ${uah(price(b))} мийці й закрити запис?`)) return;
-    Object.assign(b, { state: 'noshow', placeAmount: price(b), refund: 0, lateForfeit: true });
+    Object.assign(b, { state: 'noshow', placeAmount: price(b), refund: 0, lateForfeit: true, closedAt: Date.now() });
     sendMessages([{ placeId: b.placeId, clientKey: 'device', channel: 'app', kind: 'late', bookingId: b.id, link: `#/bookings/${b.id}`,
       text: `${place().name}: ви запізнилися більше ніж на ${PAYMENT.lateMinutes} хв, тому візит вважається неявкою — оплату зараховано мийці. Якщо це помилка, напишіть у підтримку.` }]);
     save();
@@ -5498,7 +5521,7 @@ document.addEventListener('click', (e) => {
     const b = bookings.find((x) => x.id === id);
     const placeAmount = Math.round(price(b) * PAYMENT.noShowShare);
     if (!confirm(`Позначити неявку? Клієнт не скасував запис вчасно, тож оплата ${uah(placeAmount)} зараховується точці.`)) return;
-    Object.assign(b, { state: 'noshow', placeAmount, refund: price(b) - placeAmount });
+    Object.assign(b, { state: 'noshow', placeAmount, refund: price(b) - placeAmount, closedAt: Date.now() });
     save();
     closeDrawer();
     rerenderKeepScroll();

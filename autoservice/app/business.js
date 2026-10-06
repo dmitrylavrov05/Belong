@@ -15,7 +15,7 @@ import {
   CHANNELS, sendMessages, viberLink, telegramLink, dealsOf, weeklyDealsOf, daysText, queueOf, queueEnabled, saveQueue, queueEstimate, checkWaitlist,
   PASS_KIND, passesOf, savePasses, sellPass, passActive, passLeft, usableSubs, findCert, redeemPass, restorePass,
   clientKeyOf,
-  chatPost, BIZ_QUICK, ITEM_KIND, itemSum, estimateTotal,
+  chatPost, chatTimeline, BIZ_QUICK, ITEM_KIND, itemSum, estimateTotal,
 } from './ops.js';
 import { ENTITY, TAX, DOCS, OFFER, codeValid, ibanValid, ibanBank, normIban, formatIban, missingSteps, offerHtml } from './partners.js';
 import { drawColumns, legend, tableView, hbars, hideTip } from './charts.js';
@@ -2301,7 +2301,7 @@ function estimateDrawer(id) {
 function chatSection(b) {
   if (!isCarcar(b)) return '';
   return `<section class="stack bk-chat" aria-label="Чат з клієнтом" style="gap:8px"><b>Чат з клієнтом</b>
-    ${b.chat?.length ? `<ol class="thread">${b.chat.map((m) => `<li class="msg ${m.from === 'biz' ? 'client' : m.from === 'sys' ? 'sys' : 'biz'}"><span class="who">${m.from === 'biz' ? 'Ви' : m.from === 'sys' ? 'CARCAR' : 'Клієнт'} · ${fmtTime(m.at)}</span>${esc(m.text)}</li>`).join('')}</ol>`
+    ${b.chat?.length ? `<ol class="thread">${chatTimeline(b).map((m) => m.from === 'mark' ? `<li class="msg sys mark">${esc(m.text)} · ${fmtTime(m.at)}</li>` : `<li class="msg ${m.from === 'biz' ? 'client' : m.from === 'sys' ? 'sys' : 'biz'}"><span class="who">${m.from === 'biz' ? 'Ви' : m.from === 'sys' ? 'CARCAR' : 'Клієнт'} · ${fmtTime(m.at)}</span>${esc(m.text)}</li>`).join('')}</ol>`
       : '<p class="small muted" style="margin:0">Повідомлень ще немає. Напишіть клієнту, якщо треба уточнити щось про візит.</p>'}
     ${ACTIVE.includes(b.state) ? `<div class="quick" role="group" aria-label="Швидкі відповіді">${BIZ_QUICK.map((t) => `<button class="chip" type="button" data-action="biz-quick" data-id="${b.id}" data-text="${esc(t)}">${esc(t)}</button>`).join('')}</div>
     <form class="inline-form" id="bk-chat-form" data-id="${b.id}"><label class="field"><span>Повідомлення клієнту</span><input name="text" required maxlength="500" autocomplete="off"></label>
@@ -2804,7 +2804,7 @@ document.addEventListener('click', (e) => {
   } else if (action === 'late-forfeit') {
     const b = bookings.find((x) => x.id === id);
     if (!confirm(`Клієнт запізнюється понад ${PAYMENT.lateMinutes} хв: зарахувати оплату ${uah(price(b))} мийці й закрити запис?`)) return;
-    Object.assign(b, { state: 'noshow', placeAmount: price(b), refund: 0, lateForfeit: true });
+    Object.assign(b, { state: 'noshow', placeAmount: price(b), refund: 0, lateForfeit: true, closedAt: Date.now() });
     sendMessages([{ placeId: b.placeId, clientKey: 'device', channel: 'app', kind: 'late', bookingId: b.id, link: `#/bookings/${b.id}`,
       text: `${place().name}: ви запізнилися більше ніж на ${PAYMENT.lateMinutes} хв, тому візит вважається неявкою — оплату зараховано мийці. Якщо це помилка, напишіть у підтримку.` }]);
     save();
@@ -2815,7 +2815,7 @@ document.addEventListener('click', (e) => {
     const b = bookings.find((x) => x.id === id);
     const placeAmount = Math.round(price(b) * PAYMENT.noShowShare);
     if (!confirm(`Позначити неявку? Клієнт не скасував запис вчасно, тож оплата ${uah(placeAmount)} зараховується точці.`)) return;
-    Object.assign(b, { state: 'noshow', placeAmount, refund: price(b) - placeAmount });
+    Object.assign(b, { state: 'noshow', placeAmount, refund: price(b) - placeAmount, closedAt: Date.now() });
     save();
     closeDrawer();
     rerenderKeepScroll();
