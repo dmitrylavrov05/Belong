@@ -426,3 +426,59 @@ test('місто: каталог по всій Україні, порожнє м
   await expect(page.getByRole('heading', { name: 'Вхід у CARCAR' })).toBeVisible();
   await expect(page.locator('.tabs')).toBeHidden();
 });
+
+test('номер запису: видно клієнту, мийці й підтримці; у підтримку можна надіслати фото', async ({ page }) => {
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  await page.goto('/#/book/hvylia');
+  await page.getByLabel(/Комплекс преміум/).check();
+  await page.locator('[data-action="to-time"]').click();
+  await page.getByRole('button', { name: /Завтра/ }).click();
+  await page.locator('.slot:not([disabled])').first().click();
+  await page.locator('[data-action="confirm"]').click();
+  await page.getByRole('button', { name: 'Оплатити 900 ₴' }).click();
+  const card = page.locator('article').first();
+  await expect(card.locator('.bk-no')).toHaveText(/^Запис № \d{6}$/);
+  const no = (await card.locator('.bk-no').textContent()).replace(/\D/g, '');
+
+  // Мийка бачить той самий номер і знаходить запис за ним у пошуку.
+  await page.goto('/business.html#/clients');
+  await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
+  await page.locator('#biz-q').fill(no);
+  await page.locator('#biz-q-res').getByRole('button', { name: new RegExp(`№ ${no}`) }).click();
+  await expect(page.getByRole('dialog')).toContainText(`№ ${no}`);
+  await page.keyboard.press('Escape');
+
+  // Клієнт пише в підтримку, вказавши номер і фото.
+  await page.goto('/#/support');
+  await page.getByLabel('Або номер запису').fill('999999');
+  await page.getByLabel('Що сталося?').fill('Не той колір воску');
+  await page.getByRole('button', { name: 'Надіслати в підтримку' }).click();
+  await expect(page.locator('#toast')).toContainText('Запис № 999999 не знайдено');
+  await page.getByLabel('Або номер запису').fill(`№ ${no}`);
+  await page.locator('#ticket-form input[name="photos"]').setInputFiles({ name: 'wax.png', mimeType: 'image/png', buffer: PNG });
+  await expect(page.locator('#ticket-form .photo-count')).toHaveText('Обрано фото: 1');
+  await page.getByRole('button', { name: 'Надіслати в підтримку' }).click();
+  const ticket = page.locator('article.ticket');
+  await expect(ticket).toContainText(`Запис № ${no}`);
+  await expect(ticket.locator('.ticket-photos img')).toHaveCount(1);
+
+  // Підтримка знаходить звернення за номером запису й відповідає з фото.
+  await page.goto('/admin.html#/support');
+  await page.getByLabel('Номер запису чи звернення').fill(no);
+  await page.getByRole('button', { name: 'Знайти' }).click();
+  await expect(page.locator('.notice')).toContainText(`Запис № ${no}`);
+  const rows = page.locator('tbody tr.link-row');
+  await expect(rows).toHaveCount(1);
+  await rows.first().locator('a.row-link').click();
+  await expect(page.locator('.kv')).toContainText(`№ ${no}`);
+  await expect(page.locator('.thread .ticket-photos img')).toHaveCount(1);
+  await page.locator('#admin-reply input[name="photos"]').setInputFiles({ name: 'ok.png', mimeType: 'image/png', buffer: PNG });
+  await page.getByRole('button', { name: 'Надіслати', exact: true }).click();
+  await expect(page.locator('.thread .ticket-photos img')).toHaveCount(2);
+
+  await page.goto('/#/support');
+  await page.locator('article.ticket').first().getByRole('link', { name: /відкрити/i }).click();
+  await expect(page.locator('.thread .ticket-photos img')).toHaveCount(2);
+  await page.locator('.thread .chat-photo').last().click();
+  await expect(page.getByRole('dialog', { name: 'Фото' })).toBeVisible();
+});

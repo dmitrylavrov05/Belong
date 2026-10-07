@@ -4,7 +4,7 @@ import {
   hoursFor, scheduleOf, inBreak, rangeText, WEEKDAY_NAMES, weekdayOf, phoneKey, offersOf, offerAsService, isOpenNow, hoursText, bookingStart, fmtTime, fmtDate, km, serviceCat, catById, shrinkPhoto,
   applyOverrides, isListed, payoutReady, maskIban, commissionFor, resolveDispute, visibleReviews, ACTIVE, BLOCKING, HOUR, isCarcar, price, complete, isFrozen, placeShare, balanceFor, settleAll, ratingFor,
   POWER, powerOf, worksInBlackout, TICKET_TOPICS, CLIENT_TOPICS, TICKET_STATUS, ticketsAll, openTicket, ticketReply, setTicket, isBlocked, mobileOn, spanOf, laneCap, sameLane, MOBILE_ROAD, promosAll, promoCheck, promoText,
-  enterView, bizApps, saveBizApps, APP_STATUS,
+  enterView, bizApps, saveBizApps, APP_STATUS, numberBookings, bookingNo, findByNo, ticketPhotos,
 } from './core.js';
 import {
   CHANNELS, inboxFor, markRead, sendMessages, dealsOf, dealsOn, weeklyDealsOf, daysText, dealAt, dealPrice, dealCovers, hotDeals,
@@ -1293,6 +1293,7 @@ function confirmBooking() {
 // ---------- оплата й утримання коштів ----------
 
 function save() {
+  numberBookings(bookings);
   return store.set('bookings', bookings) && store.set('payouts', payouts) && store.set('reviews', reviews);
 }
 
@@ -1341,7 +1342,8 @@ const STATE_ICON = { completed: 'checkCircle', cancelled: 'x', refunded: 'x', no
 const cardHead = (b, title, sm, amount = b.paid) => {
   const [cls, label] = STATE_LABEL[b.state];
   return `<div class="head">
-      <div><div class="bk-status ${cls}">${STATE_ICON[b.state] ? icon(STATE_ICON[b.state], 14) : ''}${label}</div><h3 class="bk-title${sm ? ' sm' : ''}">${title}</h3></div>
+      <div><div class="bk-status ${cls}">${STATE_ICON[b.state] ? icon(STATE_ICON[b.state], 14) : ''}${label}</div><h3 class="bk-title${sm ? ' sm' : ''}">${title}</h3>
+        ${b.no ? `<span class="bk-no">Запис ${bookingNo(b)}</span>` : ''}</div>
       <div class="bk-price">${uah(amount)}</div>
     </div>`;
 };
@@ -1566,7 +1568,7 @@ function viewChat(id) {
       <div class="chat-who"><h1>${esc(p.name)}</h1>${presenceLine(p.id)}</div>
       <a class="icon-btn" href="${tel(p)}" aria-label="Зателефонувати">${icon('phone', 20)}</a>
     </header>
-    <a class="chat-pin" href="#/bookings/${b.id}">${icon('calendar', 16)}<span>${dayLabel(b.date, { weekday: 'short', day: 'numeric', month: 'short' })}, ${b.time} · ${esc(b.services[0])}${b.services.length > 1 ? ` +${b.services.length - 1}` : ''}</span>${icon('chevR', 16)}</a>
+    <a class="chat-pin" href="#/bookings/${b.id}">${icon('calendar', 16)}<span>${b.no ? `${bookingNo(b)} · ` : ''}${dayLabel(b.date, { weekday: 'short', day: 'numeric', month: 'short' })}, ${b.time} · ${esc(b.services[0])}${b.services.length > 1 ? ` +${b.services.length - 1}` : ''}</span>${icon('chevR', 16)}</a>
     <ol class="chat-msgs" aria-label="Повідомлення">
       ${items || `<li class="chat-empty">${avatar(p.name)}<b>${esc(p.name)}</b><span>Напишіть мийці про цей візит: приїдете раніше, з багажником на даху чи потрібен чек.</span></li>`}
     </ol>
@@ -1741,10 +1743,11 @@ function ticketCard(t, open) {
   const b = t.bookingId ? bookings.find((x) => x.id === t.bookingId) : null;
   return `<article class="card ticket${t.unreadUser ? ' unread' : ''}" id="t-${t.id}" aria-label="Звернення №${t.no}">
     <div class="head"><b>№${t.no} · ${TICKET_TOPICS[t.topic]}</b><span class="pill-s ${cls}">${label}</span></div>
-    ${b ? `<a class="small" href="#/bookings/${b.id}">${esc(placeById(b.placeId)?.name ?? '')}, ${dayLabel(b.date, { day: 'numeric', month: 'short' })} ${b.time}${b.state === 'dispute' ? ' · спір відкрито' : ''}</a>` : ''}
-    ${open ? `<ol class="thread">${t.messages.map((m) => `<li class="msg ${m.from === 'client' ? 'client' : 'biz'}"><span class="who">${ticketWho(m)} · ${fmtTime(m.at)}</span>${esc(m.text)}</li>`).join('')}</ol>
+    ${b ? `<a class="small" href="#/bookings/${b.id}">Запис ${bookingNo(b)} · ${esc(placeById(b.placeId)?.name ?? '')}, ${dayLabel(b.date, { day: 'numeric', month: 'short' })} ${b.time}${b.state === 'dispute' ? ' · спір відкрито' : ''}</a>` : ''}
+    ${open ? `<ol class="thread">${t.messages.map((m) => `<li class="msg ${m.from === 'client' ? 'client' : 'biz'}"><span class="who">${ticketWho(m)} · ${fmtTime(m.at)}</span>${esc(m.text)}${ticketPhotos(m.photos, true)}</li>`).join('')}</ol>
       ${t.status === 'closed' ? `<p class="small muted" style="margin:0">Звернення закрито. Якщо питання лишилось — напишіть, і ми відкриємо його знову.</p>` : ''}
-      <form class="ticket-reply inline-form" data-id="${t.id}"><label class="field"><span>Відповідь підтримці</span><input name="text" required maxlength="800" autocomplete="off"></label>
+      <form class="ticket-reply stack" data-id="${t.id}" style="gap:8px"><label class="field"><span>Відповідь підтримці</span><input name="text" maxlength="800" autocomplete="off"></label>
+        ${photoPick('Додати фото')}
         <button class="btn primary" type="submit">Надіслати</button></form>`
       : `<p class="small muted" style="margin:0">${esc(t.messages.at(-1).text.slice(0, 90))}${t.messages.at(-1).text.length > 90 ? '…' : ''}</p>
       <a class="btn" href="#/support/t/${t.id}">${t.unreadUser ? 'Нова відповідь — відкрити' : 'Відкрити'}</a>`}
@@ -1763,19 +1766,26 @@ function viewSupport(sub, arg) {
   const pb = pre ? bookings.find((x) => x.id === pre) : null;
   const options = mine().sort((a, b) => bookingStart(b) - bookingStart(a)).slice(0, 15);
   return `${back('#/garage', 'Гараж')}<h1>Підтримка CARCAR</h1>
-    <p class="lead">Пишіть, якщо щось пішло не так з оплатою, записом чи якістю послуги. Термінові питання про гроші розглядаємо до 2 годин, решту — протягом доби.</p>
+    <p class="lead">Пишіть, якщо щось не так з оплатою, записом чи мийкою. Про гроші відповідаємо до 2 годин, решта — протягом доби. Вкажіть номер запису: він є в картці запису, наприклад «№ 100245».</p>
     ${list.length ? `<h2>Ваші звернення</h2><div class="stack" style="gap:8px">${list.map((t) => ticketCard(t, false)).join('')}</div>` : ''}
     <h2>Нове звернення</h2>
     <form id="ticket-form" class="card stack">
       <label class="field"><span>Тема</span><select name="topic">${CLIENT_TOPICS.map((k) => `<option value="${k}" ${pb && pb.state === 'done' && k === 'quality' ? 'selected' : ''}>${TICKET_TOPICS[k]}</option>`).join('')}</select></label>
       <label class="field"><span>Запис</span><select name="booking"><option value="">Не стосується запису</option>
-        ${options.map((b) => `<option value="${b.id}" ${b.id === pre ? 'selected' : ''}>${esc(placeById(b.placeId)?.name ?? '')} · ${dayLabel(b.date, { day: 'numeric', month: 'short' })} ${b.time} · ${STATE_LABEL[b.state]?.[1] ?? ''}</option>`).join('')}</select></label>
+        ${options.map((b) => `<option value="${b.id}" ${b.id === pre ? 'selected' : ''}>${bookingNo(b)} · ${esc(placeById(b.placeId)?.name ?? '')} · ${dayLabel(b.date, { day: 'numeric', month: 'short' })} ${b.time}</option>`).join('')}</select></label>
+      <label class="field"><span>Або номер запису</span><input name="bookingNo" inputmode="numeric" autocomplete="off" placeholder="Наприклад, 100245"></label>
       <label class="field"><span>Що сталося?</span><textarea name="text" rows="4" required maxlength="1000" placeholder="Опишіть ситуацію: що, коли й що ви очікуєте від нас"></textarea></label>
+      ${photoPick('Додати фото (до 3)')}
       <label class="check-row small"><input class="check" type="checkbox" name="dispute"><span>Відкрити спір: заморозити оплату за цим записом, доки модератор не вирішить (для виконаних чи оплачених записів)</span></label>
       <button class="btn primary block" type="submit">${icon('chat', 18)}Надіслати в підтримку</button>
       <p class="fine">Звернення бачить лише служба підтримки CARCAR${pb ? ' і, якщо потрібно, точка з вашого запису' : ''}. Відповідь прийде в «Повідомлення».</p>
     </form>`;
 }
+
+// Фото до звернення: до 3 знімків, зменшених до 720 px.
+const photoPick = (label) => `<label class="dropzone small-drop">${icon('camera', 20)}${label}<span class="photo-count" aria-live="polite"></span>
+  <input class="sr-only" name="photos" type="file" accept="image/*" multiple></label>`;
+const formPhotos = async (f) => (await Promise.all(f.getAll('photos').filter((x) => x.size).slice(0, 3).map(shrinkPhoto))).filter(Boolean);
 
 function supportCard() {
   const unread = myTickets().filter((t) => t.unreadUser).length;
@@ -3025,14 +3035,19 @@ document.addEventListener('submit', async (e) => {
     e.preventDefault();
     const f = new FormData(e.target);
     const text = f.get('text').trim();
-    if (!text) return;
+    const photos = await formPhotos(f);
+    if (!text && !photos.length) return;
     if (e.target.matches('.ticket-reply')) {
-      ticketReply(e.target.dataset.id, 'client', text);
+      ticketReply(e.target.dataset.id, 'client', text, undefined, photos);
       route();
       toast('Повідомлення надіслано в підтримку');
       return;
     }
-    const b = bookings.find((x) => x.id === f.get('booking'));
+    // Запис зі списку або за номером, який людина вписала сама.
+    const typedNo = f.get('bookingNo')?.trim();
+    const byNo = typedNo ? findByNo(mine(), typedNo) : null;
+    if (typedNo && !byNo) { toast(`Запис № ${typedNo.replace(/\D/g, '')} не знайдено серед ваших записів`); return; }
+    const b = byNo ?? bookings.find((x) => x.id === f.get('booking'));
     let topic = f.get('topic');
     let disputed = false;
     if (f.get('dispute')) {
@@ -3041,7 +3056,7 @@ document.addEventListener('submit', async (e) => {
       topic = 'dispute';
       disputed = true;
     }
-    const t = openTicket({ from: 'client', placeId: b?.placeId ?? null, bookingId: b?.id ?? null, topic, text, clientName: profile.name, clientPhone: profile.phone, clientKey: myKeys()[0] });
+    const t = openTicket({ from: 'client', placeId: b?.placeId ?? null, bookingId: b?.id ?? null, topic, text, clientName: profile.name, clientPhone: profile.phone, clientKey: myKeys()[0], photos });
     if (b) { b.ticketId = t.id; save(); }
     track('ticket', { topic });
     location.hash = `#/support/t/${t.id}`;

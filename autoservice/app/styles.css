@@ -1080,3 +1080,12 @@ body.in-auth #view { padding: 0; max-width: none; }
 .logout-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
 .auth-name input { width: 100%; height: 60px; padding: 0 16px; border: 1.5px solid var(--line); border-radius: 16px; background: var(--soft); font: inherit; font-size: 19px; font-weight: 600; color: var(--text); }
 .auth-name input:focus { outline: 0; border-color: var(--accent); background: var(--bg); }
+
+/* Номер запису й фото у зверненнях */
+.bk-no { display: inline-block; margin-top: 2px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ticket-photos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.ticket-photos img { width: 96px; height: 96px; object-fit: cover; border-radius: 10px; display: block; }
+.ticket-photos .chat-photo img { max-width: none; }
+.dropzone.small-drop { padding: 12px; font-size: 14px; flex-direction: row; gap: 8px; }
+.support-search { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 12px; }
+.support-search .field { flex: 1 1 200px; }

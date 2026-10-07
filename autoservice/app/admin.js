@@ -8,7 +8,7 @@ import {
   ratingFor, visibleReviews, ACTIVE, resolveDispute, settleAll, applyOverrides, promosAll, savePromos, promoUses, promoText,
   TICKET_TOPICS, TICKET_STATUS, ticketsAll, ticketReply, setTicket, ticketOverdue, slaHours, fraudState, saveFraud, staffOf, phoneKey,
   addCustomPlace, uid, hash,
-  enterView, bizApps, APP_STATUS, approveBizApp, rejectBizApp,
+  enterView, bizApps, APP_STATUS, approveBizApp, rejectBizApp, bookingNo, findByNo, ticketPhotos, shrinkPhoto,
 } from './core.js';
 import { ENTITY, TAX, DOCS, OFFER, codeValid, ibanValid, ibanBank, formatIban, missingSteps } from './partners.js';
 import { drawColumns, legend, tableView, hbars, hideTip } from './charts.js';
@@ -412,7 +412,10 @@ const slaText = (t) => {
 function viewSupport(id) {
   if (id) return viewTicket(id);
   const all = ticketsAll();
-  const list = all.filter(SUPPORT_FILTERS[ui.support][1]).sort((a, b) => (b.priority === 'high') - (a.priority === 'high') || (b.unreadAdmin - a.unreadAdmin) || b.updatedAt - a.updatedAt);
+  // Пошук за номером звернення чи запису: клієнт називає «№ 100245» — знаходимо всі звернення про нього.
+  const q = (ui.supportQ ?? '').replace(/\D/g, '');
+  const byNo = q ? findByNo(bookings, q) : null;
+  const list = all.filter((t) => (q ? t.no === Number(q) || (byNo && t.bookingId === byNo.id) : SUPPORT_FILTERS[ui.support][1](t))).sort((a, b) => (b.priority === 'high') - (a.priority === 'high') || (b.unreadAdmin - a.unreadAdmin) || b.updatedAt - a.updatedAt);
   const open = all.filter((t) => t.status !== 'closed');
   const replied = all.filter((t) => t.firstReplyAt);
   const avg = replied.length ? replied.reduce((a, t) => a + (t.firstReplyAt - t.createdAt), 0) / replied.length / 60000 : 0;
@@ -423,6 +426,12 @@ function viewSupport(id) {
       <div class="kpi"><span class="label">Перша відповідь</span><span class="value">${replied.length ? (avg < 60 ? `${Math.round(avg)} хв` : `${(avg / 60).toLocaleString('uk-UA', { maximumFractionDigits: 1 })} год`) : '—'}</span><span class="kpi-note">у середньому</span></div>
       <div class="kpi"><span class="label">Повʼязані зі спорами</span><span class="value">${open.filter((t) => bookings.find((b) => b.id === t.bookingId)?.state === 'dispute').length}</span></div>
     </section>
+    <form class="filters support-search" id="support-search">
+      <label class="field"><span>Номер запису чи звернення</span><input name="q" inputmode="numeric" autocomplete="off" placeholder="100245" value="${esc(ui.supportQ ?? '')}"></label>
+      <button class="btn" type="submit">Знайти</button>${q ? '<button class="btn" type="button" data-action="support-q-clear">Скинути</button>' : ''}
+    </form>
+    ${q && byNo ? `<p class="notice" style="margin:0 0 12px">Запис ${bookingNo(byNo)}: ${esc(placeName(byNo.placeId))}, ${dayLabel(byNo.date, { day: 'numeric', month: 'short' })} ${byNo.time} · ${esc(byNo.clientName || 'клієнт')} · ${uah(price(byNo))}</p>` : ''}
+    ${q && !byNo && !list.length ? `<p class="notice warn" style="margin:0 0 12px">Нічого не знайдено за номером ${esc(q)}.</p>` : ''}
     <div class="filters"><div class="seg" role="group" aria-label="Фільтр звернень">
       ${Object.entries(SUPPORT_FILTERS).map(([k, [label, fn]]) => `<button data-action="support-filter" data-f="${k}" aria-pressed="${ui.support === k}">${label} · ${all.filter(fn).length}</button>`).join('')}
     </div></div>
@@ -433,7 +442,7 @@ function viewSupport(id) {
         const [label, cls] = TICKET_STATUS[t.status];
         return `<tr class="link-row${t.unreadAdmin ? ' unread' : ''}" data-href="#/support/${t.id}"><td><a class="row-link" href="#/support/${t.id}">№${t.no}</a>${t.priority === 'high' ? '<small class="bad-text">терміново</small>' : ''}</td>
           <td>${ticketFrom(t)}</td><td>${TICKET_TOPICS[t.topic]}</td>
-          <td>${b ? `${dayLabel(b.date, { day: 'numeric', month: 'short' })} ${b.time}${b.state === 'dispute' ? ' <span class="pill warn">Спір</span>' : ''}` : '—'}</td>
+          <td>${b ? `${b.no ? `<b>${bookingNo(b)}</b><small>` : ''}${dayLabel(b.date, { day: 'numeric', month: 'short' })} ${b.time}${b.no ? '</small>' : ''}${b.state === 'dispute' ? ' <span class="pill warn">Спір</span>' : ''}` : '—'}</td>
           <td class="small">${esc(t.messages.at(-1).text.slice(0, 70))}${t.messages.at(-1).text.length > 70 ? '…' : ''}<small>${fmtTime(t.updatedAt)}</small></td>
           <td>${slaText(t)}</td><td><span class="pill ${cls}">${label}</span>${t.unreadAdmin ? ' <span class="pill warn">нове</span>' : ''}</td></tr>`;
       }).join('') : '<tr><td colspan="7" class="muted">Немає звернень у цьому списку.</td></tr>'}</tbody>
@@ -453,10 +462,12 @@ function viewTicket(id) {
     <div class="grid-2">
       <section class="panel stack" aria-labelledby="h-thread" style="gap:12px">
         <h2 id="h-thread">Листування</h2>
-        <ol class="thread">${t.messages.map((m) => `<li class="msg ${m.from === 'admin' ? 'client' : 'biz'}"><span class="who">${m.from === 'admin' ? 'CARCAR' : m.from === 'place' ? 'Точка' : 'Клієнт'} · ${fmtTime(m.at)}</span>${esc(m.text)}</li>`).join('')}</ol>
+        <ol class="thread">${t.messages.map((m) => `<li class="msg ${m.from === 'admin' ? 'client' : 'biz'}"><span class="who">${m.from === 'admin' ? 'CARCAR' : m.from === 'place' ? 'Точка' : 'Клієнт'} · ${fmtTime(m.at)}</span>${esc(m.text)}${ticketPhotos(m.photos)}</li>`).join('')}</ol>
         <form id="admin-reply" class="stack" data-id="${t.id}" style="gap:10px">
           <div class="quick" role="group" aria-label="Шаблони відповідей">${REPLY_TEMPLATES.map((x, i) => `<button class="chip" type="button" data-action="tpl" data-i="${i}">${esc(x.split(/[.!—]/)[0])}</button>`).join('')}</div>
-          <label class="field"><span>Відповідь</span><textarea name="text" rows="3" required maxlength="1000"></textarea></label>
+          <label class="field"><span>Відповідь</span><textarea name="text" rows="3" maxlength="1000"></textarea></label>
+          <label class="dropzone small-drop">${icon('camera', 20)}Додати фото (до 3)<span class="photo-count" aria-live="polite"></span>
+            <input class="sr-only" name="photos" type="file" accept="image/*" multiple></label>
           <div class="row">
             <label class="field" style="flex:1"><span>Після відповіді</span><select name="status">
               <option value="waiting">Чекаємо відповіді автора</option><option value="open">Залишити в роботі</option><option value="closed">Закрити звернення</option></select></label>
@@ -468,6 +479,7 @@ function viewTicket(id) {
       <section class="panel stack" aria-labelledby="h-linked" style="gap:10px">
         <h2 id="h-linked">Запис і спір</h2>
         ${b ? `<dl class="kv">
+            ${b.no ? `<dt>Номер</dt><dd><b>${bookingNo(b)}</b></dd>` : ''}
             <dt>Точка</dt><dd><a href="#/places/${b.placeId}">${esc(placeName(b.placeId))}</a></dd>
             <dt>Візит</dt><dd>${dayLabel(b.date, { weekday: 'short', day: 'numeric', month: 'long' })}, ${b.time} · ${esc(b.services.join(', '))}</dd>
             <dt>Клієнт</dt><dd>${esc(b.clientName || '—')}${b.clientPhone ? ` · ${esc(b.clientPhone)}` : ''}</dd>
@@ -1267,6 +1279,7 @@ document.addEventListener('click', (e) => {
     const url = campaignLink(campaigns().find((c) => c.id === id));
     navigator.clipboard?.writeText(url).then(() => toast('Посилання скопійовано'), () => toast(url));
   }
+  else if (action === 'support-q-clear') { ui.supportQ = ''; rerender(); }
   else if (action === 'tpl') { const ta = $('#admin-reply textarea'); ta.value = REPLY_TEMPLATES[Number(el.dataset.i)]; ta.focus(); }
   else if (action === 'ticket-close') { setTicket(id, { status: 'closed' }); rerender(); toast('Звернення закрито'); }
   else if (action === 'escalate') {
@@ -1291,10 +1304,11 @@ document.addEventListener('keydown', (e) => {
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('tr.link-row[data-href]')) location.hash = e.target.dataset.href;
 });
 
-document.addEventListener('submit', (e) => {
+document.addEventListener('submit', async (e) => {
   const f = e.target;
   e.preventDefault();
   const d = new FormData(f);
+  if (f.id === 'support-search') { ui.supportQ = String(d.get('q') ?? '').trim(); rerender(); return; }
   if (f.id === 'moderate-form') moderate(f.dataset.id, e.submitter?.value, d.get('note').trim());
   else if (f.id === 'campaign-form') {
     const name = d.get('name').trim();
@@ -1315,7 +1329,9 @@ document.addEventListener('submit', (e) => {
     toast('Припущення збережено');
   }
   else if (f.id === 'admin-reply') {
-    ticketReply(f.dataset.id, 'admin', d.get('text').trim(), d.get('status'));
+    const photos = (await Promise.all(d.getAll('photos').filter((x) => x?.size).slice(0, 3).map(shrinkPhoto))).filter(Boolean);
+    if (!d.get('text').trim() && !photos.length) return;
+    ticketReply(f.dataset.id, 'admin', d.get('text').trim(), d.get('status'), photos);
     rerender();
     toast(d.get('status') === 'closed' ? 'Відповідь надіслано, звернення закрито' : 'Відповідь надіслано');
   }
@@ -1377,3 +1393,11 @@ $('#to-biz').innerHTML = `${icon('chevL', 18)}Панель для бізнесу
 $('#admin-badge').innerHTML = `${icon('shield', 18)}Демо-доступ модератора: у робочій версії — лише для співробітників CARCAR із двофакторним входом`;
 window.addEventListener('hashchange', () => { route(); window.scrollTo(0, 0); });
 route();
+
+// Скільки фото обрано для відповіді.
+document.addEventListener('change', (e) => {
+  if (e.target.name !== 'photos') return;
+  const n = Math.min(e.target.files.length, 3);
+  const out = e.target.closest('form')?.querySelector('.photo-count');
+  if (out) out.textContent = n ? `Обрано фото: ${n}` : '';
+});

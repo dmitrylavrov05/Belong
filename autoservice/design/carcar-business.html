@@ -1090,6 +1090,15 @@ body.in-auth #view { padding: 0; max-width: none; }
 .logout-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
 .auth-name input { width: 100%; height: 60px; padding: 0 16px; border: 1.5px solid var(--line); border-radius: 16px; background: var(--soft); font: inherit; font-size: 19px; font-weight: 600; color: var(--text); }
 .auth-name input:focus { outline: 0; border-color: var(--accent); background: var(--bg); }
+
+/* Номер запису й фото у зверненнях */
+.bk-no { display: inline-block; margin-top: 2px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ticket-photos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.ticket-photos img { width: 96px; height: 96px; object-fit: cover; border-radius: 10px; display: block; }
+.ticket-photos .chat-photo img { max-width: none; }
+.dropzone.small-drop { padding: 12px; font-size: 14px; flex-direction: row; gap: 8px; }
+.support-search { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 12px; }
+.support-search .field { flex: 1 1 200px; }
 </style>
   <style>
 /* Панель для бізнесу CARCAR: десктоп-перший макет поверх токенів і компонентів styles.css. */
@@ -1672,7 +1681,7 @@ body.locked #view { padding: 0; }
         <label class="field"><span>Ви</span><select id="as"></select></label>
         <label class="field power-field"><span>Світло</span><select id="power"></select></label>
         <div class="biz-search" role="search">
-          <label><span class="sr-only">Пошук клієнта</span><input id="biz-q" type="search" autocomplete="off" placeholder="Клієнт, телефон чи номер авто" aria-describedby="keys-hint" aria-controls="biz-q-res"></label>
+          <label><span class="sr-only">Пошук клієнта</span><input id="biz-q" type="search" autocomplete="off" placeholder="Клієнт, телефон, авто чи № запису" aria-describedby="keys-hint" aria-controls="biz-q-res"></label>
           <div class="search-res" id="biz-q-res" hidden></div>
         </div>
         <span class="spacer"></span>
@@ -2425,10 +2434,37 @@ function balanceFor(placeId, bookings, payouts) {
   return { available: earned + passEarned - withdrawn, frozen: frozen + passFrozen, next, withdrawn };
 }
 
+// Номер запису: шість цифр по порядку, однаковий у клієнта, мийки й підтримки — його називають,
+// коли пишуть у підтримку. Записи без номера (старі чи щойно створені) отримують наступний.
+function numberBookings(list) {
+  let seq = store.get('seq.booking', 100000);
+  let changed = false;
+  for (const b of list) {
+    if (b.no) continue;
+    b.no = ++seq;
+    changed = true;
+  }
+  if (changed) store.set('seq.booking', seq);
+  return changed;
+}
+const bookingNo = (b) => (b?.no ? `№ ${b.no}` : '');
+// Пошук запису за номером: «100245», «№100245», «# 100 245».
+const findByNo = (list, text) => {
+  const n = Number(String(text).replace(/\D/g, ''));
+  return n ? list.find((b) => b.no === n) ?? null : null;
+};
+
+// Фото в зверненнях: до 3 штук у повідомленні. viewer — у застосунку клієнта відкриваються на весь екран.
+const ticketPhotos = (photos = [], viewer = false) => (photos.length ? `<span class="ticket-photos">${photos
+  .filter((src) => typeof src === 'string' && src.startsWith('data:image/'))
+  .map((src, i) => (viewer
+    ? `<button type="button" class="chat-photo" data-action="photo-open" aria-label="Відкрити фото ${i + 1}"><img src="${esc(src)}" alt="Фото ${i + 1}"></button>`
+    : `<a href="${esc(src)}" download="foto-${i + 1}.jpg"><img src="${esc(src)}" alt="Фото ${i + 1}"></a>`)).join('')}</span>` : '');
+
 // Виконання підтверджує мийка («Машина готова»). Записи зі старим проміжним станом «done»
 // (чекали підтвердження клієнта) вважаються виконаними з моменту, коли мийка їх закрила.
 function settleAll(bookings) {
-  let changed = false;
+  let changed = numberBookings(bookings);
   for (const b of bookings) {
     if (b.state === 'done') {
       complete(b, b.doneAt ?? Date.now());
@@ -2469,23 +2505,23 @@ const slaHours = (t) => (t.priority === 'high' ? 2 : 24);
 const ticketsAll = () => store.get('support', []);
 const saveTickets = (list) => store.set('support', list);
 
-function openTicket({ from, placeId = null, bookingId = null, topic, text, clientName = '', clientPhone = '', clientKey = null }) {
+function openTicket({ from, placeId = null, bookingId = null, topic, text, clientName = '', clientPhone = '', clientKey = null, photos = [] }) {
   const list = ticketsAll();
   const t = {
     id: uid(), no: 1000 + list.length + 1, from, placeId, bookingId, topic, clientName, clientPhone, clientKey,
     priority: URGENT.includes(topic) ? 'high' : 'normal', status: 'new',
-    messages: [{ from, text, at: Date.now() }], createdAt: Date.now(), updatedAt: Date.now(), unreadAdmin: true, unreadUser: false,
+    messages: [{ from, text, at: Date.now(), ...(photos.length ? { photos } : {}) }], createdAt: Date.now(), updatedAt: Date.now(), unreadAdmin: true, unreadUser: false,
   };
   saveTickets([...list, t]);
   return t;
 }
 
 // Повідомлення у зверненні. Відповідь CARCAR чекає реакції автора, відповідь автора повертає звернення в роботу.
-function ticketReply(id, from, text, status) {
+function ticketReply(id, from, text, status, photos = []) {
   const list = ticketsAll();
   const t = list.find((x) => x.id === id);
   if (!t) return null;
-  t.messages.push({ from, text, at: Date.now() });
+  t.messages.push({ from, text, at: Date.now(), ...(photos.length ? { photos } : {}) });
   t.updatedAt = Date.now();
   if (from === 'admin') {
     t.firstReplyAt ??= Date.now();
@@ -3190,6 +3226,7 @@ function load() {
 }
 
 function save() {
+  numberBookings(bookings);
   store.set('bookings', bookings);
   store.set('payouts', payouts);
   store.set('reviews', reviews);
@@ -5463,6 +5500,7 @@ function bookingDrawer(id) {
     <div class="row">${channelPill(b)}${statusPill(b)}</div>
     ${relNotice(b)}
     <dl class="kv">
+      ${b.no ? `<dt>Номер</dt><dd><b>${bookingNo(b)}</b></dd>` : ''}
       <dt>Дата</dt><dd>${dayLabel(b.date, { weekday: 'long', day: 'numeric', month: 'long' })}, ${b.time}–${hhmm(toMin(b.time) + b.minutes)}</dd>
       <dt>Клієнт</dt><dd><a href="#/clients/${encodeURIComponent(key)}" data-action="close-drawer-nav">${esc(clientName(b))}</a>${b.clientPhone ? ` · <a href="tel:${esc(b.clientPhone.replace(/[^+\d]/g, ''))}">${esc(b.clientPhone)}</a>` : ''}</dd>
       <dt>Авто</dt><dd>${esc(b.car || '—')}</dd>
@@ -5565,6 +5603,9 @@ function bizChat(b, text, photo = null) {
 
 const placeTickets = () => ticketsAll().filter((t) => t.placeId === ui.place && t.from === 'place').sort((a, b) => b.updatedAt - a.updatedAt);
 
+const supportPhotoPick = () => `<label class="dropzone small-drop">${icon('camera', 20)}Додати фото (до 3)<span class="photo-count" aria-live="polite"></span>
+  <input class="sr-only" name="photos" type="file" accept="image/*" multiple></label>`;
+
 function viewSupport(openId) {
   const list = placeTickets();
   const sel = list.find((t) => t.id === openId);
@@ -5581,16 +5622,19 @@ function viewSupport(openId) {
       }).join('')}</ul>` : '<p class="muted" style="margin:0">Звернень ще не було.</p>'}
       ${sel ? `<article class="ticket-open stack" aria-label="Звернення №${sel.no}" style="gap:10px">
         <div class="head"><b>№${sel.no} · ${TICKET_TOPICS[sel.topic]}</b><span class="pill ${TICKET_STATUS[sel.status][1]}">${TICKET_STATUS[sel.status][0]}</span></div>
-        <ol class="thread">${sel.messages.map((m) => `<li class="msg ${m.from === 'place' ? 'client' : 'biz'}"><span class="who">${m.from === 'admin' ? 'Підтримка CARCAR' : 'Ви'} · ${fmtTime(m.at)}</span>${esc(m.text)}</li>`).join('')}</ol>
-        <form class="inline-form" id="ticket-reply" data-id="${sel.id}"><label class="field"><span>Відповідь підтримці</span><input name="text" required maxlength="800" autocomplete="off"></label>
-          <button class="btn primary" type="submit">Надіслати</button></form></article>` : ''}
+        ${sel.bookingId && bookings.find((x) => x.id === sel.bookingId)?.no ? `<p class="small muted" style="margin:0">Запис ${bookingNo(bookings.find((x) => x.id === sel.bookingId))}</p>` : ''}
+        <ol class="thread">${sel.messages.map((m) => `<li class="msg ${m.from === 'place' ? 'client' : 'biz'}"><span class="who">${m.from === 'admin' ? 'Підтримка CARCAR' : 'Ви'} · ${fmtTime(m.at)}</span>${esc(m.text)}${ticketPhotos(m.photos)}</li>`).join('')}</ol>
+        <form class="stack" id="ticket-reply" data-id="${sel.id}" style="gap:8px"><label class="field"><span>Відповідь підтримці</span><input name="text" maxlength="800" autocomplete="off"></label>
+          ${supportPhotoPick()}<button class="btn primary" type="submit" style="align-self:flex-start">Надіслати</button></form></article>` : ''}
     </section>
     <form id="ticket-form" class="panel stack" aria-labelledby="h-new-ticket" style="gap:12px">
       <h2 id="h-new-ticket">Нове звернення</h2>
       <label class="field"><span>Тема</span><select name="topic">${PLACE_TOPICS.map((k) => `<option value="${k}">${TICKET_TOPICS[k]}</option>`).join('')}</select></label>
       <label class="field"><span>Запис (необовʼязково)</span><select name="booking"><option value="">Не стосується запису</option>
-        ${recent.map((b) => `<option value="${b.id}">${dayLabel(b.date, { day: 'numeric', month: 'short' })} ${b.time} · ${esc(clientName(b))} · ${STATUS[b.state][0]}</option>`).join('')}</select></label>
+        ${recent.map((b) => `<option value="${b.id}">${bookingNo(b)} · ${dayLabel(b.date, { day: 'numeric', month: 'short' })} ${b.time} · ${esc(clientName(b))}</option>`).join('')}</select></label>
+      <label class="field"><span>Або номер запису</span><input name="bookingNo" inputmode="numeric" autocomplete="off" placeholder="Наприклад, 100245"></label>
       <label class="field"><span>Опишіть питання</span><textarea name="text" rows="4" required maxlength="1000"></textarea></label>
+      ${supportPhotoPick()}
       <button class="btn primary" type="submit" style="align-self:flex-start">Надіслати</button>
     </form>
     </div>`;
@@ -5897,7 +5941,9 @@ function searchHits(q) {
   const hit = (...vals) => vals.some((v) => v && String(v).toLowerCase().includes(text))
     || (digits.length >= 3 && vals.some((v) => v && String(v).replace(/\D/g, '').includes(digits)));
   const clients = clientsList().filter((c) => hit(c.name, c.phone, ...c.cars) || c.list.some((b) => b.plate && b.plate.replace(/[\s-]/g, '').toUpperCase().includes(plate))).slice(0, 6);
-  const upcoming = own().filter((b) => b.date >= today() && BLOCKING.includes(b.state) && (hit(clientName(b), b.clientPhone, b.car, b.plate) || (b.plate && b.plate.replace(/[\s-]/g, '').toUpperCase().includes(plate))))
+  // Номер запису («100245» чи «№100245») знаходить запис будь-якої давності.
+  const exact = /^№?\s*\d{6}$/.test(text.replace(/\s/g, '')) ? findByNo(own(), text) : null;
+  const upcoming = exact ? [exact] : own().filter((b) => b.date >= today() && BLOCKING.includes(b.state) && (hit(clientName(b), b.clientPhone, b.car, b.plate) || (b.plate && b.plate.replace(/[\s-]/g, '').toUpperCase().includes(plate))))
     .sort((a, b) => bookingStart(a) - bookingStart(b)).slice(0, 4);
   return { clients, upcoming };
 }
@@ -5908,7 +5954,7 @@ function renderSearch(q) {
   if (!r) { box.hidden = true; box.innerHTML = ''; return; }
   const none = !r.clients.length && !r.upcoming.length;
   box.innerHTML = none ? `<p class="muted small">Нічого не знайдено. <button class="link-btn" data-action="new-booking">Новий запис</button></p>`
-    : `${r.upcoming.length ? `<h3>Найближчі записи</h3><ul>${r.upcoming.map((b) => `<li><button data-action="open-booking" data-id="${b.id}">${icon('calendar', 16)}<span><b>${dayLabel(b.date, { day: 'numeric', month: 'short' })}, ${b.time} · ${esc(clientName(b))}</b><small>${esc(`${carText(b)} · ${b.services.join(', ')}`)}</small></span></button></li>`).join('')}</ul>` : ''}
+    : `${r.upcoming.length ? `<h3>Найближчі записи</h3><ul>${r.upcoming.map((b) => `<li><button data-action="open-booking" data-id="${b.id}">${icon('calendar', 16)}<span><b>${b.no ? `${bookingNo(b)} · ` : ''}${dayLabel(b.date, { day: 'numeric', month: 'short' })}, ${b.time} · ${esc(clientName(b))}</b><small>${esc(`${carText(b)} · ${b.services.join(', ')}`)}</small></span></button></li>`).join('')}</ul>` : ''}
       ${r.clients.length ? `<h3>Клієнти</h3><ul>${r.clients.map((c) => `<li><a href="#/clients/${encodeURIComponent(c.key)}">${icon('users', 16)}<span><b>${esc(c.name)}</b><small>${esc([c.phone, [...c.cars].join(', '), c.visits ? `${c.visits} ${plural(c.visits, 'візит', 'візити', 'візитів')}` : ''].filter(Boolean).join(' · '))}</small></span></a></li>`).join('')}</ul>` : ''}`;
   box.hidden = false;
 }
@@ -6461,15 +6507,19 @@ document.addEventListener('submit', async (e) => {
   if (f.id === 'ticket-form' || f.id === 'ticket-reply' || f.id === 'dispute-note') {
     const d = new FormData(f);
     const text = d.get('text').trim();
-    if (!text) return;
+    const photos = (await Promise.all(d.getAll('photos').filter((x) => x?.size).slice(0, 3).map(shrinkPhoto))).filter(Boolean);
+    if (!text && !photos.length) return;
     if (f.id === 'ticket-reply') {
-      ticketReply(f.dataset.id, 'place', text);
+      ticketReply(f.dataset.id, 'place', text, undefined, photos);
       rerenderKeepScroll();
       toast('Повідомлення надіслано в підтримку');
       return;
     }
-    const b = bookings.find((x) => x.id === (f.id === 'dispute-note' ? f.dataset.id : d.get('booking')));
-    const t = openTicket({ from: 'place', placeId: ui.place, bookingId: b?.id ?? null, topic: f.id === 'dispute-note' ? 'dispute' : d.get('topic'), text, clientName: b ? clientName(b) : '' });
+    const typedNo = d.get('bookingNo')?.trim();
+    const byNo = typedNo ? findByNo(own(), typedNo) : null;
+    if (typedNo && !byNo) { toast(`Запис № ${typedNo.replace(/\D/g, '')} не знайдено у вашій точці`); return; }
+    const b = byNo ?? bookings.find((x) => x.id === (f.id === 'dispute-note' ? f.dataset.id : d.get('booking')));
+    const t = openTicket({ from: 'place', placeId: ui.place, bookingId: b?.id ?? null, topic: f.id === 'dispute-note' ? 'dispute' : d.get('topic'), text, clientName: b ? clientName(b) : '', photos });
     if (f.id === 'dispute-note') { closeDrawer(); }
     location.hash = `#/support/${t.id}`;
     toast(`Звернення №${t.no} надіслано в CARCAR`);

@@ -7,7 +7,7 @@ import {
   fmtTime, fmtDate, hash, bookingStart, hoursFor, scheduleOf, widestRange, inBreak, rangeText, WEEKDAYS, WEEKDAY_NAMES,
   weekdayOf, phoneKey, offersOf, offerAsService, EXPENSE_CATS, PAY_METHODS, expensesIn, serviceCat, catById, shrinkPhoto, applyOverrides, saveOverride,
   ACTIVE, BLOCKING, HOUR, reliability, isCarcar, price, complete, isFrozen, balanceFor, settleAll, ratingFor,
-  PARTNER_STATUS, partnerOf, savePartner, payoutReady, maskIban, commissionFor, addCustomPlace, checkBizLogin,
+  PARTNER_STATUS, partnerOf, savePartner, payoutReady, maskIban, commissionFor, addCustomPlace, checkBizLogin, numberBookings, bookingNo, findByNo, ticketPhotos,
   ROLES, staffOf, workBase, POWER, powerOf, setPower, TICKET_TOPICS, PLACE_TOPICS, TICKET_STATUS, ticketsAll, openTicket, ticketReply, setTicket, mobileOn, spanOf, MOBILE_ROAD,
   enterView,
 } from './core.js';
@@ -38,6 +38,7 @@ function load() {
 }
 
 function save() {
+  numberBookings(bookings);
   store.set('bookings', bookings);
   store.set('payouts', payouts);
   store.set('reviews', reviews);
@@ -2311,6 +2312,7 @@ function bookingDrawer(id) {
     <div class="row">${channelPill(b)}${statusPill(b)}</div>
     ${relNotice(b)}
     <dl class="kv">
+      ${b.no ? `<dt>Номер</dt><dd><b>${bookingNo(b)}</b></dd>` : ''}
       <dt>Дата</dt><dd>${dayLabel(b.date, { weekday: 'long', day: 'numeric', month: 'long' })}, ${b.time}–${hhmm(toMin(b.time) + b.minutes)}</dd>
       <dt>Клієнт</dt><dd><a href="#/clients/${encodeURIComponent(key)}" data-action="close-drawer-nav">${esc(clientName(b))}</a>${b.clientPhone ? ` · <a href="tel:${esc(b.clientPhone.replace(/[^+\d]/g, ''))}">${esc(b.clientPhone)}</a>` : ''}</dd>
       <dt>Авто</dt><dd>${esc(b.car || '—')}</dd>
@@ -2413,6 +2415,9 @@ function bizChat(b, text, photo = null) {
 
 const placeTickets = () => ticketsAll().filter((t) => t.placeId === ui.place && t.from === 'place').sort((a, b) => b.updatedAt - a.updatedAt);
 
+const supportPhotoPick = () => `<label class="dropzone small-drop">${icon('camera', 20)}Додати фото (до 3)<span class="photo-count" aria-live="polite"></span>
+  <input class="sr-only" name="photos" type="file" accept="image/*" multiple></label>`;
+
 function viewSupport(openId) {
   const list = placeTickets();
   const sel = list.find((t) => t.id === openId);
@@ -2429,16 +2434,19 @@ function viewSupport(openId) {
       }).join('')}</ul>` : '<p class="muted" style="margin:0">Звернень ще не було.</p>'}
       ${sel ? `<article class="ticket-open stack" aria-label="Звернення №${sel.no}" style="gap:10px">
         <div class="head"><b>№${sel.no} · ${TICKET_TOPICS[sel.topic]}</b><span class="pill ${TICKET_STATUS[sel.status][1]}">${TICKET_STATUS[sel.status][0]}</span></div>
-        <ol class="thread">${sel.messages.map((m) => `<li class="msg ${m.from === 'place' ? 'client' : 'biz'}"><span class="who">${m.from === 'admin' ? 'Підтримка CARCAR' : 'Ви'} · ${fmtTime(m.at)}</span>${esc(m.text)}</li>`).join('')}</ol>
-        <form class="inline-form" id="ticket-reply" data-id="${sel.id}"><label class="field"><span>Відповідь підтримці</span><input name="text" required maxlength="800" autocomplete="off"></label>
-          <button class="btn primary" type="submit">Надіслати</button></form></article>` : ''}
+        ${sel.bookingId && bookings.find((x) => x.id === sel.bookingId)?.no ? `<p class="small muted" style="margin:0">Запис ${bookingNo(bookings.find((x) => x.id === sel.bookingId))}</p>` : ''}
+        <ol class="thread">${sel.messages.map((m) => `<li class="msg ${m.from === 'place' ? 'client' : 'biz'}"><span class="who">${m.from === 'admin' ? 'Підтримка CARCAR' : 'Ви'} · ${fmtTime(m.at)}</span>${esc(m.text)}${ticketPhotos(m.photos)}</li>`).join('')}</ol>
+        <form class="stack" id="ticket-reply" data-id="${sel.id}" style="gap:8px"><label class="field"><span>Відповідь підтримці</span><input name="text" maxlength="800" autocomplete="off"></label>
+          ${supportPhotoPick()}<button class="btn primary" type="submit" style="align-self:flex-start">Надіслати</button></form></article>` : ''}
     </section>
     <form id="ticket-form" class="panel stack" aria-labelledby="h-new-ticket" style="gap:12px">
       <h2 id="h-new-ticket">Нове звернення</h2>
       <label class="field"><span>Тема</span><select name="topic">${PLACE_TOPICS.map((k) => `<option value="${k}">${TICKET_TOPICS[k]}</option>`).join('')}</select></label>
       <label class="field"><span>Запис (необовʼязково)</span><select name="booking"><option value="">Не стосується запису</option>
-        ${recent.map((b) => `<option value="${b.id}">${dayLabel(b.date, { day: 'numeric', month: 'short' })} ${b.time} · ${esc(clientName(b))} · ${STATUS[b.state][0]}</option>`).join('')}</select></label>
+        ${recent.map((b) => `<option value="${b.id}">${bookingNo(b)} · ${dayLabel(b.date, { day: 'numeric', month: 'short' })} ${b.time} · ${esc(clientName(b))}</option>`).join('')}</select></label>
+      <label class="field"><span>Або номер запису</span><input name="bookingNo" inputmode="numeric" autocomplete="off" placeholder="Наприклад, 100245"></label>
       <label class="field"><span>Опишіть питання</span><textarea name="text" rows="4" required maxlength="1000"></textarea></label>
+      ${supportPhotoPick()}
       <button class="btn primary" type="submit" style="align-self:flex-start">Надіслати</button>
     </form>
     </div>`;
@@ -2745,7 +2753,9 @@ function searchHits(q) {
   const hit = (...vals) => vals.some((v) => v && String(v).toLowerCase().includes(text))
     || (digits.length >= 3 && vals.some((v) => v && String(v).replace(/\D/g, '').includes(digits)));
   const clients = clientsList().filter((c) => hit(c.name, c.phone, ...c.cars) || c.list.some((b) => b.plate && b.plate.replace(/[\s-]/g, '').toUpperCase().includes(plate))).slice(0, 6);
-  const upcoming = own().filter((b) => b.date >= today() && BLOCKING.includes(b.state) && (hit(clientName(b), b.clientPhone, b.car, b.plate) || (b.plate && b.plate.replace(/[\s-]/g, '').toUpperCase().includes(plate))))
+  // Номер запису («100245» чи «№100245») знаходить запис будь-якої давності.
+  const exact = /^№?\s*\d{6}$/.test(text.replace(/\s/g, '')) ? findByNo(own(), text) : null;
+  const upcoming = exact ? [exact] : own().filter((b) => b.date >= today() && BLOCKING.includes(b.state) && (hit(clientName(b), b.clientPhone, b.car, b.plate) || (b.plate && b.plate.replace(/[\s-]/g, '').toUpperCase().includes(plate))))
     .sort((a, b) => bookingStart(a) - bookingStart(b)).slice(0, 4);
   return { clients, upcoming };
 }
@@ -2756,7 +2766,7 @@ function renderSearch(q) {
   if (!r) { box.hidden = true; box.innerHTML = ''; return; }
   const none = !r.clients.length && !r.upcoming.length;
   box.innerHTML = none ? `<p class="muted small">Нічого не знайдено. <button class="link-btn" data-action="new-booking">Новий запис</button></p>`
-    : `${r.upcoming.length ? `<h3>Найближчі записи</h3><ul>${r.upcoming.map((b) => `<li><button data-action="open-booking" data-id="${b.id}">${icon('calendar', 16)}<span><b>${dayLabel(b.date, { day: 'numeric', month: 'short' })}, ${b.time} · ${esc(clientName(b))}</b><small>${esc(`${carText(b)} · ${b.services.join(', ')}`)}</small></span></button></li>`).join('')}</ul>` : ''}
+    : `${r.upcoming.length ? `<h3>Найближчі записи</h3><ul>${r.upcoming.map((b) => `<li><button data-action="open-booking" data-id="${b.id}">${icon('calendar', 16)}<span><b>${b.no ? `${bookingNo(b)} · ` : ''}${dayLabel(b.date, { day: 'numeric', month: 'short' })}, ${b.time} · ${esc(clientName(b))}</b><small>${esc(`${carText(b)} · ${b.services.join(', ')}`)}</small></span></button></li>`).join('')}</ul>` : ''}
       ${r.clients.length ? `<h3>Клієнти</h3><ul>${r.clients.map((c) => `<li><a href="#/clients/${encodeURIComponent(c.key)}">${icon('users', 16)}<span><b>${esc(c.name)}</b><small>${esc([c.phone, [...c.cars].join(', '), c.visits ? `${c.visits} ${plural(c.visits, 'візит', 'візити', 'візитів')}` : ''].filter(Boolean).join(' · '))}</small></span></a></li>`).join('')}</ul>` : ''}`;
   box.hidden = false;
 }
@@ -3309,15 +3319,19 @@ document.addEventListener('submit', async (e) => {
   if (f.id === 'ticket-form' || f.id === 'ticket-reply' || f.id === 'dispute-note') {
     const d = new FormData(f);
     const text = d.get('text').trim();
-    if (!text) return;
+    const photos = (await Promise.all(d.getAll('photos').filter((x) => x?.size).slice(0, 3).map(shrinkPhoto))).filter(Boolean);
+    if (!text && !photos.length) return;
     if (f.id === 'ticket-reply') {
-      ticketReply(f.dataset.id, 'place', text);
+      ticketReply(f.dataset.id, 'place', text, undefined, photos);
       rerenderKeepScroll();
       toast('Повідомлення надіслано в підтримку');
       return;
     }
-    const b = bookings.find((x) => x.id === (f.id === 'dispute-note' ? f.dataset.id : d.get('booking')));
-    const t = openTicket({ from: 'place', placeId: ui.place, bookingId: b?.id ?? null, topic: f.id === 'dispute-note' ? 'dispute' : d.get('topic'), text, clientName: b ? clientName(b) : '' });
+    const typedNo = d.get('bookingNo')?.trim();
+    const byNo = typedNo ? findByNo(own(), typedNo) : null;
+    if (typedNo && !byNo) { toast(`Запис № ${typedNo.replace(/\D/g, '')} не знайдено у вашій точці`); return; }
+    const b = byNo ?? bookings.find((x) => x.id === (f.id === 'dispute-note' ? f.dataset.id : d.get('booking')));
+    const t = openTicket({ from: 'place', placeId: ui.place, bookingId: b?.id ?? null, topic: f.id === 'dispute-note' ? 'dispute' : d.get('topic'), text, clientName: b ? clientName(b) : '', photos });
     if (f.id === 'dispute-note') { closeDrawer(); }
     location.hash = `#/support/${t.id}`;
     toast(`Звернення №${t.no} надіслано в CARCAR`);

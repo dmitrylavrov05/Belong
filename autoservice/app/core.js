@@ -495,10 +495,37 @@ export function balanceFor(placeId, bookings, payouts) {
   return { available: earned + passEarned - withdrawn, frozen: frozen + passFrozen, next, withdrawn };
 }
 
+// Номер запису: шість цифр по порядку, однаковий у клієнта, мийки й підтримки — його називають,
+// коли пишуть у підтримку. Записи без номера (старі чи щойно створені) отримують наступний.
+export function numberBookings(list) {
+  let seq = store.get('seq.booking', 100000);
+  let changed = false;
+  for (const b of list) {
+    if (b.no) continue;
+    b.no = ++seq;
+    changed = true;
+  }
+  if (changed) store.set('seq.booking', seq);
+  return changed;
+}
+export const bookingNo = (b) => (b?.no ? `№ ${b.no}` : '');
+// Пошук запису за номером: «100245», «№100245», «# 100 245».
+export const findByNo = (list, text) => {
+  const n = Number(String(text).replace(/\D/g, ''));
+  return n ? list.find((b) => b.no === n) ?? null : null;
+};
+
+// Фото в зверненнях: до 3 штук у повідомленні. viewer — у застосунку клієнта відкриваються на весь екран.
+export const ticketPhotos = (photos = [], viewer = false) => (photos.length ? `<span class="ticket-photos">${photos
+  .filter((src) => typeof src === 'string' && src.startsWith('data:image/'))
+  .map((src, i) => (viewer
+    ? `<button type="button" class="chat-photo" data-action="photo-open" aria-label="Відкрити фото ${i + 1}"><img src="${esc(src)}" alt="Фото ${i + 1}"></button>`
+    : `<a href="${esc(src)}" download="foto-${i + 1}.jpg"><img src="${esc(src)}" alt="Фото ${i + 1}"></a>`)).join('')}</span>` : '');
+
 // Виконання підтверджує мийка («Машина готова»). Записи зі старим проміжним станом «done»
 // (чекали підтвердження клієнта) вважаються виконаними з моменту, коли мийка їх закрила.
 export function settleAll(bookings) {
-  let changed = false;
+  let changed = numberBookings(bookings);
   for (const b of bookings) {
     if (b.state === 'done') {
       complete(b, b.doneAt ?? Date.now());
@@ -539,23 +566,23 @@ export const slaHours = (t) => (t.priority === 'high' ? 2 : 24);
 export const ticketsAll = () => store.get('support', []);
 export const saveTickets = (list) => store.set('support', list);
 
-export function openTicket({ from, placeId = null, bookingId = null, topic, text, clientName = '', clientPhone = '', clientKey = null }) {
+export function openTicket({ from, placeId = null, bookingId = null, topic, text, clientName = '', clientPhone = '', clientKey = null, photos = [] }) {
   const list = ticketsAll();
   const t = {
     id: uid(), no: 1000 + list.length + 1, from, placeId, bookingId, topic, clientName, clientPhone, clientKey,
     priority: URGENT.includes(topic) ? 'high' : 'normal', status: 'new',
-    messages: [{ from, text, at: Date.now() }], createdAt: Date.now(), updatedAt: Date.now(), unreadAdmin: true, unreadUser: false,
+    messages: [{ from, text, at: Date.now(), ...(photos.length ? { photos } : {}) }], createdAt: Date.now(), updatedAt: Date.now(), unreadAdmin: true, unreadUser: false,
   };
   saveTickets([...list, t]);
   return t;
 }
 
 // Повідомлення у зверненні. Відповідь CARCAR чекає реакції автора, відповідь автора повертає звернення в роботу.
-export function ticketReply(id, from, text, status) {
+export function ticketReply(id, from, text, status, photos = []) {
   const list = ticketsAll();
   const t = list.find((x) => x.id === id);
   if (!t) return null;
-  t.messages.push({ from, text, at: Date.now() });
+  t.messages.push({ from, text, at: Date.now(), ...(photos.length ? { photos } : {}) });
   t.updatedAt = Date.now();
   if (from === 'admin') {
     t.firstReplyAt ??= Date.now();
