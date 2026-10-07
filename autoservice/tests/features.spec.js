@@ -264,7 +264,7 @@ test('захист від зловживань: 3 безкоштовні ска�
     await cancelFirst();
     await expect(page.locator('#toast')).toHaveText('Запис скасовано, 900 ₴ повернено на баланс');
   }
-  expect(dialogs[0]).toContain('Безкоштовних скасувань лишиться 2 з 3 за 30 днів');
+  expect(dialogs[0]).toContain('Безкоштовних скасувань лишиться 2 з 3 на місяць');
   await page.goto('/#/garage');
   const rel = page.getByRole('region', { name: 'Надійність' });
   await expect(rel).toContainText('0 з 3');
@@ -275,7 +275,7 @@ test('захист від зловживань: 3 безкоштовні ска�
   await page.goto('/#/bookings');
   await page.getByRole('button', { name: /^Активні/ }).click();
   const card = page.locator('article').first();
-  await expect(card).toContainText('Безкоштовні скасування за 30 днів вичерпано');
+  await expect(card).toContainText('Безкоштовні скасування на цей місяць закінчились');
   await card.getByRole('button', { name: 'Скасувати (мийці 180 ₴)' }).click();
   expect(dialogs.at(-1)).toContain('Мийка отримає 180 ₴ за зайнятий час, 720 ₴ повернемо на баланс CARCAR');
   await expect(page.locator('#toast')).toHaveText('Запис скасовано: 720 ₴ на балансі, 180 ₴ — мийці');
@@ -350,7 +350,7 @@ test('кошторис СТО: клієнт погоджує пункти окр
 test('виїзд до вас: мийка біля дому з адресою на карті, окрема колонка бригади в журналі', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Виїзд до вас' }).click();
-  await expect(page.locator('#count')).toHaveText('2 місця');
+  await expect(page.locator('#count')).toHaveText('2 мийки');
   await page.goto('/#/place/aqua24');
   await expect(page.getByRole('region', { name: 'Виїзд до вас' })).toContainText('У радіусі 12 км, виїзд +250 ₴');
 
@@ -451,7 +451,7 @@ test('промокоди: «Перша мийка −30%» сама, свій к
   await page.goto('/');
   await expect(page.locator('.promo-banner')).toContainText('Перша мийка −30%');
   await page.locator('.promo-banner').click();
-  await expect(page.locator('#count')).toHaveText('9 місць');
+  await expect(page.locator('#count')).toHaveText('9 мийок');
 
   await page.goto('/#/book/blysk');
   await page.getByLabel(/Експрес-мийка/).check();

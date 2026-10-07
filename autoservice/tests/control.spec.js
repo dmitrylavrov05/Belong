@@ -260,7 +260,7 @@ test.describe('заставка', () => {
     await expect(splash).toContainText('CARCAR');
     await expect(splash).not.toContainText('Автомийки Києва');
     await expect(splash).toHaveCount(0, { timeout: 5000 });
-    await expect(page.locator('h1')).toHaveText('Автомийки Києва');
+    await expect(page.locator('h1')).toHaveText('Автомийки, Київ');
     await page.reload();
     await expect(page.locator('#splash')).toHaveCount(0);
   });
@@ -286,7 +286,7 @@ test('вхід за номером телефону: номер → код із 
   // Неповний номер не пропускаємо.
   await page.getByLabel('Номер телефону').fill('67 12');
   await page.getByRole('button', { name: 'Отримати код' }).click();
-  await expect(page.getByRole('alert')).toContainText('9 цифр');
+  await expect(page.getByRole('alert')).toContainText('має бути 9');
   await page.getByLabel('Номер телефону').fill('0671234567');
   await expect(page.getByLabel('Номер телефону')).toHaveValue('67 123 45 67');
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
@@ -329,7 +329,7 @@ test('бізнес: умови й заявка в застосунку → ад�
   await page.getByLabel('ІПН (ФОП) або ЄДРПОУ (ТОВ)').fill('1234567890');
   await page.getByLabel(/Погоджуюсь з умовами/).check();
   await page.getByRole('button', { name: 'Надіслати заявку' }).click();
-  await expect(page.locator('#toast')).toHaveText('Заявку надіслано — перевіримо до 2 робочих днів');
+  await expect(page.locator('#toast')).toHaveText('Заявку надіслано. Відповімо протягом 2 робочих днів');
   await expect(page.getByRole('region', { name: 'Ваша заявка' })).toContainText('На перевірці');
   await expect(page.getByRole('link', { name: 'Зареєструвати бізнес' })).toHaveCount(0);
 
@@ -378,4 +378,46 @@ test('бізнес: умови й заявка в застосунку → ад�
   if (await more.isVisible()) await more.click();
   await page.locator('#logout').click();
   await expect(page.getByRole('heading', { name: 'Вхід у кабінет мийки' })).toBeVisible();
+});
+
+test('місто: каталог по всій Україні, порожнє місто запрошує мийки; вихід з акаунта', async ({ page }) => {
+  await page.goto('/');
+  const city = page.getByRole('combobox', { name: 'Місто' });
+  await expect(city).toHaveValue('Київ');
+  await expect(page.locator('#count')).toHaveText('9 мийок');
+  await city.selectOption('Львів');
+  await expect(page.locator('#count')).toHaveText('0 мийок');
+  await expect(page.locator('.city-empty')).toContainText('У місті Львів ми ще не працюємо');
+  await expect(page.getByRole('link', { name: 'Для власників мийок' })).toHaveAttribute('href', '#/business');
+  // Вибір міста запамʼятовується.
+  await page.reload();
+  await expect(city).toHaveValue('Львів');
+  await city.selectOption('Київ');
+  await expect(page.locator('#count')).toHaveText('9 мийок');
+
+  // Заявка мийки зі Львова: місто з форми, після схвалення мийка — у каталозі Львова.
+  await page.goto('/#/business/apply');
+  await page.getByLabel('Назва мийки').fill('Мийка «Лева»');
+  await page.locator('#biz-apply').getByLabel('Місто').selectOption('Львів');
+  await page.getByLabel('Адреса').fill('вул. Городоцька, 1');
+  await page.getByLabel('Контактна особа').fill('Вигаданий Власник');
+  await page.getByLabel('Телефон').fill('+380 67 000 22 33');
+  await page.getByLabel('ІПН (ФОП) або ЄДРПОУ (ТОВ)').fill('12345678');
+  await page.getByLabel(/Погоджуюсь з умовами/).check();
+  await page.getByRole('button', { name: 'Надіслати заявку' }).click();
+  await page.goto('/admin.html#/applications');
+  await expect(page.getByRole('article', { name: 'Заявка Мийка «Лева»' })).toContainText('Львів');
+  await page.getByRole('button', { name: 'Схвалити й видати доступ' }).click();
+  await expect(page.getByRole('article', { name: 'Заявка Мийка «Лева»' })).toContainText('Доступ до кабінету видано');
+  await page.goto('/');
+  await city.selectOption('Львів');
+  await expect(page.locator('#count')).toHaveText('1 мийка');
+  await expect(page.locator('#list')).toContainText('Мийка «Лева»');
+
+  // Вихід: знову екран входу за номером.
+  await page.goto('/#/garage');
+  page.once('dialog', (d) => d.accept());
+  await page.getByRole('button', { name: 'Вийти з акаунта' }).click();
+  await expect(page.getByRole('heading', { name: 'Вхід у CARCAR' })).toBeVisible();
+  await expect(page.locator('.tabs')).toBeHidden();
 });

@@ -1081,3 +1081,11 @@ body.in-auth #view { padding: 0; max-width: none; }
 .biz-dock { display: grid; gap: 8px; }
 .app-status { margin-top: 12px; }
 .app-status.ok { border-color: var(--ok); }
+
+/* Вибір міста в шапці */
+.city-pick { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
+.city-pick select { border: 0; background-color: transparent; padding: 4px 22px 4px 0; font: inherit; font-size: 15px; color: var(--text); font-weight: 600; background-position: right 2px center; background-size: 14px; max-width: 46vw; }
+.city-empty { display: grid; justify-items: center; gap: 10px; text-align: center; padding: 32px 16px; color: var(--muted); }
+.city-empty b { color: var(--text); font-size: 17px; }
+.city-empty svg { color: var(--accent); }
+.logout-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }

@@ -34,12 +34,12 @@ test('карта: точки на схемі Києва, фільтри, виб�
   const map = page.getByRole('region', { name: /Карта точок/ });
   await expect(map).toBeVisible();
   await expect(map.locator('[data-pin]')).toHaveCount(9);
-  await expect(page.locator('#count')).toHaveText('9 місць');
+  await expect(page.locator('#count')).toHaveText('9 мийок');
 
   // Фільтр працює й на карті.
   await page.getByRole('button', { name: 'Виїзд до вас' }).click();
   await expect(map.locator('[data-pin]')).toHaveCount(2);
-  await expect(page.locator('#count')).toHaveText('2 місця');
+  await expect(page.locator('#count')).toHaveText('2 мийки');
 
   await map.getByRole('button', { name: /^Автомийка «Хвиля»/ }).click();
   await expect(map.getByRole('button', { name: /^Автомийка «Хвиля»/ })).toHaveAttribute('aria-pressed', 'true');

@@ -1,6 +1,6 @@
-// Інтерактивна карта Києва з двома шарами:
+// Інтерактивна карта з двома шарами:
 // «Детальна» — вулиці й будинки з тайлів OpenStreetMap (потрібен інтернет);
-// «Схема» — власна спрощена карта (межа міста, Дніпро, райони), працює без інтернету,
+// «Схема» — власна спрощена карта Києва (межа міста, Дніпро, райони), працює без інтернету,
 // зокрема під час відключень. Якщо тайли не завантажуються, карта сама перемикається на схему.
 // Проєкція — Web Mercator, як у тайлів: одиниця карти — піксель світу на масштабі 12.
 import { DISTRICTS } from './data.js';
@@ -51,8 +51,10 @@ export function mountMap(el, opts) {
     const pts = list.map((p) => mapProject(p.lat, p.lng));
     const xs = pts.map((p) => p[0]);
     const ys = pts.map((p) => p[1]);
-    st.x = xs.length ? (Math.min(...xs) + Math.max(...xs)) / 2 : MAP_W / 2;
-    st.y = ys.length ? (Math.min(...ys) + Math.max(...ys)) / 2 : MAP_H / 2;
+    // Без точок — центр обраного міста.
+    const [cx, cy] = opts.center ? mapProject(opts.center.lat, opts.center.lng) : [MAP_W / 2, MAP_H / 2];
+    st.x = xs.length ? (Math.min(...xs) + Math.max(...xs)) / 2 : cx;
+    st.y = ys.length ? (Math.min(...ys) + Math.max(...ys)) / 2 : cy;
     // Усі точки з полями, але не ближче за кілька кварталів.
     const spanX = xs.length ? Math.max(...xs) - Math.min(...xs) : MAP_W * 0.6;
     const spanY = ys.length ? Math.max(...ys) - Math.min(...ys) : MAP_H * 0.6;
@@ -62,11 +64,11 @@ export function mountMap(el, opts) {
   el.innerHTML = `<div class="map-tiles" aria-hidden="true"></div>
     <svg class="map-svg" aria-hidden="true" preserveAspectRatio="none">
       <rect class="map-land-out" x="-2000" y="-2000" width="${MAP_W + 4000}" height="${MAP_H + 4000}"/>
-      <path class="map-city" d="${pathOf(KYIV_OUTLINE)}Z"/>
+      ${!opts.city || opts.city === 'Київ' ? `<path class="map-city" d="${pathOf(KYIV_OUTLINE)}Z"/>
       <path class="map-water" d="${pathOf(DNIPRO)}"/>
       <path class="map-water thin" d="${pathOf(RUSANIVKA)}"/>
       <path class="map-water thin" d="${pathOf(DESNA)}"/>
-      ${Object.entries(DISTRICTS).map(([name, [la, ln]]) => { const [x, y] = mapProject(la, ln); return `<text class="map-label" x="${x}" y="${y}">${name}</text>`; }).join('')}
+      ${Object.entries(DISTRICTS).map(([name, [la, ln]]) => { const [x, y] = mapProject(la, ln); return `<text class="map-label" x="${x}" y="${y}">${name}</text>`; }).join('')}` : ''}
     </svg>
     <div class="map-pins"></div>
     <div class="map-ctrl">

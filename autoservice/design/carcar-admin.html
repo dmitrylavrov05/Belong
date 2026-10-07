@@ -1091,6 +1091,14 @@ body.in-auth #view { padding: 0; max-width: none; }
 .biz-dock { display: grid; gap: 8px; }
 .app-status { margin-top: 12px; }
 .app-status.ok { border-color: var(--ok); }
+
+/* Вибір міста в шапці */
+.city-pick { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
+.city-pick select { border: 0; background-color: transparent; padding: 4px 22px 4px 0; font: inherit; font-size: 15px; color: var(--text); font-weight: 600; background-position: right 2px center; background-size: 14px; max-width: 46vw; }
+.city-empty { display: grid; justify-items: center; gap: 10px; text-align: center; padding: 32px 16px; color: var(--muted); }
+.city-empty b { color: var(--text); font-size: 17px; }
+.city-empty svg { color: var(--accent); }
+.logout-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
 </style>
   <style>
 /* Панель для бізнесу CARCAR: десктоп-перший макет поверх токенів і компонентів styles.css. */
@@ -1677,7 +1685,7 @@ body.locked #view { padding: 0; }
   <div class="tip" id="tip" hidden></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script type="module">
-// Місто та список автомийок. Щоб додати реальні мийки, замініть PLACES на справжні точки.
+// Міста й список автомийок. Щоб додати реальні мийки, замініть PLACES на справжні точки.
 // Зараз тут демо-дані: назви, номери будинків і телефони вигадані.
 
 const CITY = {
@@ -1687,6 +1695,16 @@ const CITY = {
   // Майдан Незалежності: від нього рахуємо відстань, якщо геолокація недоступна.
   center: { lat: 50.4501, lng: 30.5234 },
 };
+
+// Міста України: центр — для відстані без геолокації й для нових мийок, поки немає точних координат.
+const CITIES = [
+  ['Київ', 50.4501, 30.5234], ['Львів', 49.8397, 24.0297], ['Одеса', 46.4825, 30.7233], ['Дніпро', 48.4647, 35.0462],
+  ['Харків', 49.9935, 36.2304], ['Запоріжжя', 47.8388, 35.1396], ['Вінниця', 49.2331, 28.4682], ['Полтава', 49.5883, 34.5514],
+  ['Черкаси', 49.4444, 32.0598], ['Житомир', 50.2547, 28.6587], ['Рівне', 50.6199, 26.2516], ['Луцьк', 50.7472, 25.3254],
+  ['Івано-Франківськ', 48.9226, 24.7111], ['Тернопіль', 49.5535, 25.5948], ['Хмельницький', 49.4229, 26.9871], ['Чернівці', 48.2921, 25.9358],
+  ['Ужгород', 48.6208, 22.2879], ['Чернігів', 51.4982, 31.2893], ['Суми', 50.9077, 34.7981], ['Миколаїв', 46.975, 31.9946],
+  ['Кропивницький', 48.5079, 32.2623], ['Біла Церква', 49.7957, 30.1311], ['Бровари', 50.511, 30.79], ['Ірпінь', 50.5218, 30.2506],
+].map(([name, lat, lng]) => ({ name, center: { lat, lng } }));
 
 // icon — назва лінійної іконки з ICONS в app.js.
 const CATEGORIES = [
@@ -1866,6 +1884,8 @@ const PLACES = [
     services: [...pick(WASH, ['complex', 'wax'], 1.2), ...pick(WASH, ['polish', 'ceramic', 'headlights'], 0.9)],
   },
 ];
+// Демо-мийки — у Києві. Нові мийки отримують місто із заявки.
+for (const p of PLACES) p.city ??= 'Київ';
 
 // Правила оплати («як на FunPay»): клієнт не платить комісію, гроші утримуються до виконання
 // роботи й ще freezeHours після підтвердження, а комісія з точки — під час виведення коштів.
@@ -2565,9 +2585,11 @@ async function approveBizApp(id) {
   const a = apps.find((x) => x.id === id);
   if (!a || a.status === 'approved') return null;
   const placeId = `p_${uid()}`;
-  const [lat, lng] = DISTRICTS[a.district] ?? Object.values(DISTRICTS)[0];
+  // Поки мийка не вказала точку на карті — центр міста з невеликим зсувом, щоб мітки не злипались.
+  const c = (CITIES.find((x) => x.name === a.city) ?? CITIES[0]).center;
+  const [lat, lng] = [c.lat + (Math.random() - 0.5) * 0.03, c.lng + (Math.random() - 0.5) * 0.05];
   addCustomPlace({
-    id: placeId, custom: true, name: a.name, cats: ['wash'], district: a.district, address: a.address, phone: a.phone,
+    id: placeId, custom: true, name: a.name, cats: ['wash'], city: a.city || 'Київ', district: '', address: a.address, phone: a.phone,
     boxes: Math.max(1, Number(a.boxes) || 1), hours: [8, 21], lat, lng, tags: [], createdAt: Date.now(),
     services: Object.entries(SERVICE_TEMPLATES.wash).map(([sid, x]) => ({ id: sid, ...x, price: [...x.price] })),
   });
@@ -3971,7 +3993,7 @@ function viewApplications() {
     ${list.length ? `<div class="stack" style="gap:12px">${list.map((a) => {
       const [label, cls] = APP_STATUS[a.status];
       return `<article class="panel stack" style="gap:10px" aria-label="Заявка ${esc(a.name)}">
-        <div class="head"><div><b>${esc(a.name)}</b><small class="muted" style="display:block">${esc(a.district)} · ${esc(a.address)} · ${a.boxes} ${plural(Number(a.boxes), 'бокс', 'бокси', 'боксів')}</small></div>
+        <div class="head"><div><b>${esc(a.name)}</b><small class="muted" style="display:block">${esc(a.city ?? '')} · ${esc(a.address)} · ${a.boxes} ${plural(Number(a.boxes), 'бокс', 'бокси', 'боксів')}</small></div>
           <span class="pill ${cls}">${label}</span></div>
         <dl class="kv"><dt>Контакт</dt><dd>${esc(a.contact)} · <a href="tel:${esc(a.phone.replace(/[^+\d]/g, ''))}">${esc(a.phone)}</a>${a.email ? ` · ${esc(a.email)}` : ''}</dd>
           <dt>Бізнес</dt><dd>${a.type === 'tov' ? 'ТОВ, ЄДРПОУ' : 'ФОП, ІПН'} ${esc(a.code)}</dd><dt>Подано</dt><dd>${fmtTime(a.at)}</dd></dl>

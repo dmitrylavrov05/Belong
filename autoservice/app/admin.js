@@ -1150,7 +1150,7 @@ function viewApplications() {
     ${list.length ? `<div class="stack" style="gap:12px">${list.map((a) => {
       const [label, cls] = APP_STATUS[a.status];
       return `<article class="panel stack" style="gap:10px" aria-label="Заявка ${esc(a.name)}">
-        <div class="head"><div><b>${esc(a.name)}</b><small class="muted" style="display:block">${esc(a.district)} · ${esc(a.address)} · ${a.boxes} ${plural(Number(a.boxes), 'бокс', 'бокси', 'боксів')}</small></div>
+        <div class="head"><div><b>${esc(a.name)}</b><small class="muted" style="display:block">${esc(a.city ?? '')} · ${esc(a.address)} · ${a.boxes} ${plural(Number(a.boxes), 'бокс', 'бокси', 'боксів')}</small></div>
           <span class="pill ${cls}">${label}</span></div>
         <dl class="kv"><dt>Контакт</dt><dd>${esc(a.contact)} · <a href="tel:${esc(a.phone.replace(/[^+\d]/g, ''))}">${esc(a.phone)}</a>${a.email ? ` · ${esc(a.email)}` : ''}</dd>
           <dt>Бізнес</dt><dd>${a.type === 'tov' ? 'ТОВ, ЄДРПОУ' : 'ФОП, ІПН'} ${esc(a.code)}</dd><dt>Подано</dt><dd>${fmtTime(a.at)}</dd></dl>

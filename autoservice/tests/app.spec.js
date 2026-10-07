@@ -29,7 +29,7 @@ test.afterEach(async ({ page }) => {
 test('каталог автомийок фільтрується за виїздом, пошуком і обраним', async ({ page }) => {
   await page.goto('/');
   await expect(page).toHaveTitle('CARCAR');
-  await expect(page.locator('h1')).toHaveText('Автомийки Києва');
+  await expect(page.locator('h1')).toHaveText('Автомийки, Київ');
   await expect(page.locator('#list article')).toHaveCount(9);
   // Лише мийки: перемикачів категорій немає.
   await expect(page.getByRole('button', { name: 'Усі', exact: true })).toHaveCount(0);
@@ -193,7 +193,7 @@ test('мийка підтверджує виконання, гроші замо�
   await confirmAfterVisit(page);
   const card = page.locator('article').first();
   await expect(card).toContainText('Виконано');
-  await expect(card).toContainText('Мийка підтвердила виконання. Якщо щось не так — відкрийте спір до 7 жовтня о 21:30');
+  await expect(card).toContainText('Мийка підтвердила виконання. Якщо щось не так, відкрийте спір до 7 жовтня о 21:30');
   await expect(card).not.toContainText('Гроші точці');
   await expect(card.locator('.steps li')).toHaveText(['Оплачено', 'Виконано']);
 
@@ -282,7 +282,7 @@ test('виконання підтверджує мийка: у клієнта л
   await page.clock.setFixedTime(new Date(2026, 9, 5, 10, 30));
   await page.goto('/#/bookings');
   const card = page.locator('article').first();
-  await expect(card).toContainText('Мийка підтвердить виконання');
+  await expect(card).toContainText('мийка відмітить це тут');
   await expect(card.getByRole('button', { name: /Підтвердити виконання|Усе добре/ })).toHaveCount(0);
 
   await openJob(page, 'Автомийка «Хвиля»');
@@ -348,7 +348,7 @@ test('пізніше ніж за 1,5 год до візиту скасуванн
   await page.locator('.slot[data-time="11:00"]').click();
   await page.locator('[data-action="confirm"]').click();
   await page.getByRole('button', { name: 'Оплатити 900 ₴' }).click();
-  await expect(page.locator('article').first()).toContainText('Тепер оплата зараховується точці за послугу');
+  await expect(page.locator('article').first()).toContainText('Тепер оплата йде мийці');
   page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Скасувати без повернення' }).click();
   await expect(page.locator('article').first()).toContainText('оплату 900 ₴ зараховано точці за послугу');
@@ -373,7 +373,7 @@ test('скасування за 1,5 год і раніше: уся сума на
   await page.locator('[data-action="confirm"]').click();
   await expect(page.locator('.summary')).toContainText('Скасування до 1 год 30 хв до візиту');
   await page.getByRole('button', { name: 'Оплатити 900 ₴' }).click();
-  await expect(page.locator('article').first()).toContainText('Перенести на інший час або скасувати безкоштовно можна до 4 жовтня о 10:00');
+  await expect(page.locator('article').first()).toContainText('Перенести чи скасувати без втрат можна до 4 жовтня о 10:00');
   page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Скасувати', exact: true }).click();
   await expect(page.locator('#toast')).toHaveText('Запис скасовано, 900 ₴ повернено на баланс');
@@ -437,14 +437,14 @@ test.describe('поруч зі мною', () => {
   });
 });
 
-test('без геолокації відстань рахується від центру Києва', async ({ page }) => {
+test('без геолокації відстань рахується від центру обраного міста', async ({ page }) => {
   await page.addInitScript(() => {
     navigator.geolocation.getCurrentPosition = (ok, fail) => setTimeout(() => fail({ code: 1 }), 10);
   });
   await page.goto('/');
   await page.getByLabel('Сортування').selectOption('near');
-  await expect(page.locator('#toast')).toContainText('від центру Києва');
-  await expect(page.locator('#count')).toContainText('від центру Києва');
+  await expect(page.locator('#toast')).toContainText('від центру міста');
+  await expect(page.locator('#count')).toContainText('від центру міста');
   await expect(page.locator('#list article').first()).toContainText('Автомийка «Блиск»');
 });
 

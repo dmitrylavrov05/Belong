@@ -1,4 +1,4 @@
-import { CITY, CATEGORIES, CAR_CLASSES, PLACES, PAYMENT, MAINTENANCE, REFERRAL, RELIABILITY, DISTRICTS } from './data.js';
+import { CITY, CITIES, CATEGORIES, CAR_CLASSES, PLACES, PAYMENT, MAINTENANCE, REFERRAL, RELIABILITY } from './data.js';
 import {
   store, icon, esc, uah, pad, hhmm, toMin, isoDate, parseDate, uid, placeById, plural, duration, dayLabel, rating, tel,
   hoursFor, scheduleOf, inBreak, rangeText, WEEKDAY_NAMES, weekdayOf, phoneKey, offersOf, offerAsService, isOpenNow, hoursText, bookingStart, fmtTime, fmtDate, km, serviceCat, catById, shrinkPhoto,
@@ -43,7 +43,7 @@ let profile = { name: '', phone: '', optIn: false, ...store.get('profile', {}) }
 // Записи цього клієнта — те, що він бачить у «Мої записи».
 const mine = () => bookings.filter((b) => !b.source);
 
-const ui = { view: store.get('view', 'list'), cat: 'all', q: '', sort: 'rating', openNow: false, favOnly: false, cls: store.get('cls', 0), carId: store.get('carId', null), partner: store.get('partner', null) };
+const ui = { view: store.get('view', 'list'), cat: 'all', q: '', sort: 'rating', openNow: false, favOnly: false, cls: store.get('cls', 0), city: store.get('city', 'Київ'), carId: store.get('carId', null), partner: store.get('partner', null) };
 let draft = null; // чернетка запису: { placeId, services: Set, date, time, carId, paying }
 
 // ---------- утиліти ----------
@@ -103,12 +103,12 @@ function locate(silent = false) {
     Object.assign(ui, { pos, posFallback: fallback, locating: false });
     if ($('#list')) renderList();
     else if (/^#\/place\//.test(location.hash)) route();
-    if (fallback && !silent) toast('Не вдалося визначити ваше місце — рахуємо відстань від центру Києва');
+    if (fallback && !silent) toast('Не вдалося визначити, де ви. Рахуємо відстань від центру міста');
   };
-  if (!navigator.geolocation) { done(CITY.center, true); return; }
+  if (!navigator.geolocation) { done(cityOf().center, true); return; }
   navigator.geolocation.getCurrentPosition(
     (p) => done({ lat: p.coords.latitude, lng: p.coords.longitude }, false),
-    () => done(CITY.center, true),
+    () => done(cityOf().center, true),
     { timeout: 8000, maximumAge: 300000 },
   );
 }
@@ -208,7 +208,7 @@ const cancelWindow = () => duration(Math.round(PAYMENT.freeCancelHours * 60));
 // Баланс CARCAR: повернення за скасовані записи. Списується під час оплати, можна вивести на картку.
 const moneyCard = () => `<section class="card balance-card" aria-label="Баланс CARCAR">
     <div class="head"><span>Баланс CARCAR</span><b class="bonus-sum">${uah(wallet.money)}</b></div>
-    <p class="fine">Сюди повертаються гроші за вчасно скасовані записи. Баланс списується автоматично під час наступної оплати, або його можна вивести на картку.</p>
+    <p class="fine">Сюди повертаються гроші за скасовані записи. Ними можна оплатити наступну мийку або вивести на картку.</p>
     ${wallet.money > 0 ? `<button class="btn" data-action="money-out">${icon('card', 18)}Вивести ${uah(wallet.money)} на картку</button>` : ''}
     <ul class="ledger">${wallet.history.filter((h) => h.kind === 'money').slice(0, 5).map((h) => `<li><span>${esc(h.text)}<small>${fmtTime(h.at)}</small></span>
       <b class="${h.amount > 0 ? 'plus' : ''}">${h.amount > 0 ? '+' : '−'}${uah(Math.abs(h.amount))}</b></li>`).join('') || '<li class="muted small">Операцій ще не було.</li>'}</ul>
@@ -220,7 +220,7 @@ function viewWallet() {
     ${moneyCard()}
     <section class="card balance-card" aria-label="Бонуси" style="margin-top:12px">
       <div class="head"><span>Бонуси</span><b class="bonus-sum">${uah(wallet.bonus)}</b></div>
-      <p class="fine">${wallet.bonus ? `Спишуться під час оплати замовлення від ${uah(REFERRAL.minOrder)}.` : 'Бонуси нараховуються за друзів, яких ви запросили.'}</p>
+      <p class="fine">${wallet.bonus ? `Спишуться під час оплати замовлення від ${uah(REFERRAL.minOrder)}.` : 'Бонуси дають за друзів, яких ви запросили.'}</p>
     </section>
     <div style="margin-top:12px">${inviteCard()}</div>`;
 }
@@ -313,6 +313,7 @@ function filteredPlaces() {
   const q = ui.q.trim().toLowerCase();
   const list = PLACES.filter((p) => {
     if (!isListed(p)) return false;
+    if ((p.city ?? 'Київ') !== ui.city) return false;
     if (ui.blackout && !worksInBlackout(p)) return false;
     if (ui.mobileOnly && !mobileOn(p)) return false;
     if (ui.cat !== 'all' && !p.cats.includes(ui.cat)) return false;
@@ -487,7 +488,7 @@ function mapPin(p) {
 function mapCard(id) {
   const p = placeById(id);
   if (!p) return '<p class="small muted map-empty">Натисніть на точку на карті, щоб побачити деталі.</p>';
-  const maps = `${CITY.mapsSearch}${encodeURIComponent(`${CITY.name}, ${p.address}`)}`;
+  const maps = `${CITY.mapsSearch}${encodeURIComponent(`${p.city ?? ui.city}, ${p.address}`)}`;
   return `${placeCard(p)}
     <div class="grid2" style="margin-top:8px"><a class="btn primary" href="#/book/${p.id}">Записатися</a>
       <a class="btn" href="${maps}" target="_blank" rel="noopener">${icon('route', 18)}Маршрут</a></div>`;
@@ -498,7 +499,7 @@ function renderMap(list) {
     $('#list').innerHTML = `<div class="map" id="map" tabindex="0" role="region" aria-label="Карта точок. Стрілки зсувають карту, плюс і мінус змінюють масштаб"></div>
       <div id="map-card" aria-live="polite"></div>`;
     mapApi = mountMap($('#map'), {
-      places: list.map(mapPin), pos: ui.posFallback ? null : ui.pos, state: mapState, onLayer: (l) => store.set('mapLayer', l),
+      places: list.map(mapPin), pos: ui.posFallback ? null : ui.pos, state: mapState, city: ui.city, center: cityOf().center, onLayer: (l) => store.set('mapLayer', l),
       onSelect: (id) => { $('#map-card').innerHTML = mapCard(id); track('map_pin', { placeId: id }); },
     });
   } else mapApi.setPins(list.map(mapPin));
@@ -509,9 +510,14 @@ function renderMap(list) {
 function renderList() {
   const list = filteredPlaces();
   if (ui.view === 'map') renderMap(list);
-  else $('#list').innerHTML = list.length ? list.map(placeCard).join('') : empty('search', 'Нічого не знайшлося. Спробуйте змінити фільтри.');
-  const where = ui.sort !== 'near' ? '' : ui.locating ? ' · визначаємо ваше місце…' : ui.pos ? ` · від ${ui.posFallback ? 'центру Києва' : 'вас'}` : '';
-  $('#count').textContent = `${list.length} ${plural(list.length, 'місце', 'місця', 'місць')}${where}`;
+  else $('#list').innerHTML = list.length ? list.map(placeCard).join('')
+    : !PLACES.some((p) => isListed(p) && (p.city ?? 'Київ') === ui.city)
+      ? `<div class="empty city-empty">${icon('pin', 32)}<b>У місті ${esc(ui.city)} ми ще не працюємо</b>
+          <span>Мийки тут поки не підключились. Знаєте хорошу мийку? Розкажіть їм про CARCAR.</span>
+          <a class="btn" href="#/business">Для власників мийок</a></div>`
+      : empty('search', 'Нічого не знайшли. Спробуйте інші фільтри.');
+  const where = ui.sort !== 'near' ? '' : ui.locating ? ' · шукаємо, де ви…' : ui.pos ? ` · від ${ui.posFallback ? 'центру міста' : 'вас'}` : '';
+  $('#count').textContent = `${list.length} ${plural(list.length, 'мийка', 'мийки', 'мийок')}${where}`;
 }
 
 // Авто з гаража, для якого показуємо ціни на головній і з якого починається запис.
@@ -525,9 +531,16 @@ function pickCar(id) {
   store.set('cls', ui.cls);
 }
 
+// Місто: обирається в шапці й запамʼятовується; каталог показує мийки лише цього міста.
+const cityOf = (name = ui.city) => CITIES.find((c) => c.name === name) ?? CITIES[0];
+function renderCity() {
+  $('#city').innerHTML = `<label class="city-pick">${icon('pin', 18)}<span class="sr-only">Місто</span><select id="city-sel">
+    ${CITIES.map((c) => `<option ${c.name === ui.city ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>`;
+}
+
 function viewCatalog() {
   const chip = (label, attrs, on) => `<button class="chip" ${attrs} aria-pressed="${on}">${label}</button>`;
-  return `<h1 class="sr-only">Автомийки Києва</h1>
+  return `<h1 class="sr-only">Автомийки, ${esc(ui.city)}</h1>
     <div class="search-row">
       <label class="search">${icon('search', 20)}
         <input id="q" type="search" placeholder="Пошук мийки або послуги" aria-label="Пошук" value="${esc(ui.q)}"></label>
@@ -618,7 +631,7 @@ function viewPlace(id) {
   const p = placeById(id);
   if (!p) return viewNotFound();
   const open = isOpenNow(p);
-  const maps = `${CITY.mapsSearch}${encodeURIComponent(`${CITY.name}, ${p.address}`)}`;
+  const maps = `${CITY.mapsSearch}${encodeURIComponent(`${p.city ?? ui.city}, ${p.address}`)}`;
   const groups = CATEGORIES.map((c) => [c, p.services.filter((s) => serviceCat(s) === c.id)]).filter(([, s]) => s.length);
   const list = visibleReviews(reviews).filter((r) => r.placeId === p.id).sort((a, b) => b.at - a.at);
   const todayH = hoursFor(p, isoDate(new Date()));
@@ -1330,8 +1343,8 @@ function reliabilityCard() {
       <li><b>${r.noshows}</b><span>${plural(r.noshows, 'неявка', 'неявки', 'неявок')}</span></li>
     </ul>
     <p class="fine">${r.limited
-      ? `Через ${r.noshows >= R.noShowLimit ? `${r.noshows} ${plural(r.noshows, 'неявку', 'неявки', 'неявок')} за ${R.noShowDays} днів` : `${r.cancels} ${plural(r.cancels, 'скасування', 'скасування', 'скасувань')} за ${R.days} днів`} можна мати лише один активний запис, а під час скасування мийка отримує компенсацію.`
-      : `За ${R.days} днів: до ${R.freeCancels} безкоштовних скасувань і ${R.moves} перенесень, до ${R.maxActive} активних записів одночасно. Далі під час скасування мийці лишається ${Math.round(R.cancelFeeShare * 100)}% ціни (не менше ${uah(R.cancelFeeMin)}) — вона тримала для вас час.`}</p>
+      ? `Через ${r.noshows >= R.noShowLimit ? `${r.noshows} ${plural(r.noshows, 'неявку', 'неявки', 'неявок')} за ${R.noShowDays} днів` : `${r.cancels} ${plural(r.cancels, 'скасування', 'скасування', 'скасувань')} за ${R.days} днів`} можна мати тільки один активний запис, а при скасуванні частина оплати йде мийці.`
+      : `На місяць: ${R.freeCancels} безкоштовні скасування, ${R.moves} перенесення й до ${R.maxActive} записів одночасно. Далі при скасуванні мийці лишається ${Math.round(R.cancelFeeShare * 100)}% ціни (мінімум ${uah(R.cancelFeeMin)}): вона тримала для вас час.`}</p>
   </section>`;
 }
 
@@ -1422,12 +1435,12 @@ function bookingCard(b, highlight) {
           <button class="btn primary" data-action="extra-ok" data-id="${b.id}">Погодитися й доплатити</button>
           <button class="btn" data-action="extra-no" data-id="${b.id}">Відхилити</button>
         </div></div>` : ''}
-      ${started ? `<div class="notice ic-row">${icon('clock', 18)}Мийка підтвердить виконання, щойно авто буде готове. Після цього тут можна буде залишити відгук.</div>
+      ${started ? `<div class="notice ic-row">${icon('clock', 18)}Коли авто буде готове, мийка відмітить це тут. Тоді зможете залишити відгук.</div>
         <div class="grid2">
           ${p ? `<a class="btn" href="${tel(p)}">${icon('phone', 18)}Зателефонувати</a>` : ''}
           <button class="btn line-danger" data-action="dispute" data-id="${b.id}">Відкрити спір</button>
         </div>`
-      : `<div class="notice ic-row">${icon('shield', 18)}Оплачено. Після візиту мийка підтвердить виконання, а ви зможете залишити відгук або відкрити спір.</div>
+      : `<div class="notice ic-row">${icon('shield', 18)}Оплачено. Після візиту мийка підтвердить виконання.</div>
       <div class="grid2">
         ${canMove ? `<a class="btn" href="#/move/${b.id}">${icon('calendar', 18)}Перенести</a>` : ''}
         <button class="btn" data-action="ics" data-id="${b.id}">${icon('calendar', 18)}У календар</button>
@@ -1435,11 +1448,11 @@ function bookingCard(b, highlight) {
         <button class="btn text-danger full" data-action="cancel" data-id="${b.id}">${t.kind === 'free' ? 'Скасувати' : t.kind === 'fee' ? `Скасувати (мийці ${uah(t.fee)})` : 'Скасувати без повернення'}</button>
       </div>
       <p class="terms">${t.kind === 'free'
-        ? `Перенести на інший час або скасувати безкоштовно можна до ${fmtTime(t.deadline)}. Під час скасування всю суму ${uah(b.paid)} повернемо на баланс CARCAR, пізніше оплата зараховується точці за послугу. Безкоштовних скасувань лишилось: ${t.left} з ${RELIABILITY.freeCancels} за ${RELIABILITY.days} днів.`
+        ? `Перенести чи скасувати без втрат можна до ${fmtTime(t.deadline)}. Тоді ${uah(b.paid)} повернемо на баланс CARCAR. Безкоштовних скасувань лишилось ${t.left} з ${RELIABILITY.freeCancels} на місяць.`
         : t.kind === 'fee'
-          ? `${t.limited ? 'Для вашого профілю діє обмежений режим' : `Безкоштовні скасування за ${RELIABILITY.days} днів вичерпано`}: якщо скасуєте до ${fmtTime(t.deadline)}, мийка отримає ${uah(t.fee)} за зайнятий час, решту ${uah(t.refund)} повернемо на баланс. Пізніше оплата зараховується точці повністю.`
-          : `Скасувати з поверненням можна було до ${fmtTime(t.deadline)}. Тепер оплата зараховується точці за послугу, навіть якщо ви не приїдете.`}
-        ${t.inWindow && !canMove && (b.moves?.length ?? 0) < MOVE_LIMIT ? ` Перенесення за ${RELIABILITY.days} днів вичерпано — напишіть мийці в чаті, якщо потрібен інший час.` : ''}</p>`}`;
+          ? `${t.limited ? 'Через часті скасування' : 'Безкоштовні скасування на цей місяць закінчились'}: якщо скасуєте до ${fmtTime(t.deadline)}, мийка отримає ${uah(t.fee)} за зайнятий час, решту ${uah(t.refund)} повернемо на баланс.`
+          : `Скасувати з поверненням можна було до ${fmtTime(t.deadline)}. Тепер оплата йде мийці, навіть якщо ви не приїдете.`}
+        ${t.inWindow && !canMove && (b.moves?.length ?? 0) < MOVE_LIMIT ? ` Переносити цього місяця більше не можна. Якщо треба інший час, напишіть мийці в чат.` : ''}</p>`}`;
   } else if (b.state === 'done') {
     body = `<div class="lines tight">
         <div class="il strong">${when}</div>
@@ -1451,7 +1464,7 @@ function bookingCard(b, highlight) {
   } else if (b.state === 'completed') {
     body += result(b);
     if (isFrozen(b)) {
-      body += `<div class="notice ic-row">${icon('checkCircle', 18)}Мийка підтвердила виконання. Якщо щось не так — відкрийте спір до ${fmtTime(b.unfreezeAt)}.</div>
+      body += `<div class="notice ic-row">${icon('checkCircle', 18)}Мийка підтвердила виконання. Якщо щось не так, відкрийте спір до ${fmtTime(b.unfreezeAt)}.</div>
         <button class="btn line-danger" data-action="dispute" data-id="${b.id}">Відкрити спір</button>`;
     }
     body += reviewBlock(b);
@@ -1629,7 +1642,7 @@ function viewLogin() {
   if (login.step === 'done') {
     return `<section class="auth" aria-label="Вхід">${hero}<div class="auth-card done">
       <span class="auth-check" aria-hidden="true">${icon('check', 40)}</span>
-      <h1>Готово!</h1><p>Номер ${fmtPhone(login.phone)} підтверджено. Ласкаво просимо в CARCAR.</p></div></section>`;
+      <h1>Готово!</h1><p>Номер ${fmtPhone(login.phone)} підтверджено.</p></div></section>`;
   }
   if (login.step === 'code') {
     const left = Math.max(0, 30 - Math.round((Date.now() - login.sentAt) / 1000));
@@ -1641,18 +1654,18 @@ function viewLogin() {
       </div>
       ${login.error ? `<p class="auth-error" role="alert">${esc(login.error)}</p>` : ''}
       <button class="btn primary block" type="submit">Підтвердити</button>
-      <p class="fine">Демо: SMS не надсилаються, ваш код — <b class="code">${login.code}</b>.
+      <p class="fine">Це демо, SMS не приходять. Ваш код: <b class="code">${login.code}</b>.
         <span id="resend">${left ? `Надіслати знову можна через ${left} с.` : '<button type="button" class="link-btn" data-action="login-resend">Надіслати код знову</button>'}</span></p>
     </form></section>`;
   }
   return `<section class="auth" aria-label="Вхід">${hero}<form class="auth-card" id="phone-form" novalidate>
     <h1>Вхід у CARCAR</h1>
-    <p>Мийки Києва з онлайн-записом. Увійдіть за номером телефону — так мийка знатиме, хто приїде.</p>
+    <p>Запис на мийку без дзвінків. Вкажіть номер — надішлемо код.</p>
     <label class="auth-phone"><span class="sr-only">Номер телефону</span><span class="prefix" aria-hidden="true">+380</span>
       <input id="login-phone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="67 123 45 67" value="${esc(login.phone ? fmtPhone(login.phone).slice(5) : '')}" aria-label="Номер телефону"></label>
     ${login.error ? `<p class="auth-error" role="alert">${esc(login.error)}</p>` : ''}
     <button class="btn primary block" type="submit">Отримати код</button>
-    <p class="fine">Натискаючи «Отримати код», ви погоджуєтесь з умовами сервісу. Номер бачить лише мийка, до якої ви записуєтесь.</p>
+    <p class="fine">Номер бачить тільки мийка, до якої ви записалися.</p>
   </form></section>`;
 }
 
@@ -1673,13 +1686,13 @@ document.addEventListener('keydown', (e) => {
 function loginSubmit(form) {
   if (form.id === 'phone-form') {
     const d = phoneDigits(form.querySelector('#login-phone').value);
-    if (d.length !== 9) { login.error = 'Введіть номер повністю: 9 цифр після +380.'; route(); return; }
+    if (d.length !== 9) { login.error = 'Не вистачає цифр. Після +380 має бути 9.'; route(); return; }
     Object.assign(login, { step: 'code', phone: d, code: String(Math.floor(1000 + Math.random() * 9000)), sentAt: Date.now(), error: '', typed: '' });
     route();
     return;
   }
   const typed = [...form.querySelectorAll('.code-cell')].map((i) => i.value).join('');
-  if (typed !== login.code) { Object.assign(login, { error: 'Невірний код. Перевірте й спробуйте ще раз.', typed: '' }); route(); return; }
+  if (typed !== login.code) { Object.assign(login, { error: 'Невірний код. Спробуйте ще раз.', typed: '' }); route(); return; }
   login.step = 'done';
   route();
   // Коротка анімація успіху — і в застосунок.
@@ -2048,7 +2061,14 @@ function updateInboxBadge() {
 
 // Вхід для власників точок — у профілі, а не в нижньому меню: клієнтам він не потрібен.
 const businessEntry = () => `<a class="card link-card biz-entry" href="#/business" style="margin-top:16px">${icon('chart', 22)}<span>Для бізнесу
-    <small class="small muted" style="display:block;font-weight:400">Маєте автомийку? Умови співпраці й реєстрація в CARCAR</small></span>${icon('chevR', 18)}</a>`;
+    <small class="small muted" style="display:block;font-weight:400">Для власників мийок: умови й реєстрація</small></span>${icon('chevR', 18)}</a>`;
+
+// Вихід з акаунта: наступного разу знову вхід за номером. Записи й авто на цьому телефоні лишаються.
+const logoutBlock = () => {
+  const a = store.get('auth', null) ?? login.session;
+  return `<div class="logout-row"><span class="small muted">${a?.phone ? `Ви увійшли як ${esc(a.phone)}` : 'Ви увійшли в CARCAR'}</span>
+    <button class="btn text-danger" data-action="logout">Вийти з акаунта</button></div>`;
+};
 
 // «Для бізнесу»: умови роботи, заявка на реєстрацію і її статус. Вхід у кабінет — окремо, за логіном і паролем.
 const myApp = () => bizApps().filter((a) => a.device).sort((a, b) => b.at - a.at)[0] ?? null;
@@ -2058,21 +2078,21 @@ function viewBusiness(sub) {
   const a = myApp();
   if (sub === 'apply' && !(a && a.status !== 'rejected')) return `${head}<h1>Реєстрація мийки</h1>${bizApplyForm()}`;
   const terms = [
-    ['cash', 'Комісія 7% — лише із замовлень через CARCAR', 'Без абонплати й плати за підключення. Записи з вашого журналу, телефону й «з вулиці» — безкоштовно.'],
-    ['card', 'Клієнт платить онлайн при записі', `Ви підтверджуєте виконання кнопкою «Машина готова». Через ${PAYMENT.freezeHours} год (час, щоб клієнт міг відкрити спір) гроші доступні до виведення на рахунок ФОП чи ТОВ.`],
-    ['shield', 'Захист від неявок і скасувань', `Скасування пізніше ніж за ${cancelWindow()} до візиту, неявка чи запізнення понад ${PAYMENT.lateMinutes} хв — оплата ваша. Після ${RELIABILITY.freeCancels} безкоштовних скасувань на місяць клієнт компенсує ${Math.round(RELIABILITY.cancelFeeShare * 100)}% ціни.`],
-    ['calendar', 'CRM для мийки безкоштовно', 'Розклад по боксах, клієнти з історією, чати й запити, прайс, відгуки, фінанси й персонал — з телефона чи компʼютера.'],
-    ['star', 'Чесний рейтинг', 'Відгуки залишають лише клієнти з підтвердженим візитом. На відгук можна відповісти публічно.'],
+    ['cash', 'Комісія 7% із замовлень через CARCAR', 'Абонплати немає, за підключення не платите. Записи, які ви вносите самі, без комісії.'],
+    ['card', 'Клієнт платить одразу під час запису', `Коли авто готове, ви натискаєте «Машина готова». Гроші ${PAYMENT.freezeHours} годин чекають на випадок спору, потім виводите їх на рахунок ФОП або ТОВ.`],
+    ['shield', 'Неявку оплачує клієнт', `Скасував пізніше ніж за ${cancelWindow()}, не приїхав чи запізнився більш ніж на ${PAYMENT.lateMinutes} хв — гроші лишаються вам. Хто часто скасовує, платить ${Math.round(RELIABILITY.cancelFeeShare * 100)}% ціни.`],
+    ['calendar', 'Кабінет для мийки безкоштовно', 'Розклад по боксах, клієнти, чати, прайс, відгуки й фінанси. Зручно з телефона.'],
+    ['star', 'Відгуки тільки від справжніх клієнтів', 'Відгук може залишити лише той, хто був у вас на мийці. Відповісти можна публічно.'],
   ];
   return `${head}<h1>CARCAR для бізнесу</h1>
-    <p class="lead">Клієнти Києва записуються й платять онлайн, а ви отримуєте завантажені бокси без дзвінків.</p>
+    <p class="lead">Люди по всій Україні знаходять мийку поруч, записуються й одразу платять. Вам лишається мити.</p>
     ${a ? bizAppStatus(a) : ''}
     <h2>Умови роботи</h2>
     <ul class="biz-terms">${terms.map(([ic, t, d]) => `<li>${icon(ic, 22)}<span><b>${t}</b>${d}</span></li>`).join('')}</ul>
     <h2>Що потрібно</h2>
-    <ul class="biz-need"><li>ФОП або ТОВ і рахунок IBAN для виплат</li><li>Адреса й фото мийки, графік, кількість боксів</li><li>Прайс на послуги — шаблон заповнимо за вас</li></ul>
+    <ul class="biz-need"><li>ФОП або ТОВ і рахунок IBAN для виплат</li><li>Адреса, фото, графік і кількість боксів</li><li>Прайс. Шаблон уже готовий, лишиться поправити ціни</li></ul>
     <h2>Як підключитися</h2>
-    <ol class="biz-steps"><li><span><b>Заявка</b> — 2 хвилини тут, у застосунку</span></li><li><span><b>Перевірка CARCAR</b> — до 2 робочих днів</span></li><li><span><b>Логін і пароль</b> до кабінету — у SMS на ваш номер</span></li><li><span><b>Вхід у кабінет</b> і перші записи</span></li></ol>
+    <ol class="biz-steps"><li><span><b>Заявка</b>, 2 хвилини</span></li><li><span><b>Перевірка</b>, до 2 робочих днів</span></li><li><span><b>Логін і пароль</b> приходять у SMS</span></li><li><span><b>Перші записи</b> в кабінеті</span></li></ol>
     <div class="dock-space"></div>
     <div class="dock biz-dock">
       ${a && a.status !== 'rejected' ? '' : '<a class="btn primary block" href="#/business/apply">Зареєструвати бізнес</a>'}
@@ -2084,12 +2104,12 @@ function bizAppStatus(a) {
   const [label, cls] = APP_STATUS[a.status];
   return `<section class="card app-status ${cls}" aria-label="Ваша заявка">
     <div class="head"><b>Заявка: ${esc(a.name)}</b><span class="pill ${cls}">${label}</span></div>
-    ${a.status === 'new' ? '<p class="small muted" style="margin:0">Перевіримо дані й надішлемо логін і пароль до кабінету в SMS на ваш номер.</p>' : ''}
-    ${a.status === 'approved' ? `<p style="margin:0">Мийку підключено. Дані для входу в кабінет:</p>
+    ${a.status === 'new' ? '<p class="small muted" style="margin:0">Перевіримо дані й надішлемо логін і пароль у SMS.</p>' : ''}
+    ${a.status === 'approved' ? `<p style="margin:0">Мийку підключено. Дані для входу:</p>
       <dl class="kv"><dt>Логін</dt><dd><b class="code">${esc(a.issued.login)}</b></dd><dt>Пароль</dt><dd><b class="code">${esc(a.issued.password)}</b></dd></dl>
-      <p class="fine" style="margin:0">Демо: у робочій версії вони приходять у SMS і ніде не показуються.</p>
+      <p class="fine" style="margin:0">Це демо. Насправді логін і пароль приходять у SMS.</p>
       <a class="btn primary" href="business.html">Увійти в кабінет</a>` : ''}
-    ${a.status === 'rejected' ? `<p class="small" style="margin:0">Причина: ${esc(a.reason || 'не вказано')}. Виправте дані й подайте заявку знову.</p>` : ''}
+    ${a.status === 'rejected' ? `<p class="small" style="margin:0">Причина: ${esc(a.reason || 'не вказано')}. Виправте й надішліть ще раз.</p>` : ''}
   </section>`;
 }
 
@@ -2097,7 +2117,7 @@ function bizApplyForm() {
   return `<form class="stack" id="biz-apply" style="gap:14px">
     <label class="field"><span>Назва мийки</span><input name="name" required maxlength="60" placeholder="Автомийка «Хмаринка»"></label>
     <div class="grid2 pf">
-      <label class="field"><span>Район</span><select name="district">${Object.keys(DISTRICTS).map((d) => `<option>${d}</option>`).join('')}</select></label>
+      <label class="field"><span>Місто</span><select name="city">${CITIES.map((c) => `<option ${c.name === ui.city ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>
       <label class="field"><span>Кількість боксів</span><input name="boxes" type="number" min="1" max="30" value="2" required></label>
     </div>
     <label class="field"><span>Адреса</span><input name="address" required maxlength="100" placeholder="вул. Хрещатик, 1"></label>
@@ -2109,9 +2129,9 @@ function bizApplyForm() {
     <fieldset class="radio-row"><legend>Форма бізнесу</legend>
       <label><input type="radio" name="type" value="fop" checked> ФОП</label><label><input type="radio" name="type" value="tov"> ТОВ</label></fieldset>
     <label class="field"><span>ІПН (ФОП) або ЄДРПОУ (ТОВ)</span><input name="code" required inputmode="numeric" pattern="\\d{8}|\\d{10}" title="8 цифр ЄДРПОУ або 10 цифр ІПН"></label>
-    <label class="check-row small"><input class="check" type="checkbox" name="agree" required><span>Погоджуюсь з умовами роботи CARCAR: комісія 7% із замовлень через застосунок, правила скасувань і спорів</span></label>
+    <label class="check-row small"><input class="check" type="checkbox" name="agree" required><span>Погоджуюсь з умовами: 7% із замовлень через CARCAR, правила скасувань і спорів</span></label>
     <button class="btn primary block" type="submit">Надіслати заявку</button>
-    <p class="fine">Заявку перевіряє адміністрація CARCAR. Після схвалення ви отримаєте логін і пароль до кабінету.</p>
+    <p class="fine">Після перевірки надішлемо логін і пароль до кабінету.</p>
   </form>`;
 }
 
@@ -2386,7 +2406,8 @@ function viewGarage() {
       <label class="field"><span>Клас</span><select name="cls">${CAR_CLASSES.map((c, i) => `<option value="${i}">${c}</option>`).join('')}</select></label>
       <label class="field"><span>Поліс ОСЦПВ дійсний до (необовʼязково)</span><input name="insuranceUntil" type="date"></label>`, 'Зберегти')}
     </details>
-    ${businessEntry()}`;
+    ${businessEntry()}
+    ${logoutBlock()}`;
 }
 
 function viewCar(id) {
@@ -2436,7 +2457,7 @@ function downloadIcs(b) {
   const ics = [
     'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//CARCAR//UK', 'BEGIN:VEVENT',
     `UID:${b.id}@carcar`, `DTSTART:${fmt(start)}`, `DTEND:${fmt(end)}`,
-    `SUMMARY:${p.name}`, `LOCATION:${CITY.name}\\, ${p.address}`, `DESCRIPTION:${b.services.join('\\, ')}`,
+    `SUMMARY:${p.name}`, `LOCATION:${p.city ?? ui.city}\\, ${p.address}`, `DESCRIPTION:${b.services.join('\\, ')}`,
     'BEGIN:VALARM', 'TRIGGER:-PT1H', 'ACTION:DISPLAY', 'DESCRIPTION:Скоро запис', 'END:VALARM',
     'END:VEVENT', 'END:VCALENDAR',
   ].join('\r\n');
@@ -2476,7 +2497,7 @@ const bookingActions = {
     const t = cancelTerms(b);
     track('cancel_try', { placeId: b.placeId, free: t.free, kind: t.kind });
     const msg = t.kind === 'free'
-      ? `Скасувати запис? Повернемо ${uah(t.refund)} на баланс CARCAR. Безкоштовних скасувань лишиться ${t.left - 1} з ${RELIABILITY.freeCancels} за ${RELIABILITY.days} днів.`
+      ? `Скасувати запис? Повернемо ${uah(t.refund)} на баланс CARCAR. Безкоштовних скасувань лишиться ${t.left - 1} з ${RELIABILITY.freeCancels} на місяць.`
       : t.kind === 'fee'
         ? `${t.limited ? 'Для вашого профілю діє обмежений режим через часті скасування чи неявки.' : `Ви вже скасували ${RELIABILITY.freeCancels} записи безкоштовно за ${RELIABILITY.days} днів.`} Мийка отримає ${uah(t.fee)} за зайнятий час, ${uah(t.refund)} повернемо на баланс CARCAR. Скасувати запис?`
         : `До візиту менше ${cancelWindow()}, тому оплата ${uah(t.placeAmount)} зарахується точці за послугу — повернення не буде. Скасувати запис?`;
@@ -2847,6 +2868,13 @@ document.addEventListener('click', (e) => {
     $(action === 'move-day' ? `[data-action="move-day"][data-date="${move.date}"]` : '[data-action="move-confirm"]')?.focus();
   } else if (action === 'move-confirm') {
     confirmMove();
+  } else if (action === 'logout') {
+    if (!confirm('Вийти з акаунта? Щоб повернутися, знадобиться номер телефону й код із SMS.')) return;
+    store.set('auth', null);
+    login.session = null;
+    Object.assign(login, { step: 'phone', phone: '', error: '' });
+    location.hash = '#/';
+    route();
   } else if (action === 'login-back') {
     Object.assign(login, { step: 'phone', error: '' });
     route();
@@ -2918,6 +2946,15 @@ document.addEventListener('change', (e) => {
     if (t.checked) draft.services.add(t.value); else draft.services.delete(t.value);
     draft.paying = false;
     renderBook();
+  } else if (t.id === 'city-sel') {
+    ui.city = t.value;
+    store.set('city', ui.city);
+    // Відстань без геолокації рахуємо від центру нового міста.
+    if (ui.posFallback) ui.pos = cityOf().center;
+    // Карта для іншого міста будується заново.
+    for (const k of ['x', 'y', 'z', 'sel']) delete mapState[k];
+    $('#map')?.remove();
+    if (location.hash.replace(/^#\/?/, '') === '') renderList(); else location.hash = '#/';
   } else if (t.id === 'maincar') {
     if (t.value === '__add') { location.hash = '#/garage/add'; return; }
     pickCar(t.value);
@@ -3003,10 +3040,10 @@ document.addEventListener('submit', async (e) => {
   if (e.target.id === 'biz-apply') {
     e.preventDefault();
     const f = new FormData(e.target);
-    const a = { id: uid(), device: true, at: Date.now(), status: 'new', ...Object.fromEntries(['name', 'district', 'boxes', 'address', 'contact', 'phone', 'email', 'type', 'code'].map((k) => [k, String(f.get(k) ?? '').trim()])) };
+    const a = { id: uid(), device: true, at: Date.now(), status: 'new', ...Object.fromEntries(['name', 'city', 'boxes', 'address', 'contact', 'phone', 'email', 'type', 'code'].map((k) => [k, String(f.get(k) ?? '').trim()])) };
     saveBizApps([...bizApps(), a]);
     location.hash = '#/business';
-    toast('Заявку надіслано — перевіримо до 2 робочих днів');
+    toast('Заявку надіслано. Відповімо протягом 2 робочих днів');
     return;
   }
   if (e.target.id === 'phone-form' || e.target.id === 'code-form') {
@@ -3193,7 +3230,7 @@ document.addEventListener('submit', async (e) => {
   toast('Авто додано');
 });
 
-$('#city').innerHTML = `${icon('pin', 18)}${esc(CITY.name)}`;
+renderCity();
 window.addEventListener('hashchange', route);
 // Панель для бізнесу в іншій вкладці змінила записи, прайс чи години — перечитуємо й перемальовуємо.
 window.addEventListener('storage', (e) => {

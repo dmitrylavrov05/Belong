@@ -1,6 +1,6 @@
 // Спільна логіка застосунку клієнта (app.js) і панелі для бізнесу (business.js):
 // сховище, форматування, іконки, гроші, рейтинг і налаштування точок із CRM.
-import { CATEGORIES, PLACES, PAYMENT, RELIABILITY, SERVICE_TEMPLATES, DISTRICTS } from './data.js';
+import { CATEGORIES, PLACES, PAYMENT, RELIABILITY, SERVICE_TEMPLATES, CITIES } from './data.js';
 
 // peek — для частого читання без змін: розбираємо JSON лише тоді, коли значення змінилося.
 // Повернений обʼєкт спільний — не змінюйте його, для змін є get/set.
@@ -660,9 +660,11 @@ export async function approveBizApp(id) {
   const a = apps.find((x) => x.id === id);
   if (!a || a.status === 'approved') return null;
   const placeId = `p_${uid()}`;
-  const [lat, lng] = DISTRICTS[a.district] ?? Object.values(DISTRICTS)[0];
+  // Поки мийка не вказала точку на карті — центр міста з невеликим зсувом, щоб мітки не злипались.
+  const c = (CITIES.find((x) => x.name === a.city) ?? CITIES[0]).center;
+  const [lat, lng] = [c.lat + (Math.random() - 0.5) * 0.03, c.lng + (Math.random() - 0.5) * 0.05];
   addCustomPlace({
-    id: placeId, custom: true, name: a.name, cats: ['wash'], district: a.district, address: a.address, phone: a.phone,
+    id: placeId, custom: true, name: a.name, cats: ['wash'], city: a.city || 'Київ', district: '', address: a.address, phone: a.phone,
     boxes: Math.max(1, Number(a.boxes) || 1), hours: [8, 21], lat, lng, tags: [], createdAt: Date.now(),
     services: Object.entries(SERVICE_TEMPLATES.wash).map(([sid, x]) => ({ id: sid, ...x, price: [...x.price] })),
   });
