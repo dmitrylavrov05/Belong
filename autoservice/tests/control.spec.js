@@ -283,7 +283,11 @@ test('вхід за номером телефону: номер → код із 
   await page.goto('/#/login');
   await expect(page.locator('.tabs')).toBeHidden();
   await expect(page.getByRole('heading', { name: 'Вхід у CARCAR' })).toBeVisible();
-  // Неповний номер не пропускаємо.
+  // Без імені й з неповним номером не пропускаємо.
+  await page.getByLabel('Номер телефону').fill('0671234567');
+  await page.getByRole('button', { name: 'Отримати код' }).click();
+  await expect(page.getByRole('alert')).toContainText('Вкажіть імʼя');
+  await page.getByLabel('Ваше імʼя').fill('Олена');
   await page.getByLabel('Номер телефону').fill('67 12');
   await page.getByRole('button', { name: 'Отримати код' }).click();
   await expect(page.getByRole('alert')).toContainText('має бути 9');
@@ -306,6 +310,7 @@ test('вхід за номером телефону: номер → код із 
   await expect(page).toHaveURL(/#\/$/);
   await page.goto('/#/garage');
   await expect(page.getByLabel('Телефон')).toHaveValue('+380 67 123 45 67');
+  await expect(page.getByLabel('Імʼя')).toHaveValue('Олена');
   // Сесія зберігається: після перезавантаження входити знову не треба.
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Гараж' })).toBeVisible();

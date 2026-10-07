@@ -216,13 +216,11 @@ export const PAYMENT = {
   installments: { minTotal: 3000, parts: [3, 4, 6] },
 };
 
-// Захист від зловживань переносами й скасуваннями (рахуємо за останні days днів).
-// Безкоштовних скасувань — freeCancels; далі мийці утримується компенсація cancelFeeShare від ціни
-// (не менше cancelFeeMin), решта повертається. Перенесень — moves на всі записи разом (і не більше
-// MOVE_LIMIT на один запис). Активних майбутніх записів — maxActive. Після noShowLimit неявок за
-// noShowDays днів або cancelLimit скасувань за days днів — обмежений режим: лише один активний запис
-// і жодних безкоштовних скасувань.
-export const RELIABILITY = { days: 30, freeCancels: 3, cancelFeeShare: 0.2, cancelFeeMin: 50, moves: 4, maxActive: 3, noShowLimit: 2, noShowDays: 60, cancelLimit: 5 };
+// Обмеження на надто часті перенесення й скасування (рахуємо за останні days днів).
+// Перенесень — moves на всі записи разом (і не більше MOVE_LIMIT на один запис). Активних майбутніх
+// записів — maxActive. Після cancelLimit скасувань за days днів або noShowLimit неявок за noShowDays днів
+// можна мати лише один активний запис. Скасування вчасно завжди безкоштовне.
+export const RELIABILITY = { days: 30, moves: 4, maxActive: 3, cancelLimit: 4, noShowLimit: 2, noShowDays: 60 };
 
 // Нагадування в гаражі.
 export const MAINTENANCE = {

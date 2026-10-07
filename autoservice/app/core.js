@@ -407,16 +407,13 @@ export function reliability(list, now = Date.now()) {
   const R = RELIABILITY;
   const since = now - R.days * 24 * HOUR;
   const cancels = list.filter((b) => b.state === 'cancelled' && b.cancelBy === 'client' && (b.closedAt ?? 0) >= since);
-  const freeUsed = cancels.filter((b) => b.cancelKind === 'free').length;
   const noshows = list.filter((b) => b.state === 'noshow' && (b.closedAt ?? bookingStart(b).getTime()) >= now - R.noShowDays * 24 * HOUR).length;
   const moves = list.flatMap((b) => b.moves ?? []).filter((m) => m.at >= since).length;
   const limited = noshows >= R.noShowLimit || cancels.length >= R.cancelLimit;
-  const freeLeft = limited ? 0 : Math.max(0, R.freeCancels - freeUsed);
-  const movesLeft = limited ? 0 : Math.max(0, R.moves - moves);
   return {
-    cancels: cancels.length, freeUsed, freeLeft, noshows, moves, movesLeft, limited,
+    cancels: cancels.length, noshows, moves, movesLeft: Math.max(0, R.moves - moves), limited,
     maxActive: limited ? 1 : R.maxActive,
-    level: limited ? 'limited' : !freeLeft || !movesLeft || noshows || cancels.length >= R.freeCancels ? 'warn' : 'ok',
+    level: limited ? 'limited' : noshows || cancels.length >= R.cancelLimit - 1 || moves >= R.moves ? 'warn' : 'ok',
   };
 }
 // Стани, у яких запис займає бокс: оплачені через CARCAR і внесені в журнал точки.

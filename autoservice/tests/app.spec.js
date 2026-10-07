@@ -622,6 +622,7 @@ test('працює без збереження в localStorage', async ({ page }
   });
   await page.goto('/');
   // Вхід за телефоном працює й без памʼяті браузера — сесія живе до закриття вкладки.
+  await page.getByLabel('Ваше імʼя').fill('Тест');
   await page.getByLabel('Номер телефону').fill('671234567');
   await page.getByRole('button', { name: 'Отримати код' }).click();
   const code = (await page.locator('.auth-card .code').textContent()).trim();

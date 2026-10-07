@@ -251,7 +251,7 @@ test('чат: фото, «Прочитано / Не прочитано» і ми
   await expect(page.getByRole('dialog').locator('.thread .read-state')).toHaveText(/^Прочитано/);
 });
 
-test('захист від зловживань: 3 безкоштовні скасування, далі компенсація мийці й ліміт активних записів', async ({ page }) => {
+test('обмеження: відміни без штрафів, але після 4 скасувань за місяць — лише один активний запис', async ({ page }) => {
   const dialogs = [];
   page.on('dialog', (d) => { dialogs.push(d.message()); d.accept(); });
   const cancelFirst = async () => {
@@ -259,37 +259,32 @@ test('захист від зловживань: 3 безкоштовні ска�
     await page.getByRole('button', { name: /^Активні/ }).click();
     await page.locator('article').first().getByRole('button', { name: /^Скасувати/ }).click();
   };
-  for (let i = 0; i < 3; i++) {
+  // Карточки «Надійність» у гаражі немає — обмеження видно лише тоді, коли спрацювали.
+  await page.goto('/#/garage');
+  await expect(page.getByRole('region', { name: 'Надійність' })).toHaveCount(0);
+
+  for (let i = 0; i < 4; i++) {
     await book(page, { pay: /Оплатити/ });
+    await page.goto('/#/bookings');
+    await page.getByRole('button', { name: /^Активні/ }).click();
+    await expect(page.locator('article').first().getByRole('button', { name: 'Скасувати', exact: true })).toBeVisible();
     await cancelFirst();
     await expect(page.locator('#toast')).toHaveText('Запис скасовано, 900 ₴ повернено на баланс');
   }
-  expect(dialogs[0]).toContain('Безкоштовних скасувань лишиться 2 з 3 на місяць');
-  await page.goto('/#/garage');
-  const rel = page.getByRole('region', { name: 'Надійність' });
-  await expect(rel).toContainText('0 з 3');
-  await expect(rel).toContainText('Ліміти майже вичерпано');
+  expect(dialogs[0]).not.toContain('один активний запис');
+  expect(dialogs[3]).toContain('після 4 скасувань за місяць можна буде мати лише один активний запис');
 
-  // Четверте скасування: мийці 20% ціни за зайнятий час, решта — на баланс.
-  await book(page, { pay: /Оплатити/ });
-  await page.goto('/#/bookings');
-  await page.getByRole('button', { name: /^Активні/ }).click();
-  const card = page.locator('article').first();
-  await expect(card).toContainText('Безкоштовні скасування на цей місяць закінчились');
-  await card.getByRole('button', { name: 'Скасувати (мийці 180 ₴)' }).click();
-  expect(dialogs.at(-1)).toContain('Мийка отримає 180 ₴ за зайнятий час, 720 ₴ повернемо на баланс CARCAR');
-  await expect(page.locator('#toast')).toHaveText('Запис скасовано: 720 ₴ на балансі, 180 ₴ — мийці');
-
-  // Не більше 3 активних записів одночасно.
-  for (const time of ['10:00', '11:00', '12:00']) await book(page, { time, pay: /Оплатити/ });
+  // Тепер — лише один активний запис.
+  await book(page, { time: '10:00', pay: /Оплатити/ });
   await page.goto('/#/book/blysk');
   await expect(page.getByRole('heading', { name: 'Забагато активних записів' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Мої записи · 3' })).toBeVisible();
+  await expect(page.locator('.notice.warn')).toContainText('Ви часто скасовуєте записи');
+  await expect(page.getByRole('link', { name: 'Мої записи · 1' })).toBeVisible();
 
   // Мийка бачить, що клієнт часто змінює плани.
   await openInPanel(page, 'Автомийка «Хвиля»');
-  await expect(page.getByRole('dialog').locator('.rel-note')).toContainText('Клієнт часто змінює плани');
   await expect(page.getByRole('dialog').locator('.rel-note')).toContainText('4 скасування');
+  await expect(page.getByRole('dialog').locator('.rel-note')).toContainText('лише один активний запис');
 });
 
 test('кошторис СТО: клієнт погоджує пункти окремо, доплачує, гарантія потрапляє в сервісну книжку', async ({ page }) => {

@@ -900,9 +900,9 @@ function viewBook(id, date, time) {
   if (ahead.length >= rel.maxActive) {
     return `${back(`#/place/${p.id}`, esc(p.name))}<h1>Забагато активних записів</h1>
       <p class="notice warn">${rel.limited
-        ? 'Через часті скасування чи неявки для вашого профілю діє обмежений режим: можна мати лише один активний запис.'
-        : `Можна мати до ${rel.maxActive} активних записів одночасно — так мийки не тримають час, яким ніхто не скористається.`}
-        Відвідайте або скасуйте один із записів, щоб записатися знову.</p>
+        ? 'Ви часто скасовуєте записи або не приїжджаєте, тому зараз можна мати лише один активний запис.'
+        : `Одночасно можна мати до ${rel.maxActive} записів.`}
+        Коли відвідаєте або скасуєте запис, зможете записатися знову.</p>
       <a class="btn primary" href="#/bookings">Мої записи · ${ahead.length}</a>`;
   }
   // Посилання з гарячого вікна чи листа очікування відкриває запис одразу на потрібний день і час.
@@ -1313,16 +1313,13 @@ function settle() {
 const balanceOf = (placeId) => balanceFor(placeId, bookings, payouts);
 
 // До дедлайну — повне повернення на баланс CARCAR; пізніше оплата зараховується точці за послугу.
-// Умови скасування: kind — free (усе повертаємо), fee (ліміт безкоштовних вичерпано — мийці
-// компенсація, решта повертається) або late (пізно — оплата мийці). inWindow — ще можна переносити.
+// Умови скасування: kind — free (вчасно, усе повертаємо) або late (пізно — оплата мийці).
+// inWindow — ще можна переносити.
 function cancelTerms(b) {
   const deadline = bookingStart(b).getTime() - PAYMENT.freeCancelHours * HOUR;
   const inWindow = Date.now() <= deadline;
   if (!inWindow) return { free: false, kind: 'late', inWindow, deadline, placeAmount: price(b), refund: 0 };
-  const r = myReliability();
-  if (r.freeLeft > 0) return { free: true, kind: 'free', inWindow, deadline, placeAmount: 0, refund: b.paid, left: r.freeLeft };
-  const fee = Math.min(b.paid, Math.max(RELIABILITY.cancelFeeMin, Math.round(price(b) * RELIABILITY.cancelFeeShare)));
-  return { free: false, kind: 'fee', inWindow, deadline, fee, placeAmount: fee, refund: b.paid - fee, limited: r.limited };
+  return { free: true, kind: 'free', inWindow, deadline, placeAmount: 0, refund: b.paid };
 }
 
 // ---------- надійність клієнта ----------
@@ -1330,24 +1327,6 @@ function cancelTerms(b) {
 const myReliability = () => reliability(mine());
 // Активні майбутні записи, які клієнт зробив сам (регулярні записи створюються автоматично й не рахуються).
 const activeAhead = () => mine().filter((b) => b.state === 'paid' && !b.subId && bookingStart(b) > new Date());
-
-function reliabilityCard() {
-  const r = myReliability();
-  const R = RELIABILITY;
-  const [cls, title] = { ok: ['ok', 'Усе добре'], warn: ['warn', 'Ліміти майже вичерпано'], limited: ['danger', 'Запис обмежено'] }[r.level];
-  return `<section class="card rel-card ${cls}" aria-label="Надійність">
-    <div class="head"><b>${icon('shield', 18)}Надійність</b><span class="rel-badge ${cls}">${title}</span></div>
-    <ul class="rel-stats">
-      <li><b>${r.freeLeft} з ${R.freeCancels}</b><span>безкоштовних скасувань</span></li>
-      <li><b>${r.movesLeft} з ${R.moves}</b><span>перенесень</span></li>
-      <li><b>${r.noshows}</b><span>${plural(r.noshows, 'неявка', 'неявки', 'неявок')}</span></li>
-    </ul>
-    <p class="fine">${r.limited
-      ? `Через ${r.noshows >= R.noShowLimit ? `${r.noshows} ${plural(r.noshows, 'неявку', 'неявки', 'неявок')} за ${R.noShowDays} днів` : `${r.cancels} ${plural(r.cancels, 'скасування', 'скасування', 'скасувань')} за ${R.days} днів`} можна мати тільки один активний запис, а при скасуванні частина оплати йде мийці.`
-      : `На місяць: ${R.freeCancels} безкоштовні скасування, ${R.moves} перенесення й до ${R.maxActive} записів одночасно. Далі при скасуванні мийці лишається ${Math.round(R.cancelFeeShare * 100)}% ціни (мінімум ${uah(R.cancelFeeMin)}): вона тримала для вас час.`}</p>
-  </section>`;
-}
-
 
 // Клієнт бачить два кроки: оплатив — мийка виконала.
 function steps(b) {
@@ -1445,13 +1424,11 @@ function bookingCard(b, highlight) {
         ${canMove ? `<a class="btn" href="#/move/${b.id}">${icon('calendar', 18)}Перенести</a>` : ''}
         <button class="btn" data-action="ics" data-id="${b.id}">${icon('calendar', 18)}У календар</button>
         ${p ? `<a class="btn${canMove ? ' full' : ''}" href="${tel(p)}">${icon('phone', 18)}Зателефонувати</a>` : ''}
-        <button class="btn text-danger full" data-action="cancel" data-id="${b.id}">${t.kind === 'free' ? 'Скасувати' : t.kind === 'fee' ? `Скасувати (мийці ${uah(t.fee)})` : 'Скасувати без повернення'}</button>
+        <button class="btn text-danger full" data-action="cancel" data-id="${b.id}">${t.kind === 'free' ? 'Скасувати' : 'Скасувати без повернення'}</button>
       </div>
       <p class="terms">${t.kind === 'free'
-        ? `Перенести чи скасувати без втрат можна до ${fmtTime(t.deadline)}. Тоді ${uah(b.paid)} повернемо на баланс CARCAR. Безкоштовних скасувань лишилось ${t.left} з ${RELIABILITY.freeCancels} на місяць.`
-        : t.kind === 'fee'
-          ? `${t.limited ? 'Через часті скасування' : 'Безкоштовні скасування на цей місяць закінчились'}: якщо скасуєте до ${fmtTime(t.deadline)}, мийка отримає ${uah(t.fee)} за зайнятий час, решту ${uah(t.refund)} повернемо на баланс.`
-          : `Скасувати з поверненням можна було до ${fmtTime(t.deadline)}. Тепер оплата йде мийці, навіть якщо ви не приїдете.`}
+        ? `Перенести чи скасувати без втрат можна до ${fmtTime(t.deadline)}. Тоді ${uah(b.paid)} повернемо на баланс CARCAR.`
+        : `Скасувати з поверненням можна було до ${fmtTime(t.deadline)}. Тепер оплата йде мийці, навіть якщо ви не приїдете.`}
         ${t.inWindow && !canMove && (b.moves?.length ?? 0) < MOVE_LIMIT ? ` Переносити цього місяця більше не можна. Якщо треба інший час, напишіть мийці в чат.` : ''}</p>`}`;
   } else if (b.state === 'done') {
     body = `<div class="lines tight">
@@ -1660,7 +1637,9 @@ function viewLogin() {
   }
   return `<section class="auth" aria-label="Вхід">${hero}<form class="auth-card" id="phone-form" novalidate>
     <h1>Вхід у CARCAR</h1>
-    <p>Запис на мийку без дзвінків. Вкажіть номер — надішлемо код.</p>
+    <p>Запис на мийку без дзвінків. Вкажіть імʼя й номер — надішлемо код.</p>
+    <label class="auth-name"><span class="sr-only">Ваше імʼя</span>
+      <input id="login-name" autocomplete="given-name" autocapitalize="words" maxlength="40" placeholder="Ваше імʼя" value="${esc(login.name ?? profile.name ?? '')}" aria-label="Ваше імʼя"></label>
     <label class="auth-phone"><span class="sr-only">Номер телефону</span><span class="prefix" aria-hidden="true">+380</span>
       <input id="login-phone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="67 123 45 67" value="${esc(login.phone ? fmtPhone(login.phone).slice(5) : '')}" aria-label="Номер телефону"></label>
     ${login.error ? `<p class="auth-error" role="alert">${esc(login.error)}</p>` : ''}
@@ -1685,8 +1664,11 @@ document.addEventListener('keydown', (e) => {
 
 function loginSubmit(form) {
   if (form.id === 'phone-form') {
+    const name = form.querySelector('#login-name').value.trim().replace(/\s+/g, ' ');
     const d = phoneDigits(form.querySelector('#login-phone').value);
-    if (d.length !== 9) { login.error = 'Не вистачає цифр. Після +380 має бути 9.'; route(); return; }
+    login.name = name;
+    if (name.length < 2) { login.error = 'Вкажіть імʼя, щоб мийка знала, як до вас звертатися.'; login.phone = d; route(); return; }
+    if (d.length !== 9) { login.error = 'Не вистачає цифр. Після +380 має бути 9.'; login.phone = d; route(); return; }
     Object.assign(login, { step: 'code', phone: d, code: String(Math.floor(1000 + Math.random() * 9000)), sentAt: Date.now(), error: '', typed: '' });
     route();
     return;
@@ -1700,7 +1682,7 @@ function loginSubmit(form) {
     // Без localStorage (приватний режим) сесія живе до закриття вкладки.
     login.session = { phone: fmtPhone(login.phone), at: Date.now() };
     store.set('auth', login.session);
-    profile = { ...profile, phone: fmtPhone(login.phone) };
+    profile = { ...profile, name: login.name, phone: fmtPhone(login.phone) };
     store.set('profile', profile);
     Object.assign(login, { step: 'phone', error: '' });
     if (location.hash.startsWith('#/login')) location.hash = '#/'; else route();
@@ -1829,7 +1811,7 @@ function viewMove(id) {
     <p class="lead">${esc(p.name)} · ${esc(b.services.join(', '))}<br>Зараз: ${dayLabel(b.date, { weekday: 'short', day: 'numeric', month: 'long' })}, ${b.time}</p>`;
   if (!t.inWindow) return `${head}<p class="notice warn">Перенести можна було до ${fmtTime(t.deadline)}. Напишіть точці в чаті запису — можливо, вона знайде інший час.</p>`;
   if ((b.moves?.length ?? 0) >= MOVE_LIMIT) return `${head}<p class="notice warn">Запис уже переносили ${MOVE_LIMIT} рази. Напишіть точці в чаті запису або скасуйте його безкоштовно до ${fmtTime(t.deadline)}.</p>`;
-  if (myReliability().movesLeft <= 0) return `${head}<p class="notice warn">За останні ${RELIABILITY.days} днів ви вже переносили записи ${RELIABILITY.moves} рази — це ліміт. Напишіть мийці в чаті запису: вона може змінити час сама.</p>`;
+  if (myReliability().movesLeft <= 0) return `${head}<p class="notice warn">Цього місяця ви вже переносили записи ${RELIABILITY.moves} рази, більше не можна. Напишіть мийці в чат, вона може змінити час сама.</p>`;
   if (move?.id !== id) move = { id, date: b.date, time: null };
   return `${head}<p class="notice ok ic-row">${icon('shield', 18)}Оплата ${uah(b.paid)} не скасовується й не списується вдруге — змінюється лише час. Ціна лишається тією самою.</p>
     <div id="move"></div>`;
@@ -2080,7 +2062,7 @@ function viewBusiness(sub) {
   const terms = [
     ['cash', 'Комісія 7% із замовлень через CARCAR', 'Абонплати немає, за підключення не платите. Записи, які ви вносите самі, без комісії.'],
     ['card', 'Клієнт платить одразу під час запису', `Коли авто готове, ви натискаєте «Машина готова». Гроші ${PAYMENT.freezeHours} годин чекають на випадок спору, потім виводите їх на рахунок ФОП або ТОВ.`],
-    ['shield', 'Неявку оплачує клієнт', `Скасував пізніше ніж за ${cancelWindow()}, не приїхав чи запізнився більш ніж на ${PAYMENT.lateMinutes} хв — гроші лишаються вам. Хто часто скасовує, платить ${Math.round(RELIABILITY.cancelFeeShare * 100)}% ціни.`],
+    ['shield', 'Неявку оплачує клієнт', `Скасував пізніше ніж за ${cancelWindow()}, не приїхав чи запізнився більш ніж на ${PAYMENT.lateMinutes} хв — гроші лишаються вам. Хто часто скасовує чи переносить, отримує обмеження на запис.`],
     ['calendar', 'Кабінет для мийки безкоштовно', 'Розклад по боксах, клієнти, чати, прайс, відгуки й фінанси. Зручно з телефона.'],
     ['star', 'Відгуки тільки від справжніх клієнтів', 'Відгук може залишити лише той, хто був у вас на мийці. Відповісти можна публічно.'],
   ];
@@ -2379,7 +2361,6 @@ function viewGarage() {
     </form>
     ${walletLink()}
     ${supportCard()}
-    ${reliabilityCard()}
     ${garageExtras()}
     <div class="stack">
       ${cars.map((c) => {
@@ -2497,10 +2478,8 @@ const bookingActions = {
     const t = cancelTerms(b);
     track('cancel_try', { placeId: b.placeId, free: t.free, kind: t.kind });
     const msg = t.kind === 'free'
-      ? `Скасувати запис? Повернемо ${uah(t.refund)} на баланс CARCAR. Безкоштовних скасувань лишиться ${t.left - 1} з ${RELIABILITY.freeCancels} на місяць.`
-      : t.kind === 'fee'
-        ? `${t.limited ? 'Для вашого профілю діє обмежений режим через часті скасування чи неявки.' : `Ви вже скасували ${RELIABILITY.freeCancels} записи безкоштовно за ${RELIABILITY.days} днів.`} Мийка отримає ${uah(t.fee)} за зайнятий час, ${uah(t.refund)} повернемо на баланс CARCAR. Скасувати запис?`
-        : `До візиту менше ${cancelWindow()}, тому оплата ${uah(t.placeAmount)} зарахується точці за послугу — повернення не буде. Скасувати запис?`;
+      ? `Скасувати запис? Повернемо ${uah(t.refund)} на баланс CARCAR.${myReliability().cancels + 1 >= RELIABILITY.cancelLimit ? ` Зверніть увагу: після ${RELIABILITY.cancelLimit} скасувань за місяць можна буде мати лише один активний запис.` : ''}`
+      : `До візиту менше ${cancelWindow()}, тому оплата ${uah(t.placeAmount)} зарахується точці за послугу — повернення не буде. Скасувати запис?`;
     if (!confirm(msg)) return false;
     Object.assign(b, { state: 'cancelled', refund: t.refund, placeAmount: t.placeAmount, closedAt: Date.now(), cancelBy: 'client', cancelKind: t.kind });
     if (t.kind !== 'late') {
@@ -2511,8 +2490,7 @@ const bookingActions = {
       if (b.passUse) { restorePass(b.placeId, b.passUse); b.passUse = null; }
       if (b.promo) b.promo.returned = true;
     }
-    toast(t.kind === 'free' ? `Запис скасовано, ${uah(t.refund)} повернено на баланс`
-      : t.kind === 'fee' ? `Запис скасовано: ${uah(t.refund)} на балансі, ${uah(t.fee)} — мийці` : 'Запис скасовано, оплату зараховано точці');
+    toast(t.kind === 'free' ? `Запис скасовано, ${uah(t.refund)} повернено на баланс` : 'Запис скасовано, оплату зараховано точці');
   },
   'extra-ok'(b) {
     b.paid += b.extra.amount;
@@ -2576,7 +2554,7 @@ function route() {
   document.body.classList.toggle('in-auth', !authed);
   if (!authed) {
     $('#view').innerHTML = viewLogin();
-    $('#login-phone, .code-cell')?.focus();
+    (($('#login-name') && !$('#login-name').value) ? $('#login-name') : $('#login-phone, .code-cell'))?.focus();
     return;
   }
   // Вкладка «Мої записи» памʼятається лише поки клієнт у розділі: при новому вході — спершу активні.

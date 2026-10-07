@@ -130,7 +130,7 @@ function relNotice(b) {
   if (r.level === 'ok') return '';
   const parts = [r.cancels && `${r.cancels} ${plural(r.cancels, 'скасування', 'скасування', 'скасувань')}`, r.moves && `${r.moves} ${plural(r.moves, 'перенесення', 'перенесення', 'перенесень')}`, r.noshows && `${r.noshows} ${plural(r.noshows, 'неявка', 'неявки', 'неявок')}`].filter(Boolean);
   return `<p class="notice ${r.limited ? 'warn' : ''} rel-note">${icon('shield', 18)}<span><b>${r.limited ? 'Ненадійний клієнт — обмежений режим' : 'Клієнт часто змінює плани'}</b>
-    ${parts.join(' · ')} за останній місяць. ${r.limited ? 'CARCAR дозволяє йому лише один активний запис, а за скасування ви отримуєте компенсацію.' : 'Якщо він скасує — ви отримаєте компенсацію за зайнятий час, коли безкоштовні скасування вичерпано.'}</span></p>`;
+    ${parts.join(' · ')} за останній місяць. ${r.limited ? 'Зараз він може мати лише один активний запис.' : 'Варто нагадати про візит напередодні.'}</span></p>`;
 }
 
 function clientKey(b) {
