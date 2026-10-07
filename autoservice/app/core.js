@@ -402,19 +402,14 @@ export function expensesIn(placeId, from, to) {
 export const ACTIVE = ['paid', 'done', 'dispute'];
 export const HOUR = 3600000;
 
-// Надійність клієнта за його записами: скільки скасувань, неявок і перенесень, що ще дозволено.
+// Як часто клієнт змінює плани: скасування, неявки й перенесення — підказка для мийки, не обмеження.
 export function reliability(list, now = Date.now()) {
   const R = RELIABILITY;
   const since = now - R.days * 24 * HOUR;
   const cancels = list.filter((b) => b.state === 'cancelled' && b.cancelBy === 'client' && (b.closedAt ?? 0) >= since);
   const noshows = list.filter((b) => b.state === 'noshow' && (b.closedAt ?? bookingStart(b).getTime()) >= now - R.noShowDays * 24 * HOUR).length;
   const moves = list.flatMap((b) => b.moves ?? []).filter((m) => m.at >= since).length;
-  const limited = noshows >= R.noShowLimit || cancels.length >= R.cancelLimit;
-  return {
-    cancels: cancels.length, noshows, moves, movesLeft: Math.max(0, R.moves - moves), limited,
-    maxActive: limited ? 1 : R.maxActive,
-    level: limited ? 'limited' : noshows || cancels.length >= R.cancelLimit - 1 || moves >= R.moves ? 'warn' : 'ok',
-  };
+  return { cancels: cancels.length, noshows, moves, level: noshows || cancels.length >= 3 || moves >= 4 ? 'warn' : 'ok' };
 }
 // Стани, у яких запис займає бокс: оплачені через CARCAR і внесені в журнал точки.
 export const BLOCKING = [...ACTIVE, 'booked'];

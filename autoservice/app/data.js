@@ -216,11 +216,10 @@ export const PAYMENT = {
   installments: { minTotal: 3000, parts: [3, 4, 6] },
 };
 
-// Обмеження на надто часті перенесення й скасування (рахуємо за останні days днів).
-// Перенесень — moves на всі записи разом (і не більше MOVE_LIMIT на один запис). Активних майбутніх
-// записів — maxActive. Після cancelLimit скасувань за days днів або noShowLimit неявок за noShowDays днів
-// можна мати лише один активний запис. Скасування вчасно завжди безкоштовне.
-export const RELIABILITY = { days: 30, moves: 4, maxActive: 3, cancelLimit: 4, noShowLimit: 2, noShowDays: 60 };
+// Обмеження для клієнта одне: запис можна перенести не більше 3 разів (MOVE_LIMIT в app.js).
+// Тут — лише вікно для підказки мийці «Клієнт часто змінює плани»: скасування й перенесення за days днів,
+// неявки за noShowDays днів.
+export const RELIABILITY = { days: 30, noShowDays: 60 };
 
 // Нагадування в гаражі.
 export const MAINTENANCE = {

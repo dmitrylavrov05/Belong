@@ -1,8 +1,8 @@
-import { CITY, CITIES, CATEGORIES, CAR_CLASSES, PLACES, PAYMENT, MAINTENANCE, REFERRAL, RELIABILITY } from './data.js';
+import { CITY, CITIES, CATEGORIES, CAR_CLASSES, PLACES, PAYMENT, MAINTENANCE, REFERRAL } from './data.js';
 import {
   store, icon, esc, uah, pad, hhmm, toMin, isoDate, parseDate, uid, placeById, plural, duration, dayLabel, rating, tel,
   hoursFor, scheduleOf, inBreak, rangeText, WEEKDAY_NAMES, weekdayOf, phoneKey, offersOf, offerAsService, isOpenNow, hoursText, bookingStart, fmtTime, fmtDate, km, serviceCat, catById, shrinkPhoto,
-  applyOverrides, isListed, payoutReady, maskIban, commissionFor, resolveDispute, visibleReviews, ACTIVE, BLOCKING, HOUR, reliability, isCarcar, price, complete, isFrozen, placeShare, balanceFor, settleAll, ratingFor,
+  applyOverrides, isListed, payoutReady, maskIban, commissionFor, resolveDispute, visibleReviews, ACTIVE, BLOCKING, HOUR, isCarcar, price, complete, isFrozen, placeShare, balanceFor, settleAll, ratingFor,
   POWER, powerOf, worksInBlackout, TICKET_TOPICS, CLIENT_TOPICS, TICKET_STATUS, ticketsAll, openTicket, ticketReply, setTicket, isBlocked, mobileOn, spanOf, laneCap, sameLane, MOBILE_ROAD, promosAll, promoCheck, promoText,
   enterView, bizApps, saveBizApps, APP_STATUS,
 } from './core.js';
@@ -895,16 +895,6 @@ function viewBook(id, date, time) {
       <p class="notice warn">Служба безпеки CARCAR тимчасово обмежила онлайн-запис для цього профілю. Якщо це помилка — напишіть у підтримку, відповімо протягом доби.</p>
       <a class="btn primary" href="#/support">Написати в підтримку</a>`;
   }
-  const rel = myReliability();
-  const ahead = activeAhead();
-  if (ahead.length >= rel.maxActive) {
-    return `${back(`#/place/${p.id}`, esc(p.name))}<h1>Забагато активних записів</h1>
-      <p class="notice warn">${rel.limited
-        ? 'Ви часто скасовуєте записи або не приїжджаєте, тому зараз можна мати лише один активний запис.'
-        : `Одночасно можна мати до ${rel.maxActive} записів.`}
-        Коли відвідаєте або скасуєте запис, зможете записатися знову.</p>
-      <a class="btn primary" href="#/bookings">Мої записи · ${ahead.length}</a>`;
-  }
   // Посилання з гарячого вікна чи листа очікування відкриває запис одразу на потрібний день і час.
   const prefill = date && bookingDays(p).includes(date);
   if (!draft || draft.placeId !== id || (prefill && draft.date !== date)) {
@@ -1324,9 +1314,7 @@ function cancelTerms(b) {
 
 // ---------- надійність клієнта ----------
 
-const myReliability = () => reliability(mine());
 // Активні майбутні записи, які клієнт зробив сам (регулярні записи створюються автоматично й не рахуються).
-const activeAhead = () => mine().filter((b) => b.state === 'paid' && !b.subId && bookingStart(b) > new Date());
 
 // Клієнт бачить два кроки: оплатив — мийка виконала.
 function steps(b) {
@@ -1407,7 +1395,7 @@ function bookingCard(b, highlight) {
   const started = bookingStart(b) <= new Date();
   if (b.state === 'paid') {
     const t = cancelTerms(b);
-    const canMove = t.inWindow && (b.moves?.length ?? 0) < MOVE_LIMIT && myReliability().movesLeft > 0;
+    const canMove = t.inWindow && (b.moves?.length ?? 0) < MOVE_LIMIT;
     body += `${b.extra ? `<div class="notice">
         <b>Майстер пропонує доплату +${uah(b.extra.amount)}</b>${esc(b.extra.reason)}
         <div class="grid2" style="margin-top:10px">
@@ -1429,7 +1417,7 @@ function bookingCard(b, highlight) {
       <p class="terms">${t.kind === 'free'
         ? `Перенести чи скасувати без втрат можна до ${fmtTime(t.deadline)}. Тоді ${uah(b.paid)} повернемо на баланс CARCAR.`
         : `Скасувати з поверненням можна було до ${fmtTime(t.deadline)}. Тепер оплата йде мийці, навіть якщо ви не приїдете.`}
-        ${t.inWindow && !canMove && (b.moves?.length ?? 0) < MOVE_LIMIT ? ` Переносити цього місяця більше не можна. Якщо треба інший час, напишіть мийці в чат.` : ''}</p>`}`;
+        ${t.inWindow && !canMove ? ` Запис уже переносили ${MOVE_LIMIT} рази. Якщо треба інший час, напишіть мийці в чат.` : ''}</p>`}`;
   } else if (b.state === 'done') {
     body = `<div class="lines tight">
         <div class="il strong">${when}</div>
@@ -1810,8 +1798,7 @@ function viewMove(id) {
   const head = `${back(`#/bookings/${b.id}`, 'Мої записи')}<h1>Перенести запис</h1>
     <p class="lead">${esc(p.name)} · ${esc(b.services.join(', '))}<br>Зараз: ${dayLabel(b.date, { weekday: 'short', day: 'numeric', month: 'long' })}, ${b.time}</p>`;
   if (!t.inWindow) return `${head}<p class="notice warn">Перенести можна було до ${fmtTime(t.deadline)}. Напишіть точці в чаті запису — можливо, вона знайде інший час.</p>`;
-  if ((b.moves?.length ?? 0) >= MOVE_LIMIT) return `${head}<p class="notice warn">Запис уже переносили ${MOVE_LIMIT} рази. Напишіть точці в чаті запису або скасуйте його безкоштовно до ${fmtTime(t.deadline)}.</p>`;
-  if (myReliability().movesLeft <= 0) return `${head}<p class="notice warn">Цього місяця ви вже переносили записи ${RELIABILITY.moves} рази, більше не можна. Напишіть мийці в чат, вона може змінити час сама.</p>`;
+  if ((b.moves?.length ?? 0) >= MOVE_LIMIT) return `${head}<p class="notice warn">Запис уже переносили ${MOVE_LIMIT} рази, більше не можна. Напишіть мийці в чат або скасуйте запис безкоштовно до ${fmtTime(t.deadline)}.</p>`;
   if (move?.id !== id) move = { id, date: b.date, time: null };
   return `${head}<p class="notice ok ic-row">${icon('shield', 18)}Оплата ${uah(b.paid)} не скасовується й не списується вдруге — змінюється лише час. Ціна лишається тією самою.</p>
     <div id="move"></div>`;
@@ -1842,7 +1829,7 @@ function renderMove() {
 function confirmMove() {
   const b = bookings.find((x) => x.id === move.id);
   if (!cancelTerms(b).inWindow) { toast('Час для перенесення минув'); route(); return; }
-  if (myReliability().movesLeft <= 0 || (b.moves?.length ?? 0) >= MOVE_LIMIT) { toast('Ліміт перенесень вичерпано'); route(); return; }
+  if ((b.moves?.length ?? 0) >= MOVE_LIMIT) { toast('Ліміт перенесень вичерпано'); route(); return; }
   const from = `${dayLabel(b.date, { day: 'numeric', month: 'long' })}, ${b.time}`;
   const to = `${dayLabel(move.date, { day: 'numeric', month: 'long' })}, ${move.time}`;
   b.moves = [...(b.moves ?? []), { date: b.date, time: b.time, at: Date.now() }];
@@ -2062,7 +2049,7 @@ function viewBusiness(sub) {
   const terms = [
     ['cash', 'Комісія 7% із замовлень через CARCAR', 'Абонплати немає, за підключення не платите. Записи, які ви вносите самі, без комісії.'],
     ['card', 'Клієнт платить одразу під час запису', `Коли авто готове, ви натискаєте «Машина готова». Гроші ${PAYMENT.freezeHours} годин чекають на випадок спору, потім виводите їх на рахунок ФОП або ТОВ.`],
-    ['shield', 'Неявку оплачує клієнт', `Скасував пізніше ніж за ${cancelWindow()}, не приїхав чи запізнився більш ніж на ${PAYMENT.lateMinutes} хв — гроші лишаються вам. Хто часто скасовує чи переносить, отримує обмеження на запис.`],
+    ['shield', 'Неявку оплачує клієнт', `Скасував пізніше ніж за ${cancelWindow()}, не приїхав чи запізнився більш ніж на ${PAYMENT.lateMinutes} хв — гроші лишаються вам. Один запис можна перенести не більше ${MOVE_LIMIT} разів.`],
     ['calendar', 'Кабінет для мийки безкоштовно', 'Розклад по боксах, клієнти, чати, прайс, відгуки й фінанси. Зручно з телефона.'],
     ['star', 'Відгуки тільки від справжніх клієнтів', 'Відгук може залишити лише той, хто був у вас на мийці. Відповісти можна публічно.'],
   ];
@@ -2478,7 +2465,7 @@ const bookingActions = {
     const t = cancelTerms(b);
     track('cancel_try', { placeId: b.placeId, free: t.free, kind: t.kind });
     const msg = t.kind === 'free'
-      ? `Скасувати запис? Повернемо ${uah(t.refund)} на баланс CARCAR.${myReliability().cancels + 1 >= RELIABILITY.cancelLimit ? ` Зверніть увагу: після ${RELIABILITY.cancelLimit} скасувань за місяць можна буде мати лише один активний запис.` : ''}`
+      ? `Скасувати запис? Повернемо ${uah(t.refund)} на баланс CARCAR.`
       : `До візиту менше ${cancelWindow()}, тому оплата ${uah(t.placeAmount)} зарахується точці за послугу — повернення не буде. Скасувати запис?`;
     if (!confirm(msg)) return false;
     Object.assign(b, { state: 'cancelled', refund: t.refund, placeAmount: t.placeAmount, closedAt: Date.now(), cancelBy: 'client', cancelKind: t.kind });

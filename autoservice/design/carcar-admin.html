@@ -1894,11 +1894,10 @@ const PAYMENT = {
   installments: { minTotal: 3000, parts: [3, 4, 6] },
 };
 
-// Обмеження на надто часті перенесення й скасування (рахуємо за останні days днів).
-// Перенесень — moves на всі записи разом (і не більше MOVE_LIMIT на один запис). Активних майбутніх
-// записів — maxActive. Після cancelLimit скасувань за days днів або noShowLimit неявок за noShowDays днів
-// можна мати лише один активний запис. Скасування вчасно завжди безкоштовне.
-const RELIABILITY = { days: 30, moves: 4, maxActive: 3, cancelLimit: 4, noShowLimit: 2, noShowDays: 60 };
+// Обмеження для клієнта одне: запис можна перенести не більше 3 разів (MOVE_LIMIT в app.js).
+// Тут — лише вікно для підказки мийці «Клієнт часто змінює плани»: скасування й перенесення за days днів,
+// неявки за noShowDays днів.
+const RELIABILITY = { days: 30, noShowDays: 60 };
 
 // Нагадування в гаражі.
 const MAINTENANCE = {
@@ -2316,19 +2315,14 @@ function expensesIn(placeId, from, to) {
 const ACTIVE = ['paid', 'done', 'dispute'];
 const HOUR = 3600000;
 
-// Надійність клієнта за його записами: скільки скасувань, неявок і перенесень, що ще дозволено.
+// Як часто клієнт змінює плани: скасування, неявки й перенесення — підказка для мийки, не обмеження.
 function reliability(list, now = Date.now()) {
   const R = RELIABILITY;
   const since = now - R.days * 24 * HOUR;
   const cancels = list.filter((b) => b.state === 'cancelled' && b.cancelBy === 'client' && (b.closedAt ?? 0) >= since);
   const noshows = list.filter((b) => b.state === 'noshow' && (b.closedAt ?? bookingStart(b).getTime()) >= now - R.noShowDays * 24 * HOUR).length;
   const moves = list.flatMap((b) => b.moves ?? []).filter((m) => m.at >= since).length;
-  const limited = noshows >= R.noShowLimit || cancels.length >= R.cancelLimit;
-  return {
-    cancels: cancels.length, noshows, moves, movesLeft: Math.max(0, R.moves - moves), limited,
-    maxActive: limited ? 1 : R.maxActive,
-    level: limited ? 'limited' : noshows || cancels.length >= R.cancelLimit - 1 || moves >= R.moves ? 'warn' : 'ok',
-  };
+  return { cancels: cancels.length, noshows, moves, level: noshows || cancels.length >= 3 || moves >= 4 ? 'warn' : 'ok' };
 }
 // Стани, у яких запис займає бокс: оплачені через CARCAR і внесені в журнал точки.
 const BLOCKING = [...ACTIVE, 'booked'];

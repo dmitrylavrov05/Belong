@@ -251,40 +251,39 @@ test('чат: фото, «Прочитано / Не прочитано» і ми
   await expect(page.getByRole('dialog').locator('.thread .read-state')).toHaveText(/^Прочитано/);
 });
 
-test('обмеження: відміни без штрафів, але після 4 скасувань за місяць — лише один активний запис', async ({ page }) => {
-  const dialogs = [];
-  page.on('dialog', (d) => { dialogs.push(d.message()); d.accept(); });
-  const cancelFirst = async () => {
-    await page.goto('/#/bookings');
-    await page.getByRole('button', { name: /^Активні/ }).click();
-    await page.locator('article').first().getByRole('button', { name: /^Скасувати/ }).click();
-  };
-  // Карточки «Надійність» у гаражі немає — обмеження видно лише тоді, коли спрацювали.
-  await page.goto('/#/garage');
-  await expect(page.getByRole('region', { name: 'Надійність' })).toHaveCount(0);
-
-  for (let i = 0; i < 4; i++) {
+test('обмеження одне: запис можна перенести не більше 3 разів; скасування й кількість записів не обмежені', async ({ page }) => {
+  page.on('dialog', (d) => d.accept());
+  // Скасовуємо 5 разів поспіль — без штрафів і без блокувань.
+  for (let i = 0; i < 5; i++) {
     await book(page, { pay: /Оплатити/ });
     await page.goto('/#/bookings');
     await page.getByRole('button', { name: /^Активні/ }).click();
-    await expect(page.locator('article').first().getByRole('button', { name: 'Скасувати', exact: true })).toBeVisible();
-    await cancelFirst();
+    await page.locator('article').first().getByRole('button', { name: 'Скасувати', exact: true }).click();
     await expect(page.locator('#toast')).toHaveText('Запис скасовано, 900 ₴ повернено на баланс');
   }
-  expect(dialogs[0]).not.toContain('один активний запис');
-  expect(dialogs[3]).toContain('після 4 скасувань за місяць можна буде мати лише один активний запис');
-
-  // Тепер — лише один активний запис.
-  await book(page, { time: '10:00', pay: /Оплатити/ });
+  // Чотири активні записи одночасно — можна.
+  for (const time of ['10:00', '11:00', '12:00']) await book(page, { time, pay: /Оплатити/ });
   await page.goto('/#/book/blysk');
-  await expect(page.getByRole('heading', { name: 'Забагато активних записів' })).toBeVisible();
-  await expect(page.locator('.notice.warn')).toContainText('Ви часто скасовуєте записи');
-  await expect(page.getByRole('link', { name: 'Мої записи · 1' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Забагато активних записів' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Запис' })).toBeVisible();
 
-  // Мийка бачить, що клієнт часто змінює плани.
-  await openInPanel(page, 'Автомийка «Хвиля»');
-  await expect(page.getByRole('dialog').locator('.rel-note')).toContainText('4 скасування');
-  await expect(page.getByRole('dialog').locator('.rel-note')).toContainText('лише один активний запис');
+  // Перенесення одного запису: тричі можна, учетверте — ні.
+  await page.goto('/#/bookings');
+  await page.getByRole('button', { name: /^Активні/ }).click();
+  const id = (await page.locator('article').first().getAttribute('id')).slice(2);
+  for (const [n, time] of [[0, '14:00'], [1, '15:00'], [2, '16:00']]) {
+    await page.goto(`/#/move/${id}`);
+    await page.locator(`.slot[data-time="${time}"]`).click();
+    await page.locator('[data-action="move-confirm"]').click();
+    await expect(page.locator('#toast')).toContainText('Запис перенесено');
+    expect(n).toBeLessThan(3);
+  }
+  await page.goto('/#/bookings');
+  const card = page.locator(`#b-${id}`);
+  await expect(card.getByRole('link', { name: 'Перенести' })).toHaveCount(0);
+  await expect(card).toContainText('Запис уже переносили 3 рази');
+  await page.goto(`/#/move/${id}`);
+  await expect(page.locator('.notice.warn')).toContainText('Запис уже переносили 3 рази, більше не можна');
 });
 
 test('кошторис СТО: клієнт погоджує пункти окремо, доплачує, гарантія потрапляє в сервісну книжку', async ({ page }) => {
