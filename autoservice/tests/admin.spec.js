@@ -85,7 +85,9 @@ async function demoSeed(page, name) {
   // Приклад містить новий запис, що чекає відповіді мийки: приймаємо його в шторці «Новий запис».
   const alert = page.getByRole('dialog', { name: 'Новий запис' });
   await alert.getByRole('button', { name: 'Прийняти' }).click();
-  await expect(alert).toHaveCount(0);
+  // У прикладі є мийники — обираємо, хто митиме.
+  await page.getByRole('dialog', { name: 'Хто митиме?' }).getByRole('button').filter({ hasText: 'Олександр' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 }
 
 test('нова мийка: додається в CarCar Business, CARCAR перевіряє й додає в каталог', async ({ page }) => {

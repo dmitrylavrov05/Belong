@@ -1429,6 +1429,19 @@ a.remind { text-decoration: none; }
 
 body.pro.locked .pro-tabs { display: none; }
 .block-btn { width: 100%; font: inherit; text-align: left; background: var(--bg); cursor: pointer; margin-bottom: 8px; }
+
+/* мийники */
+.washer-list { display: grid; gap: 8px; }
+.washer-opt { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--bg); font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+.washer-opt[aria-pressed="true"] { border-color: var(--navy); background: color-mix(in srgb, var(--navy) 10%, var(--bg)); }
+.washer-opt > span:last-child { display: grid; }
+.washer-opt small { font-size: 13px; }
+.washer-opt small.free { color: var(--ok); }
+.washer-opt small.busy { color: var(--warn); }
+.avatar.none { background: var(--soft); color: var(--muted); box-shadow: none; }
+.washer-dd { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.washer-dd .btn { min-height: 34px; font-size: 13px; padding: 0 10px; }
+.bk-washer { display: inline-flex; align-items: center; gap: 4px; color: var(--navy) !important; font-weight: 600; }
 </style>
 </head>
 <body class="pro">
@@ -3080,6 +3093,19 @@ function stateOf(b) {
 }
 // Сума запису для мийки: через CARCAR — повна ціна, з журналу — оплата на місці.
 const sumOf = (b) => (isCarcar(b) ? price(b) : b.paid);
+// ---------- мийники ----------
+
+// Мийники точки (у сховищі персоналу з роллю «майстер»). Звільнені лишаються в історії записів.
+const washers = () => staffOf(ui.place).filter((x) => x.role === 'master' && x.active !== false);
+const washerName = (id) => staffOf(ui.place).find((x) => x.id === id)?.name ?? null;
+function saveWashers(list) {
+  const all = store.get('biz.staff', {});
+  store.set('biz.staff', { ...all, [ui.place]: list });
+}
+// Інший запис цього мийника, що перетинається в часі.
+const washerBusy = (id, b) => own().find((x) => x !== b && x.masterId === id && x.date === b.date && BLOCKING.includes(x.state)
+  && toMin(b.time) < toMin(x.time) + x.minutes && toMin(b.time) + b.minutes > toMin(x.time));
+
 // Клієнт натиснув «Їду» чи «Запізнююсь» у нагадуванні.
 const etaText = (b) => (b.state !== 'paid' ? '' : [b.eta === 'onway' ? 'їде' : '', b.late ? `запізниться на ${b.late} хв` : ''].filter(Boolean).join(', '));
 
@@ -3211,7 +3237,7 @@ function notifyAction(action, id) {
   const b = own().find((x) => x.id === id);
   if (!b || b.state !== 'pending') { toast(b ? 'На цей запис уже відповіли' : 'Запис не знайдено'); return; }
   alerted.add(id);
-  if (action === 'accept') { acceptBooking(b); save(); rerender(); toast(`Запис прийнято: ${who(b)}, ${dayWord(b.date).toLowerCase()} о ${b.time}`); }
+  if (action === 'accept') { if (washers().length) washerSheet(b.id, 'accept'); else { acceptBooking(b); save(); rerender(); toast(`Запис прийнято: ${who(b)}, ${dayWord(b.date).toLowerCase()} о ${b.time}`); } }
   else if (action === 'decline') declineSheet(id);
   else alertSheet(b);
 }
@@ -3406,7 +3432,7 @@ function bookingRow(b) {
   return `<li><button class="bk-row${off ? ' off' : ''}" type="button" data-action="bk-open" data-id="${b.id}">
     <span class="bk-time"><b>${b.time}</b><small>${hhmm(toMin(b.time) + b.minutes)}</small></span>
     <span class="bk-main"><b>${esc(who(b))}${b.chatUnreadBiz ? ' <span class="dot" aria-label="нове повідомлення"></span>' : ''}</b>
-      <small>${esc(b.services.join(', '))}</small>${b.car ? `<small>${esc(b.car)}</small>` : ''}</span>
+      <small>${esc(b.services.join(', '))}</small>${b.car ? `<small>${esc(b.car)}</small>` : ''}${b.masterId && washerName(b.masterId) ? `<small class="bk-washer">${icon('users', 13)}${esc(washerName(b.masterId))}</small>` : ''}</span>
     <span class="bk-side"><span class="pill ${cls}">${label}</span><small>${CHANNEL[channelOf(b)]} · ${uah(sumOf(b))}</small></span>
   </button></li>`;
 }
@@ -3554,6 +3580,8 @@ function bookingSheet(id) {
       <dt>Коли</dt><dd>${dayWord(b.date, true)}, ${b.time}–${hhmm(toMin(b.time) + b.minutes)}</dd>
       <dt>Послуги</dt><dd>${esc(b.services.join(', '))}</dd>
       <dt>Авто</dt><dd>${esc(b.car || '—')}</dd>
+      ${ACTIVE.includes(b.state) || b.state === 'booked' || b.masterId ? `<dt>Мийник</dt><dd class="washer-dd">${b.masterId && washerName(b.masterId) ? `<b>${esc(washerName(b.masterId))}</b>` : '<span class="muted">не призначено</span>'}
+        ${(ACTIVE.includes(b.state) || b.state === 'booked') && b.state !== 'pending' ? `<button class="btn soft" type="button" data-action="washer" data-id="${b.id}">${b.masterId ? 'Змінити' : 'Обрати'}</button>` : ''}</dd>` : ''}
       <dt>Сума</dt><dd>${uah(sumOf(b))}${isCarcar(b) ? ' · оплачено в CARCAR' : b.payment ? ` · ${b.payment === 'cash' ? 'готівка' : 'картка'}` : ' · оплата на місці'}</dd>
       ${b.note && !isCarcar(b) ? `<dt>Коментар</dt><dd>${esc(b.note)}</dd>` : ''}
       ${b.mobile ? `<dt>Виїзд</dt><dd>${esc(b.mobile.address)} · ${String(b.mobile.km).replace('.', ',')} км · виїзд ${uah(b.mobile.fee)}
@@ -3599,6 +3627,24 @@ function proposeSheet(id, date) {
     ${starts.length ? `<div class="slots" role="group" aria-label="Запропонувати час">${starts.map((x) => `<button class="slot" type="button" data-action="propose-to" data-id="${b.id}" data-date="${d}" data-time="${x}">${x}</button>`).join('')}</div>`
       : '<p class="muted">На цей день вільних боксів немає — оберіть інший.</p>'}
     <p class="fine">Час одразу закріплюється за клієнтом. На відповідь у нього ${PAYMENT.offerMinutes} хв; не погодиться — гроші повернуться йому, а вам це не рахується як відмова.</p>`);
+}
+
+// Хто митиме машину: під час прийняття запису з застосунку або пізніше в картці запису.
+function washerSheet(id, mode) {
+  const b = own().find((x) => x.id === id);
+  const list = washers();
+  openSheet(mode === 'accept' ? 'Хто митиме?' : 'Мийник', `
+    <p class="small muted" style="margin:0">${dayWord(b.date, true)}, ${b.time}–${hhmm(toMin(b.time) + b.minutes)} · ${esc(b.services.join(', '))} · ${esc(b.car || '')}</p>
+    <div class="washer-list" role="group" aria-label="Мийники">
+      ${list.map((w) => {
+        const busy = washerBusy(w.id, b);
+        return `<button class="washer-opt" type="button" data-action="washer-pick" data-mode="${mode}" data-id="${b.id}" data-m="${w.id}" aria-pressed="${b.masterId === w.id}">
+          <span class="avatar" aria-hidden="true">${firstLetter(w.name)}</span><span><b>${esc(w.name)}</b>
+          <small class="${busy ? 'busy' : 'free'}">${busy ? `зайнятий: ${busy.time}–${hhmm(toMin(busy.time) + busy.minutes)}, ${esc(who(busy))}` : 'вільний у цей час'}</small></span></button>`;
+      }).join('')}
+      <button class="washer-opt" type="button" data-action="washer-pick" data-mode="${mode}" data-id="${b.id}" data-m=""><span class="avatar none" aria-hidden="true">?</span><span><b>Без мийника</b><small>${mode === 'accept' ? 'оберете пізніше в картці запису' : 'зняти з запису'}</small></span></button>
+    </div>
+    ${mode === 'accept' ? '<p class="fine">Клієнт отримає підтвердження запису й імʼя мийника.</p>' : ''}`);
 }
 
 function moveSheet(id, date) {
@@ -3671,6 +3717,12 @@ function nbRender() {
   $('#nb-dyn').innerHTML = `
     <div><span class="lbl">Клас авто</span><div class="chips nb-chips" role="group" aria-label="Клас авто">${CAR_CLASSES.map((c, i) => `<button class="chip" type="button" data-action="nb-cls" data-i="${i}" aria-pressed="${i === nb.cls}">${c}</button>`).join('')}</div></div>
     <div><span class="lbl">Послуги</span><div class="svc-chips" role="group" aria-label="Послуги">${p.services.map((s) => `<button class="svc-chip" type="button" data-action="nb-svc" data-id="${s.id}" aria-pressed="${nb.services.has(s.id)}"><b>${esc(s.name)}</b><small>${uah(s.price[nb.cls])} · ${duration(s.min)}</small></button>`).join('')}</div></div>
+    ${washers().length ? `<div><span class="lbl">Мийник</span><div class="chips nb-chips" role="group" aria-label="Мийник">
+      <button class="chip" type="button" data-action="nb-washer" data-m="" aria-pressed="${!nb.masterId}">Будь-хто</button>
+      ${washers().map((w) => {
+        const busy = nb.time && washerBusy(w.id, { date: nb.date, time: nb.time, minutes: nbMinutes() });
+        return `<button class="chip" type="button" data-action="nb-washer" data-m="${w.id}" aria-pressed="${nb.masterId === w.id}">${esc(w.name)}${busy ? ' · зайнятий' : ''}</button>`;
+      }).join('')}</div></div>` : ''}
     <div><span class="lbl">День</span><div class="chips nb-chips" role="group" aria-label="День">${Array.from({ length: 7 }, (_, i) => shiftDay(t, i)).map((d) => `<button class="chip" type="button" data-action="nb-day" data-date="${d}" aria-pressed="${d === nb.date}" ${hoursFor(p, d) ? '' : 'disabled'}>${dayWord(d)}</button>`).join('')}</div></div>
     <div><span class="lbl">Час</span>${times.length ? `<div class="slots" role="group" aria-label="Вільний час">${times.map((x) => `<button class="slot" type="button" data-action="nb-time" data-time="${x}" aria-pressed="${x === nb.time}">${x === nowTime && nb.channel === 'walkin' ? 'Зараз' : x}</button>`).join('')}</div>`
       : `<p class="muted small" style="margin:6px 0 0">${hoursFor(p, nb.date) ? 'Вільних боксів на цей день немає.' : 'Цього дня мийка не працює.'}</p>`}</div>
@@ -3701,7 +3753,7 @@ function nbSubmit() {
   const total = chosen.reduce((a, s) => a + s.price[nb.cls], 0);
   const b = {
     id: uid(), source: 'crm', channel: nb.channel, placeId: p.id, services: chosen.map((s) => s.name), total, paid: total, bonus: 0,
-    covered: 0, passUse: null, masterId: null, minutes: nbMinutes(), date: nb.date, time: nb.time,
+    covered: 0, passUse: null, masterId: nb.masterId ?? null, minutes: nbMinutes(), date: nb.date, time: nb.time,
     car: nb.car.trim() || CAR_CLASSES[nb.cls], plate: '', cls: nb.cls,
     clientName: nb.name.trim() || (nb.channel === 'walkin' ? 'Клієнт з вулиці' : 'Клієнт'), clientPhone: nb.phone.trim(), note: '',
     state: 'booked', createdAt: Date.now(),
@@ -3965,6 +4017,7 @@ function viewMore() {
   const links = [
     ['#/reviews', 'star', 'Відгуки', noReply ? `Без відповіді: ${noReply}` : 'Відповіді видно на сторінці мийки', noReply],
     ['#/analytics', 'chart', 'Аналітика', 'Виручка, завантаження по годинах, послуги, клієнти', 0],
+    ['#/staff', 'users', 'Мийники', washers().length ? washers().map((w) => w.name).join(', ') : 'Додайте мийників, щоб призначати їх на записи', 0],
     ['#/clients', 'users', 'Клієнти', 'Хто приїжджав, скільки разів і на якому авто', 0],
     ['#/payout', 'card', 'Рахунок для виплат', pt.payout?.iban ? `${maskIban(pt.payout.iban)} · ${pt.payout.verified ? 'перевірено' : 'на перевірці'}` : 'Вкажіть IBAN, щоб виводити гроші', pt.payout?.iban ? 0 : 1],
     ['#/support', 'info', 'Підтримка CARCAR', answers ? `Нові відповіді: ${answers}` : 'Виплати, спори, відгуки', answers],
@@ -3975,6 +4028,29 @@ function viewMore() {
     ${s?.demo ? `<button class="btn block" type="button" data-action="demo-seed" style="margin-top:16px">Заповнити прикладом: історія, записи й повідомлення</button>` : ''}
     <p class="fine" style="margin-top:16px">Щоб CarCar Business був під рукою, додайте його на головний екран: меню браузера → «Встановити застосунок» або «На екран “Додому”».</p>
     <button class="btn line-danger block" type="button" data-action="logout" style="margin-top:8px">${s?.demo ? 'Вийти з демо' : `Вийти${s?.login ? ` (${esc(s.login)})` : ''}`}</button>`;
+}
+
+// Мийники: хто працює на мийці, скільки машин помив за місяць і відсоток від роботи (якщо вказано).
+function viewStaff() {
+  const list = washers();
+  const from = shiftDay(todayIso(), -29);
+  const cars = (id) => own().filter((b) => b.masterId === id && b.state === 'completed' && b.date >= from).length;
+  return `<a class="back" href="#/more">${icon('chevL', 22)}Ще</a><h1>Мийники</h1>
+    <p class="lead">Обирайте мийника, коли приймаєте запис. Клієнт бачить, хто митиме машину.</p>
+    ${list.length ? `<ul class="client-list">${list.map((w) => `<li>
+      <span class="avatar" aria-hidden="true">${firstLetter(w.name)}</span>
+      <span class="cl-main"><b>${esc(w.name)}</b><small>${w.phone ? esc(w.phone) : 'без телефону'}${w.pct ? ` · ${w.pct}% від роботи` : ''}</small><small>За 30 днів: ${cars(w.id)} ${plural(cars(w.id), 'машина', 'машини', 'машин')}</small></span>
+      <button class="btn text-danger" type="button" data-action="washer-del" data-id="${w.id}" aria-label="Прибрати ${esc(w.name)}">Прибрати</button>
+    </li>`).join('')}</ul>` : `<div class="pro-empty">${icon('users', 32)}<b>Мийників ще немає</b><span>Додайте їх, щоб призначати на записи.</span></div>`}
+    <form class="pro-card stack" id="washer-form" aria-labelledby="h-add-w" style="gap:12px;margin-top:12px">
+      <h2 id="h-add-w">Додати мийника</h2>
+      <label class="field"><span>Імʼя</span><input name="name" required maxlength="60" autocomplete="off"></label>
+      <div class="grid2">
+        <label class="field"><span>Телефон</span><input name="phone" type="tel" autocomplete="off" placeholder="+380"></label>
+        <label class="field"><span>% від роботи</span><input name="pct" type="number" min="0" max="100" inputmode="numeric" placeholder="необовʼязково"></label>
+      </div>
+      <button class="btn navy" type="submit">Додати</button>
+    </form>`;
 }
 
 const backTo = (href, label) => `<a class="back" href="${href}">${icon('chevL', 22)}${label}</a>`;
@@ -4302,6 +4378,10 @@ function demoSeed() {
   make(tm, pick(2), { slot: 2, channel: 'carcar', state: 'paid', clientName: 'Андрій Коваль', clientPhone: '+380 66 400 70 80', car: 'Kia Sportage · BC1209HH',
     chat: [{ from: 'client', text: 'Буду з багажником на даху, це не завадить?', at: ago(180), readAt: ago(170) }, { from: 'biz', text: 'Так, чекаємо', at: ago(170), readAt: ago(160) }] });
   make(tm, pick(0, 3), { slot: 6, channel: 'phone', state: 'booked', clientName: 'Наталія Шевчук', clientPhone: '+380 97 777 01 02', car: 'VW Golf · AA0909XT' });
+  // Мийники для прикладу й хто мив машини в історії.
+  if (!washers().length) saveWashers([...staffOf(p.id), ...['Олександр', 'Віталій', 'Денис'].map((name, i) => ({ id: `w${i}_${p.id}`, name, phone: '', role: 'master', pct: 35, active: true, demo: true }))]);
+  const ws = washers();
+  bookings.filter((b) => b.placeId === p.id && b.source === 'demo' && b.state !== 'pending' && !b.masterId).forEach((b, i) => { b.masterId = ws[i % ws.length].id; });
   requests.push({ id: uid(), demo: true, placeId: p.id, clientName: 'Максим', clientPhone: '+380 63 321 00 99', car: 'BMW X5', cls: 2,
     messages: [{ from: 'client', text: 'Робите хімчистку стелі? Скільки коштує для кросовера?', at: ago(40) }], at: ago(40), unreadBiz: true });
   save();
@@ -4316,7 +4396,7 @@ const TABS = [['', 'Повідомлення', 'chat'], ['bookings', 'Запис
 
 function renderChrome(page) {
   const badge = { '': unreadCount(), bookings: unmarked().length };
-  const tabOf = page === 'chat' ? '' : ['reviews', 'clients', 'payout', 'support'].includes(page) ? 'more' : page === 'analytics' ? 'wash' : page;
+  const tabOf = page === 'chat' ? '' : ['reviews', 'clients', 'payout', 'support', 'staff'].includes(page) ? 'more' : page === 'analytics' ? 'wash' : page;
   $('#tabbar').innerHTML = TABS.map(([id, label, ic]) => `<a href="#/${id}" ${tabOf === id ? 'aria-current="page"' : ''}>
     <span class="tab-ic">${icon(ic, 24)}${badge[id] ? `<span class="tab-count" aria-label="${id ? 'Записи без позначки' : 'Непрочитані'}: ${badge[id]}">${badge[id]}</span>` : ''}</span>${label}</a>`).join('');
   const p = place();
@@ -4379,6 +4459,7 @@ function route() {
   else if (page === 'more') view.innerHTML = viewMore();
   else if (page === 'reviews') view.innerHTML = viewReviews();
   else if (page === 'clients') view.innerHTML = viewClients();
+  else if (page === 'staff') view.innerHTML = viewStaff();
   else if (page === 'payout') view.innerHTML = viewPayout();
   else if (page === 'support') view.innerHTML = viewSupport(arg);
   else if (page === 'analytics') view.innerHTML = viewAnalytics();
@@ -4463,11 +4544,42 @@ document.addEventListener('click', async (e) => {
     return;
   }
   if (action === 'accept') {
+    // Є мийники — спершу обираємо, хто митиме.
+    if (washers().length) { washerSheet(b.id, 'accept'); return; }
     acceptBooking(b);
     save();
     closeSheet();
     rerender();
     toast(`Запис прийнято: ${who(b)}, ${dayWord(b.date).toLowerCase()} о ${b.time}`);
+    return;
+  }
+  if (action === 'washer') { washerSheet(id, 'assign'); return; }
+  if (action === 'washer-pick') {
+    const m = el.dataset.m || null;
+    b.masterId = m;
+    const name = m ? washerName(m) : null;
+    if (el.dataset.mode === 'accept') {
+      acceptBooking(b);
+      if (name) chatPost(b, 'sys', `Вашу машину митиме ${name}`, 'client');
+      save();
+      closeSheet();
+      rerender();
+      toast(`Запис прийнято${name ? `, мийник — ${name}` : ''}: ${who(b)}, ${dayWord(b.date).toLowerCase()} о ${b.time}`);
+      return;
+    }
+    save();
+    rerender();
+    bookingSheet(b.id);
+    toast(name ? `Мийник: ${name}` : 'Мийника знято із запису');
+    return;
+  }
+  if (action === 'nb-washer') { nb.masterId = el.dataset.m || null; nbRender(); return; }
+  if (action === 'washer-del') {
+    const x = staffOf(ui.place).find((w) => w.id === id);
+    if (!confirm(`Прибрати ${x.name} зі списку мийників? Минулі записи збережуться.`)) return;
+    saveWashers(staffOf(ui.place).map((w) => (w.id === id ? { ...w, active: false } : w)));
+    rerender();
+    toast(`${x.name} більше не в списку`);
     return;
   }
   if (action === 'decline') { declineSheet(id); return; }
@@ -4744,6 +4856,15 @@ document.addEventListener('submit', async (e) => {
     save();
     rerender();
     toast('Відповідь опубліковано на сторінці мийки');
+    return;
+  }
+  if (f.id === 'washer-form') {
+    const name = String(d.get('name')).trim();
+    if (!name) return;
+    const pct = Math.min(100, Math.max(0, Number(d.get('pct')) || 0));
+    saveWashers([...staffOf(ui.place), { id: uid(), name, phone: String(d.get('phone')).trim(), role: 'master', pct: pct || null, active: true, createdAt: Date.now() }]);
+    rerender();
+    toast(`${name} додано до мийників`);
     return;
   }
   if (f.id === 'payout-form') {

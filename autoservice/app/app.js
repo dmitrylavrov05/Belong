@@ -2,7 +2,7 @@ import { CITY, CITIES, CATEGORIES, CAR_CLASSES, PLACES, PAYMENT, MAINTENANCE, RE
 import {
   store, icon, esc, uah, pad, hhmm, toMin, isoDate, parseDate, uid, placeById, plural, duration, dayLabel, rating, tel,
   hoursFor, scheduleOf, inBreak, rangeText, WEEKDAY_NAMES, weekdayOf, phoneKey, offersOf, offerAsService, isOpenNow, hoursText, bookingStart, fmtTime, fmtDate, km, serviceCat, catById, shrinkPhoto,
-  confirmBy, offerBy, pauseOf, responseStats, msText, AWAITING,
+  confirmBy, offerBy, pauseOf, responseStats, msText, AWAITING, staffOf,
   applyOverrides, isListed, visibleReviews, ACTIVE, BLOCKING, HOUR, price, isFrozen, settleAll, ratingFor,
   powerOf, worksInBlackout, TICKET_TOPICS, CLIENT_TOPICS, TICKET_STATUS, ticketsAll, openTicket, ticketReply, setTicket, isBlocked, mobileOn, spanOf, laneCap, sameLane, MOBILE_ROAD, promosAll, promoCheck,
   enterView, bizApps, saveBizApps, APP_STATUS, numberBookings, bookingNo, findByNo, ticketPhotos,
@@ -1376,6 +1376,9 @@ const STATE_LABEL = {
 // Іконки статусів, щоб завершені записи розрізнялися з першого погляду.
 const STATE_ICON = { pending: 'clock', offer: 'clock', completed: 'checkCircle', cancelled: 'x', refunded: 'x', noshow: 'clock', dispute: 'info' };
 
+// Хто митиме машину — мийка обирає в CarCar Business.
+const washerOf = (b) => (b.masterId ? staffOf(b.placeId).find((x) => x.id === b.masterId)?.name ?? null : null);
+
 const cardHead = (b, title, sm, amount = b.paid) => {
   const [cls, label] = b.declined && b.declined !== 'proposal' ? ['', 'Мийка не підтвердила'] : STATE_LABEL[b.state];
   return `<div class="head">
@@ -1423,6 +1426,7 @@ function bookingCard(b, highlight) {
   const lines = `<div class="lines">
       <div class="il strong">${icon('calendar', 18)}${when}</div>
       <div class="il">${icon('carSide', 18)}${esc(b.car)}</div>
+      ${washerOf(b) ? `<div class="il">${icon('users', 18)}Мийник: ${esc(washerOf(b))}</div>` : ''}
       ${b.mobile ? `<div class="il">${icon('carSide', 18)}Виїзд до вас: ${esc(b.mobile.address)}</div>` : p ? `<div class="il">${icon('pin', 18)}${esc(p.address)}</div>` : ''}
       <div class="svc">${b.services.map(esc).join(', ')}</div>
       ${b.moves?.length ? `<div class="il muted">${icon('repeat', 18)}Перенесено з ${dayLabel(b.moves.at(-1).date, { day: 'numeric', month: 'long' })}, ${b.moves.at(-1).time}</div>` : ''}

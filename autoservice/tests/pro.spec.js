@@ -546,3 +546,65 @@ for (const path of ['#/analytics', '#/reviews', '#/clients', '#/payout', '#/supp
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 }
+
+// ---------- мийники ----------
+
+async function addWasher(page, name, pct = '') {
+  await page.goto(`${PRO}#/staff`);
+  await page.getByLabel('Імʼя').fill(name);
+  if (pct) await page.getByLabel('% від роботи').fill(pct);
+  await page.getByRole('button', { name: 'Додати', exact: true }).click();
+  await expect(page.locator('.toast')).toContainText(`${name} додано до мийників`);
+}
+
+test('мийник: обирають під час прийняття запису, клієнт бачить імʼя, зайнятого видно', async ({ page }) => {
+  await addWasher(page, 'Олександр', '35');
+  await addWasher(page, 'Віталій');
+  await expect(page.locator('.client-list')).toContainText('Олександр');
+  await expect(page.locator('.client-list')).toContainText('35% від роботи');
+
+  await clientBooks(page);
+  await page.goto(PRO);
+  await page.getByRole('dialog', { name: 'Новий запис' }).getByRole('button', { name: 'Прийняти' }).click();
+  const pick = page.getByRole('dialog', { name: 'Хто митиме?' });
+  await expect(pick.getByRole('button', { name: /Олександр/ })).toContainText('вільний у цей час');
+  await pick.getByRole('button', { name: /Олександр/ }).click();
+  await expect(page.locator('.toast')).toContainText('Запис прийнято, мийник — Олександр');
+
+  await page.goto('/#/bookings');
+  await expect(page.locator('article.bk').first()).toContainText('Мийник: Олександр');
+  await page.goto('/#/inbox');
+  await expect(page.locator('.convo').first()).toContainText('Вашу машину митиме Олександр');
+
+  // Другий запис на той самий час: Олександр уже зайнятий.
+  await page.goto(`${PRO}#/bookings/2026-10-05`);
+  await expect(page.locator('.bk-row', { hasText: '10:00' })).toContainText('Олександр');
+  await page.getByRole('button', { name: 'Новий запис' }).click();
+  const nbSheet = page.getByRole('dialog', { name: 'Новий запис' });
+  await nbSheet.getByLabel('Телефон', { exact: true }).fill('067 111 22 33');
+  await nbSheet.getByRole('button', { name: /Експрес-мийка кузова/ }).click();
+  await nbSheet.getByRole('group', { name: 'День' }).getByRole('button', { name: 'Завтра' }).click();
+  await nbSheet.getByRole('group', { name: 'Вільний час' }).getByRole('button', { name: '10:00', exact: true }).click();
+  await expect(nbSheet.getByRole('group', { name: 'Мийник' }).getByRole('button', { name: 'Олександр · зайнятий' })).toBeVisible();
+  await nbSheet.getByRole('group', { name: 'Мийник' }).getByRole('button', { name: 'Віталій' }).click();
+  await nbSheet.getByRole('button', { name: 'Записати на 10:00', exact: true }).click();
+  await expect(page.locator('.bk-row', { hasText: 'Клієнт' }).filter({ hasText: 'Віталій' })).toBeVisible();
+
+  // У картці запису мийника можна змінити.
+  await page.locator('.bk-row', { hasText: 'Віталій' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Змінити' }).click();
+  await expect(page.getByRole('dialog', { name: 'Мийник' }).getByRole('button', { name: /Олександр/ })).toContainText('зайнятий: 10:00–10:20');
+  await page.getByRole('dialog', { name: 'Мийник' }).getByRole('button', { name: /Без мийника/ }).click();
+  await expect(page.locator('.toast')).toContainText('Мийника знято із запису');
+  await expect(page.getByRole('dialog')).toContainText('не призначено');
+});
+
+test('доступність: вибір мийника й список мийників', async ({ page }) => {
+  await addWasher(page, 'Олександр');
+  expect((await new AxeBuilder({ page }).analyze()).violations.map((v) => v.id)).toEqual([]);
+  await clientBooks(page);
+  await page.goto(PRO);
+  await page.getByRole('dialog', { name: 'Новий запис' }).getByRole('button', { name: 'Прийняти' }).click();
+  await page.getByRole('dialog', { name: 'Хто митиме?' }).waitFor();
+  expect((await new AxeBuilder({ page }).analyze()).violations.map((v) => v.id)).toEqual([]);
+});

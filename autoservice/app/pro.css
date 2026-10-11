@@ -307,3 +307,16 @@ a.remind { text-decoration: none; }
 
 body.pro.locked .pro-tabs { display: none; }
 .block-btn { width: 100%; font: inherit; text-align: left; background: var(--bg); cursor: pointer; margin-bottom: 8px; }
+
+/* мийники */
+.washer-list { display: grid; gap: 8px; }
+.washer-opt { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--bg); font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+.washer-opt[aria-pressed="true"] { border-color: var(--navy); background: color-mix(in srgb, var(--navy) 10%, var(--bg)); }
+.washer-opt > span:last-child { display: grid; }
+.washer-opt small { font-size: 13px; }
+.washer-opt small.free { color: var(--ok); }
+.washer-opt small.busy { color: var(--warn); }
+.avatar.none { background: var(--soft); color: var(--muted); box-shadow: none; }
+.washer-dd { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.washer-dd .btn { min-height: 34px; font-size: 13px; padding: 0 10px; }
+.bk-washer { display: inline-flex; align-items: center; gap: 4px; color: var(--navy) !important; font-weight: 600; }
