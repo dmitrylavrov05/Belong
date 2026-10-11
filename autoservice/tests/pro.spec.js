@@ -232,19 +232,29 @@ async function clientBooks(page, toast = 'Оплачено. Чекаємо, ко
   await expect(page.locator('#toast')).toHaveText(toast);
 }
 
-test('запис із застосунку чекає підтвердження мийки, мийка приймає', async ({ page }) => {
+test('запис із застосунку чекає підтвердження: сповіщення з деталями, мийка приймає', async ({ page }) => {
   await clientBooks(page);
   const card = page.locator('article.bk').first();
   await expect(card).toContainText('Чекає підтвердження мийки');
-  await expect(card).toContainText('Мийка підтвердить запис до 10:30');
+  await expect(card).toContainText('Мийка підтвердить запис до 10:05');
 
   await page.goto(PRO);
+  // Поверх екрана — сповіщення з деталями запису й відліком 5 хвилин.
+  const alert = page.getByRole('dialog', { name: 'Новий запис' });
+  await expect(alert).toContainText('10:00');
+  await expect(alert).toContainText('Експрес-мийка кузова');
+  await expect(alert).toContainText('250 ₴ через CARCAR');
+  await expect(alert).toContainText('4 з 4 вільні в цей час');
+  await expect(alert.locator('.countdown')).toHaveText('5:00');
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await alert.getByRole('button', { name: 'Пізніше' }).click();
+  // Закрили — запис чекає в блоці зверху, повторно шторка не вискакує.
   const block = page.getByRole('region', { name: 'Нові записи' });
-  await expect(block).toContainText('Новий запис — підтвердіть');
-  await expect(block).toContainText('Експрес-мийка кузова');
-  await expect(block).toContainText('Відповісти до 10:30');
+  await expect(block).toContainText('Відповісти до 10:05');
   await expect(page.getByLabel('Непрочитані: 1')).toBeVisible();
-  await block.getByRole('button', { name: 'Прийняти' }).click();
+  await page.getByRole('link', { name: 'Записи' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByRole('region', { name: 'Нові записи' }).getByRole('button', { name: 'Прийняти' }).click();
   await expect(page.locator('.toast')).toContainText('Запис прийнято');
   await expect(page.getByRole('region', { name: 'Нові записи' })).toHaveCount(0);
 
@@ -254,10 +264,10 @@ test('запис із застосунку чекає підтвердження
   await expect(page.locator('.convo').first()).toContainText('підтверджено. Чекаємо вас!');
 });
 
-test('мийка відмовляє — клієнт бачить причину й повернення', async ({ page }) => {
+test('мийка відмовляє зі сповіщення — клієнт бачить причину й повернення', async ({ page }) => {
   await clientBooks(page);
   await page.goto(`${PRO}#/bookings/2026-10-05`);
-  await page.getByRole('region', { name: 'Нові записи' }).getByRole('button', { name: 'Відмовити' }).click();
+  await page.getByRole('dialog', { name: 'Новий запис' }).getByRole('button', { name: 'Відмовити' }).click();
   await page.getByLabel('Не робимо цю послугу').check();
   await page.getByRole('button', { name: 'Відмовити й повернути гроші' }).click();
   await expect(page.locator('.toast')).toContainText('клієнт отримав гроші назад');
@@ -270,9 +280,30 @@ test('мийка відмовляє — клієнт бачить причину
   await expect(card).toContainText('Мийка не може прийняти запис: Не робимо цю послугу. Повернено 250 ₴ на картку.');
 });
 
-test('мийка не відповіла за 30 хвилин — запис скасовується сам', async ({ page }) => {
+test('кнопки системного сповіщення: «Прийняти» з адреси', async ({ page }) => {
   await clientBooks(page);
-  await page.clock.setFixedTime(new Date(2026, 9, 4, 10, 31));
+  const id = await page.evaluate(() => JSON.parse(localStorage.getItem('carcar.bookings'))[0].id);
+  await page.goto(`${PRO}#/act/accept/${id}`);
+  await expect(page.locator('.toast')).toContainText('Запис прийнято');
+  await expect(page).toHaveURL(/pro\.html#\/$/);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('carcar.bookings'))[0].state)).toBe('paid');
+});
+
+test('відлік минає у відкритому застосунку — запис скасовується сам', async ({ page }) => {
+  await page.clock.install({ time: new Date(2026, 9, 4, 10, 0) });
+  await clientBooks(page);
+  await page.goto(PRO);
+  await expect(page.getByRole('dialog', { name: 'Новий запис' })).toBeVisible();
+  await page.clock.runFor(5 * 60 * 1000 + 2000);
+  await expect(page.locator('.toast')).toContainText('Час на підтвердження минув');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Нові записи' })).toHaveCount(0);
+});
+
+test('мийка не відповіла за 5 хвилин — запис скасовується сам', async ({ page }) => {
+  await clientBooks(page);
+  await page.clock.setFixedTime(new Date(2026, 9, 4, 10, 6));
   await page.goto('/#/bookings');
   await page.getByRole('button', { name: /^Завершені/ }).click();
   await expect(page.locator('.done-item').first()).toContainText('Мийка не підтвердила');

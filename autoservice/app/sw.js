@@ -1,6 +1,6 @@
 // Кеш для роботи без мережі: застосунок відкривається, навіть якщо зник інтернет
 // (зокрема під час відключень світла).
-const CACHE = 'carcar-v45';
+const CACHE = 'carcar-v46';
 const FILES = [
   './', 'index.html', 'styles.css', 'app.js', 'core.js', 'data.js', 'icon.svg', 'manifest.webmanifest',
   'business.html', 'business.css', 'business.js', 'charts.js', 'partners.js', 'ops.js', 'map.js', 'vehicles.js', 'admin.html', 'admin.js',
@@ -32,4 +32,18 @@ self.addEventListener('fetch', (e) => {
       })
       .catch(() => caches.match(e.request)),
   );
+});
+
+// Кнопки сповіщення про новий запис у CarCar Business: «Прийняти» / «Відмовити» або дотик до сповіщення.
+// Відкритому застосунку передаємо дію повідомленням, інакше відкриваємо його з дією в адресі.
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const id = e.notification.data?.id;
+  if (!id) return;
+  const action = e.action || 'open';
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+    const win = list.find((c) => new URL(c.url).pathname.endsWith('/pro.html'));
+    if (win) { win.postMessage({ type: 'pending-action', action, id }); return win.focus(); }
+    return self.clients.openWindow(`pro.html#/act/${action}/${id}`);
+  }));
 });

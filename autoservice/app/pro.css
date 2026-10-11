@@ -217,3 +217,15 @@ body.sheet-open .pro-fab { display: none; }
 .reason-set { border: 0; margin: 0; padding: 0; display: grid; gap: 10px; }
 .reason-set legend { font-size: 13px; color: var(--muted); margin-bottom: 6px; padding: 0; }
 .check.radio { border-radius: 50%; }
+
+/* сповіщення про новий запис */
+.pro-sheet.alert { border-top: 4px solid var(--accent); }
+.alert-card { display: grid; gap: 14px; }
+.alert-time { display: grid; justify-items: start; padding: 12px 14px; border-radius: 14px; background: var(--soft); }
+.alert-time b { font-size: 34px; line-height: 1.1; }
+.alert-time span { font-weight: 700; }
+.alert-time small { font-size: 13px; color: var(--muted); }
+.pending-due.big { font-size: 14px; }
+.countdown { font-weight: 800; font-variant-numeric: tabular-nums; }
+.text-btn { border-color: transparent; color: var(--muted); }
+.notify-ask { width: 100%; justify-content: flex-start; min-height: 44px; font-size: 14px; }

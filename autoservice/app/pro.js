@@ -155,6 +155,74 @@ function viewLogin(error = '') {
 
 // ---------- нагадування: щоб розклад у клієнтів був правдивим ----------
 
+// Скільки лишилось на відповідь: «4:52». Оновлюється щосекунди (див. tick).
+const leftText = (due) => { const sec = Math.max(0, Math.ceil((due - Date.now()) / 1000)); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; };
+const countdown = (b) => `<span class="countdown" data-due="${confirmBy(b)}">${leftText(confirmBy(b))}</span>`;
+
+const canNotify = () => 'Notification' in window && Notification.permission === 'default';
+const notifyAsk = () => (canNotify() ? `<button class="btn soft notify-ask" type="button" data-action="notify-on">${icon('bell', 18)}Сповіщення про нові записи на телефон</button>` : '');
+
+// Сповіщення про новий запис: шторка поверх будь-якого екрана з деталями й кнопками,
+// а коли застосунок згорнуто — системне сповіщення з кнопками «Прийняти» / «Відмовити».
+function alertSheet(b) {
+  const p = place();
+  openSheet('Новий запис', `<div class="alert-card">
+      <div class="alert-time"><b>${b.time}</b><span>${dayWord(b.date, true)}</span><small>до ${hhmm(toMin(b.time) + b.minutes)} · ${duration(b.minutes)}</small></div>
+      <dl class="pro-kv">
+        <dt>Клієнт</dt><dd><b>${esc(who(b))}</b>${b.clientPhone ? ` · <a href="${telHref(b.clientPhone)}">${esc(b.clientPhone)}</a>` : ''}</dd>
+        <dt>Авто</dt><dd>${esc(b.car || '—')}</dd>
+        <dt>Послуги</dt><dd>${esc(b.services.join(', '))}</dd>
+        <dt>Оплачено</dt><dd><b>${uah(sumOf(b))}</b> через CARCAR</dd>
+        ${b.mobile ? `<dt>Виїзд</dt><dd>${esc(b.mobile.address)}</dd>` : ''}
+        <dt>Бокси</dt><dd>${p.boxes - own().filter((x) => x !== b && x.date === b.date && BLOCKING.includes(x.state) && toMin(b.time) < toMin(x.time) + x.minutes && toMin(b.time) + b.minutes > toMin(x.time)).length} з ${p.boxes} вільні в цей час</dd>
+      </dl>
+      <p class="pending-due big">${icon('clock', 18)}<span>Залишилось ${countdown(b)} — потім запис скасується сам, а гроші повернуться клієнту</span></p>
+      <div class="grid2">
+        <button class="btn primary" type="button" data-action="accept" data-id="${b.id}">${icon('check', 18)}Прийняти</button>
+        <button class="btn line-danger" type="button" data-action="decline" data-id="${b.id}">Відмовити</button>
+      </div>
+      <button class="btn text-btn" type="button" data-action="sheet-close">Пізніше</button>
+    </div>`);
+  $('.pro-sheet').classList.add('alert');
+  // Вібрація дозволена лише після першого дотику до сторінки.
+  if (navigator.userActivation?.hasBeenActive) navigator.vibrate?.([200, 100, 200]);
+}
+
+async function systemNotify(b) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const title = `Новий запис: ${dayWord(b.date).toLowerCase()} о ${b.time}`;
+  const body = `${who(b)} · ${b.services.join(', ')} · ${uah(sumOf(b))}. Відповісти до ${clock(confirmBy(b))}`;
+  const opts = { body, tag: `pending-${b.id}`, requireInteraction: true, renotify: true, icon: 'pro-icon.svg', data: { id: b.id },
+    actions: [{ action: 'accept', title: 'Прийняти' }, { action: 'decline', title: 'Відмовити' }] };
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    if (reg) await reg.showNotification(title, opts);
+    else new Notification(title, { body, tag: opts.tag });
+  } catch { /* сповіщення недоступні — лишається шторка в застосунку */ }
+}
+
+// Кожен новий запис сповіщаємо один раз: шторка, якщо нічого не відкрито, і системне сповіщення.
+const alerted = new Set();
+function alertPending() {
+  if (!session()) return;
+  for (const b of pendingList()) {
+    if (alerted.has(b.id)) continue;
+    alerted.add(b.id);
+    systemNotify(b);
+    if (!$('#sheet-root').innerHTML) alertSheet(b);
+  }
+}
+
+// Дія з системного сповіщення (або посилання #/act/...): прийняти, відмовити чи відкрити запис.
+function notifyAction(action, id) {
+  const b = own().find((x) => x.id === id);
+  if (!b || b.state !== 'pending') { toast(b ? 'На цей запис уже відповіли' : 'Запис не знайдено'); return; }
+  alerted.add(id);
+  if (action === 'accept') { acceptBooking(b); save(); rerender(); toast(`Запис прийнято: ${who(b)}, ${dayWord(b.date).toLowerCase()} о ${b.time}`); }
+  else if (action === 'decline') declineSheet(id);
+  else alertSheet(b);
+}
+
 // Нові записи з застосунку: мийка вирішує, чи приймати їх на цей час.
 function pendingBlock() {
   const list = pendingList();
@@ -166,12 +234,13 @@ function pendingBlock() {
         <span class="bk-time"><b>${b.time}</b><small>${dayWord(b.date)}</small></span>
         <span class="bk-main"><b>${esc(who(b))}</b><small>${esc(b.services.join(', '))}</small><small>${esc(b.car || '')} · ${uah(sumOf(b))} оплачено</small></span>
       </button>
-      <p class="pending-due">${icon('clock', 14)}Відповісти до ${clock(confirmBy(b))}, інакше запис скасується й гроші повернуться клієнту</p>
+      <p class="pending-due">${icon('clock', 14)}<span>Відповісти до ${clock(confirmBy(b))} · залишилось ${countdown(b)}. Інакше запис скасується, гроші повернуться клієнту</span></p>
       <div class="grid2">
         <button class="btn navy" type="button" data-action="accept" data-id="${b.id}">${icon('check', 18)}Прийняти</button>
         <button class="btn" type="button" data-action="decline" data-id="${b.id}">Відмовити</button>
       </div>
     </article>`).join('')}
+    ${notifyAsk()}
   </section>`;
 }
 
@@ -407,7 +476,7 @@ function bookingSheet(id) {
   const started = bookingStart(b) <= new Date();
   let actions = '';
   if (b.state === 'pending') {
-    actions = `<p class="notice warn">Клієнт оплатив запис. Підтвердіть до ${clock(confirmBy(b))}, інакше запис скасується, а гроші повернуться клієнту.</p>
+    actions = `<p class="notice warn">Клієнт оплатив запис. Підтвердіть до ${clock(confirmBy(b))} (залишилось ${countdown(b)}), інакше запис скасується, а гроші повернуться клієнту.</p>
       <div class="grid2">
         <button class="btn primary" type="button" data-action="accept" data-id="${b.id}">${icon('check', 18)}Прийняти</button>
         <button class="btn line-danger" type="button" data-action="decline" data-id="${b.id}">Відмовити</button>
@@ -759,6 +828,7 @@ function viewMore() {
   ];
   return `<h1>Ще</h1>
     ${s?.demo ? `<label class="field"><span>Мийка (демо)</span><select id="pro-place">${PLACES.filter((p) => partnerOf(p.id).status === 'approved').map((p) => `<option value="${p.id}" ${p.id === ui.place ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>` : ''}
+    ${notifyAsk() ? `<div style="margin-top:12px">${notifyAsk()}</div>` : ''}
     <div class="stack" style="gap:8px;margin-top:12px">${links.map(([href, ic, title, sub]) => `<a class="pro-link" href="${href}">${icon(ic, 22)}<span><b>${title}</b><small>${sub}</small></span>${icon('chevR', 18)}</a>`).join('')}</div>
     ${s?.demo ? `<button class="btn block" type="button" data-action="demo-seed" style="margin-top:16px">Заповнити прикладом: записи й повідомлення</button>` : ''}
     <p class="fine" style="margin-top:16px">Щоб CarCar Business був під рукою, додайте його на головний екран: меню браузера → «Встановити застосунок» або «На екран “Додому”».</p>
@@ -788,7 +858,7 @@ function demoSeed() {
   make(t, pick(1, 2), { slot: 1, channel: 'carcar', state: 'paid', clientName: 'Ірина Мельник', clientPhone: '+380 50 123 45 67', car: 'Toyota RAV4 · KA7781CB',
     chat: [{ from: 'client', text: 'Добрий день! Можна приїхати на 15 хвилин раніше?', at: ago(12) }], chatUnreadBiz: true });
   make(t, pick(0), { slot: 4, channel: 'phone', state: 'booked', clientName: 'Сергій Бондар', clientPhone: '+380 93 555 12 12', car: 'Skoda Octavia · AI3321OO' });
-  make(t, pick(3), { slot: 8, channel: 'carcar', state: 'pending', clientName: 'Віктор Лисенко', clientPhone: '+380 68 909 11 22', car: 'Hyundai Tucson · AA7007PP', createdAt: ago(6) });
+  make(t, pick(3), { slot: 8, channel: 'carcar', state: 'pending', clientName: 'Віктор Лисенко', clientPhone: '+380 68 909 11 22', car: 'Hyundai Tucson · AA7007PP', createdAt: ago(1) });
   const tm = shiftDay(t, 1);
   make(tm, pick(2), { slot: 2, channel: 'carcar', state: 'paid', clientName: 'Андрій Коваль', clientPhone: '+380 66 400 70 80', car: 'Kia Sportage · BC1209HH',
     chat: [{ from: 'client', text: 'Буду з багажником на даху, це не завадить?', at: ago(180), readAt: ago(170) }, { from: 'biz', text: 'Так, чекаємо', at: ago(170), readAt: ago(160) }] });
@@ -835,7 +905,8 @@ function route() {
   touchPresence(ui.place);
   if (expirePending(bookings)) save();
   checkWaitlist(bookings);
-  const [, page = '', arg] = location.hash.replace(/^#/, '').split('/');
+  const [, page = '', arg, id] = location.hash.replace(/^#/, '').split('/');
+  if (page === 'act') { alerted.add(id); history.replaceState(null, '', '#/'); route(); notifyAction(arg, id); return; }
   document.body.classList.toggle('in-chat', page === 'chat');
   renderChrome(page);
   const view = $('#view');
@@ -853,6 +924,7 @@ function route() {
       for (const img of list.querySelectorAll('img')) img.addEventListener('load', () => { list.scrollTop = list.scrollHeight; }, { once: true });
     }
   }
+  alertPending();
   const key = `${page}/${page === 'chat' ? arg : ''}`;
   if (key !== ui.lastView && page !== 'chat') window.scrollTo(0, 0);
   ui.lastView = key;
@@ -933,6 +1005,12 @@ document.addEventListener('click', async (e) => {
     return;
   }
   if (action === 'decline') { declineSheet(id); return; }
+  if (action === 'notify-on') {
+    const res = await Notification.requestPermission();
+    rerender();
+    toast(res === 'granted' ? 'Сповіщення ввімкнено' : 'Сповіщення заборонені в налаштуваннях браузера');
+    return;
+  }
   if (action === 'mark-done') {
     Object.assign(b, { state: 'completed', payment: 'card', completedAt: Date.now() });
     after('Запис виконано');
@@ -1177,7 +1255,7 @@ document.addEventListener('keydown', (e) => {
 window.addEventListener('storage', (e) => {
   if (!e.key?.startsWith('carcar.')) return;
   load();
-  if (nb || document.body.classList.contains('sheet-open')) { renderChrome(location.hash.split('/')[1] ?? ''); return; }
+  if (nb || document.body.classList.contains('sheet-open')) { renderChrome(location.hash.split('/')[1] ?? ''); alertPending(); return; }
   const input = $('#pro-chat [name="text"]');
   const draft = input?.value ?? '';
   const focused = document.activeElement === input;
@@ -1187,8 +1265,27 @@ window.addEventListener('storage', (e) => {
   if (again) { again.value = draft; if (focused) again.focus(); }
 });
 
-window.addEventListener('hashchange', () => { if (nb || $('#sheet-root').innerHTML) closeSheet(); route(); });
+// Перехід між екранами закриває шторки — крім сповіщення про новий запис: воно чекає відповіді.
+window.addEventListener('hashchange', () => { if (nb || ($('#sheet-root').innerHTML && !$('.pro-sheet.alert'))) closeSheet(); route(); });
 setInterval(() => { if (session()) touchPresence(ui.place); }, 30000);
+
+// Щосекунди: зворотний відлік на відповідь; час минув — запис скасовується, екран оновлюється.
+setInterval(() => {
+  const timers = document.querySelectorAll('[data-due]');
+  if (!timers.length) return;
+  for (const el of timers) el.textContent = leftText(Number(el.dataset.due));
+  if ([...timers].some((el) => Number(el.dataset.due) <= Date.now()) && expirePending(bookings)) {
+    save();
+    if ($('.pro-sheet.alert') || $('#decline-form')) closeSheet();
+    rerender();
+    toast('Час на підтвердження минув — запис скасовано, гроші повернуто клієнту');
+  }
+}, 1000);
+
+// Кнопки системного сповіщення: service worker передає дію відкритому застосунку.
+navigator.serviceWorker?.addEventListener('message', (e) => {
+  if (e.data?.type === 'pending-action') { load(); notifyAction(e.data.action, e.data.id); }
+});
 route();
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
