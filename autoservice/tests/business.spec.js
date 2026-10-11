@@ -326,14 +326,14 @@ test('фінанси: замовлення через CARCAR, заморожув
   })));
   await page.reload();
   page.once('dialog', (d) => d.accept());
-  await page.getByRole('button', { name: 'Вивести 837 ₴ на рахунок UA…7890' }).click();
-  await expect(page.getByRole('region', { name: 'Виплати' }).locator('tbody tr', { hasText: '837 ₴' })).toBeVisible();
+  await page.getByRole('button', { name: 'Вивести 810 ₴ на рахунок UA…7890' }).click();
+  await expect(page.getByRole('region', { name: 'Виплати' }).locator('tbody tr', { hasText: '810 ₴' })).toBeVisible();
 
-  // У звіті про прибутки замовлення — дохід через CARCAR, комісія 7% — витрата.
+  // У звіті про прибутки замовлення — дохід через CARCAR, комісія 10% — витрата.
   const report = page.locator('table.pnl');
   await expect(report.locator('tr', { hasText: 'Через CARCAR' })).toContainText('900 ₴');
-  await expect(report.locator('tr', { hasText: 'Комісія CARCAR' })).toContainText('63 ₴');
-  await expect(report.locator('tfoot tr', { hasText: 'Прибуток' })).toContainText('837 ₴');
+  await expect(report.locator('tr', { hasText: 'Комісія CARCAR' })).toContainText('90 ₴');
+  await expect(report.locator('tfoot tr', { hasText: 'Прибуток' })).toContainText('810 ₴');
 });
 
 for (const path of ['#/', '#/schedule', '#/clients', '#/requests', '#/services', '#/finance', '#/expenses', '#/reviews', '#/settings', '#/import']) {

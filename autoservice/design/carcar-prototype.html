@@ -1393,7 +1393,7 @@ for (const p of PLACES) p.city ??= 'Київ';
 // Правила оплати («як на FunPay»): клієнт не платить комісію, гроші утримуються до виконання
 // роботи й ще freezeHours після підтвердження, а комісія з точки — під час виведення коштів.
 const PAYMENT = {
-  commission: 0.07, // частка, яку платформа утримує з точки під час виведення
+  commission: 0.1, // частка, яку платформа утримує з точки під час виведення
   autoReleaseHours: 24, // якщо клієнт мовчить після «Машина готова», замовлення підтверджується саме
   freezeHours: 48, // скільки годин гроші за підтверджене замовлення заморожені, перш ніж їх можна вивести
   // Скасувати без втрат можна не пізніше ніж за N годин: уся сума повертається на баланс CARCAR.
@@ -4799,7 +4799,7 @@ function viewBusiness(sub) {
   const a = myApp();
   if (sub === 'apply' && !(a && a.status !== 'rejected')) return `${head}<h1>Реєстрація мийки</h1>${bizApplyForm()}`;
   const terms = [
-    ['cash', 'Комісія 7% із замовлень через CARCAR', 'Абонплати немає, за підключення не платите. Записи, які ви вносите самі, без комісії.'],
+    ['cash', 'Комісія 10% із замовлень через CARCAR', 'Абонплати немає, за підключення не платите. Записи, які ви вносите самі, без комісії.'],
     ['card', 'Клієнт платить одразу під час запису', `Коли авто готове, ви натискаєте «Машина готова». Гроші ${PAYMENT.freezeHours} годин чекають на випадок спору, потім виводите їх на рахунок ФОП або ТОВ.`],
     ['shield', 'Неявку оплачує клієнт', `Скасував пізніше ніж за ${cancelWindow()}, не приїхав чи запізнився більш ніж на ${PAYMENT.lateMinutes} хв — гроші лишаються вам. Один запис можна перенести не більше ${MOVE_LIMIT} разів.`],
     ['calendar', 'Кабінет для мийки безкоштовно', 'Розклад по боксах, клієнти, чати, прайс, відгуки й фінанси. Зручно з телефона.'],
@@ -4850,7 +4850,7 @@ function bizApplyForm() {
     <fieldset class="radio-row"><legend>Форма бізнесу</legend>
       <label><input type="radio" name="type" value="fop" checked> ФОП</label><label><input type="radio" name="type" value="tov"> ТОВ</label></fieldset>
     <label class="field"><span>ІПН (ФОП) або ЄДРПОУ (ТОВ)</span><input name="code" required inputmode="numeric" pattern="\\d{8}|\\d{10}" title="8 цифр ЄДРПОУ або 10 цифр ІПН"></label>
-    <label class="check-row small"><input class="check" type="checkbox" name="agree" required><span>Погоджуюсь з умовами: 7% із замовлень через CARCAR, правила скасувань і спорів</span></label>
+    <label class="check-row small"><input class="check" type="checkbox" name="agree" required><span>Погоджуюсь з умовами: 10% із замовлень через CARCAR, правила скасувань і спорів</span></label>
     <button class="btn primary block" type="submit">Надіслати заявку</button>
     <p class="fine">Після перевірки надішлемо логін і пароль до кабінету.</p>
   </form>`;

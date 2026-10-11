@@ -293,7 +293,7 @@ test('огляд платформи рахує оборот і комісію з
   await expect(page.locator('#ch-gmv .hit')).toHaveCount(30);
   const row = page.getByRole('region', { name: 'Показники точок' }).locator('tbody tr').first();
   await expect(row).toContainText('Автомийка «Блиск»');
-  await expect(row).toContainText('7%');
+  await expect(row).toContainText('10%');
 });
 
 for (const path of [`${ADMIN}#/`, `${ADMIN}#/places`, `${ADMIN}#/places/hvylia`, `${ADMIN}#/reviews`, `${ADMIN}#/disputes`, `${ADMIN}#/commission`, `${PANEL}#/connect`, `${PANEL}#/offer`]) {

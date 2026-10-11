@@ -320,7 +320,7 @@ test('бізнес: умови й заявка в застосунку → ад�
   await page.goto('/#/garage');
   await page.getByRole('link', { name: /Для бізнесу/ }).click();
   await expect(page.getByRole('heading', { name: 'CARCAR для бізнесу' })).toBeVisible();
-  await expect(page.locator('.biz-terms')).toContainText('Комісія 7%');
+  await expect(page.locator('.biz-terms')).toContainText('Комісія 10%');
   await expect(page.locator('.biz-terms')).toContainText('Машина готова');
   await expect(page.getByRole('link', { name: 'Увійти в кабінет бізнесу' })).toHaveAttribute('href', 'business.html');
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);

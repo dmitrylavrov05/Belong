@@ -216,11 +216,11 @@ test('мийка підтверджує виконання, гроші замо�
   })));
   await page.reload();
 
-  // 7% від 900 ₴ = 63 ₴, на рахунок 837 ₴.
-  page.once('dialog', (d) => { expect(d.message()).toContain('Комісія 63 ₴'); d.accept(); });
-  await page.getByRole('button', { name: 'Вивести 837 ₴ на рахунок UA…7890' }).click();
+  // 10% від 900 ₴ = 90 ₴, на рахунок 810 ₴.
+  page.once('dialog', (d) => { expect(d.message()).toContain('Комісія 90 ₴'); d.accept(); });
+  await page.getByRole('button', { name: 'Вивести 810 ₴ на рахунок UA…7890' }).click();
   await expect(page.getByRole('heading', { name: 'Виплати' })).toBeVisible();
-  await expect(page.getByText('837 ₴ (комісія 63 ₴)')).toBeVisible();
+  await expect(page.getByText('810 ₴ (комісія 90 ₴)')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Немає коштів для виведення' })).toBeDisabled();
 
   await page.goto('/#/bookings');
