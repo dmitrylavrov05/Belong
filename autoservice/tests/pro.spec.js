@@ -317,3 +317,102 @@ test('автопідтвердження в профілі мийки — клі
   await clientBooks(page, 'Оплачено, ви записані');
   await expect(page.locator('article.bk').first()).toContainText('Оплачено');
 });
+
+// ---------- інший час замість відмови ----------
+
+async function proposeFromAlert(page, time = '14:30') {
+  await page.goto(PRO);
+  await page.getByRole('dialog', { name: 'Новий запис' }).getByRole('button', { name: 'Запропонувати інший час' }).click();
+  const sheet = page.getByRole('dialog', { name: /Інший час/ });
+  await expect(sheet.getByRole('button', { name: 'Завтра' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(sheet.getByRole('button', { name: '10:00', exact: true })).toHaveCount(0);
+  await sheet.getByLabel('Коментар клієнту (необовʼязково)').fill('О 14:30 точно буде вільний бокс');
+  await sheet.getByRole('button', { name: time, exact: true }).click();
+  await expect(page.locator('.toast')).toContainText(`Клієнту запропоновано завтра о ${time}`);
+}
+
+test('мийка пропонує інший час — клієнт погоджується одним дотиком', async ({ page }) => {
+  await clientBooks(page);
+  await proposeFromAlert(page);
+  await page.getByRole('link', { name: 'Записи' }).click();
+  await page.getByRole('link', { name: /^Пн\s*5/ }).click();
+  await expect(page.locator('.bk-row', { hasText: '14:30' })).toContainText('Чекає відповіді клієнта');
+
+  await page.goto('/#/bookings');
+  const card = page.locator('article.bk').first();
+  await expect(card).toContainText('Мийка пропонує інший час');
+  await expect(card.locator('.offer-when')).toContainText('14:30');
+  await expect(card).toContainText('10:00');
+  await expect(card).toContainText('«О 14:30 точно буде вільний бокс»');
+  await card.getByRole('button', { name: 'Підходить', exact: true }).click();
+  await expect(page.locator('#toast')).toHaveText('Домовилися: 5 жовтня о 14:30');
+  await expect(page.locator('article.bk').first()).toContainText('Оплачено');
+
+  // Запропонований час — не відмова.
+  await page.goto(`${PRO}#/profile`);
+  const rel = page.getByRole('region', { name: 'Надійність для клієнтів' });
+  await expect(rel).toContainText('0%відмов за 30 днів (0 з 1)');
+  await expect(rel).toContainText('Поки мало заявок для оцінки: 1 з 5.');
+});
+
+test('клієнту не підійшов запропонований час — гроші повертаються, мийці не рахується', async ({ page }) => {
+  await clientBooks(page);
+  await proposeFromAlert(page, '16:00');
+  await page.goto('/#/bookings');
+  page.once('dialog', (d) => d.accept());
+  await page.locator('article.bk').first().getByRole('button', { name: 'Не підходить' }).click();
+  await expect(page.locator('#toast')).toHaveText('Запис скасовано, 250 ₴ повернено');
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('carcar.bookings'))[0]);
+  expect([saved.state, saved.declined, saved.time]).toEqual(['cancelled', 'proposal', '10:00']);
+  await page.goto(`${PRO}#/profile`);
+  await expect(page.getByRole('region', { name: 'Надійність для клієнтів' })).toContainText('0%відмов за 30 днів (0 з 1)');
+});
+
+// ---------- відповідальність за відмови ----------
+
+const asked = (i, extra) => ({
+  ...paid, id: `q${i}`, chat: undefined, chatUnreadBiz: false, needsConfirm: true, date: '2026-10-02', time: `1${i}:00`,
+  createdAt: at(9, 0, 2), respondedAt: at(9, 1, 2), confirmedAt: at(9, 1, 2), state: 'completed', ...extra,
+});
+const declinedAsk = (i) => asked(i, { state: 'cancelled', declined: 'place', confirmedAt: undefined, closedAt: at(9, 30), refund: 550 });
+
+test('часті відмови: нижче в пошуку, пауза онлайн-запису, адмін знімає паузу', async ({ page }) => {
+  // 2 відмови з 5 заявок — 40%: пауза на 24 години від останньої відмови (сьогодні о 9:30).
+  await seed(page, { bookings: [asked(1), asked(2), asked(3), declinedAsk(4), declinedAsk(5)] });
+  await page.goto(PRO);
+  await expect(page.locator('.remind', { hasText: 'Онлайн-запис на паузі до' })).toContainText('5 жовтня');
+  await page.getByRole('link', { name: 'Профіль' }).click();
+  const rel = page.getByRole('region', { name: 'Надійність для клієнтів' });
+  await expect(rel).toContainText('40%відмов за 30 днів (2 з 5)');
+  await expect(rel).toContainText('1 хв');
+  await expect(rel).toContainText('Онлайн-запис на паузі до');
+
+  await page.goto('/');
+  await expect(page.locator('.pcard').last()).toContainText('Блиск');
+  await expect(page.locator('.pcard', { hasText: 'Блиск' })).toContainText('Онлайн-запис на паузі');
+  await page.goto('/#/book/blysk');
+  await expect(page.getByRole('heading', { name: 'Онлайн-запис на паузі' })).toBeVisible();
+
+  await page.goto('/admin.html#/places');
+  await page.getByRole('button', { name: /^Підключені/ }).click();
+  const row = page.locator('tr', { hasText: 'Блиск' });
+  await expect(row).toContainText('Запис на паузі');
+  await expect(row).toContainText('40%');
+  await row.getByRole('link').click();
+  await expect(page.getByRole('region', { name: 'Підтвердження записів' })).toContainText('Відмови40% (2, з них без відповіді 0)');
+  await page.getByRole('button', { name: 'Зняти паузу' }).click();
+  await expect(page.locator('#toast')).toContainText('Паузу знято');
+  await page.goto('/#/book/blysk');
+  await expect(page.getByRole('heading', { name: 'Онлайн-запис на паузі' })).toHaveCount(0);
+});
+
+test('відмов понад 15% — мийка нижче в пошуку, без паузи', async ({ page }) => {
+  await seed(page, { bookings: [asked(1), asked(2), asked(3), asked(4), declinedAsk(5)] });
+  await page.goto('/');
+  await expect(page.locator('.pcard').last()).toContainText('Блиск');
+  await expect(page.locator('.pcard', { hasText: 'Блиск' })).not.toContainText('на паузі');
+  await page.goto(`${PRO}#/profile`);
+  await expect(page.getByRole('region', { name: 'Надійність для клієнтів' })).toContainText('Мийка нижче в пошуку');
+  await page.goto('/#/place/blysk');
+  await expect(page.locator('.reply-time')).toHaveText('Підтверджує запис зазвичай за 1 хв');
+});

@@ -4,7 +4,7 @@
 import { PLACES, PAYMENT } from './data.js';
 import {
   store, uid, isoDate, parseDate, hhmm, toMin, plural, hoursFor, scheduleOf, inBreak, BLOCKING, phoneKey, isListed, weekdayOf,
-  spanOf, laneCap, sameLane, MOBILE_ROAD, bookingStart, creditClient,
+  spanOf, laneCap, sameLane, MOBILE_ROAD, bookingStart, creditClient, confirmBy, offerBy,
 } from './core.js';
 
 const opsToday = () => isoDate(new Date());
@@ -331,27 +331,6 @@ export function setAutoConfirm(placeId, on) {
   store.set('biz.autoConfirm', { ...store.get('biz.autoConfirm', {}), [placeId]: on });
 }
 
-// До коли мийка має відповісти: confirmMinutes робочого часу від заявки (заявка вночі — від відкриття),
-// але не пізніше за початок візиту.
-export function confirmBy(b) {
-  const p = opsPlace(b.placeId);
-  let t = b.createdAt ?? Date.now();
-  for (let i = 0; p && i < 8; i++) {
-    const d = new Date(t);
-    const iso = isoDate(d);
-    const h = hoursFor(p, iso);
-    const m = d.getHours() * 60 + d.getMinutes();
-    if (h && m < h[1]) {
-      if (m < h[0]) t = parseDate(iso).getTime() + h[0] * 60000;
-      break;
-    }
-    const next = parseDate(iso);
-    next.setDate(next.getDate() + 1);
-    t = next.getTime();
-  }
-  return Math.min(t + PAYMENT.confirmMinutes * 60000, bookingStart(b).getTime());
-}
-
 // Відповідь мийки клієнт бачить у чаті запису й отримує сповіщення.
 function clientNote(b, kind, text) {
   chatPost(b, 'sys', text.replace(/^[^:]+: /, ''), 'client');
@@ -361,17 +340,19 @@ const placeName = (b) => opsPlace(b.placeId)?.name ?? 'Мийка';
 const whenText = (b) => `${parseDate(b.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })} о ${b.time}`;
 
 export function acceptBooking(b) {
-  Object.assign(b, { state: 'paid', confirmedAt: Date.now() });
+  Object.assign(b, { state: 'paid', confirmedAt: Date.now(), respondedAt: b.respondedAt ?? Date.now() });
   clientNote(b, 'confirm', `${placeName(b)}: запис на ${whenText(b)} підтверджено. Чекаємо вас!`);
 }
 
 // Відмова чи мовчання мийки: усе повертаємо клієнту — картку на картку, баланс і бонуси на рахунок CARCAR,
 // візит абонемента й промокод знову доступні.
+// by: place — мийка відмовила; timeout — мийка не відповіла; proposal — клієнт не прийняв інший час.
 export function declineBooking(b, reason, by = 'place') {
   const fromBalance = b.fromBalance || 0;
   Object.assign(b, {
     state: 'cancelled', declined: by, declineReason: reason, refund: b.paid, placeAmount: 0, refundTo: fromBalance >= b.paid ? 'balance' : 'card',
-    closedAt: Date.now(), cancelBy: by === 'timeout' ? 'system' : 'place',
+    closedAt: Date.now(), cancelBy: by === 'place' ? 'place' : by === 'proposal' ? 'client' : 'system',
+    ...(by === 'place' && !b.respondedAt ? { respondedAt: Date.now() } : {}),
   });
   if (fromBalance) creditClient(fromBalance, `Повернення: ${placeName(b)} не підтвердила запис`);
   if (b.bonus && !b.bonusReturned) {
@@ -383,9 +364,30 @@ export function declineBooking(b, reason, by = 'place') {
   }
   if (b.passUse) { restorePass(b.placeId, b.passUse); b.passUse = null; }
   if (b.promo) b.promo.returned = true;
+  if (by === 'proposal') return;
   clientNote(b, 'decline', by === 'timeout'
     ? `${placeName(b)} не відповіла на запис на ${whenText(b)}. Запис скасовано, гроші повернуто. Оберіть інший час чи мийку.`
     : `${placeName(b)} не може прийняти запис на ${whenText(b)}${reason ? `: ${reason}` : ''}. Гроші повернуто. Оберіть інший час чи мийку.`);
+}
+
+// Замість відмови мийка пропонує інший вільний час. Запис одразу переходить на нього (щоб час не зайняли),
+// а клієнт погоджується або скасовує без втрат.
+export function proposeTime(b, date, time, note = '') {
+  const from = { date: b.date, time: b.time };
+  Object.assign(b, { state: 'offer', date, time, offer: { from, at: Date.now(), note }, respondedAt: b.respondedAt ?? Date.now() });
+  clientNote(b, 'offer', `${placeName(b)} не може прийняти вас ${parseDate(from.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })} о ${from.time} і пропонує ${whenText(b)}.${note ? ` ${note}` : ''} Погодьтеся в записі або скасуйте без втрат.`);
+}
+
+export function acceptOffer(b) {
+  Object.assign(b, { state: 'paid', confirmedAt: Date.now(), offer: { ...b.offer, accepted: Date.now() } });
+  chatPost(b, 'sys', `Клієнт погодився на ${whenText(b)}`, 'biz');
+}
+
+export function rejectOffer(b, timeout = false) {
+  // Повертаємо початковий час, щоб у журналі було видно, на що клієнт записувався.
+  Object.assign(b, { date: b.offer.from.date, time: b.offer.from.time, offer: { ...b.offer, rejected: Date.now() } });
+  declineBooking(b, timeout ? 'клієнт не відповів на запропонований час' : 'клієнту не підійшов запропонований час', 'proposal');
+  chatPost(b, 'sys', timeout ? 'Клієнт не відповів на запропонований час — запис скасовано, гроші повернуто' : 'Клієнту не підійшов запропонований час — запис скасовано, гроші повернуто', 'biz');
 }
 
 // Заявки, на які мийка не відповіла вчасно, скасовуються самі. Повертає true, якщо щось змінилося.
@@ -393,6 +395,7 @@ export function expirePending(bookings) {
   let changed = false;
   for (const b of bookings) {
     if (b.state === 'pending' && Date.now() >= confirmBy(b)) { declineBooking(b, 'мийка не відповіла вчасно', 'timeout'); changed = true; }
+    if (b.state === 'offer' && Date.now() >= offerBy(b)) { rejectOffer(b, true); changed = true; }
   }
   return changed;
 }

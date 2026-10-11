@@ -2,13 +2,14 @@ import { CITY, CITIES, CATEGORIES, CAR_CLASSES, PLACES, PAYMENT, MAINTENANCE, RE
 import {
   store, icon, esc, uah, pad, hhmm, toMin, isoDate, parseDate, uid, placeById, plural, duration, dayLabel, rating, tel,
   hoursFor, scheduleOf, inBreak, rangeText, WEEKDAY_NAMES, weekdayOf, phoneKey, offersOf, offerAsService, isOpenNow, hoursText, bookingStart, fmtTime, fmtDate, km, serviceCat, catById, shrinkPhoto,
+  confirmBy, offerBy, pauseOf, responseStats, msText, AWAITING,
   applyOverrides, isListed, payoutReady, maskIban, commissionFor, resolveDispute, visibleReviews, ACTIVE, BLOCKING, HOUR, isCarcar, price, complete, isFrozen, placeShare, balanceFor, settleAll, ratingFor,
   POWER, powerOf, worksInBlackout, TICKET_TOPICS, CLIENT_TOPICS, TICKET_STATUS, ticketsAll, openTicket, ticketReply, setTicket, isBlocked, mobileOn, spanOf, laneCap, sameLane, MOBILE_ROAD, promosAll, promoCheck, promoText,
   enterView, bizApps, saveBizApps, APP_STATUS, numberBookings, bookingNo, findByNo, ticketPhotos,
 } from './core.js';
 import {
   CHANNELS, inboxFor, markRead, sendMessages, dealsOf, dealsOn, weeklyDealsOf, daysText, dealAt, dealPrice, dealCovers, hotDeals,
-  checkWaitlist, expirePending, confirmBy, autoConfirmOf, openStarts, passesOf, sellPass, passActive, passLeft, usableSubs, findCert, redeemPass, restorePass,
+  checkWaitlist, expirePending, autoConfirmOf, acceptOffer, rejectOffer, openStarts, passesOf, sellPass, passActive, passLeft, usableSubs, findCert, redeemPass, restorePass,
   chatPost, chatTimeline, readMessages, msgPreview, presenceOf, PRESENCE_KEY, CLIENT_QUICK, ITEM_KIND, itemSum, estimateTotal, warrantyUntil,
 } from './ops.js';
 import { mountMap } from './map.js';
@@ -331,7 +332,9 @@ function filteredPlaces() {
     reviews: (a, b) => ratingOf(b.id).count - ratingOf(a.id).count,
     near: (a, b) => (ui.pos ? distTo(a) - distTo(b) : ratingOf(b.id).avg - ratingOf(a.id).avg),
   }[ui.sort];
-  return list.sort(by);
+  // Мийки, які часто відмовляють чи мовчать на записи, — нижче в будь-якому сортуванні.
+  const low = new Map(list.map((p) => [p.id, responseStats(p.id, bookings).lowered || !!pauseOf(p.id, bookings)]));
+  return list.sort((a, b) => (low.get(a.id) - low.get(b.id)) || by(a, b));
 }
 
 // Обкладинки точок: намальовані сцени (фасад із боксами, авто в піні, блиск після мийки).
@@ -406,6 +409,7 @@ function placeCard(p) {
       ${deal ? `<span class="badge deal">${icon('bolt', 13)}−${deal}%</span>` : ''}
       ${mobileOn(p) ? `<span class="badge mobile">${icon('carSide', 13)}Виїзд до вас</span>` : ''}
       ${powerBadge(p)}
+      ${pauseOf(p.id, bookings) ? '<span class="badge closed">Онлайн-запис на паузі</span>' : ''}
     </div>
     ${favButton(p, true)}
     <div class="pc-info">
@@ -634,6 +638,13 @@ function schedChecked(p) {
   return `<p class="sched-ok">${icon('checkCircle', 16)}Мийка підтвердила вільний час сьогодні о ${new Date(at).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}</p>`;
 }
 
+// Скільки зазвичай мийка підтверджує запис — коли даних досить.
+function replyLine(p) {
+  const s = responseStats(p.id, bookings);
+  if (s.total < 3 || s.avgMs === null) return '';
+  return `<p class="sched-ok reply-time">${icon('clock', 16)}Підтверджує запис зазвичай за ${msText(s.avgMs)}</p>`;
+}
+
 function viewPlace(id) {
   const p = placeById(id);
   if (!p) return viewNotFound();
@@ -654,7 +665,7 @@ function viewPlace(id) {
       ${powerBadge(p)}
       ${p.tags.map((t) => `<span class="badge">${/генератор/i.test(t) ? icon('bolt', 13) : ''}${esc(t)}</span>`).join('')}
     </div>
-    ${schedChecked(p)}
+    ${schedChecked(p)}${replyLine(p)}
     <div class="infobox">
       <div class="addr">${icon('pin', 18)}${esc(p.district)}, ${esc(p.address)}</div>
       <div class="grid2">
@@ -898,6 +909,12 @@ function viewBook(id, date, time) {
   const p = placeById(id);
   if (!p) return viewNotFound();
   if (!isListed(p)) return `${back(`#/place/${p.id}`, esc(p.name))}<h1>Запис недоступний</h1><p class="muted">Точка зараз не приймає онлайн-записи в CARCAR.</p>`;
+  const pause = pauseOf(p.id, bookings);
+  if (pause) {
+    return `${back(`#/place/${p.id}`, esc(p.name))}<h1>Онлайн-запис на паузі</h1>
+      <p class="notice warn">Мийка часто не підтверджувала записи, тому CARCAR призупинив онлайн-запис до ${fmtTime(pause.until)}. Можна зателефонувати мийці або обрати іншу поруч.</p>
+      <div class="grid2"><a class="btn" href="${tel(p)}">${icon('phone', 18)}Зателефонувати</a><a class="btn primary" href="#/">Інші мийки</a></div>`;
+  }
   if (isBlocked(myKeys())) {
     return `${back(`#/place/${p.id}`, esc(p.name))}<h1>Запис обмежено</h1>
       <p class="notice warn">Служба безпеки CARCAR тимчасово обмежила онлайн-запис для цього профілю. Якщо це помилка — напишіть у підтримку, відповімо протягом доби.</p>
@@ -1286,6 +1303,7 @@ function confirmBooking() {
     installments: q.installments ? { ...q.installments, card: q.card } : null,
     // Мийка підтверджує запис сама, якщо не ввімкнула автопідтвердження.
     state: autoConfirmOf(p.id) ? 'paid' : 'pending',
+    needsConfirm: !autoConfirmOf(p.id),
     createdAt: Date.now(),
   };
   bookings.push(b);
@@ -1333,7 +1351,7 @@ function cancelTerms(b) {
 
 // Клієнт бачить два кроки: оплатив — мийка виконала.
 function steps(b) {
-  const at = { pending: 0, paid: 0, done: 1, dispute: 1, completed: 1 }[b.state];
+  const at = { pending: 0, offer: 0, paid: 0, done: 1, dispute: 1, completed: 1 }[b.state];
   if (at === undefined) return '';
   return `<ol class="steps two" aria-label="Статус запису">${['Оплачено', 'Виконано']
     .map((s, i) => `<li class="${i <= at ? 'on' : ''}" ${i === at ? 'aria-current="step"' : ''}>${s}</li>`).join('')}</ol>`;
@@ -1342,6 +1360,7 @@ function steps(b) {
 // [клас кольору статусу, підпис]
 const STATE_LABEL = {
   pending: ['warn', 'Чекає підтвердження мийки'],
+  offer: ['warn', 'Мийка пропонує інший час'],
   paid: ['go', 'Оплачено'],
   done: ['', 'Виконано'],
   dispute: ['warn', 'Спір розглядається'],
@@ -1352,10 +1371,10 @@ const STATE_LABEL = {
 };
 
 // Іконки статусів, щоб завершені записи розрізнялися з першого погляду.
-const STATE_ICON = { pending: 'clock', completed: 'checkCircle', cancelled: 'x', refunded: 'x', noshow: 'clock', dispute: 'info' };
+const STATE_ICON = { pending: 'clock', offer: 'clock', completed: 'checkCircle', cancelled: 'x', refunded: 'x', noshow: 'clock', dispute: 'info' };
 
 const cardHead = (b, title, sm, amount = b.paid) => {
-  const [cls, label] = b.declined ? ['', 'Мийка не підтвердила'] : STATE_LABEL[b.state];
+  const [cls, label] = b.declined && b.declined !== 'proposal' ? ['', 'Мийка не підтвердила'] : STATE_LABEL[b.state];
   return `<div class="head">
       <div><div class="bk-status ${cls}">${STATE_ICON[b.state] ? icon(STATE_ICON[b.state], 14) : ''}${label}</div><h3 class="bk-title${sm ? ' sm' : ''}">${title}</h3>
         ${b.no ? `<span class="bk-no">Запис ${bookingNo(b)}</span>` : ''}</div>
@@ -1416,6 +1435,16 @@ function bookingCard(b, highlight) {
         ${p ? `<a class="btn" href="${tel(p)}">${icon('phone', 18)}Зателефонувати</a>` : ''}
         <button class="btn text-danger" data-action="cancel" data-id="${b.id}">Скасувати</button>
       </div>`;
+  } else if (b.state === 'offer') {
+    const f = b.offer.from;
+    body += `<div class="notice warn offer-box"><b>Мийка пропонує інший час</b>
+        Замість ${dayLabel(f.date, { weekday: 'short', day: 'numeric', month: 'long' })}, ${f.time} — <b class="offer-when">${dayLabel(b.date, { weekday: 'short', day: 'numeric', month: 'long' })}, ${b.time}</b>.
+        ${b.offer.note ? `<span class="offer-note">«${esc(b.offer.note)}»</span>` : ''}
+        <span class="offer-due">Відповісти до ${new Date(offerBy(b)).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}, інакше запис скасується, а гроші повернуться.</span></div>
+      <div class="grid2">
+        <button class="btn primary" data-action="offer-ok" data-id="${b.id}">Підходить</button>
+        <button class="btn" data-action="offer-no" data-id="${b.id}">Не підходить</button>
+      </div>`;
   } else if (b.state === 'paid') {
     const t = cancelTerms(b);
     const canMove = t.inWindow && (b.moves?.length ?? 0) < MOVE_LIMIT;
@@ -1456,6 +1485,8 @@ function bookingCard(b, highlight) {
         <button class="btn line-danger" data-action="dispute" data-id="${b.id}">Відкрити спір</button>`;
     }
     body += reviewBlock(b);
+  } else if (b.declined === 'proposal') {
+    body += `<p class="small muted" style="margin:0">Запропонований мийкою час не підійшов — запис скасовано. Повернено ${uah(b.paid)}${b.fromBalance ? ` (з них ${uah(Math.min(b.fromBalance, b.paid))} на баланс CARCAR)` : ' на картку'}${b.bonus ? ` і ${uah(b.bonus)} бонусів` : ''}.</p>`;
   } else if (b.declined) {
     body += `<p class="small muted" style="margin:0">${b.declined === 'timeout' ? 'Мийка не відповіла вчасно' : `Мийка не може прийняти запис${b.declineReason ? `: ${esc(b.declineReason)}` : ''}`}.
       Повернено ${uah(b.paid)}${b.fromBalance ? ` (з них ${uah(Math.min(b.fromBalance, b.paid))} на баланс CARCAR)` : ' на картку'}${b.bonus ? ` і ${uah(b.bonus)} бонусів` : ''}.</p>`;
@@ -2164,7 +2195,7 @@ function doneItem(b, highlight) {
     <summary>
       <span class="di-ic" aria-hidden="true">${icon(STATE_ICON[b.state] ?? 'checkCircle', 18)}</span>
       <span class="di-main"><b>${esc(p?.name ?? 'Мийка')}</b><small>${dayLabel(b.date, { day: 'numeric', month: 'short' })}, ${b.time} · ${esc(b.services[0] ?? '')}${b.services.length > 1 ? ` +${b.services.length - 1}` : ''}</small></span>
-      <span class="di-side"><b>${uah(b.paid)}</b><small>${esc(b.declined ? 'Мийка не підтвердила' : label)}${needsAction(b) && b.state === 'completed' ? ' · оцініть' : ''}</small></span>
+      <span class="di-side"><b>${uah(b.paid)}</b><small>${esc(b.declined && b.declined !== 'proposal' ? 'Мийка не підтвердила' : label)}${needsAction(b) && b.state === 'completed' ? ' · оцініть' : ''}</small></span>
       <span class="di-chev" aria-hidden="true">${icon('chevR', 18)}</span>
     </summary>
     ${bookingCard(b, highlight)}
@@ -2498,7 +2529,7 @@ function returnBonus(b, why) {
 const bookingActions = {
   cancel(b) {
     // Поки мийка не підтвердила, скасувати можна будь-коли без втрат.
-    const t = b.state === 'pending' ? { kind: 'free', free: true, refund: b.paid, placeAmount: 0 } : cancelTerms(b);
+    const t = AWAITING.includes(b.state) ? { kind: 'free', free: true, refund: b.paid, placeAmount: 0 } : cancelTerms(b);
     track('cancel_try', { placeId: b.placeId, free: t.free, kind: t.kind });
     const msg = t.kind === 'free'
       ? `Скасувати запис? Повернемо ${uah(t.refund)} на баланс CARCAR.`
@@ -2514,6 +2545,16 @@ const bookingActions = {
       if (b.promo) b.promo.returned = true;
     }
     toast(t.kind === 'free' ? `Запис скасовано, ${uah(t.refund)} повернено на баланс` : 'Запис скасовано, оплату зараховано точці');
+  },
+  'offer-ok'(b) {
+    acceptOffer(b);
+    toast(`Домовилися: ${dayLabel(b.date, { day: 'numeric', month: 'long' })} о ${b.time}`);
+  },
+  'offer-no'(b) {
+    if (!confirm('Скасувати запис? Гроші повернемо повністю.')) return false;
+    rejectOffer(b);
+    wallet = { bonus: 0, money: 0, history: [], ...store.get('wallet', {}) };
+    toast(`Запис скасовано, ${uah(b.paid)} повернено`);
   },
   'extra-ok'(b) {
     b.paid += b.extra.amount;

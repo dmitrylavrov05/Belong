@@ -2,16 +2,17 @@
 // Головне під пальцем: повідомлення клієнтів, записи по днях, показники мийки й профіль, який бачать клієнти.
 // Дані спільні із застосунком клієнта (на цьому пристрої — localStorage): запис, внесений тут, одразу
 // займає час, а закритий день чи нові години клієнти бачать при наступному відкритті сторінки мийки.
-import { CAR_CLASSES, PLACES, PAYMENT } from './data.js';
+import { CAR_CLASSES, PLACES, PAYMENT, DECLINE_RULES } from './data.js';
 import {
   store, icon, esc, uah, hhmm, toMin, isoDate, parseDate, uid, placeById, plural, duration, dayLabel, rating, fmtTime,
   bookingStart, hoursFor, scheduleOf, rangeText, WEEKDAYS, WEEKDAY_NAMES, phoneKey, applyOverrides, saveOverride, shrinkPhoto, inBreak,
   ACTIVE, BLOCKING, isCarcar, price, complete, isFrozen, balanceFor, settleAll, ratingFor, partnerOf, PARTNER_STATUS,
+  confirmBy, offerBy, responseStats, pauseOf, ratePct, msText, AWAITING,
   payoutReady, maskIban, commissionFor, checkBizLogin, numberBookings, bookingNo, POWER, powerOf, setPower,
 } from './core.js';
 import {
   openStarts, chatPost, chatTimeline, readMessages, msgPreview, touchPresence, BIZ_QUICK, sendMessages, checkWaitlist,
-  acceptBooking, declineBooking, expirePending, confirmBy, autoConfirmOf, setAutoConfirm,
+  acceptBooking, declineBooking, expirePending, autoConfirmOf, setAutoConfirm, proposeTime,
 } from './ops.js';
 
 // ---------- дані ----------
@@ -79,6 +80,7 @@ const CHANNEL = { carcar: 'CARCAR', phone: 'Дзвінок', walkin: 'Приїх
 const channelOf = (b) => b.channel ?? 'carcar';
 const STATE = {
   pending: ['Підтвердіть запис', 'warn'],
+  offer: ['Чекає відповіді клієнта', 'carcar'],
   paid: ['Оплачено', 'carcar'], booked: ['Записано', 'cash'], done: ['Чекає клієнта', 'warn'], dispute: ['Спір', 'warn'],
   completed: ['Виконано', 'ok'], cancelled: ['Скасовано', 'muted'], noshow: ['Неявка', 'muted'], refunded: ['Повернено клієнту', 'muted'],
 };
@@ -180,6 +182,7 @@ function alertSheet(b) {
       <div class="grid2">
         <button class="btn primary" type="button" data-action="accept" data-id="${b.id}">${icon('check', 18)}Прийняти</button>
         <button class="btn line-danger" type="button" data-action="decline" data-id="${b.id}">Відмовити</button>
+        <button class="btn full" type="button" data-action="propose" data-id="${b.id}">${icon('calendar', 18)}Запропонувати інший час</button>
       </div>
       <button class="btn text-btn" type="button" data-action="sheet-close">Пізніше</button>
     </div>`);
@@ -238,6 +241,7 @@ function pendingBlock() {
       <div class="grid2">
         <button class="btn navy" type="button" data-action="accept" data-id="${b.id}">${icon('check', 18)}Прийняти</button>
         <button class="btn" type="button" data-action="decline" data-id="${b.id}">Відмовити</button>
+        <button class="btn soft full" type="button" data-action="propose" data-id="${b.id}">${icon('calendar', 16)}Запропонувати інший час</button>
       </div>
     </article>`).join('')}
     ${notifyAsk()}
@@ -246,6 +250,11 @@ function pendingBlock() {
 
 function reminders() {
   const out = [];
+  const pause = pauseOf(ui.place, bookings);
+  if (pause) out.push(`<a class="remind warn" href="#/profile">${icon('warn', 22)}<span><b>Онлайн-запис на паузі до ${fmtTime(pause.until)}</b>
+      <small>Забагато відмов і пропущених записів. Клієнти не можуть записатися через CARCAR.</small></span>${icon('chevR', 18)}</a>`);
+  else if (responseStats(ui.place, bookings).lowered) out.push(`<a class="remind warn" href="#/profile">${icon('warn', 22)}<span><b>Мийка нижче в пошуку через відмови</b>
+      <small>Пропонуйте інший час замість відмови — це не рахується.</small></span>${icon('chevR', 18)}</a>`);
   const st = partnerOf(ui.place).status;
   if (st !== 'approved') out.push(`<p class="notice warn">Клієнти ще не бачать мийку: статус «${PARTNER_STATUS[st][0]}». <a href="business.html#/connect">Завершити підключення</a></p>`);
   const late = unmarked();
@@ -480,7 +489,10 @@ function bookingSheet(id) {
       <div class="grid2">
         <button class="btn primary" type="button" data-action="accept" data-id="${b.id}">${icon('check', 18)}Прийняти</button>
         <button class="btn line-danger" type="button" data-action="decline" data-id="${b.id}">Відмовити</button>
+        <button class="btn full" type="button" data-action="propose" data-id="${b.id}">${icon('calendar', 18)}Запропонувати інший час</button>
       </div>`;
+  } else if (b.state === 'offer') {
+    actions = `<p class="notice">Ви запропонували цей час замість ${dayWord(b.offer.from.date).toLowerCase()}, ${b.offer.from.time}. Клієнт відповість до ${clock(offerBy(b))}; не відповість — запис скасується, гроші повернуться йому.</p>`;
   } else if (b.state === 'booked') {
     actions = `<form class="stack" id="done-form" data-id="${b.id}" style="gap:10px">
         <div class="seg-row" role="radiogroup" aria-label="Оплата на місці">
@@ -527,12 +539,29 @@ function declineSheet(id) {
   const b = own().find((x) => x.id === id);
   openSheet(`Відмовити: ${esc(who(b))}`, `<form class="stack" id="decline-form" data-id="${b.id}" style="gap:12px">
     <p class="small muted" style="margin:0">${dayWord(b.date, true)}, ${b.time} · ${esc(b.services.join(', '))}. Клієнт отримає повідомлення, а гроші — назад.</p>
+    <button class="btn soft" type="button" data-action="propose" data-id="${b.id}">${icon('calendar', 18)}Краще запропонувати інший час — це не відмова</button>
     <fieldset class="reason-set"><legend>Причина</legend>
       ${DECLINE_REASONS.map((r, i) => `<label class="check-row"><input class="check radio" type="radio" name="reason" value="${esc(r)}" ${i ? '' : 'checked'}><span>${r}</span></label>`).join('')}
     </fieldset>
     <label class="field"><span>Повідомлення клієнту (необовʼязково)</span><input name="note" maxlength="300" autocomplete="off" placeholder="Наприклад, можемо о 14:00 — запишіться ще раз"></label>
     <button class="btn primary" type="submit">Відмовити й повернути гроші</button>
   </form>`);
+}
+
+// Інший час замість відмови: день і вільний час, необовʼязковий коментар. Відмовою не рахується.
+function proposeSheet(id, date) {
+  const b = own().find((x) => x.id === id);
+  const d = date ?? b.date;
+  const t = todayIso();
+  const note = $('#propose-note')?.value ?? '';
+  const starts = openStarts(place(), d, b.minutes, bookings, { lead: 0, skip: b }).filter((x) => !(d === b.date && x === b.time));
+  openSheet(`Інший час: ${esc(who(b))}`, `
+    <p class="small muted" style="margin:0">Клієнт просив ${dayWord(b.date).toLowerCase()}, ${b.time} · ${esc(b.services.join(', '))}. Оберіть час, який можете прийняти, — клієнт погодиться одним дотиком.</p>
+    <div class="chips day-chips" role="group" aria-label="День">${Array.from({ length: 7 }, (_, i) => shiftDay(t, i)).map((x) => `<button class="chip" type="button" data-action="propose-day" data-id="${b.id}" data-date="${x}" aria-pressed="${x === d}" ${hoursFor(place(), x) ? '' : 'disabled'}>${dayWord(x)}</button>`).join('')}</div>
+    <label class="field"><span>Коментар клієнту (необовʼязково)</span><input id="propose-note" maxlength="200" autocomplete="off" placeholder="Наприклад, о 14:30 точно буде вільний бокс" value="${esc(note)}"></label>
+    ${starts.length ? `<div class="slots" role="group" aria-label="Запропонувати час">${starts.map((x) => `<button class="slot" type="button" data-action="propose-to" data-id="${b.id}" data-date="${d}" data-time="${x}">${x}</button>`).join('')}</div>`
+      : '<p class="muted">На цей день вільних боксів немає — оберіть інший.</p>'}
+    <p class="fine">Час одразу закріплюється за клієнтом. На відповідь у нього ${PAYMENT.offerMinutes} хв; не погодиться — гроші повернуться йому, а вам це не рахується як відмова.</p>`);
 }
 
 function moveSheet(id, date) {
@@ -746,6 +775,7 @@ function viewProfile() {
       <div class="chips wrap" role="group" aria-label="Світло на мийці">${Object.entries(POWER).map(([k, [label]]) => `<button class="chip" type="button" data-action="power" data-k="${k}" aria-pressed="${pw?.state === k}">${label}</button>`).join('')}</div>
       <p class="fine">${pw ? `Оновлено ${fmtTime(pw.at)}. ` : ''}Під час відключень клієнти шукають мийки, які працюють, — відмітка діє 12 годин.</p>
     </section>
+    ${reliabilityCard(p)}
     <section class="pro-card" aria-labelledby="h-confirm">
       <h2 id="h-confirm">Запис клієнтів</h2>
       <label class="check-row"><input class="check" type="checkbox" id="auto-confirm" ${autoConfirmOf(p.id) ? 'checked' : ''}><span><b>Приймати записи автоматично</b>
@@ -783,6 +813,26 @@ function viewProfile() {
       <div class="head"><h2 id="h-svc">Послуги й ціни</h2><button class="btn soft" type="button" data-action="svc-new">${icon('plus', 16)}Додати</button></div>
       <ul class="svc-list">${p.allServices.map((x) => `<li><button type="button" class="svc-row${x.off ? ' off' : ''}" data-action="svc-edit" data-id="${x.id}">
         <span><b>${esc(x.name)}</b><small>${duration(x.min)}${x.off ? ' · приховано' : ''}</small></span><span class="price">${x.price[0] === x.price[2] ? uah(x.price[0]) : `${uah(x.price[0])}–${uah(x.price[2])}`}</span>${icon('chevR', 16)}</button></li>`).join('')}</ul>
+    </section>`;
+}
+
+// Відмови й швидкість відповіді: від них залежить місце в пошуку CARCAR і пауза онлайн-запису.
+function reliabilityCard(p) {
+  const s = responseStats(p.id, bookings);
+  const pause = pauseOf(p.id, bookings);
+  const R = DECLINE_RULES;
+  const status = pause ? `<p class="notice warn" style="margin:0"><b>Онлайн-запис на паузі до ${fmtTime(pause.until)}</b>Відмов ${ratePct(s.rate)} — більше за ${ratePct(R.pauseRate)}. Клієнти бачать мийку, але записатися через CARCAR не можуть.</p>`
+    : s.lowered ? `<p class="notice warn" style="margin:0"><b>Мийка нижче в пошуку</b>Відмов ${ratePct(s.rate)} — більше за ${ratePct(R.warnRate)}. Пропонуйте інший час замість відмови, щоб повернутися вгору.</p>`
+      : !s.enough ? `<p class="notice" style="margin:0">Поки мало заявок для оцінки: ${s.total} з ${R.minRequests}.</p>`
+        : '<p class="notice ok" style="margin:0">Усе добре: клієнти бачать мийку у звичайному порядку.</p>';
+  return `<section class="pro-card" aria-labelledby="h-rel">
+      <h2 id="h-rel">Надійність для клієнтів</h2>
+      <div class="rel-grid">
+        <div><b>${ratePct(s.rate)}</b><small>відмов за ${R.days} днів${s.total ? ` (${s.declined} з ${s.total})` : ''}</small></div>
+        <div><b>${msText(s.avgMs)}</b><small>середня відповідь на запис</small></div>
+      </div>
+      ${status}
+      <p class="fine">Відмова — це ваша відмова або мовчання ${PAYMENT.confirmMinutes} хв. Запропонований інший час відмовою не вважається. Понад ${ratePct(R.warnRate)} відмов — мийка нижче в пошуку, від ${ratePct(R.pauseRate)} — онлайн-запис на паузі ${R.pauseHours} год після останньої відмови (якщо за ${R.days} днів не менше ${R.minRequests} заявок).</p>
     </section>`;
 }
 
@@ -1005,6 +1055,17 @@ document.addEventListener('click', async (e) => {
     return;
   }
   if (action === 'decline') { declineSheet(id); return; }
+  if (action === 'propose') { proposeSheet(id); return; }
+  if (action === 'propose-day') { proposeSheet(id, el.dataset.date); return; }
+  if (action === 'propose-to') {
+    if (!boxFree(el.dataset.date, toMin(el.dataset.time), b.minutes, b)) { toast('Цей час щойно зайняли — оберіть інший'); proposeSheet(id, el.dataset.date); return; }
+    proposeTime(b, el.dataset.date, el.dataset.time, ($('#propose-note')?.value ?? '').trim());
+    save();
+    closeSheet();
+    rerender();
+    toast(`Клієнту запропоновано ${dayWord(b.date).toLowerCase()} о ${b.time}`);
+    return;
+  }
   if (action === 'notify-on') {
     const res = await Notification.requestPermission();
     rerender();

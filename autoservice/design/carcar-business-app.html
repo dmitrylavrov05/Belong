@@ -1103,6 +1103,10 @@ body.in-auth #view { padding: 0; max-width: none; }
 
 /* Мийка підтвердила вільний час у CarCar Business */
 .sched-ok { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; font-size: 13px; font-weight: 600; color: var(--ok); }
+.offer-box { display: grid; gap: 4px; }
+.offer-when { display: inline; font-size: 16px; margin: 0; }
+.offer-note { font-style: italic; }
+.offer-due { font-size: 13px; color: var(--muted); }
 </style>
   <style>
 /* CarCar Business — застосунок мийки для телефона. Базові кнопки, поля, чат і шторки — зі styles.css. */
@@ -1336,6 +1340,13 @@ body.sheet-open .pro-fab { display: none; }
 .countdown { font-weight: 800; font-variant-numeric: tabular-nums; }
 .text-btn { border-color: transparent; color: var(--muted); }
 .notify-ask { width: 100%; justify-content: flex-start; min-height: 44px; font-size: 14px; }
+
+/* надійність мийки */
+.rel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.rel-grid > div { display: grid; padding: 10px 12px; border-radius: 12px; background: var(--soft); }
+.rel-grid b { font-size: 22px; }
+.rel-grid small { font-size: 12px; color: var(--muted); }
+a.remind { text-decoration: none; }
 </style>
 </head>
 <body class="pro">
@@ -1560,6 +1571,8 @@ const PAYMENT = {
   // Запис із застосунку мийка підтверджує вручну. Не відповіла за стільки хвилин робочого часу —
   // запис скасовується, гроші повертаються клієнту. Коротко, щоб клієнт не чекав і не йшов до інших.
   confirmMinutes: 5,
+  // Мийка запропонувала інший час — клієнт має стільки хвилин, щоб погодитися (але не пізніше за візит).
+  offerMinutes: 30,
   noShowShare: 1, // частка точці, якщо клієнт не приїхав або скасував пізно
   lateMinutes: 15, // запізнення довше — як неявка: мийка може зарахувати собі оплату
   // Оплата частинами для дорогих послуг: клієнт платить рівними частинами без переплати,
@@ -1584,6 +1597,12 @@ const REFERRAL = {
   bonus: 150, // друг отримує одразу, той, хто запросив, — коли друг завершить перше замовлення
   minOrder: 300, // бонус списується лише із замовлення від цієї суми, не більше bonus за раз
 };
+
+// Відповідальність мийки за записи з застосунку (за останні days днів, якщо заявок не менше minRequests):
+// частка відмов (свої відмови й мовчання) понад warnRate — мийка нижче в пошуку;
+// від pauseRate — онлайн-запис на паузі pauseHours годин після останньої відмови.
+// Запропонований інший час відмовою не вважається.
+const DECLINE_RULES = { days: 30, minRequests: 5, warnRate: 0.15, pauseRate: 0.3, pauseHours: 24 };
 
 // Спільна логіка застосунку клієнта (app.js) і панелі для бізнесу (business.js):
 // сховище, форматування, іконки, гроші, рейтинг і налаштування точок із CRM.
@@ -1986,7 +2005,9 @@ function expensesIn(placeId, from, to) {
 // ---------- гроші ----------
 
 // pending — клієнт оплатив, мийка ще не підтвердила: час уже зайнятий, гроші утримує CARCAR.
-const ACTIVE = ['pending', 'paid', 'done', 'dispute'];
+// offer — мийка запропонувала інший час і чекає згоди клієнта: зайнятий уже запропонований час.
+const ACTIVE = ['pending', 'offer', 'paid', 'done', 'dispute'];
+const AWAITING = ['pending', 'offer'];
 const HOUR = 3600000;
 
 // Як часто клієнт змінює плани: скасування, неявки й перенесення — підказка для мийки, не обмеження.
@@ -2073,7 +2094,7 @@ function balanceFor(placeId, bookings, payouts) {
   const earned = own.filter((b) => !isFrozen(b)).reduce((a, b) => a + placeShare(b), 0);
   const withdrawn = payouts.filter((x) => x.placeId === placeId).reduce((a, x) => a + x.gross, 0);
   // Непідтверджений запис ще не гроші точки: якщо мийка відмовить, їх повернуть клієнту.
-  const frozen = own.filter((b) => (ACTIVE.includes(b.state) && b.state !== 'pending') || isFrozen(b)).reduce((a, b) => a + price(b), 0);
+  const frozen = own.filter((b) => (ACTIVE.includes(b.state) && !AWAITING.includes(b.state)) || isFrozen(b)).reduce((a, b) => a + price(b), 0);
   const next = own.filter(isFrozen).sort((a, b) => a.unfreezeAt - b.unfreezeAt)[0];
   // Абонементи й сертифікати, куплені в застосунку: гроші точці через ті самі 48 годин.
   const sales = (store.peek('biz.passes', {})[placeId]?.sold ?? []).filter((x) => x.source === 'carcar');
@@ -2300,6 +2321,64 @@ async function checkBizLogin(login, pass) {
   const acc = bizAccounts().find((x) => x.login === login.trim().toLowerCase());
   return acc && acc.hash === await hashPass(acc.login, pass) ? acc : null;
 }
+
+// ---------- підтвердження записів і відповідальність мийки ----------
+
+// Звідки рахується час на відповідь: від заявки, а якщо мийка зачинена — від відкриття.
+function confirmStart(b) {
+  const p = PLACES.find((x) => x.id === b.placeId);
+  let t = b.createdAt ?? Date.now();
+  for (let i = 0; p && i < 8; i++) {
+    const d = new Date(t);
+    const iso = isoDate(d);
+    const h = hoursFor(p, iso);
+    const m = d.getHours() * 60 + d.getMinutes();
+    if (h && m < h[1]) {
+      if (m < h[0]) t = parseDate(iso).getTime() + h[0] * 60000;
+      break;
+    }
+    const next = parseDate(iso);
+    next.setDate(next.getDate() + 1);
+    t = next.getTime();
+  }
+  return t;
+}
+
+// До коли мийка має відповісти: confirmMinutes робочого часу, але не пізніше за початок візиту.
+const confirmBy = (b) => Math.min(confirmStart(b) + PAYMENT.confirmMinutes * 60000, bookingStart(b).getTime());
+// До коли клієнт може погодитися на запропонований час.
+const offerBy = (b) => Math.min((b.offer?.at ?? Date.now()) + PAYMENT.offerMinutes * 60000, bookingStart(b).getTime());
+
+// Відмови й швидкість відповіді мийки за останні DECLINE_RULES.days днів.
+function responseStats(placeId, bookings, now = Date.now()) {
+  const from = now - DECLINE_RULES.days * 24 * HOUR;
+  const list = bookings.filter((b) => b.placeId === placeId && b.needsConfirm && (b.createdAt ?? 0) >= from && !AWAITING.includes(b.state));
+  const declined = list.filter((b) => b.declined === 'place' || b.declined === 'timeout');
+  const answered = list.filter((b) => b.respondedAt);
+  const avgMs = answered.length ? answered.reduce((a, b) => a + Math.max(0, b.respondedAt - confirmStart(b)), 0) / answered.length : null;
+  const enough = list.length >= DECLINE_RULES.minRequests;
+  const rate = list.length ? declined.length / list.length : 0;
+  const lastDecline = Math.max(0, ...declined.map((b) => b.closedAt ?? 0));
+  return {
+    total: list.length, declined: declined.length, timeouts: declined.filter((b) => b.declined === 'timeout').length,
+    offers: list.filter((b) => b.offer).length, rate, avgMs, enough,
+    lowered: enough && rate > DECLINE_RULES.warnRate, lastDecline,
+  };
+}
+
+// Пауза онлайн-запису: часті відмови — на pauseHours після останньої. Адмін може зняти паузу.
+function pauseOf(placeId, bookings, now = Date.now()) {
+  const s = responseStats(placeId, bookings, now);
+  if (!s.enough || s.rate < DECLINE_RULES.pauseRate || !s.lastDecline) return null;
+  if ((store.peek('admin.pauseLift', {})[placeId] ?? 0) >= s.lastDecline) return null;
+  const until = s.lastDecline + DECLINE_RULES.pauseHours * HOUR;
+  return now < until ? { until, rate: s.rate } : null;
+}
+function liftPause(placeId) {
+  store.set('admin.pauseLift', { ...store.get('admin.pauseLift', {}), [placeId]: Date.now() });
+}
+const ratePct = (k) => `${Math.round(k * 100)}%`;
+const msText = (ms) => (ms === null ? '—' : ms < 60000 ? `${Math.max(1, Math.round(ms / 1000))} с` : `${Math.floor(ms / 60000)} хв${Math.round((ms % 60000) / 1000) ? ` ${Math.round((ms % 60000) / 1000)} с` : ''}`);
 
 // Спільна логіка застосунку клієнта й панелі бізнесу для щоденної роботи точки:
 // гарячі вікна зі знижкою, жива черга, лист очікування, абонементи й сертифікати,
@@ -2629,27 +2708,6 @@ function setAutoConfirm(placeId, on) {
   store.set('biz.autoConfirm', { ...store.get('biz.autoConfirm', {}), [placeId]: on });
 }
 
-// До коли мийка має відповісти: confirmMinutes робочого часу від заявки (заявка вночі — від відкриття),
-// але не пізніше за початок візиту.
-function confirmBy(b) {
-  const p = opsPlace(b.placeId);
-  let t = b.createdAt ?? Date.now();
-  for (let i = 0; p && i < 8; i++) {
-    const d = new Date(t);
-    const iso = isoDate(d);
-    const h = hoursFor(p, iso);
-    const m = d.getHours() * 60 + d.getMinutes();
-    if (h && m < h[1]) {
-      if (m < h[0]) t = parseDate(iso).getTime() + h[0] * 60000;
-      break;
-    }
-    const next = parseDate(iso);
-    next.setDate(next.getDate() + 1);
-    t = next.getTime();
-  }
-  return Math.min(t + PAYMENT.confirmMinutes * 60000, bookingStart(b).getTime());
-}
-
 // Відповідь мийки клієнт бачить у чаті запису й отримує сповіщення.
 function clientNote(b, kind, text) {
   chatPost(b, 'sys', text.replace(/^[^:]+: /, ''), 'client');
@@ -2659,17 +2717,19 @@ const placeName = (b) => opsPlace(b.placeId)?.name ?? 'Мийка';
 const whenText = (b) => `${parseDate(b.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })} о ${b.time}`;
 
 function acceptBooking(b) {
-  Object.assign(b, { state: 'paid', confirmedAt: Date.now() });
+  Object.assign(b, { state: 'paid', confirmedAt: Date.now(), respondedAt: b.respondedAt ?? Date.now() });
   clientNote(b, 'confirm', `${placeName(b)}: запис на ${whenText(b)} підтверджено. Чекаємо вас!`);
 }
 
 // Відмова чи мовчання мийки: усе повертаємо клієнту — картку на картку, баланс і бонуси на рахунок CARCAR,
 // візит абонемента й промокод знову доступні.
+// by: place — мийка відмовила; timeout — мийка не відповіла; proposal — клієнт не прийняв інший час.
 function declineBooking(b, reason, by = 'place') {
   const fromBalance = b.fromBalance || 0;
   Object.assign(b, {
     state: 'cancelled', declined: by, declineReason: reason, refund: b.paid, placeAmount: 0, refundTo: fromBalance >= b.paid ? 'balance' : 'card',
-    closedAt: Date.now(), cancelBy: by === 'timeout' ? 'system' : 'place',
+    closedAt: Date.now(), cancelBy: by === 'place' ? 'place' : by === 'proposal' ? 'client' : 'system',
+    ...(by === 'place' && !b.respondedAt ? { respondedAt: Date.now() } : {}),
   });
   if (fromBalance) creditClient(fromBalance, `Повернення: ${placeName(b)} не підтвердила запис`);
   if (b.bonus && !b.bonusReturned) {
@@ -2681,9 +2741,30 @@ function declineBooking(b, reason, by = 'place') {
   }
   if (b.passUse) { restorePass(b.placeId, b.passUse); b.passUse = null; }
   if (b.promo) b.promo.returned = true;
+  if (by === 'proposal') return;
   clientNote(b, 'decline', by === 'timeout'
     ? `${placeName(b)} не відповіла на запис на ${whenText(b)}. Запис скасовано, гроші повернуто. Оберіть інший час чи мийку.`
     : `${placeName(b)} не може прийняти запис на ${whenText(b)}${reason ? `: ${reason}` : ''}. Гроші повернуто. Оберіть інший час чи мийку.`);
+}
+
+// Замість відмови мийка пропонує інший вільний час. Запис одразу переходить на нього (щоб час не зайняли),
+// а клієнт погоджується або скасовує без втрат.
+function proposeTime(b, date, time, note = '') {
+  const from = { date: b.date, time: b.time };
+  Object.assign(b, { state: 'offer', date, time, offer: { from, at: Date.now(), note }, respondedAt: b.respondedAt ?? Date.now() });
+  clientNote(b, 'offer', `${placeName(b)} не може прийняти вас ${parseDate(from.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })} о ${from.time} і пропонує ${whenText(b)}.${note ? ` ${note}` : ''} Погодьтеся в записі або скасуйте без втрат.`);
+}
+
+function acceptOffer(b) {
+  Object.assign(b, { state: 'paid', confirmedAt: Date.now(), offer: { ...b.offer, accepted: Date.now() } });
+  chatPost(b, 'sys', `Клієнт погодився на ${whenText(b)}`, 'biz');
+}
+
+function rejectOffer(b, timeout = false) {
+  // Повертаємо початковий час, щоб у журналі було видно, на що клієнт записувався.
+  Object.assign(b, { date: b.offer.from.date, time: b.offer.from.time, offer: { ...b.offer, rejected: Date.now() } });
+  declineBooking(b, timeout ? 'клієнт не відповів на запропонований час' : 'клієнту не підійшов запропонований час', 'proposal');
+  chatPost(b, 'sys', timeout ? 'Клієнт не відповів на запропонований час — запис скасовано, гроші повернуто' : 'Клієнту не підійшов запропонований час — запис скасовано, гроші повернуто', 'biz');
 }
 
 // Заявки, на які мийка не відповіла вчасно, скасовуються самі. Повертає true, якщо щось змінилося.
@@ -2691,6 +2772,7 @@ function expirePending(bookings) {
   let changed = false;
   for (const b of bookings) {
     if (b.state === 'pending' && Date.now() >= confirmBy(b)) { declineBooking(b, 'мийка не відповіла вчасно', 'timeout'); changed = true; }
+    if (b.state === 'offer' && Date.now() >= offerBy(b)) { rejectOffer(b, true); changed = true; }
   }
   return changed;
 }
@@ -2765,6 +2847,7 @@ const CHANNEL = { carcar: 'CARCAR', phone: 'Дзвінок', walkin: 'Приїх
 const channelOf = (b) => b.channel ?? 'carcar';
 const STATE = {
   pending: ['Підтвердіть запис', 'warn'],
+  offer: ['Чекає відповіді клієнта', 'carcar'],
   paid: ['Оплачено', 'carcar'], booked: ['Записано', 'cash'], done: ['Чекає клієнта', 'warn'], dispute: ['Спір', 'warn'],
   completed: ['Виконано', 'ok'], cancelled: ['Скасовано', 'muted'], noshow: ['Неявка', 'muted'], refunded: ['Повернено клієнту', 'muted'],
 };
@@ -2866,6 +2949,7 @@ function alertSheet(b) {
       <div class="grid2">
         <button class="btn primary" type="button" data-action="accept" data-id="${b.id}">${icon('check', 18)}Прийняти</button>
         <button class="btn line-danger" type="button" data-action="decline" data-id="${b.id}">Відмовити</button>
+        <button class="btn full" type="button" data-action="propose" data-id="${b.id}">${icon('calendar', 18)}Запропонувати інший час</button>
       </div>
       <button class="btn text-btn" type="button" data-action="sheet-close">Пізніше</button>
     </div>`);
@@ -2924,6 +3008,7 @@ function pendingBlock() {
       <div class="grid2">
         <button class="btn navy" type="button" data-action="accept" data-id="${b.id}">${icon('check', 18)}Прийняти</button>
         <button class="btn" type="button" data-action="decline" data-id="${b.id}">Відмовити</button>
+        <button class="btn soft full" type="button" data-action="propose" data-id="${b.id}">${icon('calendar', 16)}Запропонувати інший час</button>
       </div>
     </article>`).join('')}
     ${notifyAsk()}
@@ -2932,6 +3017,11 @@ function pendingBlock() {
 
 function reminders() {
   const out = [];
+  const pause = pauseOf(ui.place, bookings);
+  if (pause) out.push(`<a class="remind warn" href="#/profile">${icon('warn', 22)}<span><b>Онлайн-запис на паузі до ${fmtTime(pause.until)}</b>
+      <small>Забагато відмов і пропущених записів. Клієнти не можуть записатися через CARCAR.</small></span>${icon('chevR', 18)}</a>`);
+  else if (responseStats(ui.place, bookings).lowered) out.push(`<a class="remind warn" href="#/profile">${icon('warn', 22)}<span><b>Мийка нижче в пошуку через відмови</b>
+      <small>Пропонуйте інший час замість відмови — це не рахується.</small></span>${icon('chevR', 18)}</a>`);
   const st = partnerOf(ui.place).status;
   if (st !== 'approved') out.push(`<p class="notice warn">Клієнти ще не бачать мийку: статус «${PARTNER_STATUS[st][0]}». <a href="business.html#/connect">Завершити підключення</a></p>`);
   const late = unmarked();
@@ -3166,7 +3256,10 @@ function bookingSheet(id) {
       <div class="grid2">
         <button class="btn primary" type="button" data-action="accept" data-id="${b.id}">${icon('check', 18)}Прийняти</button>
         <button class="btn line-danger" type="button" data-action="decline" data-id="${b.id}">Відмовити</button>
+        <button class="btn full" type="button" data-action="propose" data-id="${b.id}">${icon('calendar', 18)}Запропонувати інший час</button>
       </div>`;
+  } else if (b.state === 'offer') {
+    actions = `<p class="notice">Ви запропонували цей час замість ${dayWord(b.offer.from.date).toLowerCase()}, ${b.offer.from.time}. Клієнт відповість до ${clock(offerBy(b))}; не відповість — запис скасується, гроші повернуться йому.</p>`;
   } else if (b.state === 'booked') {
     actions = `<form class="stack" id="done-form" data-id="${b.id}" style="gap:10px">
         <div class="seg-row" role="radiogroup" aria-label="Оплата на місці">
@@ -3213,12 +3306,29 @@ function declineSheet(id) {
   const b = own().find((x) => x.id === id);
   openSheet(`Відмовити: ${esc(who(b))}`, `<form class="stack" id="decline-form" data-id="${b.id}" style="gap:12px">
     <p class="small muted" style="margin:0">${dayWord(b.date, true)}, ${b.time} · ${esc(b.services.join(', '))}. Клієнт отримає повідомлення, а гроші — назад.</p>
+    <button class="btn soft" type="button" data-action="propose" data-id="${b.id}">${icon('calendar', 18)}Краще запропонувати інший час — це не відмова</button>
     <fieldset class="reason-set"><legend>Причина</legend>
       ${DECLINE_REASONS.map((r, i) => `<label class="check-row"><input class="check radio" type="radio" name="reason" value="${esc(r)}" ${i ? '' : 'checked'}><span>${r}</span></label>`).join('')}
     </fieldset>
     <label class="field"><span>Повідомлення клієнту (необовʼязково)</span><input name="note" maxlength="300" autocomplete="off" placeholder="Наприклад, можемо о 14:00 — запишіться ще раз"></label>
     <button class="btn primary" type="submit">Відмовити й повернути гроші</button>
   </form>`);
+}
+
+// Інший час замість відмови: день і вільний час, необовʼязковий коментар. Відмовою не рахується.
+function proposeSheet(id, date) {
+  const b = own().find((x) => x.id === id);
+  const d = date ?? b.date;
+  const t = todayIso();
+  const note = $('#propose-note')?.value ?? '';
+  const starts = openStarts(place(), d, b.minutes, bookings, { lead: 0, skip: b }).filter((x) => !(d === b.date && x === b.time));
+  openSheet(`Інший час: ${esc(who(b))}`, `
+    <p class="small muted" style="margin:0">Клієнт просив ${dayWord(b.date).toLowerCase()}, ${b.time} · ${esc(b.services.join(', '))}. Оберіть час, який можете прийняти, — клієнт погодиться одним дотиком.</p>
+    <div class="chips day-chips" role="group" aria-label="День">${Array.from({ length: 7 }, (_, i) => shiftDay(t, i)).map((x) => `<button class="chip" type="button" data-action="propose-day" data-id="${b.id}" data-date="${x}" aria-pressed="${x === d}" ${hoursFor(place(), x) ? '' : 'disabled'}>${dayWord(x)}</button>`).join('')}</div>
+    <label class="field"><span>Коментар клієнту (необовʼязково)</span><input id="propose-note" maxlength="200" autocomplete="off" placeholder="Наприклад, о 14:30 точно буде вільний бокс" value="${esc(note)}"></label>
+    ${starts.length ? `<div class="slots" role="group" aria-label="Запропонувати час">${starts.map((x) => `<button class="slot" type="button" data-action="propose-to" data-id="${b.id}" data-date="${d}" data-time="${x}">${x}</button>`).join('')}</div>`
+      : '<p class="muted">На цей день вільних боксів немає — оберіть інший.</p>'}
+    <p class="fine">Час одразу закріплюється за клієнтом. На відповідь у нього ${PAYMENT.offerMinutes} хв; не погодиться — гроші повернуться йому, а вам це не рахується як відмова.</p>`);
 }
 
 function moveSheet(id, date) {
@@ -3432,6 +3542,7 @@ function viewProfile() {
       <div class="chips wrap" role="group" aria-label="Світло на мийці">${Object.entries(POWER).map(([k, [label]]) => `<button class="chip" type="button" data-action="power" data-k="${k}" aria-pressed="${pw?.state === k}">${label}</button>`).join('')}</div>
       <p class="fine">${pw ? `Оновлено ${fmtTime(pw.at)}. ` : ''}Під час відключень клієнти шукають мийки, які працюють, — відмітка діє 12 годин.</p>
     </section>
+    ${reliabilityCard(p)}
     <section class="pro-card" aria-labelledby="h-confirm">
       <h2 id="h-confirm">Запис клієнтів</h2>
       <label class="check-row"><input class="check" type="checkbox" id="auto-confirm" ${autoConfirmOf(p.id) ? 'checked' : ''}><span><b>Приймати записи автоматично</b>
@@ -3469,6 +3580,26 @@ function viewProfile() {
       <div class="head"><h2 id="h-svc">Послуги й ціни</h2><button class="btn soft" type="button" data-action="svc-new">${icon('plus', 16)}Додати</button></div>
       <ul class="svc-list">${p.allServices.map((x) => `<li><button type="button" class="svc-row${x.off ? ' off' : ''}" data-action="svc-edit" data-id="${x.id}">
         <span><b>${esc(x.name)}</b><small>${duration(x.min)}${x.off ? ' · приховано' : ''}</small></span><span class="price">${x.price[0] === x.price[2] ? uah(x.price[0]) : `${uah(x.price[0])}–${uah(x.price[2])}`}</span>${icon('chevR', 16)}</button></li>`).join('')}</ul>
+    </section>`;
+}
+
+// Відмови й швидкість відповіді: від них залежить місце в пошуку CARCAR і пауза онлайн-запису.
+function reliabilityCard(p) {
+  const s = responseStats(p.id, bookings);
+  const pause = pauseOf(p.id, bookings);
+  const R = DECLINE_RULES;
+  const status = pause ? `<p class="notice warn" style="margin:0"><b>Онлайн-запис на паузі до ${fmtTime(pause.until)}</b>Відмов ${ratePct(s.rate)} — більше за ${ratePct(R.pauseRate)}. Клієнти бачать мийку, але записатися через CARCAR не можуть.</p>`
+    : s.lowered ? `<p class="notice warn" style="margin:0"><b>Мийка нижче в пошуку</b>Відмов ${ratePct(s.rate)} — більше за ${ratePct(R.warnRate)}. Пропонуйте інший час замість відмови, щоб повернутися вгору.</p>`
+      : !s.enough ? `<p class="notice" style="margin:0">Поки мало заявок для оцінки: ${s.total} з ${R.minRequests}.</p>`
+        : '<p class="notice ok" style="margin:0">Усе добре: клієнти бачать мийку у звичайному порядку.</p>';
+  return `<section class="pro-card" aria-labelledby="h-rel">
+      <h2 id="h-rel">Надійність для клієнтів</h2>
+      <div class="rel-grid">
+        <div><b>${ratePct(s.rate)}</b><small>відмов за ${R.days} днів${s.total ? ` (${s.declined} з ${s.total})` : ''}</small></div>
+        <div><b>${msText(s.avgMs)}</b><small>середня відповідь на запис</small></div>
+      </div>
+      ${status}
+      <p class="fine">Відмова — це ваша відмова або мовчання ${PAYMENT.confirmMinutes} хв. Запропонований інший час відмовою не вважається. Понад ${ratePct(R.warnRate)} відмов — мийка нижче в пошуку, від ${ratePct(R.pauseRate)} — онлайн-запис на паузі ${R.pauseHours} год після останньої відмови (якщо за ${R.days} днів не менше ${R.minRequests} заявок).</p>
     </section>`;
 }
 
@@ -3691,6 +3822,17 @@ document.addEventListener('click', async (e) => {
     return;
   }
   if (action === 'decline') { declineSheet(id); return; }
+  if (action === 'propose') { proposeSheet(id); return; }
+  if (action === 'propose-day') { proposeSheet(id, el.dataset.date); return; }
+  if (action === 'propose-to') {
+    if (!boxFree(el.dataset.date, toMin(el.dataset.time), b.minutes, b)) { toast('Цей час щойно зайняли — оберіть інший'); proposeSheet(id, el.dataset.date); return; }
+    proposeTime(b, el.dataset.date, el.dataset.time, ($('#propose-note')?.value ?? '').trim());
+    save();
+    closeSheet();
+    rerender();
+    toast(`Клієнту запропоновано ${dayWord(b.date).toLowerCase()} о ${b.time}`);
+    return;
+  }
   if (action === 'notify-on') {
     const res = await Notification.requestPermission();
     rerender();

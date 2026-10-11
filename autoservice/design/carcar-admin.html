@@ -1102,6 +1102,10 @@ body.in-auth #view { padding: 0; max-width: none; }
 
 /* Мийка підтвердила вільний час у CarCar Business */
 .sched-ok { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; font-size: 13px; font-weight: 600; color: var(--ok); }
+.offer-box { display: grid; gap: 4px; }
+.offer-when { display: inline; font-size: 16px; margin: 0; }
+.offer-note { font-style: italic; }
+.offer-due { font-size: 13px; color: var(--muted); }
 </style>
   <style>
 /* Панель для бізнесу CARCAR: десктоп-перший макет поверх токенів і компонентів styles.css. */
@@ -1902,6 +1906,8 @@ const PAYMENT = {
   // Запис із застосунку мийка підтверджує вручну. Не відповіла за стільки хвилин робочого часу —
   // запис скасовується, гроші повертаються клієнту. Коротко, щоб клієнт не чекав і не йшов до інших.
   confirmMinutes: 5,
+  // Мийка запропонувала інший час — клієнт має стільки хвилин, щоб погодитися (але не пізніше за візит).
+  offerMinutes: 30,
   noShowShare: 1, // частка точці, якщо клієнт не приїхав або скасував пізно
   lateMinutes: 15, // запізнення довше — як неявка: мийка може зарахувати собі оплату
   // Оплата частинами для дорогих послуг: клієнт платить рівними частинами без переплати,
@@ -1926,6 +1932,12 @@ const REFERRAL = {
   bonus: 150, // друг отримує одразу, той, хто запросив, — коли друг завершить перше замовлення
   minOrder: 300, // бонус списується лише із замовлення від цієї суми, не більше bonus за раз
 };
+
+// Відповідальність мийки за записи з застосунку (за останні days днів, якщо заявок не менше minRequests):
+// частка відмов (свої відмови й мовчання) понад warnRate — мийка нижче в пошуку;
+// від pauseRate — онлайн-запис на паузі pauseHours годин після останньої відмови.
+// Запропонований інший час відмовою не вважається.
+const DECLINE_RULES = { days: 30, minRequests: 5, warnRate: 0.15, pauseRate: 0.3, pauseHours: 24 };
 
 // Спільна логіка застосунку клієнта (app.js) і панелі для бізнесу (business.js):
 // сховище, форматування, іконки, гроші, рейтинг і налаштування точок із CRM.
@@ -2328,7 +2340,9 @@ function expensesIn(placeId, from, to) {
 // ---------- гроші ----------
 
 // pending — клієнт оплатив, мийка ще не підтвердила: час уже зайнятий, гроші утримує CARCAR.
-const ACTIVE = ['pending', 'paid', 'done', 'dispute'];
+// offer — мийка запропонувала інший час і чекає згоди клієнта: зайнятий уже запропонований час.
+const ACTIVE = ['pending', 'offer', 'paid', 'done', 'dispute'];
+const AWAITING = ['pending', 'offer'];
 const HOUR = 3600000;
 
 // Як часто клієнт змінює плани: скасування, неявки й перенесення — підказка для мийки, не обмеження.
@@ -2415,7 +2429,7 @@ function balanceFor(placeId, bookings, payouts) {
   const earned = own.filter((b) => !isFrozen(b)).reduce((a, b) => a + placeShare(b), 0);
   const withdrawn = payouts.filter((x) => x.placeId === placeId).reduce((a, x) => a + x.gross, 0);
   // Непідтверджений запис ще не гроші точки: якщо мийка відмовить, їх повернуть клієнту.
-  const frozen = own.filter((b) => (ACTIVE.includes(b.state) && b.state !== 'pending') || isFrozen(b)).reduce((a, b) => a + price(b), 0);
+  const frozen = own.filter((b) => (ACTIVE.includes(b.state) && !AWAITING.includes(b.state)) || isFrozen(b)).reduce((a, b) => a + price(b), 0);
   const next = own.filter(isFrozen).sort((a, b) => a.unfreezeAt - b.unfreezeAt)[0];
   // Абонементи й сертифікати, куплені в застосунку: гроші точці через ті самі 48 годин.
   const sales = (store.peek('biz.passes', {})[placeId]?.sold ?? []).filter((x) => x.source === 'carcar');
@@ -2642,6 +2656,64 @@ async function checkBizLogin(login, pass) {
   const acc = bizAccounts().find((x) => x.login === login.trim().toLowerCase());
   return acc && acc.hash === await hashPass(acc.login, pass) ? acc : null;
 }
+
+// ---------- підтвердження записів і відповідальність мийки ----------
+
+// Звідки рахується час на відповідь: від заявки, а якщо мийка зачинена — від відкриття.
+function confirmStart(b) {
+  const p = PLACES.find((x) => x.id === b.placeId);
+  let t = b.createdAt ?? Date.now();
+  for (let i = 0; p && i < 8; i++) {
+    const d = new Date(t);
+    const iso = isoDate(d);
+    const h = hoursFor(p, iso);
+    const m = d.getHours() * 60 + d.getMinutes();
+    if (h && m < h[1]) {
+      if (m < h[0]) t = parseDate(iso).getTime() + h[0] * 60000;
+      break;
+    }
+    const next = parseDate(iso);
+    next.setDate(next.getDate() + 1);
+    t = next.getTime();
+  }
+  return t;
+}
+
+// До коли мийка має відповісти: confirmMinutes робочого часу, але не пізніше за початок візиту.
+const confirmBy = (b) => Math.min(confirmStart(b) + PAYMENT.confirmMinutes * 60000, bookingStart(b).getTime());
+// До коли клієнт може погодитися на запропонований час.
+const offerBy = (b) => Math.min((b.offer?.at ?? Date.now()) + PAYMENT.offerMinutes * 60000, bookingStart(b).getTime());
+
+// Відмови й швидкість відповіді мийки за останні DECLINE_RULES.days днів.
+function responseStats(placeId, bookings, now = Date.now()) {
+  const from = now - DECLINE_RULES.days * 24 * HOUR;
+  const list = bookings.filter((b) => b.placeId === placeId && b.needsConfirm && (b.createdAt ?? 0) >= from && !AWAITING.includes(b.state));
+  const declined = list.filter((b) => b.declined === 'place' || b.declined === 'timeout');
+  const answered = list.filter((b) => b.respondedAt);
+  const avgMs = answered.length ? answered.reduce((a, b) => a + Math.max(0, b.respondedAt - confirmStart(b)), 0) / answered.length : null;
+  const enough = list.length >= DECLINE_RULES.minRequests;
+  const rate = list.length ? declined.length / list.length : 0;
+  const lastDecline = Math.max(0, ...declined.map((b) => b.closedAt ?? 0));
+  return {
+    total: list.length, declined: declined.length, timeouts: declined.filter((b) => b.declined === 'timeout').length,
+    offers: list.filter((b) => b.offer).length, rate, avgMs, enough,
+    lowered: enough && rate > DECLINE_RULES.warnRate, lastDecline,
+  };
+}
+
+// Пауза онлайн-запису: часті відмови — на pauseHours після останньої. Адмін може зняти паузу.
+function pauseOf(placeId, bookings, now = Date.now()) {
+  const s = responseStats(placeId, bookings, now);
+  if (!s.enough || s.rate < DECLINE_RULES.pauseRate || !s.lastDecline) return null;
+  if ((store.peek('admin.pauseLift', {})[placeId] ?? 0) >= s.lastDecline) return null;
+  const until = s.lastDecline + DECLINE_RULES.pauseHours * HOUR;
+  return now < until ? { until, rate: s.rate } : null;
+}
+function liftPause(placeId) {
+  store.set('admin.pauseLift', { ...store.get('admin.pauseLift', {}), [placeId]: Date.now() });
+}
+const ratePct = (k) => `${Math.round(k * 100)}%`;
+const msText = (ms) => (ms === null ? '—' : ms < 60000 ? `${Math.max(1, Math.round(ms / 1000))} с` : `${Math.floor(ms / 60000)} хв${Math.round((ms % 60000) / 1000) ? ` ${Math.round((ms % 60000) / 1000)} с` : ''}`);
 
 // Графіки для панелі бізнесу й адмінки CARCAR: стовпчики (складені чи згруповані), горизонтальні
 // смуги, легенда, таблиця під графіком і один тултип на сторінку. Палітра — змінні --series-1/2.
@@ -3066,17 +3138,41 @@ function viewPlaces() {
       ${Object.entries(PLACE_FILTERS).map(([k, [label, fn]]) => `<button data-action="place-filter" data-f="${k}" aria-pressed="${ui.places === k}">${label} · ${all.filter(({ pt }) => fn(pt)).length}</button>`).join('')}
     </div></div>
     <div class="table-wrap" tabindex="0" role="region" aria-label="Точки"><table class="t">
-      <thead><tr><th>Точка</th><th>Юрособа</th><th>Статус</th><th>Що перевірити</th><th>Оновлено</th></tr></thead>
+      <thead><tr><th>Точка</th><th>Юрособа</th><th>Статус</th><th class="num">Відмови</th><th class="num">Відповідь</th><th>Що перевірити</th><th>Оновлено</th></tr></thead>
       <tbody>${list.length ? list.map(({ p, pt }) => {
         const todo = [pt.status === 'pending' && 'Нова заявка', pt.update === 'pending' && 'Зміни даних', pt.payout?.iban && !pt.payout.verified && 'Реквізити'].filter(Boolean);
         const last = pt.history.at(-1);
         return `<tr class="link-row" data-href="#/places/${p.id}"><td><a class="row-link" href="#/places/${p.id}">${esc(p.name)}</a><small>${esc(p.district)}, ${esc(p.address)}</small></td>
           <td>${pt.company ? `${ENTITY[pt.company.type]} ${esc(pt.company.name)}<small>${pt.company.type === 'fop' ? 'РНОКПП' : 'ЄДРПОУ'} ${esc(pt.company.code)}</small>` : '<span class="muted">не вказано</span>'}</td>
-          <td>${statusPill(pt.status)}${pt.demo ? ' <span class="pill">демо</span>' : ''}</td>
+          <td>${statusPill(pt.status)}${pt.demo ? ' <span class="pill">демо</span>' : ''}${pauseOf(p.id, bookings) ? ' <span class="pill bad">Запис на паузі</span>' : responseStats(p.id, bookings).lowered ? ' <span class="pill warn">Нижче в пошуку</span>' : ''}</td>
+          ${relCells(p.id)}
           <td>${todo.length ? todo.map((x) => `<span class="pill warn">${x}</span>`).join(' ') : '—'}</td>
           <td>${last ? fmtTime(last.at) : '—'}</td></tr>`;
-      }).join('') : '<tr><td colspan="5" class="muted">Немає точок у цьому списку.</td></tr>'}</tbody>
+      }).join('') : '<tr><td colspan="7" class="muted">Немає точок у цьому списку.</td></tr>'}</tbody>
     </table></div>`;
+}
+
+// Відмови мийки на записи з застосунку й середній час відповіді за 30 днів.
+function relCells(placeId) {
+  const s = responseStats(placeId, bookings);
+  return `<td class="num">${s.total ? `${ratePct(s.rate)}<small>${s.declined} з ${s.total}</small>` : '—'}</td><td class="num">${msText(s.avgMs)}</td>`;
+}
+
+function relPanel(id) {
+  const s = responseStats(id, bookings);
+  const pause = pauseOf(id, bookings);
+  return `<section class="panel stack" aria-labelledby="h-rel" style="gap:10px;margin-top:16px">
+    <h2 id="h-rel">Підтвердження записів</h2>
+    <dl class="kv">
+      <dt>Заявок за 30 днів</dt><dd>${s.total}</dd>
+      <dt>Відмови</dt><dd>${ratePct(s.rate)} (${s.declined}, з них без відповіді ${s.timeouts})</dd>
+      <dt>Запропоновано інший час</dt><dd>${s.offers}</dd>
+      <dt>Середня відповідь</dt><dd>${msText(s.avgMs)}</dd>
+      <dt>Стан</dt><dd>${pause ? `<span class="pill bad">Онлайн-запис на паузі до ${fmtTime(pause.until)}</span>` : s.lowered ? '<span class="pill warn">Нижче в пошуку</span>' : '<span class="pill ok">Звичайний</span>'}</dd>
+    </dl>
+    ${pause ? `<button class="btn" data-action="lift-pause" data-id="${id}" style="align-self:flex-start">Зняти паузу</button>
+      <p class="fine">Наприклад, якщо мийка пояснила відмови (поломка обладнання). Наступна відмова знову поставить запис на паузу, поки частка відмов висока.</p>` : ''}
+  </section>`;
 }
 
 const check = (ok, yes, no) => `<li class="${ok ? 'ok-text' : 'bad-text'}">${icon(ok ? 'checkCircle' : 'warn', 16)}${ok ? yes : no}</li>`;
@@ -3094,6 +3190,7 @@ function viewPlace(id) {
     <div class="title-row"><h1>${esc(p.name)}</h1><div class="row">${statusPill(pt.status)}${pt.update === 'pending' ? '<span class="pill warn">Зміни на перевірці</span>' : ''}</div></div>
     <p class="page-sub">${esc(p.district)}, ${esc(p.address)} · ${esc(p.phone)} · ${p.cats.map((x) => catById(x).name).join(', ')} · ${p.boxes} ${plural(p.boxes, 'бокс', 'бокси', 'боксів')}
       · <a href="index.html#/place/${p.id}" target="_blank" rel="noopener">сторінка для клієнтів</a></p>
+    ${relPanel(p.id)}
     <div class="grid-2" style="margin-top:8px">
       <section class="panel stack" aria-labelledby="h-co" style="gap:10px">
         <h2 id="h-co">Юридична особа</h2>
@@ -4110,6 +4207,7 @@ document.addEventListener('click', (e) => {
     toast(list.find((x) => x.code === id).active ? `Промокод ${id} увімкнено` : `Промокод ${id} вимкнено`);
   }
   else if (action === 'place-filter') { ui.places = el.dataset.f; rerender(); }
+  else if (action === 'lift-pause') { liftPause(el.dataset.id); rerender(); toast('Паузу знято — мийка знову приймає онлайн-записи'); }
   else if (action === 'support-filter') { ui.support = el.dataset.f; rerender(); }
   else if (action === 'fraud-filter') { ui.fraud = el.dataset.f; rerender(); }
   else if (action === 'fraud-demo') { fraudDemo(); rerender(); toast('Додано вигадані підозрілі відгуки, скасування й заявку точки-двійника'); }

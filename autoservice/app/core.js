@@ -1,6 +1,6 @@
 // Спільна логіка застосунку клієнта (app.js) і панелі для бізнесу (business.js):
 // сховище, форматування, іконки, гроші, рейтинг і налаштування точок із CRM.
-import { CATEGORIES, PLACES, PAYMENT, RELIABILITY, SERVICE_TEMPLATES, CITIES } from './data.js';
+import { CATEGORIES, PLACES, PAYMENT, RELIABILITY, SERVICE_TEMPLATES, CITIES, DECLINE_RULES } from './data.js';
 
 // peek — для частого читання без змін: розбираємо JSON лише тоді, коли значення змінилося.
 // Повернений обʼєкт спільний — не змінюйте його, для змін є get/set.
@@ -400,7 +400,9 @@ export function expensesIn(placeId, from, to) {
 // ---------- гроші ----------
 
 // pending — клієнт оплатив, мийка ще не підтвердила: час уже зайнятий, гроші утримує CARCAR.
-export const ACTIVE = ['pending', 'paid', 'done', 'dispute'];
+// offer — мийка запропонувала інший час і чекає згоди клієнта: зайнятий уже запропонований час.
+export const ACTIVE = ['pending', 'offer', 'paid', 'done', 'dispute'];
+export const AWAITING = ['pending', 'offer'];
 export const HOUR = 3600000;
 
 // Як часто клієнт змінює плани: скасування, неявки й перенесення — підказка для мийки, не обмеження.
@@ -487,7 +489,7 @@ export function balanceFor(placeId, bookings, payouts) {
   const earned = own.filter((b) => !isFrozen(b)).reduce((a, b) => a + placeShare(b), 0);
   const withdrawn = payouts.filter((x) => x.placeId === placeId).reduce((a, x) => a + x.gross, 0);
   // Непідтверджений запис ще не гроші точки: якщо мийка відмовить, їх повернуть клієнту.
-  const frozen = own.filter((b) => (ACTIVE.includes(b.state) && b.state !== 'pending') || isFrozen(b)).reduce((a, b) => a + price(b), 0);
+  const frozen = own.filter((b) => (ACTIVE.includes(b.state) && !AWAITING.includes(b.state)) || isFrozen(b)).reduce((a, b) => a + price(b), 0);
   const next = own.filter(isFrozen).sort((a, b) => a.unfreezeAt - b.unfreezeAt)[0];
   // Абонементи й сертифікати, куплені в застосунку: гроші точці через ті самі 48 годин.
   const sales = (store.peek('biz.passes', {})[placeId]?.sold ?? []).filter((x) => x.source === 'carcar');
@@ -714,3 +716,61 @@ export async function checkBizLogin(login, pass) {
   const acc = bizAccounts().find((x) => x.login === login.trim().toLowerCase());
   return acc && acc.hash === await hashPass(acc.login, pass) ? acc : null;
 }
+
+// ---------- підтвердження записів і відповідальність мийки ----------
+
+// Звідки рахується час на відповідь: від заявки, а якщо мийка зачинена — від відкриття.
+export function confirmStart(b) {
+  const p = PLACES.find((x) => x.id === b.placeId);
+  let t = b.createdAt ?? Date.now();
+  for (let i = 0; p && i < 8; i++) {
+    const d = new Date(t);
+    const iso = isoDate(d);
+    const h = hoursFor(p, iso);
+    const m = d.getHours() * 60 + d.getMinutes();
+    if (h && m < h[1]) {
+      if (m < h[0]) t = parseDate(iso).getTime() + h[0] * 60000;
+      break;
+    }
+    const next = parseDate(iso);
+    next.setDate(next.getDate() + 1);
+    t = next.getTime();
+  }
+  return t;
+}
+
+// До коли мийка має відповісти: confirmMinutes робочого часу, але не пізніше за початок візиту.
+export const confirmBy = (b) => Math.min(confirmStart(b) + PAYMENT.confirmMinutes * 60000, bookingStart(b).getTime());
+// До коли клієнт може погодитися на запропонований час.
+export const offerBy = (b) => Math.min((b.offer?.at ?? Date.now()) + PAYMENT.offerMinutes * 60000, bookingStart(b).getTime());
+
+// Відмови й швидкість відповіді мийки за останні DECLINE_RULES.days днів.
+export function responseStats(placeId, bookings, now = Date.now()) {
+  const from = now - DECLINE_RULES.days * 24 * HOUR;
+  const list = bookings.filter((b) => b.placeId === placeId && b.needsConfirm && (b.createdAt ?? 0) >= from && !AWAITING.includes(b.state));
+  const declined = list.filter((b) => b.declined === 'place' || b.declined === 'timeout');
+  const answered = list.filter((b) => b.respondedAt);
+  const avgMs = answered.length ? answered.reduce((a, b) => a + Math.max(0, b.respondedAt - confirmStart(b)), 0) / answered.length : null;
+  const enough = list.length >= DECLINE_RULES.minRequests;
+  const rate = list.length ? declined.length / list.length : 0;
+  const lastDecline = Math.max(0, ...declined.map((b) => b.closedAt ?? 0));
+  return {
+    total: list.length, declined: declined.length, timeouts: declined.filter((b) => b.declined === 'timeout').length,
+    offers: list.filter((b) => b.offer).length, rate, avgMs, enough,
+    lowered: enough && rate > DECLINE_RULES.warnRate, lastDecline,
+  };
+}
+
+// Пауза онлайн-запису: часті відмови — на pauseHours після останньої. Адмін може зняти паузу.
+export function pauseOf(placeId, bookings, now = Date.now()) {
+  const s = responseStats(placeId, bookings, now);
+  if (!s.enough || s.rate < DECLINE_RULES.pauseRate || !s.lastDecline) return null;
+  if ((store.peek('admin.pauseLift', {})[placeId] ?? 0) >= s.lastDecline) return null;
+  const until = s.lastDecline + DECLINE_RULES.pauseHours * HOUR;
+  return now < until ? { until, rate: s.rate } : null;
+}
+export function liftPause(placeId) {
+  store.set('admin.pauseLift', { ...store.get('admin.pauseLift', {}), [placeId]: Date.now() });
+}
+export const ratePct = (k) => `${Math.round(k * 100)}%`;
+export const msText = (ms) => (ms === null ? '—' : ms < 60000 ? `${Math.max(1, Math.round(ms / 1000))} с` : `${Math.floor(ms / 60000)} хв${Math.round((ms % 60000) / 1000) ? ` ${Math.round((ms % 60000) / 1000)} с` : ''}`);

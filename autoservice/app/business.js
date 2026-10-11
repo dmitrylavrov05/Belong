@@ -8,13 +8,13 @@ import {
   weekdayOf, phoneKey, offersOf, offerAsService, EXPENSE_CATS, PAY_METHODS, expensesIn, serviceCat, catById, shrinkPhoto, applyOverrides, saveOverride,
   ACTIVE, BLOCKING, HOUR, reliability, isCarcar, price, complete, isFrozen, balanceFor, settleAll, ratingFor,
   PARTNER_STATUS, partnerOf, savePartner, payoutReady, maskIban, commissionFor, addCustomPlace, checkBizLogin, numberBookings, bookingNo, findByNo, ticketPhotos,
-  ROLES, staffOf, workBase, POWER, powerOf, setPower, TICKET_TOPICS, PLACE_TOPICS, TICKET_STATUS, ticketsAll, openTicket, ticketReply, setTicket, mobileOn, spanOf, MOBILE_ROAD,
+  confirmBy, ROLES, staffOf, workBase, POWER, powerOf, setPower, TICKET_TOPICS, PLACE_TOPICS, TICKET_STATUS, ticketsAll, openTicket, ticketReply, setTicket, mobileOn, spanOf, MOBILE_ROAD,
   enterView,
 } from './core.js';
 import {
   CHANNELS, sendMessages, viberLink, telegramLink, dealsOf, weeklyDealsOf, daysText, queueOf, queueEnabled, saveQueue, queueEstimate, checkWaitlist,
   PASS_KIND, passesOf, savePasses, sellPass, passActive, passLeft, usableSubs, findCert, redeemPass, restorePass,
-  clientKeyOf, acceptBooking, declineBooking, expirePending, confirmBy,
+  clientKeyOf, acceptBooking, declineBooking, expirePending,
   chatPost, chatTimeline, readMessages, msgPreview, touchPresence, PRESENCE_KEY, BIZ_QUICK, ITEM_KIND, itemSum, estimateTotal,
 } from './ops.js';
 import { ENTITY, TAX, DOCS, OFFER, codeValid, ibanValid, ibanBank, normIban, formatIban, missingSteps, offerHtml } from './partners.js';
@@ -112,6 +112,7 @@ const channelPill = (b) => `<span class="pill ${isCarcar(b) ? 'carcar' : 'cash'}
 
 const STATUS = {
   pending: ['Чекає вашого підтвердження', 'warn'],
+  offer: ['Запропоновано інший час', 'warn'],
   paid: ['Оплачено в CARCAR', 'carcar'],
   booked: ['Записано', 'cash'],
   done: ['Чекає підтвердження клієнта', 'warn'],

@@ -1092,3 +1092,7 @@ body.in-auth #view { padding: 0; max-width: none; }
 
 /* Мийка підтвердила вільний час у CarCar Business */
 .sched-ok { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; font-size: 13px; font-weight: 600; color: var(--ok); }
+.offer-box { display: grid; gap: 4px; }
+.offer-when { display: inline; font-size: 16px; margin: 0; }
+.offer-note { font-style: italic; }
+.offer-due { font-size: 13px; color: var(--muted); }

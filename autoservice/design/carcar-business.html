@@ -1102,6 +1102,10 @@ body.in-auth #view { padding: 0; max-width: none; }
 
 /* Мийка підтвердила вільний час у CarCar Business */
 .sched-ok { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; font-size: 13px; font-weight: 600; color: var(--ok); }
+.offer-box { display: grid; gap: 4px; }
+.offer-when { display: inline; font-size: 16px; margin: 0; }
+.offer-note { font-style: italic; }
+.offer-due { font-size: 13px; color: var(--muted); }
 </style>
   <style>
 /* Панель для бізнесу CARCAR: десктоп-перший макет поверх токенів і компонентів styles.css. */
@@ -1919,6 +1923,8 @@ const PAYMENT = {
   // Запис із застосунку мийка підтверджує вручну. Не відповіла за стільки хвилин робочого часу —
   // запис скасовується, гроші повертаються клієнту. Коротко, щоб клієнт не чекав і не йшов до інших.
   confirmMinutes: 5,
+  // Мийка запропонувала інший час — клієнт має стільки хвилин, щоб погодитися (але не пізніше за візит).
+  offerMinutes: 30,
   noShowShare: 1, // частка точці, якщо клієнт не приїхав або скасував пізно
   lateMinutes: 15, // запізнення довше — як неявка: мийка може зарахувати собі оплату
   // Оплата частинами для дорогих послуг: клієнт платить рівними частинами без переплати,
@@ -1943,6 +1949,12 @@ const REFERRAL = {
   bonus: 150, // друг отримує одразу, той, хто запросив, — коли друг завершить перше замовлення
   minOrder: 300, // бонус списується лише із замовлення від цієї суми, не більше bonus за раз
 };
+
+// Відповідальність мийки за записи з застосунку (за останні days днів, якщо заявок не менше minRequests):
+// частка відмов (свої відмови й мовчання) понад warnRate — мийка нижче в пошуку;
+// від pauseRate — онлайн-запис на паузі pauseHours годин після останньої відмови.
+// Запропонований інший час відмовою не вважається.
+const DECLINE_RULES = { days: 30, minRequests: 5, warnRate: 0.15, pauseRate: 0.3, pauseHours: 24 };
 
 // Спільна логіка застосунку клієнта (app.js) і панелі для бізнесу (business.js):
 // сховище, форматування, іконки, гроші, рейтинг і налаштування точок із CRM.
@@ -2345,7 +2357,9 @@ function expensesIn(placeId, from, to) {
 // ---------- гроші ----------
 
 // pending — клієнт оплатив, мийка ще не підтвердила: час уже зайнятий, гроші утримує CARCAR.
-const ACTIVE = ['pending', 'paid', 'done', 'dispute'];
+// offer — мийка запропонувала інший час і чекає згоди клієнта: зайнятий уже запропонований час.
+const ACTIVE = ['pending', 'offer', 'paid', 'done', 'dispute'];
+const AWAITING = ['pending', 'offer'];
 const HOUR = 3600000;
 
 // Як часто клієнт змінює плани: скасування, неявки й перенесення — підказка для мийки, не обмеження.
@@ -2432,7 +2446,7 @@ function balanceFor(placeId, bookings, payouts) {
   const earned = own.filter((b) => !isFrozen(b)).reduce((a, b) => a + placeShare(b), 0);
   const withdrawn = payouts.filter((x) => x.placeId === placeId).reduce((a, x) => a + x.gross, 0);
   // Непідтверджений запис ще не гроші точки: якщо мийка відмовить, їх повернуть клієнту.
-  const frozen = own.filter((b) => (ACTIVE.includes(b.state) && b.state !== 'pending') || isFrozen(b)).reduce((a, b) => a + price(b), 0);
+  const frozen = own.filter((b) => (ACTIVE.includes(b.state) && !AWAITING.includes(b.state)) || isFrozen(b)).reduce((a, b) => a + price(b), 0);
   const next = own.filter(isFrozen).sort((a, b) => a.unfreezeAt - b.unfreezeAt)[0];
   // Абонементи й сертифікати, куплені в застосунку: гроші точці через ті самі 48 годин.
   const sales = (store.peek('biz.passes', {})[placeId]?.sold ?? []).filter((x) => x.source === 'carcar');
@@ -2659,6 +2673,64 @@ async function checkBizLogin(login, pass) {
   const acc = bizAccounts().find((x) => x.login === login.trim().toLowerCase());
   return acc && acc.hash === await hashPass(acc.login, pass) ? acc : null;
 }
+
+// ---------- підтвердження записів і відповідальність мийки ----------
+
+// Звідки рахується час на відповідь: від заявки, а якщо мийка зачинена — від відкриття.
+function confirmStart(b) {
+  const p = PLACES.find((x) => x.id === b.placeId);
+  let t = b.createdAt ?? Date.now();
+  for (let i = 0; p && i < 8; i++) {
+    const d = new Date(t);
+    const iso = isoDate(d);
+    const h = hoursFor(p, iso);
+    const m = d.getHours() * 60 + d.getMinutes();
+    if (h && m < h[1]) {
+      if (m < h[0]) t = parseDate(iso).getTime() + h[0] * 60000;
+      break;
+    }
+    const next = parseDate(iso);
+    next.setDate(next.getDate() + 1);
+    t = next.getTime();
+  }
+  return t;
+}
+
+// До коли мийка має відповісти: confirmMinutes робочого часу, але не пізніше за початок візиту.
+const confirmBy = (b) => Math.min(confirmStart(b) + PAYMENT.confirmMinutes * 60000, bookingStart(b).getTime());
+// До коли клієнт може погодитися на запропонований час.
+const offerBy = (b) => Math.min((b.offer?.at ?? Date.now()) + PAYMENT.offerMinutes * 60000, bookingStart(b).getTime());
+
+// Відмови й швидкість відповіді мийки за останні DECLINE_RULES.days днів.
+function responseStats(placeId, bookings, now = Date.now()) {
+  const from = now - DECLINE_RULES.days * 24 * HOUR;
+  const list = bookings.filter((b) => b.placeId === placeId && b.needsConfirm && (b.createdAt ?? 0) >= from && !AWAITING.includes(b.state));
+  const declined = list.filter((b) => b.declined === 'place' || b.declined === 'timeout');
+  const answered = list.filter((b) => b.respondedAt);
+  const avgMs = answered.length ? answered.reduce((a, b) => a + Math.max(0, b.respondedAt - confirmStart(b)), 0) / answered.length : null;
+  const enough = list.length >= DECLINE_RULES.minRequests;
+  const rate = list.length ? declined.length / list.length : 0;
+  const lastDecline = Math.max(0, ...declined.map((b) => b.closedAt ?? 0));
+  return {
+    total: list.length, declined: declined.length, timeouts: declined.filter((b) => b.declined === 'timeout').length,
+    offers: list.filter((b) => b.offer).length, rate, avgMs, enough,
+    lowered: enough && rate > DECLINE_RULES.warnRate, lastDecline,
+  };
+}
+
+// Пауза онлайн-запису: часті відмови — на pauseHours після останньої. Адмін може зняти паузу.
+function pauseOf(placeId, bookings, now = Date.now()) {
+  const s = responseStats(placeId, bookings, now);
+  if (!s.enough || s.rate < DECLINE_RULES.pauseRate || !s.lastDecline) return null;
+  if ((store.peek('admin.pauseLift', {})[placeId] ?? 0) >= s.lastDecline) return null;
+  const until = s.lastDecline + DECLINE_RULES.pauseHours * HOUR;
+  return now < until ? { until, rate: s.rate } : null;
+}
+function liftPause(placeId) {
+  store.set('admin.pauseLift', { ...store.get('admin.pauseLift', {}), [placeId]: Date.now() });
+}
+const ratePct = (k) => `${Math.round(k * 100)}%`;
+const msText = (ms) => (ms === null ? '—' : ms < 60000 ? `${Math.max(1, Math.round(ms / 1000))} с` : `${Math.floor(ms / 60000)} хв${Math.round((ms % 60000) / 1000) ? ` ${Math.round((ms % 60000) / 1000)} с` : ''}`);
 
 // Спільна логіка застосунку клієнта й панелі бізнесу для щоденної роботи точки:
 // гарячі вікна зі знижкою, жива черга, лист очікування, абонементи й сертифікати,
@@ -2988,27 +3060,6 @@ function setAutoConfirm(placeId, on) {
   store.set('biz.autoConfirm', { ...store.get('biz.autoConfirm', {}), [placeId]: on });
 }
 
-// До коли мийка має відповісти: confirmMinutes робочого часу від заявки (заявка вночі — від відкриття),
-// але не пізніше за початок візиту.
-function confirmBy(b) {
-  const p = opsPlace(b.placeId);
-  let t = b.createdAt ?? Date.now();
-  for (let i = 0; p && i < 8; i++) {
-    const d = new Date(t);
-    const iso = isoDate(d);
-    const h = hoursFor(p, iso);
-    const m = d.getHours() * 60 + d.getMinutes();
-    if (h && m < h[1]) {
-      if (m < h[0]) t = parseDate(iso).getTime() + h[0] * 60000;
-      break;
-    }
-    const next = parseDate(iso);
-    next.setDate(next.getDate() + 1);
-    t = next.getTime();
-  }
-  return Math.min(t + PAYMENT.confirmMinutes * 60000, bookingStart(b).getTime());
-}
-
 // Відповідь мийки клієнт бачить у чаті запису й отримує сповіщення.
 function clientNote(b, kind, text) {
   chatPost(b, 'sys', text.replace(/^[^:]+: /, ''), 'client');
@@ -3018,17 +3069,19 @@ const placeName = (b) => opsPlace(b.placeId)?.name ?? 'Мийка';
 const whenText = (b) => `${parseDate(b.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })} о ${b.time}`;
 
 function acceptBooking(b) {
-  Object.assign(b, { state: 'paid', confirmedAt: Date.now() });
+  Object.assign(b, { state: 'paid', confirmedAt: Date.now(), respondedAt: b.respondedAt ?? Date.now() });
   clientNote(b, 'confirm', `${placeName(b)}: запис на ${whenText(b)} підтверджено. Чекаємо вас!`);
 }
 
 // Відмова чи мовчання мийки: усе повертаємо клієнту — картку на картку, баланс і бонуси на рахунок CARCAR,
 // візит абонемента й промокод знову доступні.
+// by: place — мийка відмовила; timeout — мийка не відповіла; proposal — клієнт не прийняв інший час.
 function declineBooking(b, reason, by = 'place') {
   const fromBalance = b.fromBalance || 0;
   Object.assign(b, {
     state: 'cancelled', declined: by, declineReason: reason, refund: b.paid, placeAmount: 0, refundTo: fromBalance >= b.paid ? 'balance' : 'card',
-    closedAt: Date.now(), cancelBy: by === 'timeout' ? 'system' : 'place',
+    closedAt: Date.now(), cancelBy: by === 'place' ? 'place' : by === 'proposal' ? 'client' : 'system',
+    ...(by === 'place' && !b.respondedAt ? { respondedAt: Date.now() } : {}),
   });
   if (fromBalance) creditClient(fromBalance, `Повернення: ${placeName(b)} не підтвердила запис`);
   if (b.bonus && !b.bonusReturned) {
@@ -3040,9 +3093,30 @@ function declineBooking(b, reason, by = 'place') {
   }
   if (b.passUse) { restorePass(b.placeId, b.passUse); b.passUse = null; }
   if (b.promo) b.promo.returned = true;
+  if (by === 'proposal') return;
   clientNote(b, 'decline', by === 'timeout'
     ? `${placeName(b)} не відповіла на запис на ${whenText(b)}. Запис скасовано, гроші повернуто. Оберіть інший час чи мийку.`
     : `${placeName(b)} не може прийняти запис на ${whenText(b)}${reason ? `: ${reason}` : ''}. Гроші повернуто. Оберіть інший час чи мийку.`);
+}
+
+// Замість відмови мийка пропонує інший вільний час. Запис одразу переходить на нього (щоб час не зайняли),
+// а клієнт погоджується або скасовує без втрат.
+function proposeTime(b, date, time, note = '') {
+  const from = { date: b.date, time: b.time };
+  Object.assign(b, { state: 'offer', date, time, offer: { from, at: Date.now(), note }, respondedAt: b.respondedAt ?? Date.now() });
+  clientNote(b, 'offer', `${placeName(b)} не може прийняти вас ${parseDate(from.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })} о ${from.time} і пропонує ${whenText(b)}.${note ? ` ${note}` : ''} Погодьтеся в записі або скасуйте без втрат.`);
+}
+
+function acceptOffer(b) {
+  Object.assign(b, { state: 'paid', confirmedAt: Date.now(), offer: { ...b.offer, accepted: Date.now() } });
+  chatPost(b, 'sys', `Клієнт погодився на ${whenText(b)}`, 'biz');
+}
+
+function rejectOffer(b, timeout = false) {
+  // Повертаємо початковий час, щоб у журналі було видно, на що клієнт записувався.
+  Object.assign(b, { date: b.offer.from.date, time: b.offer.from.time, offer: { ...b.offer, rejected: Date.now() } });
+  declineBooking(b, timeout ? 'клієнт не відповів на запропонований час' : 'клієнту не підійшов запропонований час', 'proposal');
+  chatPost(b, 'sys', timeout ? 'Клієнт не відповів на запропонований час — запис скасовано, гроші повернуто' : 'Клієнту не підійшов запропонований час — запис скасовано, гроші повернуто', 'biz');
 }
 
 // Заявки, на які мийка не відповіла вчасно, скасовуються самі. Повертає true, якщо щось змінилося.
@@ -3050,6 +3124,7 @@ function expirePending(bookings) {
   let changed = false;
   for (const b of bookings) {
     if (b.state === 'pending' && Date.now() >= confirmBy(b)) { declineBooking(b, 'мийка не відповіла вчасно', 'timeout'); changed = true; }
+    if (b.state === 'offer' && Date.now() >= offerBy(b)) { rejectOffer(b, true); changed = true; }
   }
   return changed;
 }
@@ -3383,6 +3458,7 @@ const channelPill = (b) => `<span class="pill ${isCarcar(b) ? 'carcar' : 'cash'}
 
 const STATUS = {
   pending: ['Чекає вашого підтвердження', 'warn'],
+  offer: ['Запропоновано інший час', 'warn'],
   paid: ['Оплачено в CARCAR', 'carcar'],
   booked: ['Записано', 'cash'],
   done: ['Чекає підтвердження клієнта', 'warn'],

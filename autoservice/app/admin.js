@@ -5,6 +5,7 @@ import { CATEGORIES, PLACES, PAYMENT } from './data.js';
 import {
   store, icon, esc, uah, pad, isoDate, parseDate, plural, dayLabel, rating, fmtTime, fmtDate, catById, WEEKDAYS, bookingStart, HOUR,
   PARTNER_STATUS, partnerOf, savePartner, commissionFor, isCarcar, price, placeShare, isFrozen,
+  responseStats, pauseOf, liftPause, ratePct, msText,
   ratingFor, visibleReviews, ACTIVE, resolveDispute, settleAll, applyOverrides, promosAll, savePromos, promoUses, promoText,
   TICKET_TOPICS, TICKET_STATUS, ticketsAll, ticketReply, setTicket, ticketOverdue, slaHours, fraudState, saveFraud, staffOf, phoneKey,
   addCustomPlace, uid, hash,
@@ -199,17 +200,41 @@ function viewPlaces() {
       ${Object.entries(PLACE_FILTERS).map(([k, [label, fn]]) => `<button data-action="place-filter" data-f="${k}" aria-pressed="${ui.places === k}">${label} · ${all.filter(({ pt }) => fn(pt)).length}</button>`).join('')}
     </div></div>
     <div class="table-wrap" tabindex="0" role="region" aria-label="Точки"><table class="t">
-      <thead><tr><th>Точка</th><th>Юрособа</th><th>Статус</th><th>Що перевірити</th><th>Оновлено</th></tr></thead>
+      <thead><tr><th>Точка</th><th>Юрособа</th><th>Статус</th><th class="num">Відмови</th><th class="num">Відповідь</th><th>Що перевірити</th><th>Оновлено</th></tr></thead>
       <tbody>${list.length ? list.map(({ p, pt }) => {
         const todo = [pt.status === 'pending' && 'Нова заявка', pt.update === 'pending' && 'Зміни даних', pt.payout?.iban && !pt.payout.verified && 'Реквізити'].filter(Boolean);
         const last = pt.history.at(-1);
         return `<tr class="link-row" data-href="#/places/${p.id}"><td><a class="row-link" href="#/places/${p.id}">${esc(p.name)}</a><small>${esc(p.district)}, ${esc(p.address)}</small></td>
           <td>${pt.company ? `${ENTITY[pt.company.type]} ${esc(pt.company.name)}<small>${pt.company.type === 'fop' ? 'РНОКПП' : 'ЄДРПОУ'} ${esc(pt.company.code)}</small>` : '<span class="muted">не вказано</span>'}</td>
-          <td>${statusPill(pt.status)}${pt.demo ? ' <span class="pill">демо</span>' : ''}</td>
+          <td>${statusPill(pt.status)}${pt.demo ? ' <span class="pill">демо</span>' : ''}${pauseOf(p.id, bookings) ? ' <span class="pill bad">Запис на паузі</span>' : responseStats(p.id, bookings).lowered ? ' <span class="pill warn">Нижче в пошуку</span>' : ''}</td>
+          ${relCells(p.id)}
           <td>${todo.length ? todo.map((x) => `<span class="pill warn">${x}</span>`).join(' ') : '—'}</td>
           <td>${last ? fmtTime(last.at) : '—'}</td></tr>`;
-      }).join('') : '<tr><td colspan="5" class="muted">Немає точок у цьому списку.</td></tr>'}</tbody>
+      }).join('') : '<tr><td colspan="7" class="muted">Немає точок у цьому списку.</td></tr>'}</tbody>
     </table></div>`;
+}
+
+// Відмови мийки на записи з застосунку й середній час відповіді за 30 днів.
+function relCells(placeId) {
+  const s = responseStats(placeId, bookings);
+  return `<td class="num">${s.total ? `${ratePct(s.rate)}<small>${s.declined} з ${s.total}</small>` : '—'}</td><td class="num">${msText(s.avgMs)}</td>`;
+}
+
+function relPanel(id) {
+  const s = responseStats(id, bookings);
+  const pause = pauseOf(id, bookings);
+  return `<section class="panel stack" aria-labelledby="h-rel" style="gap:10px;margin-top:16px">
+    <h2 id="h-rel">Підтвердження записів</h2>
+    <dl class="kv">
+      <dt>Заявок за 30 днів</dt><dd>${s.total}</dd>
+      <dt>Відмови</dt><dd>${ratePct(s.rate)} (${s.declined}, з них без відповіді ${s.timeouts})</dd>
+      <dt>Запропоновано інший час</dt><dd>${s.offers}</dd>
+      <dt>Середня відповідь</dt><dd>${msText(s.avgMs)}</dd>
+      <dt>Стан</dt><dd>${pause ? `<span class="pill bad">Онлайн-запис на паузі до ${fmtTime(pause.until)}</span>` : s.lowered ? '<span class="pill warn">Нижче в пошуку</span>' : '<span class="pill ok">Звичайний</span>'}</dd>
+    </dl>
+    ${pause ? `<button class="btn" data-action="lift-pause" data-id="${id}" style="align-self:flex-start">Зняти паузу</button>
+      <p class="fine">Наприклад, якщо мийка пояснила відмови (поломка обладнання). Наступна відмова знову поставить запис на паузу, поки частка відмов висока.</p>` : ''}
+  </section>`;
 }
 
 const check = (ok, yes, no) => `<li class="${ok ? 'ok-text' : 'bad-text'}">${icon(ok ? 'checkCircle' : 'warn', 16)}${ok ? yes : no}</li>`;
@@ -227,6 +252,7 @@ function viewPlace(id) {
     <div class="title-row"><h1>${esc(p.name)}</h1><div class="row">${statusPill(pt.status)}${pt.update === 'pending' ? '<span class="pill warn">Зміни на перевірці</span>' : ''}</div></div>
     <p class="page-sub">${esc(p.district)}, ${esc(p.address)} · ${esc(p.phone)} · ${p.cats.map((x) => catById(x).name).join(', ')} · ${p.boxes} ${plural(p.boxes, 'бокс', 'бокси', 'боксів')}
       · <a href="index.html#/place/${p.id}" target="_blank" rel="noopener">сторінка для клієнтів</a></p>
+    ${relPanel(p.id)}
     <div class="grid-2" style="margin-top:8px">
       <section class="panel stack" aria-labelledby="h-co" style="gap:10px">
         <h2 id="h-co">Юридична особа</h2>
@@ -1243,6 +1269,7 @@ document.addEventListener('click', (e) => {
     toast(list.find((x) => x.code === id).active ? `Промокод ${id} увімкнено` : `Промокод ${id} вимкнено`);
   }
   else if (action === 'place-filter') { ui.places = el.dataset.f; rerender(); }
+  else if (action === 'lift-pause') { liftPause(el.dataset.id); rerender(); toast('Паузу знято — мийка знову приймає онлайн-записи'); }
   else if (action === 'support-filter') { ui.support = el.dataset.f; rerender(); }
   else if (action === 'fraud-filter') { ui.fraud = el.dataset.f; rerender(); }
   else if (action === 'fraud-demo') { fraudDemo(); rerender(); toast('Додано вигадані підозрілі відгуки, скасування й заявку точки-двійника'); }
