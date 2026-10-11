@@ -627,6 +627,13 @@ function scheduleBlock(p) {
     <p class="small muted">Записатися можна на ${s.horizon} ${plural(s.horizon, 'день', 'дні', 'днів')} уперед${s.lead ? `, не пізніше ніж за ${duration(s.lead)} до початку` : ''}.</p>`;
 }
 
+// Мийка щодня підтверджує в CarCar Business, що вільний час правильний.
+function schedChecked(p) {
+  const at = store.get('biz.places', {})[p.id]?.checkedAt;
+  if (!at || isoDate(new Date(at)) !== isoDate(new Date())) return '';
+  return `<p class="sched-ok">${icon('checkCircle', 16)}Мийка підтвердила вільний час сьогодні о ${new Date(at).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}</p>`;
+}
+
 function viewPlace(id) {
   const p = placeById(id);
   if (!p) return viewNotFound();
@@ -647,6 +654,7 @@ function viewPlace(id) {
       ${powerBadge(p)}
       ${p.tags.map((t) => `<span class="badge">${/генератор/i.test(t) ? icon('bolt', 13) : ''}${esc(t)}</span>`).join('')}
     </div>
+    ${schedChecked(p)}
     <div class="infobox">
       <div class="addr">${icon('pin', 18)}${esc(p.district)}, ${esc(p.address)}</div>
       <div class="grid2">
@@ -2060,7 +2068,7 @@ function viewBusiness(sub) {
     ['cash', 'Комісія 10% із замовлень через CARCAR', 'Абонплати немає, за підключення не платите. Записи, які ви вносите самі, без комісії.'],
     ['card', 'Клієнт платить одразу під час запису', `Коли авто готове, ви натискаєте «Машина готова». Гроші ${PAYMENT.freezeHours} годин чекають на випадок спору, потім виводите їх на рахунок ФОП або ТОВ.`],
     ['shield', 'Неявку оплачує клієнт', `Скасував пізніше ніж за ${cancelWindow()}, не приїхав чи запізнився більш ніж на ${PAYMENT.lateMinutes} хв — гроші лишаються вам. Один запис можна перенести не більше ${MOVE_LIMIT} разів.`],
-    ['calendar', 'Кабінет для мийки безкоштовно', 'Розклад по боксах, клієнти, чати, прайс, відгуки й фінанси. Зручно з телефона.'],
+    ['calendar', 'Застосунок CarCar Business безкоштовно', 'Повідомлення клієнтів, записи по днях, швидкий запис дзвінка за кілька секунд, гроші й профіль мийки — з телефона.'],
     ['star', 'Відгуки тільки від справжніх клієнтів', 'Відгук може залишити лише той, хто був у вас на мийці. Відповісти можна публічно.'],
   ];
   return `${head}<h1>CARCAR для бізнесу</h1>
@@ -2075,7 +2083,7 @@ function viewBusiness(sub) {
     <div class="dock-space"></div>
     <div class="dock biz-dock">
       ${a && a.status !== 'rejected' ? '' : '<a class="btn primary block" href="#/business/apply">Зареєструвати бізнес</a>'}
-      <a class="btn block" href="business.html">${icon('shield', 18)}Увійти в кабінет бізнесу</a>
+      <a class="btn block" href="pro.html">${icon('shield', 18)}Увійти в кабінет бізнесу</a>
     </div>`;
 }
 
@@ -2087,7 +2095,7 @@ function bizAppStatus(a) {
     ${a.status === 'approved' ? `<p style="margin:0">Мийку підключено. Дані для входу:</p>
       <dl class="kv"><dt>Логін</dt><dd><b class="code">${esc(a.issued.login)}</b></dd><dt>Пароль</dt><dd><b class="code">${esc(a.issued.password)}</b></dd></dl>
       <p class="fine" style="margin:0">Це демо. Насправді логін і пароль приходять у SMS.</p>
-      <a class="btn primary" href="business.html">Увійти в кабінет</a>` : ''}
+      <a class="btn primary" href="pro.html">Увійти в CarCar Business</a>` : ''}
     ${a.status === 'rejected' ? `<p class="small" style="margin:0">Причина: ${esc(a.reason || 'не вказано')}. Виправте й надішліть ще раз.</p>` : ''}
   </section>`;
 }

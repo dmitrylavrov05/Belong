@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>CarCar Business</title>
+  <meta name="description" content="CarCar Business — застосунок для автомийки: повідомлення клієнтів, записи по днях, фінанси й профіль мийки з телефона.">
+  <meta name="theme-color" content="#1e3a5f">
+  <link rel="manifest" href="pro.webmanifest">
+  <link rel="icon" href="pro-icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="pro-icon.svg">
+  <link rel="preload" href="fonts/onest-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="pro.css">
+</head>
+<body class="pro">
+  <header class="pro-top" id="top"></header>
+  <main id="view" tabindex="-1"></main>
+  <button class="pro-fab" id="fab" type="button" data-action="nb-open" hidden></button>
+  <nav class="tabs pro-tabs" id="tabbar" aria-label="Розділи"></nav>
+  <div id="sheet-root"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="pro.js"></script>
+</body>
+</html>

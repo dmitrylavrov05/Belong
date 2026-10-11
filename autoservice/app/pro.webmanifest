@@ -1,0 +1,15 @@
+{
+  "id": "carcar-business",
+  "name": "CarCar Business",
+  "short_name": "CarCar Business",
+  "description": "Застосунок для автомийок: повідомлення клієнтів, записи, фінанси й профіль мийки.",
+  "lang": "uk",
+  "start_url": "pro.html#/",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#1e3a5f",
+  "theme_color": "#1e3a5f",
+  "icons": [
+    { "src": "pro-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

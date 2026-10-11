@@ -635,7 +635,7 @@ test('файли для дизайну в design/ зібрано з поточн
   test.skip(test.info().project.name !== 'desktop', 'достатньо однієї перевірки');
   const dir = mkdtempSync(join(tmpdir(), 'carcar-'));
   execFileSync('node', ['scripts/bundle.mjs', dir]);
-  for (const f of ['carcar-prototype.html', 'carcar-business.html', 'carcar-admin.html']) {
+  for (const f of ['carcar-prototype.html', 'carcar-business.html', 'carcar-business-app.html', 'carcar-admin.html']) {
     expect(readFileSync(`design/${f}`, 'utf8') === readFileSync(join(dir, f), 'utf8'), `${f}: запустіть npm run bundle`).toBe(true);
   }
 });

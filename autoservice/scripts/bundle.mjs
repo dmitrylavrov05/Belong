@@ -17,7 +17,7 @@ const stripModule = (code) => code
 const inlineFonts = (css) => css.replace(/url\("(fonts\/[\w-]+\.woff2)"\)/g, (m, f) =>
   `url("data:font/woff2;base64,${readFileSync(new URL(`../app/${f}`, import.meta.url)).toString('base64')}")`);
 
-const icon = `data:image/svg+xml,${encodeURIComponent(app('icon.svg').trim())}`;
+const svgData = (f) => `data:image/svg+xml,${encodeURIComponent(app(f).trim())}`;
 
 function bundle({ html, script, out, modules = [] }) {
   const code = ['data.js', 'core.js', ...modules, script].map((f) => stripModule(app(f)))
@@ -27,9 +27,10 @@ function bundle({ html, script, out, modules = [] }) {
   if (code.includes('</script')) throw new Error(`${script} містить </script і зламає вбудований скрипт`);
 
   const page = app(html)
-    .replace('<link rel="manifest" href="manifest.webmanifest">\n', '')
+    .replace(/<link rel="manifest" href="[\w.]+\.webmanifest">\n/, '')
     .replace(/ *<link rel="preload"[^>]*>\n/, '')
-    .replace(/<link rel="(icon|apple-touch-icon)" href="icon\.svg"[^>]*>/g, (m) => m.replace('icon.svg', icon))
+    .replace(/<link rel="(icon|apple-touch-icon)" href="([\w-]+\.svg)"[^>]*>/g, (m, r, f) => m.replace(f, svgData(f)))
+    .replace(/src="([\w-]+\.svg)"/g, (m, f) => `src="${svgData(f)}"`)
     .replace(/<link rel="stylesheet" href="([\w.]+\.css)">/g, (m, f) => `<style>\n${inlineFonts(app(f))}</style>`)
     .replace(`<script type="module" src="${script}"></script>`, () => `<script type="module">\n${code}</script>`);
 
@@ -41,4 +42,5 @@ function bundle({ html, script, out, modules = [] }) {
 
 bundle({ html: 'index.html', script: 'app.js', out: 'carcar-prototype.html', modules: ['ops.js', 'map.js', 'vehicles.js'] });
 bundle({ html: 'business.html', script: 'business.js', out: 'carcar-business.html', modules: ['ops.js', 'charts.js', 'partners.js'] });
+bundle({ html: 'pro.html', script: 'pro.js', out: 'carcar-business-app.html', modules: ['ops.js'] });
 bundle({ html: 'admin.html', script: 'admin.js', out: 'carcar-admin.html', modules: ['charts.js', 'partners.js'] });
