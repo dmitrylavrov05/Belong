@@ -399,7 +399,8 @@ export function expensesIn(placeId, from, to) {
 
 // ---------- гроші ----------
 
-export const ACTIVE = ['paid', 'done', 'dispute'];
+// pending — клієнт оплатив, мийка ще не підтвердила: час уже зайнятий, гроші утримує CARCAR.
+export const ACTIVE = ['pending', 'paid', 'done', 'dispute'];
 export const HOUR = 3600000;
 
 // Як часто клієнт змінює плани: скасування, неявки й перенесення — підказка для мийки, не обмеження.
@@ -485,7 +486,8 @@ export function balanceFor(placeId, bookings, payouts) {
   const own = bookings.filter((b) => b.placeId === placeId && isCarcar(b));
   const earned = own.filter((b) => !isFrozen(b)).reduce((a, b) => a + placeShare(b), 0);
   const withdrawn = payouts.filter((x) => x.placeId === placeId).reduce((a, x) => a + x.gross, 0);
-  const frozen = own.filter((b) => ACTIVE.includes(b.state) || isFrozen(b)).reduce((a, b) => a + price(b), 0);
+  // Непідтверджений запис ще не гроші точки: якщо мийка відмовить, їх повернуть клієнту.
+  const frozen = own.filter((b) => (ACTIVE.includes(b.state) && b.state !== 'pending') || isFrozen(b)).reduce((a, b) => a + price(b), 0);
   const next = own.filter(isFrozen).sort((a, b) => a.unfreezeAt - b.unfreezeAt)[0];
   // Абонементи й сертифікати, куплені в застосунку: гроші точці через ті самі 48 годин.
   const sales = (store.peek('biz.passes', {})[placeId]?.sold ?? []).filter((x) => x.source === 'carcar');

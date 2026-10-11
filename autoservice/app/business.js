@@ -14,7 +14,7 @@ import {
 import {
   CHANNELS, sendMessages, viberLink, telegramLink, dealsOf, weeklyDealsOf, daysText, queueOf, queueEnabled, saveQueue, queueEstimate, checkWaitlist,
   PASS_KIND, passesOf, savePasses, sellPass, passActive, passLeft, usableSubs, findCert, redeemPass, restorePass,
-  clientKeyOf,
+  clientKeyOf, acceptBooking, declineBooking, expirePending, confirmBy,
   chatPost, chatTimeline, readMessages, msgPreview, touchPresence, PRESENCE_KEY, BIZ_QUICK, ITEM_KIND, itemSum, estimateTotal,
 } from './ops.js';
 import { ENTITY, TAX, DOCS, OFFER, codeValid, ibanValid, ibanBank, normIban, formatIban, missingSteps, offerHtml } from './partners.js';
@@ -34,7 +34,8 @@ function load() {
   expenses = store.get('biz.expenses', []); // витрати: разові й щомісячні
   requests = store.get('requests', []); // запити клієнтів «не знайшов послугу»
   applyOverrides();
-  if (settleAll(bookings)) save();
+  const settled = settleAll(bookings);
+  if (expirePending(bookings) || settled) save();
 }
 
 function save() {
@@ -110,6 +111,7 @@ const channelOf = (b) => b.channel ?? 'carcar';
 const channelPill = (b) => `<span class="pill ${isCarcar(b) ? 'carcar' : 'cash'}"><i></i>${CHANNEL[channelOf(b)]}</span>`;
 
 const STATUS = {
+  pending: ['Чекає вашого підтвердження', 'warn'],
   paid: ['Оплачено в CARCAR', 'carcar'],
   booked: ['Записано', 'cash'],
   done: ['Чекає підтвердження клієнта', 'warn'],
@@ -2267,7 +2269,13 @@ function bookingDrawer(id) {
   if (!b) return;
   const started = bookingStart(b) <= new Date();
   let actions = '';
-  if (b.state === 'booked') {
+  if (b.state === 'pending') {
+    actions = `<p class="notice warn">Клієнт оплатив запис через CARCAR. Підтвердіть до ${fmtTime(confirmBy(b))}, інакше запис скасується, а гроші повернуться клієнту.</p>
+      <div class="grid2">
+        <button class="btn primary" data-action="bk-accept" data-id="${b.id}">${icon('check', 18)}Прийняти запис</button>
+        <button class="btn text-danger" data-action="bk-decline" data-id="${b.id}">Відмовити</button>
+      </div>`;
+  } else if (b.state === 'booked') {
     actions = `<form class="stack" id="complete-form" data-id="${b.id}">
         <fieldset class="radio-row"><legend>Оплата на місці</legend>
           <label><input type="radio" name="payment" value="card" checked> Картка</label>
@@ -2787,7 +2795,7 @@ const inNav = (id) => NAV.some(([, items]) => items.some(([x]) => x === id));
 
 function renderChrome(page) {
   const unanswered = reviews.filter((r) => r.placeId === ui.place && !r.reply).length;
-  const openReq = requests.filter((r) => r.placeId === ui.place && reqState(r) === 'new').length + own().filter((b) => b.chatUnreadBiz).length;
+  const openReq = requests.filter((r) => r.placeId === ui.place && reqState(r) === 'new').length + own().filter((b) => b.chatUnreadBiz || b.state === 'pending').length;
   const badge = {
     reviews: [unanswered, 'без відповіді'], requests: [openReq, 'чекають відповіді'], stock: [lowStock().length, 'закінчується'],
     queue: [queueOf(ui.place).filter((q) => q.status === 'waiting').length, 'у черзі'],
@@ -2831,6 +2839,7 @@ function route() {
   document.body.classList.toggle('locked', !session());
   if (!session()) { $('#view').innerHTML = viewBizLogin(); $('#tabbar').innerHTML = ''; return; }
   touchPresence(ui.place);
+  if (expirePending(bookings)) save();
   if ($('#biz-q')?.value) { $('#biz-q').value = ''; closeSearch(); }
   charts = {};
   const [, page = '', arg] = location.hash.replace(/^#/, '').split('/');
@@ -2967,6 +2976,22 @@ document.addEventListener('click', (e) => {
     save();
     rerenderKeepScroll();
     toast(`Виплату відправлено на рахунок ${iban}`);
+  } else if (action === 'bk-accept') {
+    const b = bookings.find((x) => x.id === id);
+    acceptBooking(b);
+    save();
+    closeDrawer();
+    rerenderKeepScroll();
+    toast('Запис прийнято, клієнт отримав підтвердження');
+  } else if (action === 'bk-decline') {
+    const b = bookings.find((x) => x.id === id);
+    const reason = prompt('Чому не можете прийняти запис? Клієнт побачить причину, гроші повернуться йому.', 'Усі бокси зайняті на цей час');
+    if (reason === null) return;
+    declineBooking(b, reason.trim());
+    save();
+    closeDrawer();
+    rerenderKeepScroll();
+    toast('Відмовлено, клієнт отримав гроші назад');
   } else if (action === 'crm-noshow' || action === 'crm-cancel') {
     const b = bookings.find((x) => x.id === id);
     if (!confirm(action === 'crm-noshow' ? 'Позначити, що клієнт не приїхав?' : 'Скасувати запис?')) return;

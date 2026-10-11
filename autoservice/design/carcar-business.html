@@ -1916,6 +1916,9 @@ const PAYMENT = {
   // Скасувати без втрат можна не пізніше ніж за N годин: уся сума повертається на баланс CARCAR.
   // Пізніше (або якщо клієнт не приїхав) оплата зараховується точці як оплата послуги.
   freeCancelHours: 1.5,
+  // Запис із застосунку мийка підтверджує вручну. Не відповіла за стільки хвилин робочого часу —
+  // запис скасовується, гроші повертаються клієнту.
+  confirmMinutes: 30,
   noShowShare: 1, // частка точці, якщо клієнт не приїхав або скасував пізно
   lateMinutes: 15, // запізнення довше — як неявка: мийка може зарахувати собі оплату
   // Оплата частинами для дорогих послуг: клієнт платить рівними частинами без переплати,
@@ -2341,7 +2344,8 @@ function expensesIn(placeId, from, to) {
 
 // ---------- гроші ----------
 
-const ACTIVE = ['paid', 'done', 'dispute'];
+// pending — клієнт оплатив, мийка ще не підтвердила: час уже зайнятий, гроші утримує CARCAR.
+const ACTIVE = ['pending', 'paid', 'done', 'dispute'];
 const HOUR = 3600000;
 
 // Як часто клієнт змінює плани: скасування, неявки й перенесення — підказка для мийки, не обмеження.
@@ -2427,7 +2431,8 @@ function balanceFor(placeId, bookings, payouts) {
   const own = bookings.filter((b) => b.placeId === placeId && isCarcar(b));
   const earned = own.filter((b) => !isFrozen(b)).reduce((a, b) => a + placeShare(b), 0);
   const withdrawn = payouts.filter((x) => x.placeId === placeId).reduce((a, x) => a + x.gross, 0);
-  const frozen = own.filter((b) => ACTIVE.includes(b.state) || isFrozen(b)).reduce((a, b) => a + price(b), 0);
+  // Непідтверджений запис ще не гроші точки: якщо мийка відмовить, їх повернуть клієнту.
+  const frozen = own.filter((b) => (ACTIVE.includes(b.state) && b.state !== 'pending') || isFrozen(b)).reduce((a, b) => a + price(b), 0);
   const next = own.filter(isFrozen).sort((a, b) => a.unfreezeAt - b.unfreezeAt)[0];
   // Абонементи й сертифікати, куплені в застосунку: гроші точці через ті самі 48 годин.
   const sales = (store.peek('biz.passes', {})[placeId]?.sold ?? []).filter((x) => x.source === 'carcar');
@@ -2974,6 +2979,81 @@ function restorePass(placeId, use) {
 
 const clientKeyOf = (phone, car) => phoneKey(phone) ?? (car ? `car:${car}` : null);
 
+// ---------- підтвердження запису мийкою ----------
+
+// Мийка сама вирішує, чи приймати запис на цей час. Без автопідтвердження запис із застосунку
+// чекає її відповіді (state: 'pending'), час уже зайнятий, а гроші утримує CARCAR.
+const autoConfirmOf = (placeId) => !!store.peek('biz.autoConfirm', {})[placeId];
+function setAutoConfirm(placeId, on) {
+  store.set('biz.autoConfirm', { ...store.get('biz.autoConfirm', {}), [placeId]: on });
+}
+
+// До коли мийка має відповісти: confirmMinutes робочого часу від заявки (заявка вночі — від відкриття),
+// але не пізніше за початок візиту.
+function confirmBy(b) {
+  const p = opsPlace(b.placeId);
+  let t = b.createdAt ?? Date.now();
+  for (let i = 0; p && i < 8; i++) {
+    const d = new Date(t);
+    const iso = isoDate(d);
+    const h = hoursFor(p, iso);
+    const m = d.getHours() * 60 + d.getMinutes();
+    if (h && m < h[1]) {
+      if (m < h[0]) t = parseDate(iso).getTime() + h[0] * 60000;
+      break;
+    }
+    const next = parseDate(iso);
+    next.setDate(next.getDate() + 1);
+    t = next.getTime();
+  }
+  return Math.min(t + PAYMENT.confirmMinutes * 60000, bookingStart(b).getTime());
+}
+
+// Відповідь мийки клієнт бачить у чаті запису й отримує сповіщення.
+function clientNote(b, kind, text) {
+  chatPost(b, 'sys', text.replace(/^[^:]+: /, ''), 'client');
+  sendMessages([{ placeId: b.placeId, clientKey: 'device', channel: 'app', kind, bookingId: b.id, text, link: `#/bookings/${b.id}` }]);
+}
+const placeName = (b) => opsPlace(b.placeId)?.name ?? 'Мийка';
+const whenText = (b) => `${parseDate(b.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })} о ${b.time}`;
+
+function acceptBooking(b) {
+  Object.assign(b, { state: 'paid', confirmedAt: Date.now() });
+  clientNote(b, 'confirm', `${placeName(b)}: запис на ${whenText(b)} підтверджено. Чекаємо вас!`);
+}
+
+// Відмова чи мовчання мийки: усе повертаємо клієнту — картку на картку, баланс і бонуси на рахунок CARCAR,
+// візит абонемента й промокод знову доступні.
+function declineBooking(b, reason, by = 'place') {
+  const fromBalance = b.fromBalance || 0;
+  Object.assign(b, {
+    state: 'cancelled', declined: by, declineReason: reason, refund: b.paid, placeAmount: 0, refundTo: fromBalance >= b.paid ? 'balance' : 'card',
+    closedAt: Date.now(), cancelBy: by === 'timeout' ? 'system' : 'place',
+  });
+  if (fromBalance) creditClient(fromBalance, `Повернення: ${placeName(b)} не підтвердила запис`);
+  if (b.bonus && !b.bonusReturned) {
+    const w = { bonus: 0, money: 0, history: [], ...store.get('wallet', {}) };
+    w.bonus += b.bonus;
+    w.history.unshift({ amount: b.bonus, text: `Повернення бонусу: ${placeName(b)} не підтвердила запис`, at: Date.now() });
+    store.set('wallet', w);
+    b.bonusReturned = true;
+  }
+  if (b.passUse) { restorePass(b.placeId, b.passUse); b.passUse = null; }
+  if (b.promo) b.promo.returned = true;
+  clientNote(b, 'decline', by === 'timeout'
+    ? `${placeName(b)} не відповіла на запис на ${whenText(b)}. Запис скасовано, гроші повернуто. Оберіть інший час чи мийку.`
+    : `${placeName(b)} не може прийняти запис на ${whenText(b)}${reason ? `: ${reason}` : ''}. Гроші повернуто. Оберіть інший час чи мийку.`);
+}
+
+// Заявки, на які мийка не відповіла вчасно, скасовуються самі. Повертає true, якщо щось змінилося.
+function expirePending(bookings) {
+  let changed = false;
+  for (const b of bookings) {
+    if (b.state === 'pending' && Date.now() >= confirmBy(b)) { declineBooking(b, 'мийка не відповіла вчасно', 'timeout'); changed = true; }
+  }
+  return changed;
+}
+
 // Графіки для панелі бізнесу й адмінки CARCAR: стовпчики (складені чи згруповані), горизонтальні
 // смуги, легенда, таблиця під графіком і один тултип на сторінку. Палітра — змінні --series-1/2.
 
@@ -3225,7 +3305,8 @@ function load() {
   expenses = store.get('biz.expenses', []); // витрати: разові й щомісячні
   requests = store.get('requests', []); // запити клієнтів «не знайшов послугу»
   applyOverrides();
-  if (settleAll(bookings)) save();
+  const settled = settleAll(bookings);
+  if (expirePending(bookings) || settled) save();
 }
 
 function save() {
@@ -3301,6 +3382,7 @@ const channelOf = (b) => b.channel ?? 'carcar';
 const channelPill = (b) => `<span class="pill ${isCarcar(b) ? 'carcar' : 'cash'}"><i></i>${CHANNEL[channelOf(b)]}</span>`;
 
 const STATUS = {
+  pending: ['Чекає вашого підтвердження', 'warn'],
   paid: ['Оплачено в CARCAR', 'carcar'],
   booked: ['Записано', 'cash'],
   done: ['Чекає підтвердження клієнта', 'warn'],
@@ -5458,7 +5540,13 @@ function bookingDrawer(id) {
   if (!b) return;
   const started = bookingStart(b) <= new Date();
   let actions = '';
-  if (b.state === 'booked') {
+  if (b.state === 'pending') {
+    actions = `<p class="notice warn">Клієнт оплатив запис через CARCAR. Підтвердіть до ${fmtTime(confirmBy(b))}, інакше запис скасується, а гроші повернуться клієнту.</p>
+      <div class="grid2">
+        <button class="btn primary" data-action="bk-accept" data-id="${b.id}">${icon('check', 18)}Прийняти запис</button>
+        <button class="btn text-danger" data-action="bk-decline" data-id="${b.id}">Відмовити</button>
+      </div>`;
+  } else if (b.state === 'booked') {
     actions = `<form class="stack" id="complete-form" data-id="${b.id}">
         <fieldset class="radio-row"><legend>Оплата на місці</legend>
           <label><input type="radio" name="payment" value="card" checked> Картка</label>
@@ -5978,7 +6066,7 @@ const inNav = (id) => NAV.some(([, items]) => items.some(([x]) => x === id));
 
 function renderChrome(page) {
   const unanswered = reviews.filter((r) => r.placeId === ui.place && !r.reply).length;
-  const openReq = requests.filter((r) => r.placeId === ui.place && reqState(r) === 'new').length + own().filter((b) => b.chatUnreadBiz).length;
+  const openReq = requests.filter((r) => r.placeId === ui.place && reqState(r) === 'new').length + own().filter((b) => b.chatUnreadBiz || b.state === 'pending').length;
   const badge = {
     reviews: [unanswered, 'без відповіді'], requests: [openReq, 'чекають відповіді'], stock: [lowStock().length, 'закінчується'],
     queue: [queueOf(ui.place).filter((q) => q.status === 'waiting').length, 'у черзі'],
@@ -6022,6 +6110,7 @@ function route() {
   document.body.classList.toggle('locked', !session());
   if (!session()) { $('#view').innerHTML = viewBizLogin(); $('#tabbar').innerHTML = ''; return; }
   touchPresence(ui.place);
+  if (expirePending(bookings)) save();
   if ($('#biz-q')?.value) { $('#biz-q').value = ''; closeSearch(); }
   charts = {};
   const [, page = '', arg] = location.hash.replace(/^#/, '').split('/');
@@ -6158,6 +6247,22 @@ document.addEventListener('click', (e) => {
     save();
     rerenderKeepScroll();
     toast(`Виплату відправлено на рахунок ${iban}`);
+  } else if (action === 'bk-accept') {
+    const b = bookings.find((x) => x.id === id);
+    acceptBooking(b);
+    save();
+    closeDrawer();
+    rerenderKeepScroll();
+    toast('Запис прийнято, клієнт отримав підтвердження');
+  } else if (action === 'bk-decline') {
+    const b = bookings.find((x) => x.id === id);
+    const reason = prompt('Чому не можете прийняти запис? Клієнт побачить причину, гроші повернуться йому.', 'Усі бокси зайняті на цей час');
+    if (reason === null) return;
+    declineBooking(b, reason.trim());
+    save();
+    closeDrawer();
+    rerenderKeepScroll();
+    toast('Відмовлено, клієнт отримав гроші назад');
   } else if (action === 'crm-noshow' || action === 'crm-cancel') {
     const b = bookings.find((x) => x.id === id);
     if (!confirm(action === 'crm-noshow' ? 'Позначити, що клієнт не приїхав?' : 'Скасувати запис?')) return;

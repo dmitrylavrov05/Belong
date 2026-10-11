@@ -218,3 +218,71 @@ test('доступність шторки нового запису', async ({ p
   const { violations } = await new AxeBuilder({ page }).analyze();
   expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(', ')}`)).toEqual([]);
 });
+
+// ---------- підтвердження запису мийкою ----------
+
+async function clientBooks(page, toast = 'Оплачено. Чекаємо, коли мийка підтвердить запис') {
+  await page.goto('/#/book/blysk');
+  await page.getByLabel(/Експрес-мийка кузова/).check();
+  await page.locator('[data-action="to-time"]').click();
+  await page.getByRole('button', { name: /Завтра/ }).click();
+  await page.locator('.slot[data-time="10:00"]').click();
+  await page.locator('[data-action="confirm"]').click();
+  await page.getByRole('button', { name: 'Оплатити 250 ₴' }).click();
+  await expect(page.locator('#toast')).toHaveText(toast);
+}
+
+test('запис із застосунку чекає підтвердження мийки, мийка приймає', async ({ page }) => {
+  await clientBooks(page);
+  const card = page.locator('article.bk').first();
+  await expect(card).toContainText('Чекає підтвердження мийки');
+  await expect(card).toContainText('Мийка підтвердить запис до 10:30');
+
+  await page.goto(PRO);
+  const block = page.getByRole('region', { name: 'Нові записи' });
+  await expect(block).toContainText('Новий запис — підтвердіть');
+  await expect(block).toContainText('Експрес-мийка кузова');
+  await expect(block).toContainText('Відповісти до 10:30');
+  await expect(page.getByLabel('Непрочитані: 1')).toBeVisible();
+  await block.getByRole('button', { name: 'Прийняти' }).click();
+  await expect(page.locator('.toast')).toContainText('Запис прийнято');
+  await expect(page.getByRole('region', { name: 'Нові записи' })).toHaveCount(0);
+
+  await page.goto('/#/bookings');
+  await expect(page.locator('article.bk').first()).toContainText('Оплачено');
+  await page.goto('/#/inbox');
+  await expect(page.locator('.convo').first()).toContainText('підтверджено. Чекаємо вас!');
+});
+
+test('мийка відмовляє — клієнт бачить причину й повернення', async ({ page }) => {
+  await clientBooks(page);
+  await page.goto(`${PRO}#/bookings/2026-10-05`);
+  await page.getByRole('region', { name: 'Нові записи' }).getByRole('button', { name: 'Відмовити' }).click();
+  await page.getByLabel('Не робимо цю послугу').check();
+  await page.getByRole('button', { name: 'Відмовити й повернути гроші' }).click();
+  await expect(page.locator('.toast')).toContainText('клієнт отримав гроші назад');
+  await expect(page.locator('.bk-row')).toContainText('Скасовано');
+  await expect(page.locator('.free-row').first()).toContainText('08:00');
+
+  await page.goto('/#/bookings');
+  const card = page.locator('article.bk').first();
+  await expect(card).toContainText('Мийка не підтвердила');
+  await expect(card).toContainText('Мийка не може прийняти запис: Не робимо цю послугу. Повернено 250 ₴ на картку.');
+});
+
+test('мийка не відповіла за 30 хвилин — запис скасовується сам', async ({ page }) => {
+  await clientBooks(page);
+  await page.clock.setFixedTime(new Date(2026, 9, 4, 10, 31));
+  await page.goto('/#/bookings');
+  await page.getByRole('button', { name: /^Завершені/ }).click();
+  await expect(page.locator('.done-item').first()).toContainText('Мийка не підтвердила');
+  await expect(page.locator('article.bk').first()).toContainText('Мийка не відповіла вчасно. Повернено 250 ₴ на картку.');
+});
+
+test('автопідтвердження в профілі мийки — клієнт записаний одразу', async ({ page }) => {
+  await page.goto(`${PRO}#/profile`);
+  await page.getByLabel(/Приймати записи автоматично/).check();
+  await expect(page.locator('.toast')).toContainText('автоматично');
+  await clientBooks(page, 'Оплачено, ви записані');
+  await expect(page.locator('article.bk').first()).toContainText('Оплачено');
+});

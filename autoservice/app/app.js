@@ -8,7 +8,7 @@ import {
 } from './core.js';
 import {
   CHANNELS, inboxFor, markRead, sendMessages, dealsOf, dealsOn, weeklyDealsOf, daysText, dealAt, dealPrice, dealCovers, hotDeals,
-  checkWaitlist, openStarts, passesOf, sellPass, passActive, passLeft, usableSubs, findCert, redeemPass, restorePass,
+  checkWaitlist, expirePending, confirmBy, autoConfirmOf, openStarts, passesOf, sellPass, passActive, passLeft, usableSubs, findCert, redeemPass, restorePass,
   chatPost, chatTimeline, readMessages, msgPreview, presenceOf, PRESENCE_KEY, CLIENT_QUICK, ITEM_KIND, itemSum, estimateTotal, warrantyUntil,
 } from './ops.js';
 import { mountMap } from './map.js';
@@ -1284,7 +1284,8 @@ function confirmBooking() {
     campaign: campaignNow()?.id ?? null,
     firstOrder: !mine().some((x) => !(x.state === 'cancelled' && x.refundTo === 'balance')),
     installments: q.installments ? { ...q.installments, card: q.card } : null,
-    state: 'paid',
+    // Мийка підтверджує запис сама, якщо не ввімкнула автопідтвердження.
+    state: autoConfirmOf(p.id) ? 'paid' : 'pending',
     createdAt: Date.now(),
   };
   bookings.push(b);
@@ -1295,7 +1296,8 @@ function confirmBooking() {
   location.hash = `#/bookings/${b.id}`;
   track('paid', { placeId: p.id, amount: total, deal: !!q.deal, pass: q.use?.kind ?? null, bonus: !!bonus, balance: !!fromBal, leadH: Math.round((bookingStart(b) - Date.now()) / HOUR),
     promo: q.promo?.code ?? null, mobile: !!b.mobile, parts: q.parts || 0 });
-  toast(q.installments ? `Оплачено першу частину, ви записані` : 'Оплачено, ви записані');
+  toast(b.state === 'pending' ? 'Оплачено. Чекаємо, коли мийка підтвердить запис'
+    : q.installments ? `Оплачено першу частину, ви записані` : 'Оплачено, ви записані');
 }
 
 // ---------- оплата й утримання коштів ----------
@@ -1306,7 +1308,11 @@ function save() {
 }
 
 function settle() {
-  if (settleAll(bookings)) save();
+  const done = settleAll(bookings);
+  // Мийка не відповіла на запис вчасно — скасовуємо й повертаємо гроші (і на баланс, якщо платили з нього).
+  const expired = expirePending(bookings);
+  if (expired) wallet = { bonus: 0, money: 0, history: [], ...store.get('wallet', {}) };
+  if (done || expired) save();
 }
 
 const balanceOf = (placeId) => balanceFor(placeId, bookings, payouts);
@@ -1327,7 +1333,7 @@ function cancelTerms(b) {
 
 // Клієнт бачить два кроки: оплатив — мийка виконала.
 function steps(b) {
-  const at = { paid: 0, done: 1, dispute: 1, completed: 1 }[b.state];
+  const at = { pending: 0, paid: 0, done: 1, dispute: 1, completed: 1 }[b.state];
   if (at === undefined) return '';
   return `<ol class="steps two" aria-label="Статус запису">${['Оплачено', 'Виконано']
     .map((s, i) => `<li class="${i <= at ? 'on' : ''}" ${i === at ? 'aria-current="step"' : ''}>${s}</li>`).join('')}</ol>`;
@@ -1335,6 +1341,7 @@ function steps(b) {
 
 // [клас кольору статусу, підпис]
 const STATE_LABEL = {
+  pending: ['warn', 'Чекає підтвердження мийки'],
   paid: ['go', 'Оплачено'],
   done: ['', 'Виконано'],
   dispute: ['warn', 'Спір розглядається'],
@@ -1345,10 +1352,10 @@ const STATE_LABEL = {
 };
 
 // Іконки статусів, щоб завершені записи розрізнялися з першого погляду.
-const STATE_ICON = { completed: 'checkCircle', cancelled: 'x', refunded: 'x', noshow: 'clock', dispute: 'info' };
+const STATE_ICON = { pending: 'clock', completed: 'checkCircle', cancelled: 'x', refunded: 'x', noshow: 'clock', dispute: 'info' };
 
 const cardHead = (b, title, sm, amount = b.paid) => {
-  const [cls, label] = STATE_LABEL[b.state];
+  const [cls, label] = b.declined ? ['', 'Мийка не підтвердила'] : STATE_LABEL[b.state];
   return `<div class="head">
       <div><div class="bk-status ${cls}">${STATE_ICON[b.state] ? icon(STATE_ICON[b.state], 14) : ''}${label}</div><h3 class="bk-title${sm ? ' sm' : ''}">${title}</h3>
         ${b.no ? `<span class="bk-no">Запис ${bookingNo(b)}</span>` : ''}</div>
@@ -1403,7 +1410,13 @@ function bookingCard(b, highlight) {
     </div>`;
   let body = lines;
   const started = bookingStart(b) <= new Date();
-  if (b.state === 'paid') {
+  if (b.state === 'pending') {
+    body += `<div class="notice ic-row">${icon('clock', 18)}<span>Оплату отримано. Мийка підтвердить запис до ${new Date(confirmBy(b)).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}${isoDate(new Date(confirmBy(b))) === isoDate(new Date()) ? '' : `, ${dayLabel(isoDate(new Date(confirmBy(b))), { day: 'numeric', month: 'long' })}`}. Якщо не зможе прийняти — гроші повернемо.</span></div>
+      <div class="grid2">
+        ${p ? `<a class="btn" href="${tel(p)}">${icon('phone', 18)}Зателефонувати</a>` : ''}
+        <button class="btn text-danger" data-action="cancel" data-id="${b.id}">Скасувати</button>
+      </div>`;
+  } else if (b.state === 'paid') {
     const t = cancelTerms(b);
     const canMove = t.inWindow && (b.moves?.length ?? 0) < MOVE_LIMIT;
     body += `${b.extra ? `<div class="notice">
@@ -1443,6 +1456,9 @@ function bookingCard(b, highlight) {
         <button class="btn line-danger" data-action="dispute" data-id="${b.id}">Відкрити спір</button>`;
     }
     body += reviewBlock(b);
+  } else if (b.declined) {
+    body += `<p class="small muted" style="margin:0">${b.declined === 'timeout' ? 'Мийка не відповіла вчасно' : `Мийка не може прийняти запис${b.declineReason ? `: ${esc(b.declineReason)}` : ''}`}.
+      Повернено ${uah(b.paid)}${b.fromBalance ? ` (з них ${uah(Math.min(b.fromBalance, b.paid))} на баланс CARCAR)` : ' на картку'}${b.bonus ? ` і ${uah(b.bonus)} бонусів` : ''}.</p>`;
   } else {
     body += b.refund || b.state === 'refunded' || !b.placeAmount
       ? `<p class="small muted" style="margin:0">Повернено ${uah(b.refund ?? b.paid)} ${b.refundTo === 'balance' ? 'на баланс CARCAR' : 'на картку'}${b.bonusReturned ? ` і ${uah(b.bonus)} на бонусний рахунок` : ''}${b.placeAmount ? `, ${uah(b.placeAmount)} отримала точка` : ''}.</p>`
@@ -2066,6 +2082,7 @@ function viewBusiness(sub) {
   if (sub === 'apply' && !(a && a.status !== 'rejected')) return `${head}<h1>Реєстрація мийки</h1>${bizApplyForm()}`;
   const terms = [
     ['cash', 'Комісія 10% із замовлень через CARCAR', 'Абонплати немає, за підключення не платите. Записи, які ви вносите самі, без комісії.'],
+    ['check', 'Ви вирішуєте, чи приймати запис', `Клієнт обирає час і платить, а ви підтверджуєте запис у CarCar Business. Не відповіли за ${PAYMENT.confirmMinutes} хв робочого часу — запис скасовується, гроші повертаються клієнту. Можна ввімкнути автопідтвердження.`],
     ['card', 'Клієнт платить одразу під час запису', `Коли авто готове, ви натискаєте «Машина готова». Гроші ${PAYMENT.freezeHours} годин чекають на випадок спору, потім виводите їх на рахунок ФОП або ТОВ.`],
     ['shield', 'Неявку оплачує клієнт', `Скасував пізніше ніж за ${cancelWindow()}, не приїхав чи запізнився більш ніж на ${PAYMENT.lateMinutes} хв — гроші лишаються вам. Один запис можна перенести не більше ${MOVE_LIMIT} разів.`],
     ['calendar', 'Застосунок CarCar Business безкоштовно', 'Повідомлення клієнтів, записи по днях, швидкий запис дзвінка за кілька секунд, гроші й профіль мийки — з телефона.'],
@@ -2147,7 +2164,7 @@ function doneItem(b, highlight) {
     <summary>
       <span class="di-ic" aria-hidden="true">${icon(STATE_ICON[b.state] ?? 'checkCircle', 18)}</span>
       <span class="di-main"><b>${esc(p?.name ?? 'Мийка')}</b><small>${dayLabel(b.date, { day: 'numeric', month: 'short' })}, ${b.time} · ${esc(b.services[0] ?? '')}${b.services.length > 1 ? ` +${b.services.length - 1}` : ''}</small></span>
-      <span class="di-side"><b>${uah(b.paid)}</b><small>${esc(label)}${needsAction(b) && b.state === 'completed' ? ' · оцініть' : ''}</small></span>
+      <span class="di-side"><b>${uah(b.paid)}</b><small>${esc(b.declined ? 'Мийка не підтвердила' : label)}${needsAction(b) && b.state === 'completed' ? ' · оцініть' : ''}</small></span>
       <span class="di-chev" aria-hidden="true">${icon('chevR', 18)}</span>
     </summary>
     ${bookingCard(b, highlight)}
@@ -2480,7 +2497,8 @@ function returnBonus(b, why) {
 // Дії із записом з боку клієнта, точки й модератора. Повертають false, якщо нічого не змінилося.
 const bookingActions = {
   cancel(b) {
-    const t = cancelTerms(b);
+    // Поки мийка не підтвердила, скасувати можна будь-коли без втрат.
+    const t = b.state === 'pending' ? { kind: 'free', free: true, refund: b.paid, placeAmount: 0 } : cancelTerms(b);
     track('cancel_try', { placeId: b.placeId, free: t.free, kind: t.kind });
     const msg = t.kind === 'free'
       ? `Скасувати запис? Повернемо ${uah(t.refund)} на баланс CARCAR.`

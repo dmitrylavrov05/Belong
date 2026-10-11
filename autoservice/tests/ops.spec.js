@@ -10,6 +10,10 @@ test.beforeEach(async ({ page }, testInfo) => {
   if (!/промокод|маркетинг/i.test(testInfo.title)) {
     await page.addInitScript(() => localStorage.getItem('carcar.admin.promos') ?? localStorage.setItem('carcar.admin.promos', '[]'));
   }
+  // Мийки за замовчуванням підтверджують записи вручну; у цих тестах — автопідтвердження, як раніше.
+  // Підтвердження мийкою перевіряє pro.spec.js.
+  await page.addInitScript(() => localStorage.getItem('carcar.biz.autoConfirm') ?? localStorage.setItem('carcar.biz.autoConfirm',
+    JSON.stringify(Object.fromEntries(['blysk', 'aqua24', 'hvylia', 'strumin', 'pina', 'kraplia', 'chysto', 'hlyanets', 'keramika'].map((id) => [id, true])))));
   await page.clock.setFixedTime(new Date(2026, 9, 4, 10, 0));
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));

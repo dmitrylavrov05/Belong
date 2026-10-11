@@ -1,10 +1,10 @@
 // Спільна логіка застосунку клієнта й панелі бізнесу для щоденної роботи точки:
 // гарячі вікна зі знижкою, жива черга, лист очікування, абонементи й сертифікати,
 // шинний готель і повідомлення клієнтам (розсилки, нагадування).
-import { PLACES } from './data.js';
+import { PLACES, PAYMENT } from './data.js';
 import {
   store, uid, isoDate, parseDate, hhmm, toMin, plural, hoursFor, scheduleOf, inBreak, BLOCKING, phoneKey, isListed, weekdayOf,
-  spanOf, laneCap, sameLane, MOBILE_ROAD,
+  spanOf, laneCap, sameLane, MOBILE_ROAD, bookingStart, creditClient,
 } from './core.js';
 
 const opsToday = () => isoDate(new Date());
@@ -321,3 +321,78 @@ export function restorePass(placeId, use) {
 }
 
 export const clientKeyOf = (phone, car) => phoneKey(phone) ?? (car ? `car:${car}` : null);
+
+// ---------- підтвердження запису мийкою ----------
+
+// Мийка сама вирішує, чи приймати запис на цей час. Без автопідтвердження запис із застосунку
+// чекає її відповіді (state: 'pending'), час уже зайнятий, а гроші утримує CARCAR.
+export const autoConfirmOf = (placeId) => !!store.peek('biz.autoConfirm', {})[placeId];
+export function setAutoConfirm(placeId, on) {
+  store.set('biz.autoConfirm', { ...store.get('biz.autoConfirm', {}), [placeId]: on });
+}
+
+// До коли мийка має відповісти: confirmMinutes робочого часу від заявки (заявка вночі — від відкриття),
+// але не пізніше за початок візиту.
+export function confirmBy(b) {
+  const p = opsPlace(b.placeId);
+  let t = b.createdAt ?? Date.now();
+  for (let i = 0; p && i < 8; i++) {
+    const d = new Date(t);
+    const iso = isoDate(d);
+    const h = hoursFor(p, iso);
+    const m = d.getHours() * 60 + d.getMinutes();
+    if (h && m < h[1]) {
+      if (m < h[0]) t = parseDate(iso).getTime() + h[0] * 60000;
+      break;
+    }
+    const next = parseDate(iso);
+    next.setDate(next.getDate() + 1);
+    t = next.getTime();
+  }
+  return Math.min(t + PAYMENT.confirmMinutes * 60000, bookingStart(b).getTime());
+}
+
+// Відповідь мийки клієнт бачить у чаті запису й отримує сповіщення.
+function clientNote(b, kind, text) {
+  chatPost(b, 'sys', text.replace(/^[^:]+: /, ''), 'client');
+  sendMessages([{ placeId: b.placeId, clientKey: 'device', channel: 'app', kind, bookingId: b.id, text, link: `#/bookings/${b.id}` }]);
+}
+const placeName = (b) => opsPlace(b.placeId)?.name ?? 'Мийка';
+const whenText = (b) => `${parseDate(b.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })} о ${b.time}`;
+
+export function acceptBooking(b) {
+  Object.assign(b, { state: 'paid', confirmedAt: Date.now() });
+  clientNote(b, 'confirm', `${placeName(b)}: запис на ${whenText(b)} підтверджено. Чекаємо вас!`);
+}
+
+// Відмова чи мовчання мийки: усе повертаємо клієнту — картку на картку, баланс і бонуси на рахунок CARCAR,
+// візит абонемента й промокод знову доступні.
+export function declineBooking(b, reason, by = 'place') {
+  const fromBalance = b.fromBalance || 0;
+  Object.assign(b, {
+    state: 'cancelled', declined: by, declineReason: reason, refund: b.paid, placeAmount: 0, refundTo: fromBalance >= b.paid ? 'balance' : 'card',
+    closedAt: Date.now(), cancelBy: by === 'timeout' ? 'system' : 'place',
+  });
+  if (fromBalance) creditClient(fromBalance, `Повернення: ${placeName(b)} не підтвердила запис`);
+  if (b.bonus && !b.bonusReturned) {
+    const w = { bonus: 0, money: 0, history: [], ...store.get('wallet', {}) };
+    w.bonus += b.bonus;
+    w.history.unshift({ amount: b.bonus, text: `Повернення бонусу: ${placeName(b)} не підтвердила запис`, at: Date.now() });
+    store.set('wallet', w);
+    b.bonusReturned = true;
+  }
+  if (b.passUse) { restorePass(b.placeId, b.passUse); b.passUse = null; }
+  if (b.promo) b.promo.returned = true;
+  clientNote(b, 'decline', by === 'timeout'
+    ? `${placeName(b)} не відповіла на запис на ${whenText(b)}. Запис скасовано, гроші повернуто. Оберіть інший час чи мийку.`
+    : `${placeName(b)} не може прийняти запис на ${whenText(b)}${reason ? `: ${reason}` : ''}. Гроші повернуто. Оберіть інший час чи мийку.`);
+}
+
+// Заявки, на які мийка не відповіла вчасно, скасовуються самі. Повертає true, якщо щось змінилося.
+export function expirePending(bookings) {
+  let changed = false;
+  for (const b of bookings) {
+    if (b.state === 'pending' && Date.now() >= confirmBy(b)) { declineBooking(b, 'мийка не відповіла вчасно', 'timeout'); changed = true; }
+  }
+  return changed;
+}

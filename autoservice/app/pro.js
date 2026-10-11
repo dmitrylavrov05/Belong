@@ -9,7 +9,10 @@ import {
   ACTIVE, BLOCKING, isCarcar, price, complete, isFrozen, balanceFor, settleAll, ratingFor, partnerOf, PARTNER_STATUS,
   payoutReady, maskIban, commissionFor, checkBizLogin, numberBookings, bookingNo, POWER, powerOf, setPower,
 } from './core.js';
-import { openStarts, chatPost, chatTimeline, readMessages, msgPreview, touchPresence, BIZ_QUICK, sendMessages, checkWaitlist } from './ops.js';
+import {
+  openStarts, chatPost, chatTimeline, readMessages, msgPreview, touchPresence, BIZ_QUICK, sendMessages, checkWaitlist,
+  acceptBooking, declineBooking, expirePending, confirmBy, autoConfirmOf, setAutoConfirm,
+} from './ops.js';
 
 // ---------- дані ----------
 
@@ -21,7 +24,8 @@ function load() {
   reviews = store.get('reviews', []);
   requests = store.get('requests', []); // «не знайшов послугу» — повідомлення мийці зі сторінки точки
   applyOverrides();
-  if (settleAll(bookings)) save();
+  const settled = settleAll(bookings);
+  if (expirePending(bookings) || settled) save();
 }
 
 function save() {
@@ -74,6 +78,7 @@ function toast(text) {
 const CHANNEL = { carcar: 'CARCAR', phone: 'Дзвінок', walkin: 'Приїхав сам', other: 'Інше' };
 const channelOf = (b) => b.channel ?? 'carcar';
 const STATE = {
+  pending: ['Підтвердіть запис', 'warn'],
   paid: ['Оплачено', 'carcar'], booked: ['Записано', 'cash'], done: ['Чекає клієнта', 'warn'], dispute: ['Спір', 'warn'],
   completed: ['Виконано', 'ok'], cancelled: ['Скасовано', 'muted'], noshow: ['Неявка', 'muted'], refunded: ['Повернено клієнту', 'muted'],
 };
@@ -92,7 +97,8 @@ const ownRequests = () => requests.filter((r) => r.placeId === ui.place);
 
 // Записи, які вже минули, але мийка не позначила, чим вони закінчились.
 const unmarked = () => own().filter((b) => (b.state === 'paid' || b.state === 'booked') && isPast(b)).sort((a, b) => bookingStart(a) - bookingStart(b));
-const unreadCount = () => own().filter((b) => b.chatUnreadBiz).length + ownRequests().filter((r) => r.unreadBiz).length;
+const pendingList = () => own().filter((b) => b.state === 'pending').sort((a, b) => confirmBy(a) - confirmBy(b));
+const unreadCount = () => own().filter((b) => b.chatUnreadBiz || b.state === 'pending').length + ownRequests().filter((r) => r.unreadBiz).length;
 
 // Розклад «перевірено»: мийка раз на день підтверджує, що вільний час у CARCAR відповідає дійсності.
 const checkedAt = () => store.get('biz.places', {})[ui.place]?.checkedAt ?? 0;
@@ -149,6 +155,26 @@ function viewLogin(error = '') {
 
 // ---------- нагадування: щоб розклад у клієнтів був правдивим ----------
 
+// Нові записи з застосунку: мийка вирішує, чи приймати їх на цей час.
+function pendingBlock() {
+  const list = pendingList();
+  if (!list.length) return '';
+  return `<section class="pending" aria-label="Нові записи">
+    <h2>${list.length === 1 ? 'Новий запис — підтвердіть' : `Нові записи — підтвердіть (${list.length})`}</h2>
+    ${list.map((b) => `<article class="pending-card" aria-label="Запис ${esc(who(b))}">
+      <button class="pending-info" type="button" data-action="bk-open" data-id="${b.id}">
+        <span class="bk-time"><b>${b.time}</b><small>${dayWord(b.date)}</small></span>
+        <span class="bk-main"><b>${esc(who(b))}</b><small>${esc(b.services.join(', '))}</small><small>${esc(b.car || '')} · ${uah(sumOf(b))} оплачено</small></span>
+      </button>
+      <p class="pending-due">${icon('clock', 14)}Відповісти до ${clock(confirmBy(b))}, інакше запис скасується й гроші повернуться клієнту</p>
+      <div class="grid2">
+        <button class="btn navy" type="button" data-action="accept" data-id="${b.id}">${icon('check', 18)}Прийняти</button>
+        <button class="btn" type="button" data-action="decline" data-id="${b.id}">Відмовити</button>
+      </div>
+    </article>`).join('')}
+  </section>`;
+}
+
 function reminders() {
   const out = [];
   const st = partnerOf(ui.place).status;
@@ -201,6 +227,7 @@ function viewMessages() {
   const list = all.filter(pass);
   const count = (f) => all.filter((t) => (f === 'all' ? true : f === 'new' ? t.unread : t.kind === f)).length;
   return `<h1>Повідомлення</h1>
+    ${pendingBlock()}
     ${reminders()}
     <div class="chips" role="group" aria-label="Які повідомлення показати">${MSG_FILTERS.map(([f, label]) => `<button class="chip" type="button" data-action="msg-filter" data-f="${f}" aria-pressed="${ui.filter === f}">${label}${count(f) ? ` · ${count(f)}` : ''}</button>`).join('')}</div>
     ${list.length ? `<ul class="convos pro-convos">${list.map((t) => `<li><a class="convo${t.unread ? ' unread' : ''}${t.live ? '' : ' over'}" href="#/chat/${t.id}">
@@ -262,6 +289,7 @@ function viewThread(arg = '') {
     return `<section class="chat-screen" aria-label="Чат з ${esc(who(b))}">
       ${chatHead(who(b), `${label} · ${dayWord(b.date)}, ${b.time}`, b.clientPhone)}
       <button class="chat-pin" type="button" data-action="bk-open" data-id="${b.id}">${icon('calendar', 16)}<span>${b.no ? `${bookingNo(b)} · ` : ''}${esc(b.services.join(', '))} · ${uah(sumOf(b))}${b.car ? ` · ${esc(b.car)}` : ''}</span>${icon('chevR', 16)}</button>
+      ${b.state === 'pending' ? `<div class="chat-actions"><button class="btn navy" type="button" data-action="accept" data-id="${b.id}">${icon('check', 18)}Прийняти запис</button><button class="btn" type="button" data-action="decline" data-id="${b.id}">Відмовити</button></div>` : ''}
       ${b.state === 'paid' ? `<div class="chat-actions"><button class="btn navy" type="button" data-action="ready" data-id="${b.id}">${icon('check', 18)}Машина готова</button></div>` : ''}
       <ol class="chat-msgs" aria-label="Повідомлення">${threadList(chatTimeline(b))}</ol>
       ${open ? compose(arg, true) : '<p class="chat-closed">Запис закрито — листування лише для читання.</p>'}
@@ -337,6 +365,7 @@ function viewBookings(day) {
   const busy = list.filter((b) => BLOCKING.includes(b.state)).length;
   const special = day in scheduleOf(p).special;
   return `<h1>Записи</h1>
+    ${pendingBlock()}
     ${reminders()}
     <nav class="day-strip" aria-label="Дні">${days.map((d) => {
       const n = live(d);
@@ -377,7 +406,13 @@ function bookingSheet(id) {
   const [label, cls] = stateOf(b);
   const started = bookingStart(b) <= new Date();
   let actions = '';
-  if (b.state === 'booked') {
+  if (b.state === 'pending') {
+    actions = `<p class="notice warn">Клієнт оплатив запис. Підтвердіть до ${clock(confirmBy(b))}, інакше запис скасується, а гроші повернуться клієнту.</p>
+      <div class="grid2">
+        <button class="btn primary" type="button" data-action="accept" data-id="${b.id}">${icon('check', 18)}Прийняти</button>
+        <button class="btn line-danger" type="button" data-action="decline" data-id="${b.id}">Відмовити</button>
+      </div>`;
+  } else if (b.state === 'booked') {
     actions = `<form class="stack" id="done-form" data-id="${b.id}" style="gap:10px">
         <div class="seg-row" role="radiogroup" aria-label="Оплата на місці">
           <label><input type="radio" name="payment" value="card" checked><span>Картка</span></label>
@@ -415,6 +450,20 @@ function bookingSheet(id) {
       ${isCarcar(b) ? `<a class="btn" href="#/chat/b-${b.id}" data-action="sheet-close">${icon('chat', 18)}Написати</a>` : ''}
     </div>
     ${actions}`);
+}
+
+const DECLINE_REASONS = ['Усі бокси зайняті на цей час', 'Не робимо цю послугу', 'Мийка не працюватиме в цей час', 'Немає майстра'];
+
+function declineSheet(id) {
+  const b = own().find((x) => x.id === id);
+  openSheet(`Відмовити: ${esc(who(b))}`, `<form class="stack" id="decline-form" data-id="${b.id}" style="gap:12px">
+    <p class="small muted" style="margin:0">${dayWord(b.date, true)}, ${b.time} · ${esc(b.services.join(', '))}. Клієнт отримає повідомлення, а гроші — назад.</p>
+    <fieldset class="reason-set"><legend>Причина</legend>
+      ${DECLINE_REASONS.map((r, i) => `<label class="check-row"><input class="check radio" type="radio" name="reason" value="${esc(r)}" ${i ? '' : 'checked'}><span>${r}</span></label>`).join('')}
+    </fieldset>
+    <label class="field"><span>Повідомлення клієнту (необовʼязково)</span><input name="note" maxlength="300" autocomplete="off" placeholder="Наприклад, можемо о 14:00 — запишіться ще раз"></label>
+    <button class="btn primary" type="submit">Відмовити й повернути гроші</button>
+  </form>`);
 }
 
 function moveSheet(id, date) {
@@ -628,6 +677,11 @@ function viewProfile() {
       <div class="chips wrap" role="group" aria-label="Світло на мийці">${Object.entries(POWER).map(([k, [label]]) => `<button class="chip" type="button" data-action="power" data-k="${k}" aria-pressed="${pw?.state === k}">${label}</button>`).join('')}</div>
       <p class="fine">${pw ? `Оновлено ${fmtTime(pw.at)}. ` : ''}Під час відключень клієнти шукають мийки, які працюють, — відмітка діє 12 годин.</p>
     </section>
+    <section class="pro-card" aria-labelledby="h-confirm">
+      <h2 id="h-confirm">Запис клієнтів</h2>
+      <label class="check-row"><input class="check" type="checkbox" id="auto-confirm" ${autoConfirmOf(p.id) ? 'checked' : ''}><span><b>Приймати записи автоматично</b>
+        <small class="fine" style="display:block">${autoConfirmOf(p.id) ? 'Клієнт одразу отримує підтвердження. Слідкуйте, щоб розклад був актуальним.' : `Кожен запис ви підтверджуєте самі. Не відповіли за ${PAYMENT.confirmMinutes} хв робочого часу — запис скасовується, гроші повертаються клієнту.`}</small></span></label>
+    </section>
     <form class="pro-card stack" id="pf-main" aria-labelledby="h-main" style="gap:12px">
       <h2 id="h-main">Контакти й бокси</h2>
       <div class="grid2">
@@ -734,6 +788,7 @@ function demoSeed() {
   make(t, pick(1, 2), { slot: 1, channel: 'carcar', state: 'paid', clientName: 'Ірина Мельник', clientPhone: '+380 50 123 45 67', car: 'Toyota RAV4 · KA7781CB',
     chat: [{ from: 'client', text: 'Добрий день! Можна приїхати на 15 хвилин раніше?', at: ago(12) }], chatUnreadBiz: true });
   make(t, pick(0), { slot: 4, channel: 'phone', state: 'booked', clientName: 'Сергій Бондар', clientPhone: '+380 93 555 12 12', car: 'Skoda Octavia · AI3321OO' });
+  make(t, pick(3), { slot: 8, channel: 'carcar', state: 'pending', clientName: 'Віктор Лисенко', clientPhone: '+380 68 909 11 22', car: 'Hyundai Tucson · AA7007PP', createdAt: ago(6) });
   const tm = shiftDay(t, 1);
   make(tm, pick(2), { slot: 2, channel: 'carcar', state: 'paid', clientName: 'Андрій Коваль', clientPhone: '+380 66 400 70 80', car: 'Kia Sportage · BC1209HH',
     chat: [{ from: 'client', text: 'Буду з багажником на даху, це не завадить?', at: ago(180), readAt: ago(170) }, { from: 'biz', text: 'Так, чекаємо', at: ago(170), readAt: ago(160) }] });
@@ -778,6 +833,7 @@ function route() {
   }
   if (s.placeId && placeById(s.placeId)) ui.place = s.placeId;
   touchPresence(ui.place);
+  if (expirePending(bookings)) save();
   checkWaitlist(bookings);
   const [, page = '', arg] = location.hash.replace(/^#/, '').split('/');
   document.body.classList.toggle('in-chat', page === 'chat');
@@ -868,6 +924,15 @@ document.addEventListener('click', async (e) => {
     after('Клієнт отримав сповіщення «Машина готова»');
     return;
   }
+  if (action === 'accept') {
+    acceptBooking(b);
+    save();
+    closeSheet();
+    rerender();
+    toast(`Запис прийнято: ${who(b)}, ${dayWord(b.date).toLowerCase()} о ${b.time}`);
+    return;
+  }
+  if (action === 'decline') { declineSheet(id); return; }
   if (action === 'mark-done') {
     Object.assign(b, { state: 'completed', payment: 'card', completedAt: Date.now() });
     after('Запис виконано');
@@ -971,6 +1036,12 @@ document.addEventListener('input', (e) => {
 });
 
 document.addEventListener('change', async (e) => {
+  if (e.target.id === 'auto-confirm') {
+    setAutoConfirm(ui.place, e.target.checked);
+    rerender();
+    toast(e.target.checked ? 'Записи прийматимуться автоматично' : 'Тепер кожен запис підтверджуєте ви');
+    return;
+  }
   if (e.target.id === 'pro-place') {
     ui.place = e.target.value;
     store.set('partner', ui.place);
@@ -1013,6 +1084,17 @@ document.addEventListener('submit', async (e) => {
     return;
   }
   if (f.id === 'nb-form') { nbSubmit(); return; }
+  if (f.id === 'decline-form') {
+    const b = own().find((x) => x.id === f.dataset.id);
+    const note = String(d.get('note')).trim();
+    declineBooking(b, String(d.get('reason')));
+    if (note) chatPost(b, 'biz', note, 'client');
+    save();
+    closeSheet();
+    rerender();
+    toast('Відмовлено, клієнт отримав гроші назад');
+    return;
+  }
   if (f.id === 'done-form') {
     const b = own().find((x) => x.id === f.dataset.id);
     Object.assign(b, { state: 'completed', payment: d.get('payment'), paid: Number(d.get('paid')) || 0, completedAt: Date.now() });
