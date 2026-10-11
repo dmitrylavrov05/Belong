@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { PRO, washReady, proWash } from './helpers.js';
 
 // Той самий фіксований час, що й в інших тестах: неділя, 4 жовтня 2026, 10:00.
 test.beforeEach(async ({ page }, testInfo) => {
@@ -26,164 +27,164 @@ test.afterEach(async ({ page }) => {
   expect(page.errors).toEqual([]);
 });
 
-const PANEL = '/business.html';
+const ADMIN = '/admin.html';
+// Вигадані коди з правильними контрольними сумами.
+const RNOKPP = '1234567899';
+const IBAN = 'UA22 3052 9900 0002 6001 2345 6789 0';
 
-// Мийка підтверджує виконання («Машина готова») у кабінеті точки; клієнт відкриває завершені записи.
-async function washDone(page, place = 'Автомийка «Хвиля»') {
-  await page.goto('/#/partner');
-  await page.getByLabel('Точка').selectOption({ label: place });
-  await page.locator('a.prow').first().click();
-  await page.getByRole('button', { name: 'Машина готова' }).click();
+// Клієнт відкриває завершені записи після «Машина готова» в CarCar Business.
+async function washDone(page) {
+  await washReady(page);
   await page.goto('/#/bookings');
   await page.getByRole('button', { name: /^Завершені/ }).click();
 }
 
-// У панелі точки на телефоні розділи — у меню «Ще» нижньої панелі.
-async function openNav(page) {
-  const more = page.locator('#tabbar [data-action="menu-open"]');
-  if (await more.isVisible() && (await more.getAttribute('aria-expanded')) !== 'true') await more.click();
-  return page.locator('#nav');
+// Рахунок для виплат поточної мийки в CarCar Business.
+async function fillPayout(page, { iban = IBAN, holder = 'ФОП Тестенко О. П.', code = RNOKPP } = {}) {
+  await page.goto(`${PRO}#/payout`);
+  await page.getByLabel('IBAN').fill(iban);
+  await page.getByLabel('Отримувач (ФОП чи назва ТОВ)').fill(holder);
+  await page.getByLabel('РНОКПП (ФОП) чи ЄДРПОУ (ТОВ)').fill(code);
+  await page.getByRole('button', { name: 'Надіслати на перевірку' }).click();
 }
-const ADMIN = '/admin.html';
-// Вигадані коди з правильними контрольними сумами.
-const RNOKPP = '1234567899';
-const EDRPOU = '12345678';
-const IBAN = 'UA22 3052 9900 0002 6001 2345 6789 0';
 
-async function newPlace(page, name = 'Автомийка «Хмаринка»') {
-  await page.goto(PANEL);
-  await page.getByLabel('Точка').selectOption('__new');
+// У CarCar Business немає форми юрособи, документів і оферти, а без них адмінка не дає схвалити точку
+// чи підтвердити реквізити. Тому ці дані кладемо в сховище напряму (як їх заповнила б мийка).
+async function seedLegal(page, placeId) {
+  await page.evaluate(({ id, code }) => {
+    const all = JSON.parse(localStorage.getItem('carcar.partners') ?? '{}');
+    const at = Date.now();
+    all[id] = {
+      ...all[id],
+      company: { type: 'fop', name: 'Тестенко Олена Петрівна', code, tax: 'ep3', email: 'owner@example.com', phone: '+380 67 000 00 99', address: '' },
+      docs: { registry: { name: 'vytiah-edr.pdf', size: 2048, at } },
+      offer: { version: '1.0', acceptedAt: at, signer: 'Тестенко Олена Петрівна' },
+    };
+    localStorage.setItem('carcar.partners', JSON.stringify(all));
+  }, { id: placeId, code: RNOKPP });
+}
+
+// Правильний IBAN monobank (МФО 322001).
+const MONO_IBAN = (() => {
+  const body = '3220010000026001234567890';
+  for (let cc = 0; cc < 100; cc++) {
+    const s = `UA${String(cc).padStart(2, '0')}${body}`;
+    const moved = `${s.slice(4)}3010${s.slice(2, 4)}`;
+    let r = 0;
+    for (const ch of moved) r = (r * 10 + Number(ch)) % 97;
+    if (r === 1) return s;
+  }
+  return '';
+})();
+
+async function demoSeed(page, name) {
+  await proWash(page, name);
+  await page.goto(`${PRO}#/more`);
+  await page.getByRole('button', { name: 'Заповнити прикладом: історія, записи й повідомлення' }).click();
+  await expect(page.locator('#toast')).toHaveText('Додано приклад записів і повідомлень');
+  // Приклад містить новий запис, що чекає відповіді мийки: приймаємо його в шторці «Новий запис».
+  const alert = page.getByRole('dialog', { name: 'Новий запис' });
+  await alert.getByRole('button', { name: 'Прийняти' }).click();
+  await expect(alert).toHaveCount(0);
+}
+
+test('нова мийка: додається в CarCar Business, CARCAR перевіряє й додає в каталог', async ({ page }) => {
+  await page.goto(`${PRO}#/wash`);
+  await page.getByRole('group', { name: 'Ваші мийки' }).getByRole('button', { name: 'Додати мийку' }).click();
   const d = page.getByRole('dialog');
-  await d.getByLabel('Назва точки').fill(name);
-  await d.getByLabel('Мийка').check();
-  await d.getByLabel('Район').selectOption('Оболонський');
+  await d.getByLabel('Назва').fill('Автомийка «Хмаринка»');
+  await d.getByLabel('Місто').selectOption('Київ');
   await d.getByLabel('Адреса').fill('вул. Тестова, 1');
-  await d.getByLabel('Телефон точки').fill('+380 44 000 00 99');
-  await d.getByRole('button', { name: 'Створити й перейти до підключення' }).click();
-  await expect(page.locator('#toast')).toHaveText('Точку створено — заповніть дані для підключення');
-}
+  await d.getByLabel('Телефон').fill('+380 44 000 00 99');
+  await d.getByLabel('Боксів').fill('3');
+  await d.getByRole('button', { name: 'Додати мийку' }).click();
+  await expect(page.locator('#toast')).toContainText('Мийку додано');
+  const id = await page.evaluate(() => JSON.parse(localStorage.getItem('carcar.partner')));
+  expect(await page.evaluate((x) => JSON.parse(localStorage.getItem('carcar.partners'))[x].status, id)).toBe('pending');
 
-async function fillConnect(page, { type = 'fop', code = RNOKPP, name = 'Тестенко Олена Петрівна' } = {}) {
-  const f = page.locator('#connect-form');
-  await f.getByLabel(type === 'fop' ? 'ФОП' : 'ТОВ', { exact: true }).check();
-  await f.getByLabel(type === 'fop' ? 'ПІБ підприємця' : 'Повна назва юридичної особи').fill(name);
-  await f.getByLabel(type === 'fop' ? 'РНОКПП (ІПН)' : 'Код ЄДРПОУ').fill(code);
-  if (type === 'tov') await f.getByLabel('Керівник (ПІБ)').fill('Директоренко Іван');
-  await f.getByLabel('Email для документів').fill('owner@example.com');
-  await f.getByLabel('Телефон відповідальної особи').fill('+380 67 000 00 99');
-  await f.locator('[data-doc="registry"]').setInputFiles({ name: 'vytiah-edr.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 test') });
-  await expect(f).toContainText('vytiah-edr.pdf');
-  await f.getByLabel('IBAN').fill(IBAN);
-  await f.getByLabel('Отримувач', { exact: true }).fill(type === 'fop' ? 'ФОП Тестенко О. П.' : name);
-  await f.getByLabel('Код отримувача').fill(code);
-  await f.getByLabel(/приймаю оферту/).check();
-}
-
-test('нова точка: підключення ФОП, перевірка CARCAR і поява в каталозі', async ({ page }) => {
-  await newPlace(page);
-  await expect(page.getByRole('heading', { name: 'Підключення до CARCAR' })).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Статус підключення' })).toContainText('Чернетка');
-
-  // На інших екранах — нагадування, а клієнти точку ще не бачать.
-  await page.goto(`${PANEL}#/schedule`);
-  await expect(page.locator('.status-banner')).toContainText('Клієнти ще не бачать цю точку');
+  // Мийка вже в кабінеті, але клієнти її ще не бачать.
+  await page.goto(`${PRO}#/wash`);
+  await expect(page.getByRole('group', { name: 'Ваші мийки' })).toContainText('Автомийка «Хмаринка»');
+  await expect(page.locator('.notice.warn')).toContainText('Клієнти ще не бачать цю мийку: «На перевірці»');
+  await expect(page.getByRole('link', { name: 'Вказати рахунок для виплат' })).toBeVisible();
   await page.goto('/');
   await expect(page.getByText('Автомийка «Хмаринка»')).toHaveCount(0);
 
-  // Неправильний код одразу видно, заявку з ним не надіслати.
-  await page.goto(`${PANEL}#/connect`);
-  const f = page.locator('#connect-form');
-  await f.getByLabel('РНОКПП (ІПН)').fill('1234567890');
-  await expect(page.locator('#code-check')).toContainText('контрольна сума не збігається');
-  await f.getByLabel('IBAN').fill('UA00 3052 9900 0002 6001 2345 6789 0');
-  await expect(page.locator('#iban-check')).toContainText('контрольна сума не збігається');
-  await f.getByRole('button', { name: 'Надіслати на перевірку' }).click();
-  await expect(page.locator('#toast')).toContainText('Заповніть: юридична особа, документи, реквізити для виплат, договір-оферта');
+  // Неправильні реквізити не приймаються.
+  await fillPayout(page, { iban: 'UA00 3052 9900 0002 6001 2345 6789 0' });
+  await expect(page.locator('#toast')).toHaveText('Перевірте IBAN: UA і 27 цифр');
+  await fillPayout(page, { code: '1234567890' });
+  await expect(page.locator('#toast')).toHaveText('Перевірте РНОКПП чи ЄДРПОУ');
+  await fillPayout(page);
+  await expect(page.locator('#toast')).toHaveText('Рахунок надіслано на перевірку CARCAR');
+  await seedLegal(page, id);
 
-  await fillConnect(page);
-  await expect(page.locator('#code-check')).toContainText('Контрольна сума правильна');
-  await expect(page.locator('#iban-check')).toContainText('ПриватБанк (МФО 305299)');
-  await f.getByRole('button', { name: 'Надіслати на перевірку' }).click();
-  await expect(page.locator('#toast')).toHaveText('Заявку надіслано — CARCAR перевірить дані до 3 робочих днів');
-  await expect(page.getByRole('region', { name: 'Статус підключення' })).toContainText('На перевірці');
-  await expect(page.locator('.notice.ok')).toContainText('Тестенко Олена Петрівна');
-
-  // Модератор бачить заявку в черзі, усі автоматичні перевірки пройдено.
+  // Модератор бачить мийку в черзі й схвалює її.
   await page.goto(ADMIN);
   await expect(page.locator('.queue')).toContainText('1 точка чекає перевірки');
   await page.locator('#nav').getByRole('link', { name: /Точки/ }).click();
   await page.getByRole('link', { name: 'Автомийка «Хмаринка»' }).click();
   await expect(page.locator('.checks .bad-text')).toHaveCount(0);
-  await expect(page.locator('.checks')).toContainText('Оферту 1.0 прийнято');
   await page.getByRole('button', { name: 'Схвалити й додати в каталог' }).click();
   await expect(page.locator('#toast')).toHaveText('Точку підключено — вона вже в каталозі');
 
-  // Точка в каталозі, до неї можна записатися, а виплати дозволені.
+  // Мийка в каталозі, до неї можна записатися, а виплати дозволені.
   await page.goto('/');
   await page.getByRole('link', { name: /Автомийка «Хмаринка»/ }).first().click();
   await expect(page.getByRole('link', { name: 'Записатися онлайн' })).toBeVisible();
-  await page.goto(`${PANEL}#/finance`);
-  await expect(page.locator('.status-banner')).toHaveCount(0);
+  await page.goto(`${PRO}#/wash`);
+  await expect(page.locator('.notice.warn')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Немає коштів для виведення' })).toBeVisible();
 });
 
-test('модератор просить виправлення, точка виправляє; зміна IBAN зупиняє виплати до перевірки', async ({ page }) => {
-  await newPlace(page, 'СТО «Тест»');
-  await fillConnect(page, { type: 'tov', code: EDRPOU, name: 'ТОВ «Тест Авто»' });
-  await page.getByRole('button', { name: 'Надіслати на перевірку' }).click();
+test('рахунок для виплат: CARCAR перевіряє IBAN, зміна IBAN зупиняє виплати до перевірки', async ({ page }) => {
+  await demoSeed(page, 'Автомийка «Хвиля»');
+  await page.goto(`${PRO}#/wash`);
+  await page.getByRole('link', { name: 'Вказати рахунок для виплат' }).click();
+  await expect(page).toHaveURL(/#\/payout$/);
+  await fillPayout(page);
+  await expect(page.locator('#toast')).toHaveText('Рахунок надіслано на перевірку CARCAR');
+  await expect(page.locator('.notice.warn')).toContainText('Рахунок UA…7890 на перевірці CARCAR');
+  await page.goto(`${PRO}#/wash`);
+  await expect(page.getByRole('link', { name: 'Рахунок на перевірці CARCAR' })).toBeVisible();
+  await seedLegal(page, 'hvylia');
 
-  await page.goto(`${ADMIN}#/places`);
-  await page.getByRole('link', { name: 'СТО «Тест»' }).click();
-  await page.getByRole('button', { name: 'Потрібні виправлення' }).click();
-  await expect(page.locator('#toast')).toHaveText('Напишіть коментар для точки');
-  await page.getByLabel('Коментар для точки').fill('Додайте юридичну адресу з витягу');
-  await page.getByRole('button', { name: 'Потрібні виправлення' }).click();
-
-  await page.goto(`${PANEL}#/connect`);
-  await expect(page.locator('.connect-status')).toContainText('Потрібні виправлення');
-  await expect(page.locator('.connect-status')).toContainText('Додайте юридичну адресу з витягу');
-  await page.getByLabel('Юридична адреса').fill('м. Київ, вул. Тестова, 1');
-  await page.getByRole('button', { name: 'Надіслати на перевірку' }).click();
-  await page.goto(`${ADMIN}#/places`);
-  await page.getByRole('link', { name: 'СТО «Тест»' }).click();
-  await page.getByRole('button', { name: 'Схвалити й додати в каталог' }).click();
-
-  // Нові реквізити: точка лишається в каталозі, але виплати чекають перевірки.
-  await page.goto(`${PANEL}#/connect`);
-  await page.getByLabel('IBAN').fill('UA21 3220 0100 0002 6001 2345 6789 0');
-  await page.getByRole('button', { name: 'Надіслати зміни на перевірку' }).click();
-  await expect(page.locator('#toast')).toContainText('Заповніть: реквізити для виплат');
-  // Правильний IBAN monobank із тим самим рахунком.
-  const iban = await page.evaluate(() => {
-    const body = '3220010000026001234567890';
-    for (let cc = 0; cc < 100; cc++) {
-      const s = `UA${String(cc).padStart(2, '0')}${body}`;
-      const moved = `${s.slice(4)}3010${s.slice(2, 4)}`;
-      let r = 0;
-      for (const ch of moved) r = (r * 10 + Number(ch)) % 97;
-      if (r === 1) return s;
-    }
-    return '';
-  });
-  await page.getByLabel('IBAN').fill(iban);
-  await expect(page.locator('#iban-check')).toContainText('monobank');
-  await page.getByRole('button', { name: 'Надіслати зміни на перевірку' }).click();
-  await expect(page.locator('.connect-status')).toContainText('Реквізити на перевірці');
-  await page.goto(`${PANEL}#/finance`);
-  await expect(page.getByText('Реквізити на перевірці CARCAR')).toBeVisible();
-  await page.goto('/');
-  await expect(page.getByRole('link', { name: /СТО «Тест»/ }).first()).toBeVisible();
-
-  await page.goto(`${ADMIN}#/places/`);
-  await page.getByRole('link', { name: 'СТО «Тест»' }).click();
+  await page.goto(ADMIN);
+  await expect(page.locator('.queue')).toContainText('1 точка чекає перевірки');
+  await page.goto(`${ADMIN}#/places/hvylia`);
+  await expect(page.locator('#h-pay').locator('..')).toContainText('Не перевірено — виплати призупинені');
   await page.getByRole('button', { name: 'Підтвердити зміни й реквізити' }).click();
   await expect(page.locator('#toast')).toHaveText('Зміни підтверджено, виплати дозволені');
 
-  // Призупинення прибирає точку з каталогу.
+  // Тепер можна вивести гроші.
+  await page.goto(`${PRO}#/wash`);
+  page.once('dialog', (dl) => dl.accept());
+  await page.getByRole('button', { name: /^Вивести .* на UA…7890$/ }).click();
+  await expect(page.locator('#toast')).toHaveText('Виплату відправлено на рахунок UA…7890');
+  await expect(page.locator('.plain-list')).toBeVisible();
+
+  // Новий IBAN: виплати зупинені, доки CARCAR не перевірить; мийка лишається в каталозі.
+  await fillPayout(page, { iban: MONO_IBAN });
+  await expect(page.locator('#toast')).toHaveText('Рахунок надіслано на перевірку CARCAR');
+  await page.goto(`${PRO}#/wash`);
+  await expect(page.getByRole('link', { name: 'Рахунок на перевірці CARCAR' })).toBeVisible();
+  await expect(page.locator('[data-action="payout"]')).toHaveCount(0);
+  await page.goto('/');
+  await expect(page.getByRole('link', { name: /Автомийка «Хвиля»/ }).first()).toBeVisible();
+
+  await page.goto(`${ADMIN}#/places/hvylia`);
+  await expect(page.locator('.checks')).toContainText('monobank');
+  await page.getByRole('button', { name: 'Підтвердити зміни й реквізити' }).click();
+  await expect(page.locator('#toast')).toHaveText('Зміни підтверджено, виплати дозволені');
+  await page.goto(`${PRO}#/wash`);
+  await expect(page.locator('[data-action="payout"]')).toHaveText(/Немає коштів для виведення|на UA…\d{4}/);
+
+  // Призупинення прибирає мийку з каталогу.
+  await page.goto(`${ADMIN}#/places/hvylia`);
   await page.getByLabel('Коментар для точки').fill('Скарги клієнтів, перевіряємо');
   await page.getByRole('button', { name: 'Призупинити в каталозі' }).click();
   await page.goto('/');
-  await expect(page.getByRole('link', { name: /СТО «Тест»/ })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /Автомийка «Хвиля»/ })).toHaveCount(0);
 });
 
 test('скарга точки на відгук: модератор приховує, рейтинг перераховується', async ({ page }) => {
@@ -206,11 +207,12 @@ test('скарга точки на відгук: модератор прихов
   await expect(page.locator('.meta .rating').first()).toHaveText('3,0');
   await expect(page.getByText('шахрай')).toBeVisible();
 
-  await page.goto(`${PANEL}#/reviews`);
-  await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
+  await proWash(page, 'Автомийка «Хвиля»');
+  await page.goto(`${PRO}#/reviews`);
   page.once('dialog', (d) => d.accept('Персональні дані й образи майстра'));
-  await page.locator('article', { hasText: 'шахрай' }).getByRole('button', { name: 'Поскаржитися модератору' }).click();
-  await expect(page.locator('#toast')).toHaveText('Скаргу надіслано модератору CARCAR');
+  await page.locator('.pro-review', { hasText: 'шахрай' }).getByRole('button', { name: 'Поскаржитися модератору' }).click();
+  await expect(page.locator('#toast')).toHaveText('Скаргу надіслано модератору');
+  await expect(page.locator('.pro-review', { hasText: 'шахрай' })).toContainText('Скаргу надіслано модератору CARCAR.');
 
   await page.goto(ADMIN);
   await expect(page.locator('.queue')).toContainText('1 скарга на відгуки');
@@ -224,8 +226,10 @@ test('скарга точки на відгук: модератор прихов
   await page.goto('/#/place/hvylia');
   await expect(page.getByText('шахрай')).toHaveCount(0);
   await expect(page.locator('.meta .rating').first()).toHaveText('5,0');
-  await page.goto(`${PANEL}#/reviews`);
-  await expect(page.locator('article', { hasText: 'шахрай' })).toContainText('Приховано модератором CARCAR: Персональні дані');
+  await page.goto(`${PRO}#/reviews`);
+  const hidden = page.locator('.pro-review', { hasText: 'шахрай' });
+  await expect(hidden).toContainText('приховано модератором');
+  await expect(hidden.getByRole('button', { name: 'Поскаржитися модератору' })).toHaveCount(0);
 });
 
 test('спір: модератор ділить суму, клієнт отримує решту на баланс', async ({ page }) => {
@@ -237,10 +241,7 @@ test('спір: модератор ділить суму, клієнт отри�
   await page.locator('[data-action="confirm"]').click();
   await page.getByRole('button', { name: 'Оплатити 900 ₴' }).click();
   await page.clock.setFixedTime(new Date(2026, 9, 5, 21, 30));
-  await page.goto(`${PANEL}#/schedule/2026-10-05`);
-  await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
-  await page.locator('.slot-block').first().click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Машина готова' }).click();
+  await washReady(page);
   await page.goto('/#/bookings');
   page.once('dialog', (d) => d.accept('Не відбалансували одне колесо'));
   await page.getByRole('button', { name: 'Відкрити спір' }).click();
@@ -258,12 +259,11 @@ test('спір: модератор ділить суму, клієнт отри�
   await expect(page.getByRole('region', { name: 'Баланс CARCAR' }).locator('.bonus-sum')).toHaveText('300 ₴');
   await page.goto('/#/bookings');
   await expect(page.locator('article', { hasText: 'Автомийка «Хвиля»' })).toContainText('Повернено 300 ₴ на баланс CARCAR, 600 ₴ отримала точка');
-  await page.goto('/#/partner');
-  await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
-  await expect(page.getByRole('region', { name: 'Баланс' })).toContainText('Доступно до виведення600 ₴');
+  await proWash(page, 'Автомийка «Хвиля»');
+  await expect(page.getByRole('region', { name: 'Гроші через CARCAR' })).toContainText('Можна вивести600 ₴');
 });
 
-test('комісії: загальна й індивідуальна ставка впливають на виплати й звіт точки', async ({ page }) => {
+test('комісії: загальна й індивідуальна ставка впливають на виплати точки', async ({ page }) => {
   await page.goto(`${ADMIN}#/commission`);
   await page.getByLabel('Комісія, %').fill('8');
   await page.getByRole('button', { name: 'Зберегти', exact: true }).click();
@@ -277,18 +277,37 @@ test('комісії: загальна й індивідуальна ставк�
   await expect(page.locator('.special-list')).toContainText('Автомийка «Хвиля»');
   await expect(page.locator('.special-list')).toContainText('5%');
 
-  await page.goto(`${PANEL}#/finance`);
-  await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
-  await expect(page.locator('table.pnl')).toContainText('Комісія CARCAR, 5%');
-  await page.getByLabel('Точка').selectOption({ label: 'Аква 24' });
-  await expect(page.locator('table.pnl')).toContainText('Комісія CARCAR, 8%');
+  // Мийки з перевіреним рахунком і грошима до виведення: комісія утримується під час виплати.
+  await page.evaluate((iban) => {
+    const all = JSON.parse(localStorage.getItem('carcar.partners') ?? '{}');
+    for (const id of ['hvylia', 'aqua24']) all[id] = { ...all[id], payout: { iban, holder: 'ФОП Тестенко О. П.', code: '1234567899', verified: true } };
+    localStorage.setItem('carcar.partners', JSON.stringify(all));
+  }, IBAN.replace(/\s/g, ''));
+  for (const [name, pct] of [['Автомийка «Хвиля»', 5], ['Аква 24', 8]]) {
+    await demoSeed(page, name);
+    await page.goto(`${PRO}#/wash`);
+    const money = page.getByRole('region', { name: 'Гроші через CARCAR' });
+    await expect(money).toContainText(`Комісія CARCAR ${pct}% утримується під час виведення`);
+    const available = Number((await money.locator('.money-row', { hasText: 'Можна вивести' }).locator('b').innerText()).replace(/\D/g, ''));
+    expect(available).toBeGreaterThan(0);
+    const fee = Math.round(available * pct / 100);
+    const net = (available - fee).toLocaleString('uk-UA').replace(/\s/g, '');
+    const btn = money.getByRole('button', { name: /^Вивести / });
+    expect((await btn.innerText()).replace(/\s/g, '')).toBe(`Вивести${net}₴наUA…7890`);
+    let msg = '';
+    page.once('dialog', (dl) => { msg = dl.message(); dl.accept(); });
+    await btn.click();
+    await expect(page.locator('#toast')).toHaveText('Виплату відправлено на рахунок UA…7890');
+    expect(msg.replace(/\s/g, '')).toContain(`Комісія${fee.toLocaleString('uk-UA').replace(/\s/g, '')}₴`);
+    expect((await money.locator('.plain-list li b').first().innerText()).replace(/\s/g, '')).toBe(`${net}₴`);
+  }
+  await page.goto(`${ADMIN}#/commission`);
+  await expect(page.getByRole('region', { name: 'Виплати точкам' })).toContainText('Автомийка «Хвиля»');
+  await expect(page.getByRole('region', { name: 'Виплати точкам' })).toContainText('Аква 24');
 });
 
 test('огляд платформи рахує оборот і комісію з демо-історії', async ({ page }) => {
-  await page.goto(PANEL);
-  await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Блиск»' });
-  await page.getByRole('button', { name: 'Заповнити демо-історію' }).click();
-  await expect(page.locator('#toast')).toContainText('демо-записів');
+  await demoSeed(page, 'Автомийка «Блиск»');
 
   await page.goto(ADMIN);
   const kpis = page.getByRole('region', { name: 'Показники платформи' });
@@ -300,7 +319,7 @@ test('огляд платформи рахує оборот і комісію з
   await expect(row).toContainText('10%');
 });
 
-for (const path of [`${ADMIN}#/`, `${ADMIN}#/places`, `${ADMIN}#/places/hvylia`, `${ADMIN}#/reviews`, `${ADMIN}#/disputes`, `${ADMIN}#/commission`, `${PANEL}#/connect`, `${PANEL}#/offer`]) {
+for (const path of [`${ADMIN}#/`, `${ADMIN}#/places`, `${ADMIN}#/places/hvylia`, `${ADMIN}#/reviews`, `${ADMIN}#/disputes`, `${ADMIN}#/commission`]) {
   test(`доступність і верстка ${path}`, async ({ page }) => {
     await page.goto(path);
     await page.locator('#view h1').waitFor();

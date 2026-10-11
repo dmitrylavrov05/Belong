@@ -3,50 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>CARCAR для бізнесу</title>
-  <meta name="description" content="Панель для автомийок і детейлінг-студій: журнал по боксах, клієнти, прайс, фінанси й аналітика.">
-  <meta name="theme-color" content="#c8402b">
-  <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="preload" href="fonts/onest-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="business.css">
+  <title>CarCar Business</title>
+  <link rel="icon" href="pro-icon.svg" type="image/svg+xml">
+  <script>
+    // Стару панель для бізнесу замінив застосунок CarCar Business. Старі посилання ведуть у відповідний розділ.
+    const map = { schedule: 'bookings', requests: '', finance: 'wash', expenses: 'analytics', settings: 'profile', services: 'profile',
+      reviews: 'reviews', clients: 'clients', support: 'support', connect: 'payout', login: '' };
+    const page = location.hash.replace(/^#\/?/, '').split('/')[0];
+    location.replace(`pro.html#/${map[page] ?? ''}`);
+  </script>
 </head>
-<body class="biz crm">
-  <div class="biz-shell">
-    <aside class="biz-side">
-      <a class="brand" href="#/" aria-label="CARCAR для бізнесу, огляд"><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#c8402b"/><path d="M15 10.5a6 6 0 1 0 0 11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/><path d="M24 10.5a6 6 0 1 0 0 11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".6"/></svg><span><span class="c1">CAR</span><span class="c2">CAR</span><small>для бізнесу</small></span></a>
-      <div class="sheet-head"><b>Усі розділи</b><button class="icon-btn" type="button" data-action="menu-close" aria-label="Закрити меню">✕</button></div>
-      <nav class="biz-nav" id="nav" aria-label="Розділи панелі"></nav>
-      <p class="keys-hint" id="keys-hint">Клавіші: <kbd>/</kbd> пошук · <kbd>N</kbd> новий запис · <kbd>T</kbd> сьогодні · <kbd>←</kbd><kbd>→</kbd> дні в розкладі</p>
-      <button class="logout" id="logout" type="button" data-action="logout">Вийти</button>
-      <a class="to-app" id="to-app" href="index.html"></a>
-    </aside>
-    <div class="biz-main">
-      <header class="biz-top">
-        <label class="field"><span>Точка</span><select id="place"></select></label>
-        <label class="field"><span>Ви</span><select id="as"></select></label>
-        <label class="field power-field"><span>Світло</span><select id="power"></select></label>
-        <div class="biz-search" role="search">
-          <label><span class="sr-only">Пошук клієнта</span><input id="biz-q" type="search" autocomplete="off" placeholder="Клієнт, телефон, авто чи № запису" aria-describedby="keys-hint" aria-controls="biz-q-res"></label>
-          <div class="search-res" id="biz-q-res" hidden></div>
-        </div>
-        <span class="spacer"></span>
-        <details class="menu" id="demo-menu">
-          <summary class="btn">Демо-дані</summary>
-          <div class="menu-list">
-            <button type="button" data-action="demo-fill">Заповнити історію за 90 днів<small>Записи, клієнти й виплати для вибраної точки</small></button>
-            <button type="button" data-action="demo-clear">Очистити демо-дані<small>Ваші записи й нотатки залишаться</small></button>
-          </div>
-        </details>
-        <button class="btn primary" type="button" data-action="new-booking" id="new-booking"></button>
-      </header>
-      <main id="view" tabindex="-1"></main>
-    </div>
-  </div>
-  <nav class="crm-tabs" id="tabbar" aria-label="Основні розділи"></nav>
-  <div id="drawer-root"></div>
-  <div class="tip" id="tip" hidden></div>
-  <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="business.js"></script>
-</body>
+<body><p><a href="pro.html">Відкрити CarCar Business</a></p></body>
 </html>

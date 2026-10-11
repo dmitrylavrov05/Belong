@@ -100,7 +100,7 @@ test('записи по днях: швидкий запис дзвінка за�
   await page.getByRole('dialog').getByRole('button', { name: /Експрес-мийка кузова/ }).click();
   await page.getByRole('group', { name: 'День' }).getByRole('button', { name: 'Завтра' }).click();
   await page.getByRole('group', { name: 'Вільний час' }).getByRole('button', { name: '10:00' }).click();
-  await page.getByRole('button', { name: 'Записати на 10:00' }).click();
+  await page.getByRole('button', { name: 'Записати на 10:00', exact: true }).click();
   await expect(page.locator('.toast')).toContainText('Записано: Петро, завтра о 10:00');
   await expect(page).toHaveURL(/#\/bookings\/2026-10-05$/);
   const row = page.locator('.bk-row', { hasText: 'Петро' });
@@ -187,16 +187,25 @@ test('питання клієнта: додати послугу й відпов
   await expect(page.getByRole('button', { name: /Хімчистка стелі/ })).toBeVisible();
 });
 
-test('мийка: виручка, гроші й відповідь на відгук', async ({ page }) => {
+test('мийка: виручка й гроші; відгуки — в «Ще» з публічною відповіддю', async ({ page }) => {
   await seed(page, { bookings: [{ ...paid, id: 'b3', state: 'completed', date: '2026-10-01', completedAt: at(13, 0, 1), unfreezeAt: at(13, 0, 3), chat: undefined, chatUnreadBiz: false }] });
   await page.goto(`${PRO}#/wash`);
-  await page.evaluate(() => localStorage.setItem('carcar.reviews', JSON.stringify([{ id: 'v1', placeId: 'blysk', bookingId: 'b3', name: 'Ірина', rating: 5, text: 'Чисто й швидко', at: Date.now() }])));
+  await page.evaluate(() => localStorage.setItem('carcar.reviews', JSON.stringify([{ id: 'v1', placeId: 'blysk', bookingId: 'b3', stars: 5, text: 'Чисто й швидко', services: 'Комплекс: кузов + салон', date: '2026-10-01', clientKey: 'device', at: Date.now(), photos: [] }])));
   await page.reload();
   await expect(page.getByRole('region', { name: 'Виручка' })).toContainText('7 днів550 ₴');
   await expect(page.locator('.money-row').first()).toContainText('550 ₴');
-  await page.getByLabel('Відповідь на відгук').fill('Дякуємо, чекаємо знову!');
-  await page.getByRole('button', { name: 'Надіслати відповідь' }).click();
+  await expect(page.locator('.pro-review')).toHaveCount(0);
+
+  await page.getByRole('link', { name: 'Ще' }).click();
+  await page.getByRole('link', { name: /Відгуки/ }).click();
+  const review = page.locator('.pro-review');
+  await expect(review).toContainText('Ірина');
+  await expect(review).toContainText('Чисто й швидко');
+  await review.getByLabel('Відповідь на відгук: Ірина').fill('Дякуємо, чекаємо знову!');
+  await review.getByRole('button', { name: 'Надіслати відповідь' }).click();
   await expect(page.locator('.pro-review .reply')).toContainText('Дякуємо, чекаємо знову!');
+  await page.goto('/#/place/blysk');
+  await expect(page.locator('.review').first()).toContainText('Дякуємо, чекаємо знову!');
 });
 
 for (const path of ['#/', '#/bookings', '#/wash', '#/profile', '#/more', '#/chat/b-b1']) {
@@ -272,7 +281,7 @@ test('мийка відмовляє зі сповіщення — клієнт �
   await page.getByRole('button', { name: 'Відмовити й повернути гроші' }).click();
   await expect(page.locator('.toast')).toContainText('клієнт отримав гроші назад');
   await expect(page.locator('.bk-row')).toContainText('Скасовано');
-  await expect(page.locator('.free-row').first()).toContainText('08:00');
+  await expect(page.locator('.hour-free').first()).toContainText('08:00 · вільно 4 з 4');
 
   await page.goto('/#/bookings');
   const card = page.locator('article.bk').first();
@@ -416,3 +425,124 @@ test('відмов понад 30% — мийка нижче в пошуку, б�
   await page.goto('/#/place/blysk');
   await expect(page.locator('.reply-time')).toHaveText('Підтверджує запис зазвичай за 1 хв');
 });
+
+// ---------- профіль, кілька мийок, аналітика й знижки ----------
+
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+
+test('профіль: аватар, фото, назва, адреса й опис одразу бачать клієнти', async ({ page }) => {
+  await page.goto(`${PRO}#/profile`);
+  const info = page.locator('#pf-info');
+  await info.getByLabel('Аватар мийки').setInputFiles({ name: 'a.png', mimeType: 'image/png', buffer: PNG });
+  await expect(page.locator('.toast')).toContainText('Аватар оновлено');
+  await page.locator('#pf-info').getByLabel('Додати фото мийки').setInputFiles([{ name: '1.png', mimeType: 'image/png', buffer: PNG }, { name: '2.png', mimeType: 'image/png', buffer: PNG }]);
+  await expect(page.locator('.toast')).toContainText('Додано 2 фото');
+  await expect(page.locator('.photo-grid figure')).toHaveCount(2);
+  await page.locator('#pf-info').getByLabel('Назва').fill('Автомийка «Блиск Преміум»');
+  await page.locator('#pf-info').getByLabel('Адреса').fill('вул. Антоновича, 50');
+  await page.locator('#pf-info').getByLabel('Опис').fill('Кава поки чекаєте, безконтактна мийка за 20 хвилин.');
+  await page.locator('#pf-info').getByRole('button', { name: 'Зберегти' }).click();
+  await expect(page.locator('.toast')).toContainText('клієнти бачать оновлений профіль');
+
+  await page.goto('/#/place/blysk');
+  await expect(page.getByRole('heading', { name: 'Автомийка «Блиск Преміум»' })).toBeVisible();
+  await expect(page.locator('.place-ava')).toBeVisible();
+  await expect(page.locator('.place-about')).toHaveText('Кава поки чекаєте, безконтактна мийка за 20 хвилин.');
+  await expect(page.getByRole('img', { name: 'Автомийка «Блиск Преміум», фото 2' })).toBeAttached();
+  await expect(page.locator('.infobox')).toContainText('вул. Антоновича, 50');
+});
+
+test('кілька мийок: додати другу мийку, перемикатися, адмін її підключає', async ({ page }) => {
+  await page.goto(`${PRO}#/wash`);
+  const sw = page.getByRole('group', { name: 'Ваші мийки' });
+  await expect(sw.getByRole('button', { name: /Автомийка «Блиск»/ })).toHaveAttribute('aria-pressed', 'true');
+  await sw.getByRole('button', { name: 'Додати мийку' }).click();
+  const form = page.getByRole('dialog', { name: 'Нова мийка' });
+  await form.getByLabel('Назва').fill('Автомийка «Блиск» на Оболоні');
+  await form.getByLabel('Адреса').fill('просп. Оболонський, 1');
+  await form.getByLabel('Телефон').fill('+380 44 000 11 22');
+  await form.getByRole('button', { name: 'Додати мийку' }).click();
+  await expect(page).toHaveURL(/#\/profile$/);
+  await expect(page.locator('.pro-top')).toContainText('Автомийка «Блиск» на Оболоні');
+
+  await page.getByRole('link', { name: 'Мийка' }).click();
+  await expect(page.getByRole('group', { name: 'Ваші мийки' }).getByRole('button', { name: /на Оболоні/ })).toContainText('на перевірці');
+  await expect(page.locator('main')).toContainText('Клієнти ще не бачать цю мийку');
+  await page.getByRole('group', { name: 'Ваші мийки' }).getByRole('button', { name: /Автомийка «Блиск» Київ/ }).click();
+  await expect(page.locator('.pro-top')).toContainText('Автомийка «Блиск»');
+
+  await page.goto('/admin.html#/places');
+  await page.getByRole('link', { name: 'Автомийка «Блиск» на Оболоні' }).click();
+  await expect(page.locator('main')).toContainText('просп. Оболонський, 1');
+});
+
+test('аналітика знаходить тихі години, мийка вмикає знижку — клієнт бачить її під час запису', async ({ page }) => {
+  await page.goto(`${PRO}#/more`);
+  await page.getByRole('button', { name: /Заповнити прикладом/ }).click();
+  await page.getByRole('dialog', { name: 'Новий запис' }).getByRole('button', { name: 'Пізніше' }).click();
+  await page.getByRole('link', { name: 'Мийка' }).click();
+  const card = page.getByRole('region', { name: /Знижка на тихі години/ });
+  await expect(card).toContainText('Пн–Пт, 08:00–11:00');
+  await page.getByRole('link', { name: /Аналітика/ }).click();
+  await expect(page.getByRole('region', { name: 'Завантаження по годинах', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: /Підсумки за 30 днів/ })).toContainText('Виручка');
+  await page.getByRole('button', { name: 'Увімкнути −20%' }).first().click();
+  await expect(page.locator('.toast')).toContainText('Знижку −20% увімкнено: Пн–Пт, 08:00–11:00');
+  await expect(page.getByRole('region', { name: /Знижка на тихі години/ })).toContainText('−20% Пн–Пт, 08:00–11:00');
+
+  // Клієнт записується на понеділок: о 09:00 ціна зі знижкою, закреслена стара.
+  await page.goto('/#/book/blysk');
+  await page.getByLabel(/Експрес-мийка кузова/).check();
+  await page.locator('[data-action="to-time"]').click();
+  await page.getByRole('button', { name: /Завтра/ }).click();
+  const slot = page.getByRole('button', { name: '09:00, знижка 20%, 200 ₴ замість 250 ₴' });
+  await expect(slot).toBeVisible();
+  await expect(slot.locator('.slot-pct')).toHaveText('−20%');
+  await slot.click();
+  await expect(page.locator('.save-pill')).toContainText('Знижка за тихий час −20%: ви економите 50 ₴');
+});
+
+test('рахунок для виплат, підтримка й клієнти — в «Ще»', async ({ page }) => {
+  await seed(page, { bookings: [{ ...paid, chat: undefined, chatUnreadBiz: false }] });
+  await page.goto(`${PRO}#/more`);
+  await page.getByRole('link', { name: /Рахунок для виплат/ }).click();
+  await page.getByLabel('IBAN').fill('UA00 0000');
+  await page.getByLabel('Отримувач (ФОП чи назва ТОВ)').fill('ФОП Петренко');
+  await page.getByLabel('РНОКПП (ФОП) чи ЄДРПОУ (ТОВ)').fill('1234567899');
+  await page.getByRole('button', { name: 'Надіслати на перевірку' }).click();
+  await expect(page.locator('.toast')).toContainText('Перевірте IBAN');
+  await page.getByLabel('IBAN').fill('UA223052990000026001234567890');
+  await page.getByRole('button', { name: 'Надіслати на перевірку' }).click();
+  await expect(page.locator('.toast')).toContainText('Рахунок надіслано на перевірку CARCAR');
+  await expect(page.locator('main')).toContainText('на перевірці CARCAR');
+
+  await page.goto(`${PRO}#/support`);
+  await page.getByLabel('Тема').selectOption({ label: 'Виплати й комісія' });
+  await page.getByLabel('Опишіть питання').fill('Коли перевірите рахунок?');
+  await page.getByRole('button', { name: 'Надіслати', exact: true }).click();
+  await expect(page.locator('.toast')).toContainText(/Звернення №\d+ надіслано в CARCAR/);
+  await expect(page.locator('.ticket-thread')).toContainText('Коли перевірите рахунок?');
+
+  await page.goto(`${PRO}#/clients`);
+  await expect(page.locator('.client-list')).toContainText('Ірина');
+  const no = await page.evaluate(() => JSON.parse(localStorage.getItem('carcar.bookings'))[0].no);
+  await page.getByLabel('Пошук клієнта').fill(`№ ${no}`);
+  await page.getByRole('button', { name: new RegExp(`Запис № ${no}`) }).click();
+  await expect(page.getByRole('dialog')).toContainText('Ірина');
+  await page.getByRole('dialog').getByRole('button', { name: 'Закрити' }).click();
+  await page.getByLabel('Пошук клієнта').fill('rav4');
+  await expect(page.locator('.client-list li')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Записати' }).click();
+  await expect(page.getByLabel('Імʼя')).toHaveValue('Ірина');
+});
+
+for (const path of ['#/analytics', '#/reviews', '#/clients', '#/payout', '#/support']) {
+  test(`доступність CarCar Business ${path}`, async ({ page }) => {
+    await seed(page, { bookings: [{ ...paid, chat: undefined, chatUnreadBiz: false, state: 'completed', date: '2026-10-01' }] });
+    await page.goto(`${PRO}${path}`);
+    await page.locator('#view h1').waitFor();
+    const { violations } = await new AxeBuilder({ page }).analyze();
+    expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(', ')}`)).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+}

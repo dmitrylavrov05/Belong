@@ -3,12 +3,12 @@ import {
   store, icon, esc, uah, pad, hhmm, toMin, isoDate, parseDate, uid, placeById, plural, duration, dayLabel, rating, tel,
   hoursFor, scheduleOf, inBreak, rangeText, WEEKDAY_NAMES, weekdayOf, phoneKey, offersOf, offerAsService, isOpenNow, hoursText, bookingStart, fmtTime, fmtDate, km, serviceCat, catById, shrinkPhoto,
   confirmBy, offerBy, pauseOf, responseStats, msText, AWAITING,
-  applyOverrides, isListed, payoutReady, maskIban, commissionFor, resolveDispute, visibleReviews, ACTIVE, BLOCKING, HOUR, isCarcar, price, complete, isFrozen, placeShare, balanceFor, settleAll, ratingFor,
-  POWER, powerOf, worksInBlackout, TICKET_TOPICS, CLIENT_TOPICS, TICKET_STATUS, ticketsAll, openTicket, ticketReply, setTicket, isBlocked, mobileOn, spanOf, laneCap, sameLane, MOBILE_ROAD, promosAll, promoCheck, promoText,
+  applyOverrides, isListed, visibleReviews, ACTIVE, BLOCKING, HOUR, price, isFrozen, settleAll, ratingFor,
+  powerOf, worksInBlackout, TICKET_TOPICS, CLIENT_TOPICS, TICKET_STATUS, ticketsAll, openTicket, ticketReply, setTicket, isBlocked, mobileOn, spanOf, laneCap, sameLane, MOBILE_ROAD, promosAll, promoCheck,
   enterView, bizApps, saveBizApps, APP_STATUS, numberBookings, bookingNo, findByNo, ticketPhotos,
 } from './core.js';
 import {
-  CHANNELS, inboxFor, markRead, sendMessages, dealsOf, dealsOn, weeklyDealsOf, daysText, dealAt, dealPrice, dealCovers, hotDeals,
+  inboxFor, markRead, sendMessages, dealsOf, dealsOn, weeklyDealsOf, daysText, dealAt, dealPrice, dealCovers, hotDeals,
   checkWaitlist, expirePending, autoConfirmOf, acceptOffer, rejectOffer, openStarts, passesOf, sellPass, passActive, passLeft, usableSubs, findCert, redeemPass, restorePass,
   chatPost, chatTimeline, readMessages, msgPreview, presenceOf, PRESENCE_KEY, CLIENT_QUICK, ITEM_KIND, itemSum, estimateTotal, warrantyUntil,
 } from './ops.js';
@@ -44,7 +44,7 @@ let profile = { name: '', phone: '', optIn: false, ...store.get('profile', {}) }
 // Записи цього клієнта — те, що він бачить у «Мої записи».
 const mine = () => bookings.filter((b) => !b.source);
 
-const ui = { view: store.get('view', 'list'), cat: 'all', q: '', sort: 'rating', openNow: false, favOnly: false, cls: store.get('cls', 0), city: store.get('city', 'Київ'), carId: store.get('carId', null), partner: store.get('partner', null) };
+const ui = { view: store.get('view', 'list'), cat: 'all', q: '', sort: 'rating', openNow: false, favOnly: false, cls: store.get('cls', 0), city: store.get('city', 'Київ'), carId: store.get('carId', null) };
 let draft = null; // чернетка запису: { placeId, services: Set, date, time, carId, paying }
 
 // ---------- утиліти ----------
@@ -59,8 +59,6 @@ function minPrice(place, cat, cls) {
 // ---------- рейтинг з відгуків ----------
 
 const ratingOf = (placeId) => ratingFor(placeId, reviews);
-const partnerIban = (placeId) => maskIban(store.get('partners', {})[placeId]?.payout?.iban ?? '');
-const pctText = (k) => `${(k * 100).toLocaleString('uk-UA', { maximumFractionDigits: 1 })}%`;
 
 const reviewsWord = (n) => plural(n, 'відгук', 'відгуки', 'відгуків');
 
@@ -391,10 +389,15 @@ function coverArt(p, i) {
 }
 
 // Карусель обкладинок: гортається пальцем, крапки показують, яке фото зараз.
+const safeImg = (src) => (typeof src === 'string' && src.startsWith('data:image/') ? esc(src) : '');
+
+// Фото, які мийка завантажила в CarCar Business; поки їх немає — намальовані обкладинки.
 function coverCarousel(p, href, cls = '') {
+  const photos = (p.photos ?? []).map(safeImg).filter(Boolean);
+  const slides = photos.length ? photos.map((src, i) => `<img src="${src}" alt="${esc(p.name)}, фото ${i + 1}" loading="lazy">`) : [0, 1, 2].map((i) => coverArt(p, i));
   return `<div class="pc-cover ${cls}">
-    <a class="pc-slides" href="${href}" aria-label="${esc(p.name)}">${[0, 1, 2].map((i) => `<div class="pc-slide">${coverArt(p, i)}</div>`).join('')}</a>
-    <div class="pc-dots" aria-hidden="true"><i class="on"></i><i></i><i></i></div>
+    <a class="pc-slides" href="${href}" aria-label="${esc(p.name)}">${slides.map((x) => `<div class="pc-slide">${x}</div>`).join('')}</a>
+    ${slides.length > 1 ? `<div class="pc-dots" aria-hidden="true">${slides.map((_, i) => `<i${i ? '' : ' class="on"'}></i>`).join('')}</div>` : ''}
   </div>`;
 }
 
@@ -655,7 +658,8 @@ function viewPlace(id) {
   const todayH = hoursFor(p, isoDate(new Date()));
   return `<div class="topbar">${back('#/', 'Усі місця')}${favButton(p, false)}</div>
     ${coverCarousel(p, `#/book/${p.id}`, 'hero')}
-    <h1>${esc(p.name)}</h1>
+    <h1 class="place-h">${safeImg(p.avatar) ? `<img class="place-ava" src="${safeImg(p.avatar)}" alt="">` : ''}<span>${esc(p.name)}</span></h1>
+    ${p.about ? `<p class="place-about">${esc(p.about)}</p>` : ''}
     ${list.length || ui.pos ? `<div class="meta lg" style="margin-top:-4px">
       ${ratingBadge(p.id)}
       ${ui.pos ? `<span class="travel">${icon('carSide', 16)}${travelText(p)}</span>` : ''}
@@ -1057,7 +1061,7 @@ function renderBook() {
   const free = slots.filter((s) => !s.busy);
   const step = draft.paying ? 'pay' : draft.step === 'time' && chosen.length && where.ok ? 'time' : 'svc';
   const when = draft.time ? `${dayLabel(draft.date, { day: 'numeric', month: 'long' })}, ${draft.time}` : '';
-  const pills = `${q.deal ? `<p class="save-pill">${icon('bolt', 14)}${q.deal.days ? 'Щасливі години' : 'Гаряче вікно'} −${q.deal.pct}%: ви економите ${uah(q.listTotal - total)}</p>` : ''}
+  const pills = `${q.deal ? `<p class="save-pill">${icon('bolt', 14)}${q.deal.source === 'quiet' ? 'Знижка за тихий час' : q.deal.days ? 'Щасливі години' : 'Гаряче вікно'} −${q.deal.pct}%: ви економите ${uah(q.listTotal - total)}</p>` : ''}
       ${q.promo ? `<p class="save-pill">${icon('gift', 14)}${esc(q.promo.title)}: −${uah(q.promo.amount)} за промокодом ${esc(q.promo.code)}</p>` : ''}`;
   const priceTag = `${q.deal || q.promo ? `<s class="muted">${uah(q.listTotal)}</s> ` : ''}${uah(q.rest)}`;
   let html = '';
@@ -1136,7 +1140,7 @@ function renderBook() {
           const sum = d ? chosen.reduce((a, y) => a + (!y.personal && dealCovers(d, y.id) ? dealPrice(y.price[cls], d.pct) : y.price[cls]), 0) : 0;
           const off = d && sum < q.listTotal;
           return `<button class="slot${off ? ' hot' : ''}" data-action="time" data-time="${x.time}"
-            ${x.busy ? `disabled aria-label="${x.time}, зайнято"` : off ? `aria-label="${x.time}, знижка ${d.pct}%, ${uah(sum)}"` : ''} aria-pressed="${x.time === draft.time}">${x.time}${off ? `<small>−${d.pct}% · ${uah(sum)}</small>` : ''}</button>`;
+            ${x.busy ? `disabled aria-label="${x.time}, зайнято"` : off ? `aria-label="${x.time}, знижка ${d.pct}%, ${uah(sum)} замість ${uah(q.listTotal)}"` : ''} aria-pressed="${x.time === draft.time}">${off ? `<span class="slot-pct" aria-hidden="true">−${d.pct}%</span>` : ''}${x.time}${off ? `<small aria-hidden="true"><s>${uah(q.listTotal)}</s> ${uah(sum)}</small>` : ''}</button>`;
         }).join('')}</div>`;
       }).join('')
       : '<p class="muted">На цей день вільного часу немає. Оберіть інший день або станьте в лист очікування.</p>'}
@@ -1333,7 +1337,6 @@ function settle() {
   if (done || expired) save();
 }
 
-const balanceOf = (placeId) => balanceFor(placeId, bookings, payouts);
 
 // До дедлайну — повне повернення на баланс CARCAR; пізніше оплата зараховується точці за послугу.
 // Умови скасування: kind — free (вчасно, усе повертаємо) або late (пізно — оплата мийці).
@@ -2248,117 +2251,6 @@ function viewBookings(highlightId) {
       : `<h2 class="sr-only">Завершені записи</h2>${rest.length ? doneByMonth(rest, highlightId ?? focus) : `<div class="stack" style="margin-top:12px">${empty('calendar', 'Завершених записів ще немає.')}</div>`}${inviteCard()}`}`;
 }
 
-// ---------- кабінет точки ----------
-
-function partnerRow(b) {
-  const [cls, label] = isFrozen(b) ? ['go', 'Підтверджено · гроші заморожені'] : STATE_LABEL[b.state];
-  return `<a class="card prow" href="#/partner/${b.id}">
-    <div><div class="bk-status ${cls}">${label}</div>
-      <h3>${dayLabel(b.date, { day: 'numeric', month: 'short' })}, ${b.time} · ${esc(b.car)}</h3>
-      <div class="small muted" style="margin-top:2px">${b.services.map(esc).join(', ')}</div></div>
-    <span class="price">${uah(ACTIVE.includes(b.state) || isFrozen(b) ? price(b) : placeShare(b))}</span>
-  </a>`;
-}
-
-function viewPartner() {
-  if (!placeById(ui.partner)) ui.partner = PLACES[0].id;
-  const p = placeById(ui.partner);
-  const own = bookings.filter((b) => b.placeId === p.id && isCarcar(b)).sort((a, b) => bookingStart(a) - bookingStart(b));
-  const active = own.filter((b) => ACTIVE.includes(b.state));
-  const rest = own.filter((b) => !ACTIVE.includes(b.state)).reverse();
-  const bal = balanceOf(p.id);
-  const fee = Math.round(bal.available * commissionFor(p.id));
-  const ready = payoutReady(p.id);
-  const history = payouts.filter((x) => x.placeId === p.id).reverse();
-  const disputes = bookings.filter((b) => b.state === 'dispute').length;
-  return `${back('#/garage', 'Гараж')}<h1>Кабінет точки</h1>
-    <a class="card link-card" href="business.html" style="margin-bottom:12px">${icon('chart', 22)}<span>Повна панель для бізнесу
-      <small class="small muted" style="display:block;font-weight:400">Журнал по боксах, клієнти, прайс, фінанси й аналітика — зручно з компʼютера</small></span>${icon('chevR', 18)}</a>
-    <label class="field"><span>Точка</span><select id="partner-place">
-      ${PLACES.map((x) => `<option value="${x.id}" ${x.id === p.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}
-    </select></label>
-    <section class="card balance-card" aria-label="Баланс" style="margin-top:12px">
-      <div class="tiles">
-        <div class="tile ok"><span>Доступно до виведення</span><b>${uah(bal.available)}</b></div>
-        <div class="tile"><span>Заморожено</span><b>${uah(bal.frozen)}</b></div>
-      </div>
-      ${ready ? `<button class="btn primary block" data-action="payout" ${bal.available > 0 ? '' : 'disabled'}>
-        ${icon('card', 20)}${bal.available > 0 ? `Вивести ${uah(bal.available - fee)} на рахунок ${partnerIban(p.id)}` : 'Немає коштів для виведення'}
-      </button>` : `<a class="btn block" href="business.html#/connect">${icon('card', 20)}Вказати реквізити для виплат</a>
-      <p class="fine">Виплати йдуть на рахунок ФОП чи ТОВ. Після перевірки реквізитів CARCAR виведення стане доступним.</p>`}
-      <p class="fine">Гроші за замовлення заморожені, доки клієнт не підтвердить виконання, і ще ${PAYMENT.freezeHours} год після цього.${bal.next ? ` Найближче розморожування: ${uah(price(bal.next))} — ${fmtTime(bal.next.unfreezeAt)}.` : ''}
-        Комісія сервісу ${pctText(commissionFor(p.id))} утримується лише під час виведення${bal.available > 0 ? `: ${uah(fee)}` : ''}. Для клієнтів комісії немає.</p>
-    </section>
-    <a class="card link-card" href="business.html#/requests" style="margin-top:12px">${icon('chat', 22)}<span>Запити клієнтів
-      <small class="small muted" style="display:block;font-weight:400">Клієнти пишуть, якщо не знайшли потрібну послугу</small></span>
-      ${requests.filter((r) => r.placeId === p.id && r.unreadBiz).length ? `<span class="count">${requests.filter((r) => r.placeId === p.id && r.unreadBiz).length}</span>` : ''}${icon('chevR', 18)}</a>
-    <a class="card link-card" href="#/place/${p.id}" style="margin-top:12px">${icon('star', 22)}<span>Сторінка точки й відгуки<small class="small muted" style="display:block;font-weight:400">${ratingOf(p.id).count ? `Рейтинг ${rating(ratingOf(p.id).avg)} · ${ratingOf(p.id).count} ${reviewsWord(ratingOf(p.id).count)}` : 'Ще немає відгуків'}</small></span>${icon('chevR', 18)}</a>
-    <h2>Активні записи</h2>
-    <div class="stack">${active.length ? active.map(partnerRow).join('') : '<p class="muted">Активних записів немає.</p>'}</div>
-    ${rest.length ? `<h2>Завершені</h2><div class="stack">${rest.map(partnerRow).join('')}</div>` : ''}
-    ${history.length ? `<h2>Виплати</h2><div class="card">${history.map((x) => `<div class="head small">
-        <span>${fmtTime(x.at)}</span><span>${uah(x.net)} <span class="muted">(комісія ${uah(x.fee)})</span></span></div>`).join('')}</div>` : ''}
-    <h2>Для модератора</h2>
-    <a class="card link-card" href="admin.html">${icon('shield', 22)}<span>Адмінка CARCAR<small class="small muted" style="display:block;font-weight:400">Підключення точок, відгуки, спори, комісії й статистика</small></span>${icon('chevR', 18)}</a>
-    <a class="card link-card" href="#/disputes" style="margin-top:8px">${icon('scale', 22)}<span>Модерація спорів</span>
-      ${disputes ? `<span class="count">${disputes}</span>` : ''}${icon('chevR', 18)}</a>
-    <p class="note">Демо: записи, баланс і виплати зберігаються на цьому пристрої, тож клієнта й точку можна перевірити на одному телефоні.</p>`;
-}
-
-// Запис у кабінеті: фото результату, пробіг, код клієнта й дії майстра.
-function viewPartnerJob(id) {
-  const b = bookings.find((x) => x.id === id);
-  if (!b) return viewNotFound();
-  const started = bookingStart(b) <= new Date();
-  let body = '';
-  if (b.state === 'paid') {
-    body = `<form class="ready-form stack" data-id="${b.id}" style="gap:14px">
-        <label class="dropzone">${icon('camera', 24)}Додати фото результату (до 3)
-          <span class="photo-count" aria-live="polite"></span>
-          <input class="sr-only" name="photos" type="file" accept="image/*" capture="environment" multiple></label>
-        <label class="field"><span>Пробіг, км</span><input name="km" type="number" inputmode="numeric" min="0" autocomplete="off"></label>
-        <label class="field"><span>Коментар для клієнта</span><input name="note" autocomplete="off" placeholder="Наприклад, старі колодки в багажнику"></label>
-        <button class="btn primary block" type="submit">Машина готова</button>
-        <p class="fine">Клієнт отримає сповіщення й підтвердить виконання у своєму застосунку — тоді замовлення підтвердиться тут автоматично.</p>
-      </form>
-      ${b.extra ? `<p class="small muted" style="margin:0">Запит на доплату +${uah(b.extra.amount)} чекає відповіді клієнта.</p>` : ''}
-      ${b.extraDeclined ? '<p class="small muted" style="margin:0">Клієнт відхилив доплату.</p>' : ''}
-      <div class="row divider">
-        ${b.extra ? '' : `<button class="btn soft" data-action="extra" data-id="${b.id}">${icon('plus', 16)}Доплата</button>`}
-        ${started ? `<button class="btn text-danger" data-action="noshow" data-id="${b.id}">Клієнт не приїхав</button>` : ''}
-      </div>`;
-  } else if (b.state === 'done') {
-    body = `<p class="small muted" style="margin:0">Чекаємо підтвердження клієнта. Якщо він не відповість, замовлення підтвердиться автоматично ${fmtTime(b.doneAt + PAYMENT.autoReleaseHours * HOUR)}.</p>${result(b)}`;
-  } else if (isFrozen(b)) {
-    body = `<div class="notice ok">${icon('checkCircle', 22)}<div><b>Клієнт підтвердив виконання</b>${uah(price(b))} заморожено до ${fmtTime(b.unfreezeAt)}, потім їх можна вивести.</div></div>${result(b)}`;
-  } else if (b.state === 'dispute') {
-    body = `<div class="notice warn"><div class="label">Скарга клієнта</div>«${esc(b.disputeReason)}»</div>`;
-  } else {
-    body = result(b);
-  }
-  return `${back('#/partner', 'Кабінет точки')}
-    <h1>Запис клієнта</h1>
-    <article class="bk">
-      ${cardHead(b, `${dayLabel(b.date, { day: 'numeric', month: 'short' })}, ${b.time} · ${esc(b.car)}`, true, price(b)).replace('<h3', '<h2').replace('</h3>', '</h2>')}
-      <div class="small muted" style="font-size:14px">${b.services.map(esc).join(', ')}</div>
-      ${body}
-    </article>`;
-}
-
-function viewDisputes() {
-  const list = bookings.filter((b) => b.state === 'dispute');
-  return `${back('#/partner', 'Кабінет точки')}
-    <h1>Модерація спорів</h1>
-    <p class="lead">У справжньому сервісі цей розділ бачить лише модератор платформи.</p>
-    <div class="stack">${list.length ? list.map((b) => `<article class="bk">
-        ${cardHead(b, esc(placeById(b.placeId)?.name ?? ''), true, price(b)).replace('<h3', '<h2').replace('</h3>', '</h2>')}
-        <div class="notice warn"><div class="label">Скарга клієнта</div><span style="font-size:15px">«${esc(b.disputeReason)}»</span></div>
-        <div class="grid2">
-          <button class="btn" data-action="resolve-client" data-id="${b.id}">Повернути клієнту</button>
-          <button class="btn" data-action="resolve-place" data-id="${b.id}">Передати точці</button>
-        </div></article>`).join('') : empty('scale', 'Відкритих спорів немає.')}</div>`;
-}
-
 // ---------- гараж і сервісна книжка ----------
 
 // Історія авто: завершені записи в CARCAR плюс записи, додані вручну.
@@ -2502,22 +2394,6 @@ function downloadIcs(b) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
-// «Машина готова»: точка додає фото, пробіг і коментар, а клієнт отримує сповіщення
-// й підтверджує виконання. Після цього повертаємось у кабінет.
-async function finishJob(form) {
-  const b = bookings.find((x) => x.id === form.dataset.id);
-  const f = new FormData(form);
-  const files = f.getAll('photos').filter((x) => x.size).slice(0, 3);
-  const photos = (await Promise.all(files.map(shrinkPhoto))).filter(Boolean);
-  // Виконання підтверджує мийка: запис одразу виконаний, гроші заморожені на час для спору.
-  Object.assign(b, { photos, note: f.get('note').trim() || null, km: Number(f.get('km')) || null, doneAt: Date.now() });
-  complete(b);
-  const dropped = !save() && photos.length > 0;
-  if (dropped) { b.photos = []; save(); }
-  location.hash = '#/partner';
-  toast(dropped ? 'Фото не вмістилися в памʼять пристрою, запис збережено без них' : 'Клієнт отримав сповіщення «Машина готова»');
-}
-
 // Бонус зі скасованого чи поверненого замовлення повертається на бонусний рахунок.
 function returnBonus(b, why) {
   if (!b.bonus || b.bonusReturned) return;
@@ -2582,31 +2458,6 @@ const bookingActions = {
     b.ticketId = t.id;
     toast('Спір відкрито, гроші заморожено');
   },
-  extra(b) {
-    const amount = Math.round(Number(prompt('Сума доплати, ₴')));
-    if (!(amount > 0)) return false;
-    const reason = prompt('За що доплата?')?.trim();
-    if (!reason) return false;
-    b.extra = { amount, reason };
-    delete b.extraDeclined;
-    toast('Запит на доплату надіслано клієнту');
-  },
-  noshow(b) {
-    const placeAmount = Math.round(price(b) * PAYMENT.noShowShare);
-    if (!confirm(`Позначити неявку? Клієнт не скасував запис вчасно, тож точка отримає оплату ${uah(placeAmount)}.`)) return false;
-    Object.assign(b, { state: 'noshow', placeAmount, refund: price(b) - placeAmount, closedAt: Date.now() });
-    location.hash = '#/partner';
-  },
-  'resolve-client'(b) {
-    resolveDispute(b, 0);
-    wallet = { ...wallet, ...store.get('wallet', {}) };
-    returnBonus(b, 'повернення за спором');
-    toast('Гроші повернено клієнту');
-  },
-  'resolve-place'(b) {
-    resolveDispute(b, price(b));
-    toast('Гроші передано точці');
-  },
 };
 
 // ---------- роутер і події ----------
@@ -2624,7 +2475,7 @@ function route() {
   // Вкладка «Мої записи» памʼятається лише поки клієнт у розділі: при новому вході — спершу активні.
   if (page !== 'bookings') { ui.bookTab = null; ui.doneLimit = null; }
   const view = $('#view');
-  const tab = ['partner', 'disputes', 'invite'].includes(page) ? '' : ['support', 'wallet', 'business'].includes(page) ? 'garage' : page === 'move' ? 'bookings' : page === 'chat' ? 'inbox' : ['bookings', 'garage', 'inbox'].includes(page) ? page : 'catalog';
+  const tab = ['invite'].includes(page) ? '' : ['support', 'wallet', 'business'].includes(page) ? 'garage' : page === 'move' ? 'bookings' : page === 'chat' ? 'inbox' : ['bookings', 'garage', 'inbox'].includes(page) ? page : 'catalog';
   settle();
   // Хтось скасував запис — можливо, звільнився час для листа очікування.
   checkWaitlist(bookings);
@@ -2669,8 +2520,6 @@ function route() {
     if (ui.addCar) ui.addReturn = sub === 'book' && draft ? `#/book/${draft.placeId}` : null;
     view.innerHTML = arg && arg !== 'add' ? viewCar(arg) : viewGarage();
   }
-  else if (page === 'partner') view.innerHTML = arg ? viewPartnerJob(arg) : viewPartner();
-  else if (page === 'disputes') view.innerHTML = viewDisputes();
   else if (page === 'invite') view.innerHTML = viewInvite();
   else if (page === 'wallet') view.innerHTML = viewWallet();
   else if (page === 'business') view.innerHTML = viewBusiness(arg);
@@ -2785,15 +2634,6 @@ document.addEventListener('click', (e) => {
     addBonus(REFERRAL.bonus, 'Друг завершив перше замовлення');
     route();
     toast(`Вам нараховано ${uah(REFERRAL.bonus)}`);
-  } else if (action === 'payout') {
-    const { available } = balanceOf(ui.partner);
-    const fee = Math.round(available * commissionFor(ui.partner));
-    const iban = partnerIban(ui.partner);
-    if (!confirm(`Вивести ${uah(available)}? Комісія ${uah(fee)}, на рахунок ${iban} надійде ${uah(available - fee)}.`)) return;
-    payouts.push({ id: uid(), placeId: ui.partner, gross: available, fee, net: available - fee, at: Date.now(), iban });
-    save();
-    route();
-    toast(`Виплату відправлено на рахунок ${iban}`);
   } else if (action === 'cert-apply') {
     const code = $('#cert-code').value.trim().toUpperCase();
     const c = findCert(draft.placeId, code);
@@ -3040,10 +2880,6 @@ document.addEventListener('change', (e) => {
   } else if (t.name === 'photos') {
     const n = Math.min(t.files.length, 3);
     t.closest('form').querySelector('.photo-count').textContent = n ? `Обрано фото: ${n}` : '';
-  } else if (t.id === 'partner-place') {
-    ui.partner = t.value;
-    store.set('partner', ui.partner);
-    route();
   }
 });
 
@@ -3091,11 +2927,6 @@ document.addEventListener('submit', async (e) => {
   if (e.target.id === 'phone-form' || e.target.id === 'code-form') {
     e.preventDefault();
     loginSubmit(e.target);
-    return;
-  }
-  if (e.target.matches('.ready-form')) {
-    e.preventDefault();
-    finishJob(e.target);
     return;
   }
   if (e.target.id === 'ticket-form' || e.target.matches('.ticket-reply')) {
@@ -3279,7 +3110,7 @@ document.addEventListener('submit', async (e) => {
 
 renderCity();
 window.addEventListener('hashchange', route);
-// Панель для бізнесу в іншій вкладці змінила записи, прайс чи години — перечитуємо й перемальовуємо.
+// CarCar Business в іншій вкладці змінила записи, прайс чи години — перечитуємо й перемальовуємо.
 window.addEventListener('storage', (e) => {
   if (!e.key?.startsWith('carcar.')) return;
   // Мийка відкрила чи закрила панель — оновлюємо лише «у мережі», без перемальовування.

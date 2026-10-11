@@ -1107,6 +1107,17 @@ body.in-auth #view { padding: 0; max-width: none; }
 .offer-when { display: inline; font-size: 16px; margin: 0; }
 .offer-note { font-style: italic; }
 .offer-due { font-size: 13px; color: var(--muted); }
+
+/* Фото й аватар, які мийка завантажила в CarCar Business */
+.pc-slide img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.place-h { display: flex; align-items: center; gap: 12px; }
+.place-ava { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; flex: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--line); }
+.place-about { margin: -4px 0 12px; font-size: 15px; line-height: 1.5; color: var(--text); white-space: pre-line; }
+
+/* Час зі знижкою: стара ціна закреслена, відсоток у куточку */
+.slot.hot { position: relative; height: 58px; display: grid; place-content: center; gap: 1px; font-weight: 700; }
+.slot.hot small s { opacity: .7; font-weight: 400; }
+.slot-pct { position: absolute; top: -8px; right: -6px; padding: 1px 6px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: 10px; font-weight: 800; box-shadow: 0 0 0 2px var(--bg); }
 </style>
   <style>
 /* CarCar Business — застосунок мийки для телефона. Базові кнопки, поля, чат і шторки — зі styles.css. */
@@ -1347,6 +1358,77 @@ body.sheet-open .pro-fab { display: none; }
 .rel-grid b { font-size: 22px; }
 .rel-grid small { font-size: 12px; color: var(--muted); }
 a.remind { text-decoration: none; }
+
+/* записи по годинах */
+.hours { list-style: none; margin: 0; padding: 0; display: grid; }
+.hour { display: grid; grid-template-columns: 52px 1fr; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+.hour-label { font-size: 14px; font-weight: 700; color: var(--muted); padding-top: 4px; font-variant-numeric: tabular-nums; }
+.hour.now .hour-label { color: var(--accent); }
+.hour.past .hour-label { font-weight: 500; }
+.hour-body { display: grid; gap: 8px; min-width: 0; }
+.hour-body .day-list { gap: 8px; }
+.hour-free { display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px; border: 1.5px dashed var(--box); border-radius: 12px; background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: var(--accent); cursor: pointer; text-align: left; }
+.hour-free:hover { background: var(--soft); }
+.hour-state { display: flex; align-items: center; min-height: 32px; font-size: 13px; color: var(--muted); }
+.hour-state.full { color: var(--warn); font-weight: 600; }
+
+/* профіль: аватар і фото */
+.ava-row { display: flex; align-items: center; gap: 14px; }
+.ava { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; flex: none; font-size: 26px; }
+.photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.photo-grid figure { position: relative; margin: 0; aspect-ratio: 4 / 3; border-radius: 12px; overflow: hidden; background: var(--soft); }
+.photo-grid img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-del { position: absolute; top: 4px; right: 4px; width: 30px; height: 30px; border: 0; border-radius: 50%; background: rgb(0 0 0 / 55%); color: #fff; display: grid; place-items: center; cursor: pointer; }
+.photo-first { position: absolute; left: 4px; bottom: 4px; border: 0; border-radius: 999px; padding: 3px 8px; background: rgb(0 0 0 / 55%); color: #fff; font: inherit; font-size: 11px; cursor: pointer; }
+.photo-add { aspect-ratio: 4 / 3; display: grid; place-items: center; align-content: center; gap: 2px; border: 1.5px dashed var(--box); border-radius: 12px; color: var(--muted); font-size: 13px; cursor: pointer; }
+.photo-add:focus-within { outline: 3px solid var(--accent); }
+
+/* мийки акаунта */
+.wash-switch { display: flex; gap: 8px; overflow-x: auto; margin: 0 -16px 14px; padding: 2px 16px 4px; scrollbar-width: none; }
+.wash-switch::-webkit-scrollbar { display: none; }
+.wash-chip { flex: none; display: grid; gap: 2px; max-width: 230px; padding: 10px 14px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--bg); font: inherit; text-align: left; color: var(--text); cursor: pointer; }
+.wash-chip b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wash-chip small { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wash-chip[aria-pressed="true"] { border-color: var(--navy); background: color-mix(in srgb, var(--navy) 10%, var(--bg)); }
+.wash-chip.add { display: flex; align-items: center; gap: 6px; color: var(--accent); border-style: dashed; }
+
+/* ще: клієнти, підтримка */
+.count-dot { min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: 12px; font-weight: 700; display: grid; place-items: center; }
+.back { margin-top: 4px; }
+.client-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.client-list li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.cl-main { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.cl-main small { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.client-list .btn.soft { min-height: 38px; font-size: 14px; }
+.client-list .icon-btn { width: 40px; height: 40px; display: grid; place-items: center; color: var(--navy); }
+.ticket-thread { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 8px; }
+.ticket-thread .msg { display: grid; gap: 4px; padding: 10px 12px; border-radius: 14px; background: var(--soft); max-width: 90%; }
+.ticket-thread .msg.me { justify-self: end; background: color-mix(in srgb, var(--navy) 12%, var(--bg)); }
+.ticket-thread small { font-size: 12px; color: var(--muted); }
+.dropzone.small-drop { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1.5px dashed var(--box); border-radius: 12px; color: var(--muted); font-size: 14px; cursor: pointer; }
+.pro-review { display: grid; gap: 6px; }
+
+/* аналітика */
+.suggest h2 { display: flex; align-items: center; gap: 8px; }
+.suggest h2 .ic { color: var(--accent); }
+.suggest-item { display: grid; gap: 8px; padding: 12px; border-radius: 14px; background: var(--accent-soft); }
+.suggest-item .btn { justify-self: start; }
+.rev-bars { display: flex; align-items: flex-end; gap: 2px; height: 120px; padding-top: 4px; border-bottom: 1px solid var(--line); }
+.rev-bar { flex: 1; min-width: 2px; border-radius: 4px 4px 0 0; background: var(--navy); }
+.rev-axis { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+.heat-wrap { overflow-x: auto; }
+.heat { border-collapse: separate; border-spacing: 2px; font-size: 11px; font-variant-numeric: tabular-nums; }
+.heat th { font-weight: 600; color: var(--muted); padding: 0 2px; }
+.heat td { min-width: 26px; height: 26px; text-align: center; border-radius: 4px; }
+.heat td.off { background: var(--soft); }
+.hbars { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.hbars li { display: grid; grid-template-columns: minmax(0, 1.4fr) 1fr auto; align-items: center; gap: 10px; font-size: 14px; }
+.hbars li > span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hb { height: 10px; border-radius: 999px; background: var(--soft); overflow: hidden; }
+.hb i { display: block; height: 100%; border-radius: 999px; background: var(--navy); }
+
+body.pro.locked .pro-tabs { display: none; }
+.block-btn { width: 100%; font: inherit; text-align: left; background: var(--bg); cursor: pointer; margin-bottom: 8px; }
 </style>
 </head>
 <body class="pro">
@@ -1604,7 +1686,7 @@ const REFERRAL = {
 // Запропонований інший час відмовою не вважається.
 const DECLINE_RULES = { days: 30, minRequests: 5, warnRate: 0.3, pauseRate: 0.5, pauseHours: 24 };
 
-// Спільна логіка застосунку клієнта (app.js) і панелі для бізнесу (business.js):
+// Спільна логіка застосунку клієнта (app.js), CarCar Business (pro.js) і адмінки (admin.js):
 // сховище, форматування, іконки, гроші, рейтинг і налаштування точок із CRM.
 
 // peek — для частого читання без змін: розбираємо JSON лише тоді, коли значення змінилося.
@@ -1843,7 +1925,10 @@ async function shrinkPhoto(file) {
 
 // Точка може змінити в панелі для бізнесу телефон, години, кількість боксів і прайс.
 // Зміни зберігаються в 'biz.places' і накладаються на дані з data.js в обох застосунках.
-const withBase = (p) => Object.assign(p, { basePhone: p.phone, baseHours: p.hours, baseBoxes: p.boxes, baseServices: p.services, baseCats: p.cats, baseMobile: p.mobile ?? null });
+const withBase = (p) => Object.assign(p, {
+  basePhone: p.phone, baseHours: p.hours, baseBoxes: p.boxes, baseServices: p.services, baseCats: p.cats, baseMobile: p.mobile ?? null,
+  baseName: p.name, baseAddress: p.address, baseAbout: p.about ?? '',
+});
 PLACES.forEach(withBase);
 
 // Нові точки, зареєстровані в панелі через «Підключення». Клієнти бачать їх лише після схвалення CARCAR.
@@ -1864,6 +1949,12 @@ function applyOverrides() {
   for (const p of PLACES) {
     const o = all[p.id] || {};
     p.phone = o.phone ?? p.basePhone;
+    // Профіль, який бачать клієнти: назва, адреса, опис, аватар і фото — з CarCar Business.
+    p.name = o.name ?? p.baseName;
+    p.address = o.address ?? p.baseAddress;
+    p.about = o.about ?? p.baseAbout;
+    p.avatar = o.avatar ?? null;
+    p.photos = o.photos ?? [];
     p.hours = o.hours !== undefined ? o.hours : p.baseHours;
     p.boxes = o.boxes ?? p.baseBoxes;
     p.schedule = o.schedule ?? null;
@@ -2316,6 +2407,31 @@ function rejectBizApp(id, reason) {
   saveBizApps(apps);
 }
 
+// Мийки акаунта: перша — зі схваленої заявки, далі — додані в CarCar Business.
+// Демо-кабінет бачить усі підключені демо-мийки й ті, що додали в демо.
+function accountPlaces(session) {
+  if (!session) return [];
+  if (session.demo) return [...PLACES.filter((p) => !p.custom).map((p) => p.id), ...store.get('biz.demoPlaces', [])].filter((id) => PLACES.some((p) => p.id === id));
+  const acc = bizAccounts().find((x) => x.login === session.login);
+  return [acc?.placeId ?? session.placeId, ...(acc?.places ?? [])].filter((id, i, a) => id && a.indexOf(id) === i && PLACES.some((p) => p.id === id));
+}
+
+// Ще одна мийка в тому ж акаунті: зʼявиться в каталозі після перевірки CARCAR.
+function addAccountPlace(session, f) {
+  const placeId = `p_${uid()}`;
+  const c = (CITIES.find((x) => x.name === f.city) ?? CITIES[0]).center;
+  addCustomPlace({
+    id: placeId, custom: true, name: f.name, cats: ['wash'], city: f.city || 'Київ', district: '', address: f.address, phone: f.phone,
+    boxes: Math.max(1, Number(f.boxes) || 1), hours: [8, 21], lat: c.lat + (Math.random() - 0.5) * 0.03, lng: c.lng + (Math.random() - 0.5) * 0.05,
+    tags: [], createdAt: Date.now(), services: Object.entries(SERVICE_TEMPLATES.wash).map(([sid, x]) => ({ id: sid, ...x, price: [...x.price] })),
+  });
+  const owner = session.demo ? 'демо-кабінет' : session.login;
+  savePartner(placeId, { status: 'pending', company: null, history: [{ at: Date.now(), by: 'partner', status: 'pending', note: `Нова мийка з кабінету ${owner}` }] });
+  if (session.demo) store.set('biz.demoPlaces', [...store.get('biz.demoPlaces', []), placeId]);
+  else store.set('biz.accounts', bizAccounts().map((x) => (x.login === session.login ? { ...x, places: [...(x.places ?? []), placeId] } : x)));
+  return placeId;
+}
+
 // Вхід у кабінет: повертає акаунт або null.
 async function checkBizLogin(login, pass) {
   const acc = bizAccounts().find((x) => x.login === login.trim().toLowerCase());
@@ -2380,7 +2496,7 @@ function liftPause(placeId) {
 const ratePct = (k) => `${Math.round(k * 100)}%`;
 const msText = (ms) => (ms === null ? '—' : ms < 60000 ? `${Math.max(1, Math.round(ms / 1000))} с` : `${Math.floor(ms / 60000)} хв${Math.round((ms % 60000) / 1000) ? ` ${Math.round((ms % 60000) / 1000)} с` : ''}`);
 
-// Спільна логіка застосунку клієнта й панелі бізнесу для щоденної роботи точки:
+// Спільна логіка застосунку клієнта й CarCar Business для щоденної роботи точки:
 // гарячі вікна зі знижкою, жива черга, лист очікування, абонементи й сертифікати,
 // шинний готель і повідомлення клієнтам (розсилки, нагадування).
 
@@ -2777,6 +2893,111 @@ function expirePending(bookings) {
   return changed;
 }
 
+// Підключення точки до CARCAR: перевірка кодів ФОП і ТОВ, IBAN і текст договору-оферти.
+// Спільне для CarCar Business (pro.js) і адмінки CARCAR (admin.js).
+// Перевірки локальні: формат і контрольні суми. Звірку з ЄДР і банком робить модератор
+// (а в робочій версії — сервер через офіційні реєстри).
+
+const digits = (s) => [...String(s)].map(Number);
+
+// РНОКПП (ідентифікаційний номер ФОП): 10 цифр, остання — контрольна.
+function rnokppValid(code) {
+  if (!/^\d{10}$/.test(code)) return false;
+  const d = digits(code);
+  const w = [-1, 5, 7, 9, 4, 6, 10, 5, 7];
+  return (w.reduce((a, k, i) => a + k * d[i], 0) % 11) % 10 === d[9];
+}
+
+// Код ЄДРПОУ юридичної особи: 8 цифр, остання — контрольна; ваги залежать від діапазону коду.
+function edrpouValid(code) {
+  if (!/^\d{8}$/.test(code)) return false;
+  const d = digits(code);
+  const n = Number(code);
+  const w = n < 30000000 || n > 60000000 ? [1, 2, 3, 4, 5, 6, 7] : [7, 1, 2, 3, 4, 5, 6];
+  let s = w.reduce((a, k, i) => a + k * d[i], 0) % 11;
+  if (s === 10) {
+    s = w.reduce((a, k, i) => a + (k + 2) * d[i], 0) % 11;
+    if (s === 10) s = 0;
+  }
+  return s === d[7];
+}
+
+const codeValid = (type, code) => (type === 'fop' ? rnokppValid(code) : edrpouValid(code));
+
+const normIban = (s) => String(s ?? '').replace(/\s+/g, '').toUpperCase();
+
+// Український IBAN: UA, 2 контрольні цифри, 6 цифр МФО банку й 19 символів рахунку; перевірка mod 97.
+function ibanValid(raw) {
+  const iban = normIban(raw);
+  if (!/^UA\d{27}$/.test(iban)) return false;
+  const moved = `${iban.slice(4)}${iban.slice(0, 4)}`.replace(/[A-Z]/g, (c) => String(c.charCodeAt(0) - 55));
+  let r = 0;
+  for (const ch of moved) r = (r * 10 + Number(ch)) % 97;
+  return r === 1;
+}
+
+const formatIban = (raw) => normIban(raw).replace(/(.{4})/g, '$1 ').trim();
+
+// Банк за МФО (цифри 5–10 IBAN) — для підказки; невідомий МФО просто показуємо числом.
+const BANKS = {
+  305299: 'ПриватБанк', 322001: 'Універсал Банк (monobank)', 300465: 'Ощадбанк', 334851: 'ПУМБ',
+  380805: 'Райффайзен Банк', 351005: 'УКРСИББАНК', 307770: 'А-Банк', 300346: 'Сенс Банк',
+};
+function ibanBank(raw) {
+  const mfo = normIban(raw).slice(4, 10);
+  return mfo.length === 6 ? `${BANKS[mfo] ?? 'Банк'} (МФО ${mfo})` : '';
+}
+
+const ENTITY = { fop: 'ФОП', tov: 'ТОВ' };
+const TAX = {
+  fop: [['ep2', 'Єдиний податок, 2 група'], ['ep3', 'Єдиний податок, 3 група'], ['general', 'Загальна система']],
+  tov: [['ep3', 'Єдиний податок, 3 група'], ['general', 'Загальна система']],
+};
+const DOCS = [
+  ['registry', 'Виписка або витяг з ЄДР', true],
+  ['account', 'Довідка про відкриття рахунку', false],
+  ['facade', 'Фото фасаду чи боксів точки', false],
+];
+
+// Що ще не заповнено, щоб надіслати заявку на перевірку. Порожній список — можна надсилати.
+function missingSteps(partner) {
+  const c = partner.company ?? {};
+  const out = [];
+  if (!c.type || !c.name?.trim() || !codeValid(c.type, c.code ?? '') || !c.tax || !c.email?.trim() || !c.phone?.trim() || (c.type === 'tov' && !c.director?.trim())) out.push('Юридична особа');
+  if (!DOCS.filter(([, , req]) => req).every(([id]) => partner.docs?.[id])) out.push('Документи');
+  const pay = partner.payout ?? {};
+  if (!ibanValid(pay.iban) || !pay.holder?.trim() || pay.code !== c.code) out.push('Реквізити для виплат');
+  if (partner.offer?.version !== OFFER.version) out.push('Договір-оферта');
+  return out;
+}
+
+// Договір-оферта для партнерів. Редакція фіксується разом із датою й підписантом під час прийняття.
+const OFFER = {
+  version: '1.0',
+  date: '5 жовтня 2026 р.',
+  title: 'Публічна оферта про надання послуг сервісу CARCAR для партнерів',
+  draft: 'Проєкт для прототипу. Перед запуском текст має перевірити юрист.',
+  sections: [
+    ['1. Сторони й предмет', 'CARCAR (Сервіс) надає партнеру — ФОП або юридичній особі, яка надає послуги мийки чи детейлінгу авто (Партнер), — доступ до каталогу, онлайн-запису, приймання оплати від клієнтів і панелі для бізнесу. Партнер приймає ці умови повністю, поставивши позначку про згоду в панелі.'],
+    ['2. Підключення', 'Партнер надає достовірні дані про себе, документи з ЄДР і реквізити рахунку, відкритого на його імʼя. Сервіс перевіряє дані до 3 робочих днів і може відмовити в підключенні або призупинити його, якщо дані недостовірні чи Партнер порушує ці умови.'],
+    ['3. Оплата й утримання коштів', 'Клієнт оплачує замовлення в застосунку. Кошти утримуються, доки клієнт не підтвердить виконання (або 24 години після позначки «Машина готова» без відповіді), потім заморожуються ще на 48 годин для можливого спору й стають доступні до виведення.'],
+    ['4. Скасування й неявка', 'Якщо клієнт скасовує запис не пізніше ніж за 1,5 години до візиту, кошти повертаються клієнту повністю. Пізніше скасування або неявка клієнта — оплата зараховується Партнеру за послугу.'],
+    ['5. Винагорода Сервісу', 'Сервіс утримує комісію від суми, що виводиться Партнером, у розмірі, вказаному в панелі (типово 10%). Для клієнтів комісії немає. Оплати на місці, внесені Партнером у журнал, комісією не обкладаються.'],
+    ['6. Виплати', 'Виплати здійснюються лише на перевірений рахунок Партнера в українському банку. Зміна реквізитів потребує повторної перевірки. Партнер самостійно сплачує податки й видає клієнту фіскальний чек, якщо цього вимагає законодавство.'],
+    ['7. Спори', 'Якщо клієнт відкриває спір, кошти за замовленням залишаються замороженими до рішення модератора Сервісу. Модератор може передати кошти Партнеру, повернути клієнту або розділити їх, зважаючи на фото результату, листування й пояснення сторін.'],
+    ['8. Відгуки й рейтинг', 'Відгук може залишити лише клієнт, який завершив замовлення через Сервіс. Партнер не може видаляти відгуки, але може відповісти на них або поскаржитися модератору. Сервіс приховує відгуки з образами, персональними даними чи без звʼязку з послугою.'],
+    ['9. Ціни й інформація для клієнтів', 'Партнер підтримує актуальні прайс, графік роботи й вільний час. Ціна в записі є остаточною, якщо клієнт не погодив доплату в застосунку.'],
+    ['10. Персональні дані', 'Партнер обробляє імʼя, телефон і дані авто клієнтів лише для виконання замовлень і не передає їх третім особам, крім випадків, передбачених законом.'],
+    ['11. Строк дії', 'Договір діє безстроково з моменту прийняття. Партнер може припинити співпрацю, вивівши доступні кошти й завершивши прийняті замовлення. Сервіс повідомляє про зміни умов щонайменше за 14 днів; нова редакція потребує повторної згоди.'],
+  ],
+};
+
+const offerHtml = (esc) => `<article class="offer">
+  <h2>${esc(OFFER.title)}</h2>
+  <p class="small muted">Редакція ${OFFER.version} від ${OFFER.date}. ${esc(OFFER.draft)}</p>
+  ${OFFER.sections.map(([h, t]) => `<h3>${esc(h)}</h3><p>${esc(t)}</p>`).join('')}
+</article>`;
+
 // CarCar Business — окремий застосунок мийки для телефона.
 // Головне під пальцем: повідомлення клієнтів, записи по днях, показники мийки й профіль, який бачать клієнти.
 // Дані спільні із застосунком клієнта (на цьому пристрої — localStorage): запис, внесений тут, одразу
@@ -2859,6 +3080,8 @@ function stateOf(b) {
 }
 // Сума запису для мийки: через CARCAR — повна ціна, з журналу — оплата на місці.
 const sumOf = (b) => (isCarcar(b) ? price(b) : b.paid);
+// Клієнт натиснув «Їду» чи «Запізнююсь» у нагадуванні.
+const etaText = (b) => (b.state !== 'paid' ? '' : [b.eta === 'onway' ? 'їде' : '', b.late ? `запізниться на ${b.late} хв` : ''].filter(Boolean).join(', '));
 
 const REQ_STATE = { new: ['Новий запит', 'warn'], answered: ['Відповіли', 'carcar'], added: ['Послугу додано', 'ok'], closed: ['Закрито', 'muted'] };
 const reqState = (r) => (r.closed ? 'closed' : r.service ? 'added' : r.messages.at(-1).from === 'client' ? 'new' : 'answered');
@@ -3023,7 +3246,7 @@ function reminders() {
   else if (responseStats(ui.place, bookings).lowered) out.push(`<a class="remind warn" href="#/profile">${icon('warn', 22)}<span><b>Мийка нижче в пошуку через відмови</b>
       <small>Пропонуйте інший час замість відмови — це не рахується.</small></span>${icon('chevR', 18)}</a>`);
   const st = partnerOf(ui.place).status;
-  if (st !== 'approved') out.push(`<p class="notice warn">Клієнти ще не бачать мийку: статус «${PARTNER_STATUS[st][0]}». <a href="business.html#/connect">Завершити підключення</a></p>`);
+  if (st !== 'approved') out.push(`<p class="notice warn">Клієнти ще не бачать мийку: статус «${PARTNER_STATUS[st][0]}». CARCAR перевіряє дані, зазвичай до 2 робочих днів.</p>`);
   const late = unmarked();
   if (late.length) {
     out.push(`<button class="remind warn" type="button" data-action="mark-open">${icon('warn', 22)}<span><b>${late.length} ${plural(late.length, 'запис чекає', 'записи чекають', 'записів чекають')} позначки</b>
@@ -3034,7 +3257,7 @@ function reminders() {
     const free = freeWindows(todayIso());
     out.push(`<section class="remind sched" aria-label="Перевірка розкладу">${icon('calendar', 22)}<span><b>Розклад на сьогодні правильний?</b>
       <small>${free.length ? `Клієнти бачать вільним: ${windowsText(free)}.` : 'Вільного часу на сьогодні вже немає.'} Якщо когось записали по телефону чи він приїхав сам, додайте запис, щоб цей час не продали двічі.</small>
-      <span class="row"><button class="btn navy" type="button" data-action="sched-ok">Так, усе вірно</button><button class="btn" type="button" data-action="nb-open">${icon('plus', 16)}Додати запис</button></span></span></section>`);
+      <span class="row"><a class="btn" href="#/bookings/${todayIso()}">${icon('calendar', 16)}Переглянути розклад</a><button class="btn navy" type="button" data-action="sched-ok">Так, усе вірно</button><button class="btn" type="button" data-action="nb-open">${icon('plus', 16)}Додати запис</button></span></span></section>`);
   }
   return out.length ? `<div class="reminders">${out.join('')}</div>` : '';
 }
@@ -3196,17 +3419,8 @@ function viewBookings(day) {
   const live = (d) => own().filter((b) => b.date === d && BLOCKING.includes(b.state)).length;
   const list = own().filter((b) => b.date === day).sort((a, b) => a.time.localeCompare(b.time));
   const h = hoursFor(p, day);
-  // Вільні вікна ділимо на початках записів, щоб стрічка читалась по порядку.
-  const cuts = list.filter((b) => BLOCKING.includes(b.state)).map((b) => toMin(b.time));
-  const free = freeWindows(day).flatMap(([s, e]) => {
-    const pts = [s, ...cuts.filter((c) => c > s && c < e), e].sort((a, b) => a - b);
-    return pts.slice(1).map((x, i) => [pts[i], x]).filter(([a, b]) => b > a);
-  });
-  // Записи й вільні вікна однією стрічкою за часом.
-  const items = [...list.map((b) => [toMin(b.time), bookingRow(b), 0]),
-    ...free.map(([s, e]) => [s, `<li><button class="free-row" type="button" data-action="nb-open" data-date="${day}" data-time="${hhmm(s)}">
-      <span class="bk-time"><b>${hhmm(s)}</b><small>${hhmm(e)}</small></span><span class="free-text">Вільно ${duration(e - s)}</span><span class="free-add">${icon('plus', 16)}Записати</span></button></li>`, 1]),
-  ].sort((a, b) => a[0] - b[0] || a[2] - b[2]).map(([, html]) => html).join('');
+  // Розбивка по годинах: у кожній годині — записи, що в ній починаються, і скільки боксів вільно.
+  const hourly = hourRows(day, list, h);
   const busy = list.filter((b) => BLOCKING.includes(b.state)).length;
   const special = day in scheduleOf(p).special;
   return `<h1>Записи</h1>
@@ -3221,8 +3435,46 @@ function viewBookings(day) {
       <p class="small muted">${h ? `${rangeText(h)}${special ? ' (змінено на цей день)' : ''} · ${p.boxes} ${plural(p.boxes, 'бокс', 'бокси', 'боксів')} · ${busy} ${plural(busy, 'запис', 'записи', 'записів')}` : `Вихідний${special ? ' (закрито на цей день)' : ' за графіком'}`}</p></div>
       <div class="row">${h ? `<button class="btn soft" type="button" data-action="day-hours" data-date="${day}">Години</button><button class="btn soft" type="button" data-action="day-close" data-date="${day}">Закрити день</button>`
         : `<button class="btn navy" type="button" data-action="day-hours" data-date="${day}">Відкрити день</button>`}</div></div>
-    ${items ? `<ul class="day-list">${items}</ul>` : `<div class="pro-empty">${icon('calendar', 32)}<b>${h ? 'Вільного часу вже немає' : 'Мийка не працює'}</b>
-      <span>${h ? 'Усі бокси зайняті або робочий день закінчився.' : 'Клієнти не можуть записатися на цей день. Відкрийте день, якщо працюєте.'}</span></div>`}`;
+    ${hourly || `<div class="pro-empty">${icon('calendar', 32)}<b>Мийка не працює</b>
+      <span>Клієнти не можуть записатися на цей день. Відкрийте день, якщо працюєте.</span></div>`}`;
+}
+
+// Вільні бокси на 30 хв від t (без урахування минулого часу).
+function freeBoxes(date, t) {
+  const p = place();
+  const h = hoursFor(p, date);
+  if (!h || t < h[0] || t + 30 > h[1] || inBreak(p, t, 30)) return 0;
+  const busy = own().filter((b) => b.date === date && BLOCKING.includes(b.state) && !b.mobile)
+    .filter((b) => t < toMin(b.time) + b.minutes && t + 30 > toMin(b.time)).length;
+  return Math.max(0, p.boxes - busy);
+}
+
+function hourRows(day, list, h) {
+  const p = place();
+  const starts = list.map((b) => toMin(b.time));
+  if (!h && !starts.length) return '';
+  const from = Math.floor(Math.min(h?.[0] ?? 24 * 60, ...starts) / 60);
+  const to = Math.ceil(Math.max(h?.[1] ?? 0, ...list.map((b) => toMin(b.time) + b.minutes)) / 60);
+  const now = day === todayIso() ? minuteNow() : day < todayIso() ? 24 * 60 : -1;
+  const rows = [];
+  for (let hr = from; hr < to; hr++) {
+    const m = hr * 60;
+    const inHour = list.filter((b) => toMin(b.time) >= m && toMin(b.time) < m + 60);
+    const past = m + 60 <= now;
+    // Вільний час години: перший пів години, що ще не минули й мають вільний бокс.
+    const slot = [m, m + 30].find((t) => t >= now && freeBoxes(day, t) > 0);
+    const n = slot === undefined ? 0 : freeBoxes(day, slot);
+    const open = h && m >= h[0] && m < h[1];
+    const side = !open ? '<span class="hour-state">не працюємо</span>'
+      : past ? '' : inBreak(p, m, 30) && inBreak(p, m + 30, 30) ? '<span class="hour-state">перерва</span>'
+        : slot !== undefined ? `<button class="hour-free" type="button" data-action="nb-open" data-date="${day}" data-time="${hhmm(slot)}" aria-label="Записати на ${hhmm(slot)}, вільно ${n} з ${p.boxes}">${icon('plus', 16)}<span>${hhmm(slot)} · вільно ${n} з ${p.boxes}</span></button>`
+          : '<span class="hour-state full">усі бокси зайняті</span>';
+    rows.push(`<li class="hour${past ? ' past' : ''}${hr === Math.floor(now / 60) && day === todayIso() ? ' now' : ''}">
+      <span class="hour-label">${String(hr).padStart(2, '0')}:00</span>
+      <div class="hour-body">${slot !== undefined && inHour.length && slot < toMin(inHour[0].time) ? side : ''}${inHour.length ? `<ul class="day-list">${inHour.map(bookingRow).join('')}</ul>` : ''}${slot !== undefined && inHour.length && slot < toMin(inHour[0].time) ? '' : side}</div>
+    </li>`);
+  }
+  return `<ol class="hours" aria-label="Записи по годинах">${rows.join('')}</ol>`;
 }
 
 // ---------- шторка ----------
@@ -3275,12 +3527,24 @@ function bookingSheet(id) {
       </div>`;
   } else if (b.state === 'paid') {
     const late = Date.now() > bookingStart(b).getTime() + PAYMENT.lateMinutes * 60000;
-    actions = `<button class="btn primary" type="button" data-action="ready" data-id="${b.id}">${icon('check', 18)}Машина готова</button>
-      <p class="fine">Так ви підтверджуєте виконання. Клієнт отримає сповіщення, гроші ${PAYMENT.freezeHours} год чекають на випадок спору.</p>
+    actions = `<form class="stack ready-form" id="ready-form" data-id="${b.id}" style="gap:10px">
+        <label class="dropzone small-drop">${icon('camera', 20)}Фото результату (до 3, необовʼязково)<span class="photo-count" aria-live="polite"></span>
+          <input class="sr-only" name="photos" type="file" accept="image/*" multiple></label>
+        <div class="grid2">
+          <label class="field"><span>Коментар для клієнта</span><input name="note" maxlength="200" autocomplete="off"></label>
+          <label class="field"><span>Пробіг, км</span><input name="km" type="number" min="0" inputmode="numeric" autocomplete="off"></label>
+        </div>
+        <button class="btn primary" type="submit">${icon('check', 18)}Машина готова</button>
+        <p class="fine">Так ви підтверджуєте виконання. Клієнт отримає сповіщення, а фото й пробіг потраплять у сервісну книжку авто. Гроші ${PAYMENT.freezeHours} год чекають на випадок спору.</p>
+      </form>
       ${late ? `<button class="btn" type="button" data-action="late-forfeit" data-id="${b.id}">Запізнення понад ${PAYMENT.lateMinutes} хв — оплата нам</button>` : ''}
       ${started ? `<button class="btn text-danger" type="button" data-action="carcar-noshow" data-id="${b.id}">Клієнт не приїхав</button>` : ''}`;
   } else if (b.state === 'dispute') {
-    actions = `<p class="notice warn"><b>Клієнт відкрив спір</b>«${esc(b.disputeReason ?? '')}». Поясніть ситуацію в <a href="business.html#/support">підтримці CARCAR</a>.</p>`;
+    const t = ticketsAll().find((x) => x.bookingId === b.id && x.from === 'place');
+    actions = `<p class="notice warn"><b>Клієнт відкрив спір</b>«${esc(b.disputeReason ?? '')}». Гроші заморожені, доки модератор CARCAR не вирішить.</p>
+      ${t ? `<a class="btn" href="#/support/${t.id}" data-action="sheet-close">Ваше пояснення: звернення №${t.no}</a>` : `<form class="stack" id="dispute-note" data-id="${b.id}" style="gap:8px">
+        <label class="field"><span>Пояснення для модератора</span><textarea name="text" rows="3" required maxlength="1000" placeholder="Що було зроблено, фото, домовленості з клієнтом"></textarea></label>
+        <button class="btn" type="submit">Надіслати модератору</button></form>`}`;
   } else if (b.state === 'completed' && isCarcar(b)) {
     actions = `<p class="notice">${isFrozen(b) ? `Гроші стануть доступні ${fmtTime(b.unfreezeAt)}.` : 'Гроші доступні до виведення в розділі «Мийка».'}</p>`;
   }
@@ -3292,7 +3556,13 @@ function bookingSheet(id) {
       <dt>Авто</dt><dd>${esc(b.car || '—')}</dd>
       <dt>Сума</dt><dd>${uah(sumOf(b))}${isCarcar(b) ? ' · оплачено в CARCAR' : b.payment ? ` · ${b.payment === 'cash' ? 'готівка' : 'картка'}` : ' · оплата на місці'}</dd>
       ${b.note && !isCarcar(b) ? `<dt>Коментар</dt><dd>${esc(b.note)}</dd>` : ''}
+      ${b.mobile ? `<dt>Виїзд</dt><dd>${esc(b.mobile.address)} · ${String(b.mobile.km).replace('.', ',')} км · виїзд ${uah(b.mobile.fee)}
+        <a href="https://www.openstreetmap.org/?mlat=${b.mobile.lat.toFixed(5)}&amp;mlon=${b.mobile.lng.toFixed(5)}#map=17/${b.mobile.lat.toFixed(5)}/${b.mobile.lng.toFixed(5)}" target="_blank" rel="noopener">Точка на карті</a></dd>` : ''}
+      ${b.moves?.length ? `<dt>Перенесено</dt><dd>${b.moves.map((m) => `з ${dayLabel(m.date, { day: 'numeric', month: 'short' })}, ${m.time}`).join('; ')}</dd>` : ''}
+      ${b.promo && !b.promo.returned ? `<dt>Промокод</dt><dd>${esc(b.promo.code)}: −${uah(b.promo.amount)} для клієнта, доплачує CARCAR — ви отримаєте повну суму</dd>` : ''}
+      ${b.installments ? `<dt>Оплата</dt><dd>Частинами · ${b.installments.n} платежі. Ви отримуєте всю суму одразу</dd>` : ''}
     </dl>
+    ${etaText(b) ? `<p class="notice ok" style="margin:0">${icon('bell', 18)}<span>Клієнт повідомив: ${etaText(b)} (${fmtTime(b.etaAt)}).</span></p>` : ''}
     <div class="grid2">
       ${b.clientPhone ? `<a class="btn" href="${telHref(b.clientPhone)}">${icon('phone', 18)}Подзвонити</a>` : ''}
       ${isCarcar(b) ? `<a class="btn" href="#/chat/b-${b.id}" data-action="sheet-close">${icon('chat', 18)}Написати</a>` : ''}
@@ -3480,13 +3750,13 @@ function viewWash() {
   const month = periodStats(30);
   const bal = balanceFor(p.id, bookings, payouts);
   const fee = Math.round(bal.available * commissionFor(p.id));
-  const r = ratingFor(p.id, reviews);
-  const list = reviews.filter((x) => x.placeId === p.id).sort((a, b) => b.at - a.at);
-  const waiting = list.filter((x) => !x.reply);
+  const st = partnerOf(p.id).status;
   const mine = payouts.filter((x) => x.placeId === p.id).sort((a, b) => b.at - a.at).slice(0, 3);
   const loadToday = loadPct(t);
   const loadTomorrow = loadPct(shiftDay(t, 1));
   return `<h1>Мийка</h1>
+    ${washSwitch()}
+    ${st !== 'approved' ? `<p class="notice warn">Клієнти ще не бачать цю мийку: «${PARTNER_STATUS[st][0]}». ${st === 'pending' ? 'CARCAR перевіряє дані, зазвичай до 2 робочих днів.' : ''}</p>` : ''}
     <section class="tiles pro-tiles" aria-label="Виручка">
       <div class="tile hero"><span>Сьогодні</span><b>${uah(day.money)}</b><small>${day.orders} ${plural(day.orders, 'машина', 'машини', 'машин')}${loadToday === null ? '' : ` · завантаження ${loadToday}%`}</small></div>
       <div class="tile"><span>7 днів</span><b>${uah(week.money)}</b><small>${week.orders} ${plural(week.orders, 'машина', 'машини', 'машин')}</small></div>
@@ -3499,20 +3769,39 @@ function viewWash() {
       <div class="money-row"><span>Заморожено до підтвердження</span><b>${uah(bal.frozen)}</b></div>
       ${payoutReady(p.id)
         ? `<button class="btn primary block" type="button" data-action="payout" ${bal.available > 0 ? '' : 'disabled'}>${bal.available > 0 ? `Вивести ${uah(bal.available - fee)} на ${maskIban(partnerOf(p.id).payout.iban)}` : 'Немає коштів для виведення'}</button>`
-        : `<a class="btn block" href="business.html#/connect">Вказати рахунок для виплат</a>`}
+        : `<a class="btn block" href="#/payout">${partnerOf(p.id).payout?.iban ? 'Рахунок на перевірці CARCAR' : 'Вказати рахунок для виплат'}</a>`}
       <p class="fine">Комісія CARCAR ${Math.round(commissionFor(p.id) * 100)}% утримується під час виведення. Оплати на місці не обкладаються.</p>
       ${mine.length ? `<ul class="plain-list">${mine.map((x) => `<li><span>${fmtTime(x.at)}</span><b>${uah(x.net)}</b></li>`).join('')}</ul>` : ''}
     </section>
-    <section class="pro-card" aria-labelledby="h-rev">
-      <h2 id="h-rev">Відгуки${r.count ? ` · ${rating(r.avg)}` : ''}</h2>
-      ${r.count ? `<p class="small muted" style="margin:0">${starsLine(r.avg)} ${r.count} ${plural(r.count, 'відгук', 'відгуки', 'відгуків')}${waiting.length ? ` · без відповіді: ${waiting.length}` : ''}</p>` : '<p class="small muted" style="margin:0">Відгуків ще немає. Їх залишають лише клієнти, які були у вас через CARCAR.</p>'}
-      ${list.slice(0, 5).map((x) => `<article class="pro-review" aria-label="Відгук ${esc(x.name ?? 'клієнта')}">
-        <div class="head"><b>${esc(x.name ?? 'Клієнт')}</b>${starsLine(x.rating)}</div>
-        ${x.text ? `<p>${esc(x.text)}</p>` : ''}
-        ${x.reply ? `<p class="reply"><b>Ваша відповідь</b>${esc(x.reply.text)}</p>` : `<form class="chat-form rev-reply" data-id="${x.id}"><input name="reply" required maxlength="500" autocomplete="off" placeholder="Відповісти публічно…" aria-label="Відповідь на відгук"><button class="send-btn" type="submit" aria-label="Надіслати відповідь">${icon('send', 18)}</button></form>`}
-      </article>`).join('')}
-    </section>
-    <a class="pro-link" href="business.html#/finance">${icon('chart', 22)}<span><b>Звіти, витрати й аналітика</b><small>Повна версія панелі — зручніше з компʼютера</small></span>${icon('chevR', 18)}</a>`;
+    ${suggestCard(true)}
+    <a class="pro-link" href="#/analytics">${icon('chart', 22)}<span><b>Аналітика</b><small>Виручка по днях, завантаження по годинах, послуги й клієнти</small></span>${icon('chevR', 18)}</a>`;
+}
+
+// Перемикач мийок акаунта й «Додати мийку».
+function washSwitch() {
+  const ids = accountPlaces(session());
+  return `<div class="wash-switch" role="group" aria-label="Ваші мийки">
+    ${ids.map((id) => {
+      const x = placeById(id);
+      const st = partnerOf(id).status;
+      return `<button class="wash-chip" type="button" data-action="wash-pick" data-id="${id}" aria-pressed="${id === ui.place}"><b>${esc(x.name)}</b><small>${esc(x.city ?? 'Київ')}, ${esc(x.address)}${st === 'approved' ? '' : ` · ${PARTNER_STATUS[st][0].toLowerCase()}`}</small></button>`;
+    }).join('')}
+    <button class="wash-chip add" type="button" data-action="wash-add">${icon('plus', 18)}<b>Додати мийку</b></button>
+  </div>`;
+}
+
+function addWashSheet() {
+  openSheet('Нова мийка', `<form class="stack" id="wash-form" style="gap:12px">
+    <p class="small muted" style="margin:0">Мийка зʼявиться в цьому ж кабінеті одразу, а клієнтам — після перевірки CARCAR (до 2 робочих днів).</p>
+    <label class="field"><span>Назва</span><input name="name" required maxlength="80" autocomplete="off" placeholder="Автомийка «Блиск» на Подолі"></label>
+    <label class="field"><span>Місто</span><select name="city">${CITIES.map((c) => `<option ${c.name === (place().city ?? 'Київ') ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>
+    <label class="field"><span>Адреса</span><input name="address" required maxlength="120" autocomplete="off"></label>
+    <div class="grid2">
+      <label class="field"><span>Телефон</span><input name="phone" type="tel" required autocomplete="off" placeholder="+380"></label>
+      <label class="field"><span>Боксів</span><input name="boxes" type="number" min="1" max="30" value="2" required inputmode="numeric"></label>
+    </div>
+    <button class="btn primary" type="submit">Додати мийку</button>
+  </form>`);
 }
 
 // ---------- профіль мийки ----------
@@ -3531,12 +3820,7 @@ function viewProfile() {
   const t = todayIso();
   const specials = Object.entries(s.special).filter(([d]) => d >= t).sort(([a], [b]) => a.localeCompare(b));
   return `<h1>Профіль мийки</h1><p class="lead">Так вас бачать клієнти в CARCAR. Зміни зʼявляються в застосунку одразу.</p>
-    <section class="pro-card preview" aria-label="Як бачать клієнти">
-      <span class="avatar" aria-hidden="true">${firstLetter(p.name.replace(/^(Автомийка|Детейлінг-мийка)\s*/, '').replace(/[«»"]/g, ''))}</span>
-      <div><b>${esc(p.name)}</b><small>${esc(p.city ?? 'Київ')}, ${esc(p.address)}</small>
-        <small>${r.count ? `★ ${rating(r.avg)} · ` : ''}сьогодні ${rangeText(hoursFor(p, t)).toLowerCase()}</small></div>
-      <a class="btn soft" href="index.html#/place/${p.id}" target="_blank" rel="noopener">Відкрити</a>
-    </section>
+    ${infoCard(p, r)}
     <section class="pro-card" aria-labelledby="h-power">
       <h2 id="h-power">Світло</h2>
       <div class="chips wrap" role="group" aria-label="Світло на мийці">${Object.entries(POWER).map(([k, [label]]) => `<button class="chip" type="button" data-action="power" data-k="${k}" aria-pressed="${pw?.state === k}">${label}</button>`).join('')}</div>
@@ -3581,6 +3865,40 @@ function viewProfile() {
       <ul class="svc-list">${p.allServices.map((x) => `<li><button type="button" class="svc-row${x.off ? ' off' : ''}" data-action="svc-edit" data-id="${x.id}">
         <span><b>${esc(x.name)}</b><small>${duration(x.min)}${x.off ? ' · приховано' : ''}</small></span><span class="price">${x.price[0] === x.price[2] ? uah(x.price[0]) : `${uah(x.price[0])}–${uah(x.price[2])}`}</span>${icon('chevR', 16)}</button></li>`).join('')}</ul>
     </section>`;
+}
+
+const MAX_PHOTOS = 6;
+const imgSrc = (src) => (typeof src === 'string' && src.startsWith('data:image/') ? esc(src) : '');
+
+// Профіль для клієнтів: аватар, фото, назва, адреса й опис — одразу на сторінці мийки в CARCAR.
+function infoCard(p, r) {
+  const photos = p.photos ?? [];
+  const letter = firstLetter(p.name.replace(/^(Автомийка|Детейлінг-мийка)\s*/, '').replace(/[«»"]/g, ''));
+  return `<form class="pro-card stack" id="pf-info" aria-labelledby="h-info" style="gap:12px">
+      <h2 id="h-info">Як вас бачать клієнти</h2>
+      <div class="ava-row">
+        ${imgSrc(p.avatar) ? `<img class="ava" src="${imgSrc(p.avatar)}" alt="Аватар мийки">` : `<span class="avatar ava" aria-hidden="true">${letter}</span>`}
+        <div class="stack" style="gap:6px"><small class="muted">${r.count ? `★ ${rating(r.avg)} · ${r.count} ${plural(r.count, 'відгук', 'відгуки', 'відгуків')}` : 'Відгуків ще немає'}</small>
+          <div class="row"><label class="btn soft">${icon('camera', 16)}${p.avatar ? 'Змінити аватар' : 'Додати аватар'}<input class="sr-only" type="file" accept="image/*" id="pf-avatar" aria-label="Аватар мийки"></label>
+          ${p.avatar ? '<button class="btn text-danger" type="button" data-action="ava-del">Прибрати</button>' : ''}</div></div>
+      </div>
+      <div><span class="lbl">Фото мийки (${photos.length} з ${MAX_PHOTOS}) — перше стає обкладинкою</span>
+        <div class="photo-grid">${photos.map((src, i) => `<figure><img src="${imgSrc(src)}" alt="Фото ${i + 1}"><button class="photo-del" type="button" data-action="photo-del" data-i="${i}" aria-label="Видалити фото ${i + 1}">${icon('x', 16)}</button>${i ? `<button class="photo-first" type="button" data-action="photo-first" data-i="${i}">Обкладинка</button>` : ''}</figure>`).join('')}
+        ${photos.length < MAX_PHOTOS ? `<label class="photo-add">${icon('plus', 22)}<span>Фото</span><input class="sr-only" type="file" accept="image/*" multiple id="pf-photos" aria-label="Додати фото мийки"></label>` : ''}</div></div>
+      <label class="field"><span>Назва</span><input name="name" required maxlength="80" value="${esc(p.name)}" autocomplete="off"></label>
+      <label class="field"><span>Адреса</span><input name="address" required maxlength="120" value="${esc(p.address)}" autocomplete="off"></label>
+      <label class="field"><span>Опис</span><textarea name="about" rows="4" maxlength="500" placeholder="Що вирізняє мийку: хімія, зона очікування з кавою, швидкість, оплата карткою">${esc(p.about ?? '')}</textarea></label>
+      <div class="row"><button class="btn navy" type="submit">Зберегти</button><a class="btn soft" href="index.html#/place/${p.id}" target="_blank" rel="noopener">Подивитися як клієнт</a></div>
+    </form>`;
+}
+
+// Фото зберігаються на пристрої; якщо місця забракло — кажемо про це.
+function savePhotos(patch, ok) {
+  saveOverride(ui.place, patch);
+  const saved = store.get('biz.places', {})[ui.place] ?? {};
+  const fits = Object.entries(patch).every(([k, v]) => JSON.stringify(saved[k] ?? null) === JSON.stringify(v));
+  rerender();
+  toast(fits ? ok : 'Не вистачило памʼяті пристрою — спробуйте менше фото');
 }
 
 // Відмови й швидкість відповіді: від них залежить місце в пошуку CARCAR і пауза онлайн-запису.
@@ -3634,27 +3952,331 @@ function dayHoursSheet(date) {
 
 // ---------- ще ----------
 
+const placeTickets = () => ticketsAll().filter((t) => t.placeId === ui.place && t.from === 'place').sort((a, b) => b.updatedAt - a.updatedAt);
+const reviewsOf = () => reviews.filter((x) => x.placeId === ui.place).sort((a, b) => b.at - a.at);
+// Імʼя автора відгуку — із запису, за яким його залишили.
+const reviewer = (x) => x.name ?? bookings.find((b) => b.id === x.bookingId)?.clientName ?? 'Клієнт CARCAR';
+
 function viewMore() {
   const s = session();
+  const pt = partnerOf(ui.place);
+  const noReply = reviewsOf().filter((x) => !x.reply).length;
+  const answers = placeTickets().filter((t) => t.unreadUser).length;
   const links = [
-    ['business.html#/clients', 'users', 'Клієнти', 'Історія візитів, нотатки, розсилки'],
-    ['business.html#/staff', 'users', 'Персонал', 'Майстри, ролі й заробіток'],
-    ['business.html#/connect', 'shield', 'Реквізити й документи', 'Рахунок для виплат, оферта'],
-    ['business.html#/support', 'info', 'Підтримка CARCAR', 'Виплати, спори, відгуки'],
-    ['business.html', 'chart', 'Повна версія панелі', 'Розклад по боксах, склад, абонементи — для компʼютера'],
+    ['#/reviews', 'star', 'Відгуки', noReply ? `Без відповіді: ${noReply}` : 'Відповіді видно на сторінці мийки', noReply],
+    ['#/analytics', 'chart', 'Аналітика', 'Виручка, завантаження по годинах, послуги, клієнти', 0],
+    ['#/clients', 'users', 'Клієнти', 'Хто приїжджав, скільки разів і на якому авто', 0],
+    ['#/payout', 'card', 'Рахунок для виплат', pt.payout?.iban ? `${maskIban(pt.payout.iban)} · ${pt.payout.verified ? 'перевірено' : 'на перевірці'}` : 'Вкажіть IBAN, щоб виводити гроші', pt.payout?.iban ? 0 : 1],
+    ['#/support', 'info', 'Підтримка CARCAR', answers ? `Нові відповіді: ${answers}` : 'Виплати, спори, відгуки', answers],
   ];
   return `<h1>Ще</h1>
-    ${s?.demo ? `<label class="field"><span>Мийка (демо)</span><select id="pro-place">${PLACES.filter((p) => partnerOf(p.id).status === 'approved').map((p) => `<option value="${p.id}" ${p.id === ui.place ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>` : ''}
     ${notifyAsk() ? `<div style="margin-top:12px">${notifyAsk()}</div>` : ''}
-    <div class="stack" style="gap:8px;margin-top:12px">${links.map(([href, ic, title, sub]) => `<a class="pro-link" href="${href}">${icon(ic, 22)}<span><b>${title}</b><small>${sub}</small></span>${icon('chevR', 18)}</a>`).join('')}</div>
-    ${s?.demo ? `<button class="btn block" type="button" data-action="demo-seed" style="margin-top:16px">Заповнити прикладом: записи й повідомлення</button>` : ''}
+    <div class="stack" style="gap:8px;margin-top:12px">${links.map(([href, ic, title, sub, n]) => `<a class="pro-link" href="${href}">${icon(ic, 22)}<span><b>${title}</b><small>${sub}</small></span>${n ? `<span class="count-dot" aria-hidden="true">${n}</span>` : ''}${icon('chevR', 18)}</a>`).join('')}</div>
+    ${s?.demo ? `<button class="btn block" type="button" data-action="demo-seed" style="margin-top:16px">Заповнити прикладом: історія, записи й повідомлення</button>` : ''}
     <p class="fine" style="margin-top:16px">Щоб CarCar Business був під рукою, додайте його на головний екран: меню браузера → «Встановити застосунок» або «На екран “Додому”».</p>
     <button class="btn line-danger block" type="button" data-action="logout" style="margin-top:8px">${s?.demo ? 'Вийти з демо' : `Вийти${s?.login ? ` (${esc(s.login)})` : ''}`}</button>`;
+}
+
+const backTo = (href, label) => `<a class="back" href="${href}">${icon('chevL', 22)}${label}</a>`;
+
+// Відгуки: відповідь публічна, видалити не можна — можна поскаржитися модератору.
+function viewReviews() {
+  const list = reviewsOf();
+  const r = ratingFor(ui.place, reviews);
+  return `${backTo('#/more', 'Ще')}<h1>Відгуки</h1>
+    <p class="lead">${r.count ? `${starsLine(r.avg)} <b>${rating(r.avg)}</b> · ${r.count} ${plural(r.count, 'відгук', 'відгуки', 'відгуків')}` : 'Відгуків ще немає.'} Відгук залишає лише клієнт, який був у вас через CARCAR.</p>
+    ${list.map((x) => `<article class="pro-card pro-review" aria-label="Відгук: ${esc(reviewer(x))}">
+      <div class="head"><b>${esc(reviewer(x))}</b>${starsLine(x.stars ?? x.rating)}</div>
+      <small class="muted">${fmtTime(x.at)}${x.hidden ? ' · приховано модератором' : ''}</small>
+      ${x.text ? `<p>${esc(x.text)}</p>` : ''}
+      ${(x.photos ?? []).length ? `<div class="photo-grid">${x.photos.map((src, i) => `<figure><img src="${imgSrc(src)}" alt="Фото до відгуку ${i + 1}"></figure>`).join('')}</div>` : ''}
+      ${x.reply ? `<p class="reply"><b>Ваша відповідь</b>${esc(x.reply.text)}</p>` : `<form class="chat-form rev-reply" data-id="${x.id}"><input name="reply" required maxlength="500" autocomplete="off" placeholder="Відповісти публічно…" aria-label="Відповідь на відгук: ${esc(reviewer(x))}"><button class="send-btn" type="submit" aria-label="Надіслати відповідь">${icon('send', 18)}</button></form>`}
+      ${x.report?.status === 'open' ? '<p class="small muted" style="margin:0">Скаргу надіслано модератору CARCAR.</p>'
+        : x.report?.status === 'rejected' ? `<p class="small muted" style="margin:0">Модератор залишив відгук${x.report.note ? `: ${esc(x.report.note)}` : ''}.</p>`
+          : x.hidden ? '' : `<button class="btn text-danger" type="button" data-action="review-report" data-id="${x.id}" style="justify-self:start">Поскаржитися модератору</button>`}
+    </article>`).join('')}`;
+}
+
+// Клієнти мийки — з записів: телефон, авто, візити, скільки витратили, коли були востаннє.
+function clientsList() {
+  const map = new Map();
+  for (const b of own()) {
+    if (b.source === 'demo-hist' && !b.clientPhone) continue;
+    const key = b.clientPhone ? phoneKey(b.clientPhone) : `name:${(b.clientName || '').toLowerCase()}`;
+    if (!key || key === 'name:') continue;
+    const c = map.get(key) ?? { key, name: b.clientName || 'Клієнт', phone: b.clientPhone || '', cars: new Set(), visits: 0, spent: 0, last: '', cls: b.cls ?? 0, car: '' };
+    if (b.car) c.cars.add(b.car);
+    if (b.state === 'completed') { c.visits += 1; c.spent += sumOf(b); }
+    if (b.date > c.last) { c.last = b.date; c.name = b.clientName || c.name; c.car = b.car || c.car; c.cls = b.cls ?? c.cls; }
+    map.set(key, c);
+  }
+  return [...map.values()].sort((a, b) => b.last.localeCompare(a.last));
+}
+
+function viewClients() {
+  const q = (ui.clientQ ?? '').trim().toLowerCase();
+  const all = clientsList();
+  const list = q ? all.filter((c) => [c.name, c.phone, ...c.cars].join(' ').toLowerCase().includes(q)) : all;
+  // Номер запису з дзвінка чи звернення: «100245» або «№ 100245».
+  const byNo = /^\D*\d{6}\D*$/.test(q) ? own().find((b) => String(b.no) === q.replace(/\D/g, '')) : null;
+  return `${backTo('#/more', 'Ще')}<h1>Клієнти</h1>
+    <label class="search"><span class="sr-only">Пошук клієнта</span>${icon('search', 18)}<input id="client-q" type="search" placeholder="Імʼя, телефон, авто чи № запису" value="${esc(ui.clientQ ?? '')}" autocomplete="off"></label>
+    ${byNo ? `<button class="pro-link block-btn" type="button" data-action="bk-open" data-id="${byNo.id}">${icon('calendar', 22)}<span><b>Запис ${bookingNo(byNo)}</b><small>${esc(who(byNo))} · ${dayWord(byNo.date)}, ${byNo.time} · ${esc(byNo.services.join(', '))}</small></span>${icon('chevR', 18)}</button>` : ''}
+    <p class="small muted">${all.length} ${plural(all.length, 'клієнт', 'клієнти', 'клієнтів')}</p>
+    ${list.length ? `<ul class="client-list">${list.slice(0, 100).map((c) => `<li>
+      <span class="avatar" aria-hidden="true">${firstLetter(c.name)}</span>
+      <span class="cl-main"><b>${esc(c.name)}</b><small>${esc([...c.cars].join(', ') || '—')}</small>
+        <small>${c.visits} ${plural(c.visits, 'візит', 'візити', 'візитів')}${c.spent ? ` · ${uah(c.spent)}` : ''} · востаннє ${dayLabel(c.last, { day: 'numeric', month: 'short' })}</small></span>
+      <span class="row">${c.phone ? `<a class="icon-btn" href="${telHref(c.phone)}" aria-label="Подзвонити: ${esc(c.name)}">${icon('phone', 20)}</a>` : ''}
+        <button class="btn soft" type="button" data-action="nb-client" data-key="${esc(c.key)}">Записати</button></span>
+    </li>`).join('')}</ul>` : `<div class="pro-empty">${icon('users', 32)}<b>${all.length ? 'Нікого не знайдено' : 'Клієнтів ще немає'}</b><span>Тут зʼявляться всі, хто записувався через CARCAR, по телефону чи приїжджав сам.</span></div>`}`;
+}
+
+// Рахунок для виплат: IBAN ФОП чи ТОВ. Нові реквізити перевіряє CARCAR, до того виведення недоступне.
+function viewPayout() {
+  const pt = partnerOf(ui.place);
+  const pay = pt.payout ?? {};
+  return `${backTo('#/more', 'Ще')}<h1>Рахунок для виплат</h1>
+    <p class="lead">Гроші за записи через CARCAR виводяться лише на рахунок ФОП чи ТОВ.</p>
+    ${pay.iban ? `<p class="notice ${pay.verified ? 'ok' : 'warn'}">${pay.verified ? `Рахунок ${maskIban(pay.iban)} перевірено — можна виводити гроші.` : `Рахунок ${maskIban(pay.iban)} на перевірці CARCAR, зазвичай до 2 робочих днів.`}</p>` : ''}
+    <form class="pro-card stack" id="payout-form" style="gap:12px">
+      <label class="field"><span>IBAN</span><input name="iban" required autocomplete="off" inputmode="text" placeholder="UA00 0000 0000 0000 0000 0000 000" value="${esc(pay.iban ? formatIban(pay.iban) : '')}"></label>
+      <label class="field"><span>Отримувач (ФОП чи назва ТОВ)</span><input name="holder" required maxlength="120" autocomplete="off" value="${esc(pay.holder ?? '')}"></label>
+      <label class="field"><span>РНОКПП (ФОП) чи ЄДРПОУ (ТОВ)</span><input name="code" required inputmode="numeric" maxlength="10" autocomplete="off" value="${esc(pay.code ?? '')}"></label>
+      <button class="btn primary" type="submit">Надіслати на перевірку</button>
+      <p class="fine">Після зміни рахунку виведення зупиняється, доки CARCAR не перевірить, що рахунок належить вашій мийці.</p>
+    </form>`;
+}
+
+// Підтримка CARCAR для мийки: звернення з номером запису й фото.
+function viewSupport(openId) {
+  const list = placeTickets();
+  const sel = list.find((t) => t.id === openId);
+  if (sel?.unreadUser) setTicket(sel.id, { unreadUser: false });
+  if (sel) {
+    const b = bookings.find((x) => x.id === sel.bookingId);
+    return `${backTo('#/support', 'Підтримка')}<h1>№${sel.no} · ${TICKET_TOPICS[sel.topic]}</h1>
+      <p class="row"><span class="pill ${TICKET_STATUS[sel.status][1]}">${TICKET_STATUS[sel.status][0]}</span>${b?.no ? `<span class="small muted">Запис ${bookingNo(b)}</span>` : ''}</p>
+      <ol class="thread ticket-thread">${sel.messages.map((m) => `<li class="msg ${m.from === 'place' ? 'me' : 'them'}"><small>${m.from === 'admin' ? 'Підтримка CARCAR' : 'Ви'} · ${fmtTime(m.at)}</small>${esc(m.text)}${ticketPhotos(m.photos)}</li>`).join('')}</ol>
+      ${sel.status === 'closed' ? '<p class="small muted">Звернення закрито.</p>' : `<form class="stack" id="ticket-reply" data-id="${sel.id}" style="gap:10px">
+        <label class="field"><span>Відповідь підтримці</span><textarea name="text" rows="3" maxlength="800"></textarea></label>
+        ${photoPick()}<button class="btn primary" type="submit">Надіслати</button></form>`}`;
+  }
+  const recent = own().filter(isCarcar).sort((a, b) => bookingStart(b) - bookingStart(a)).slice(0, 20);
+  const pre = ui.ticketPre ?? {};
+  return `${backTo('#/more', 'Ще')}<h1>Підтримка CARCAR</h1>
+    <p class="lead">Термінові питання про гроші й спори розглядаємо до 2 годин, решту — протягом доби.</p>
+    ${list.length ? `<ul class="client-list">${list.map((t) => `<li><span class="cl-main"><b>№${t.no} · ${TICKET_TOPICS[t.topic]}</b><small>${esc(t.messages.at(-1).text)}</small></span>
+      <span class="pill ${t.unreadUser ? 'warn' : TICKET_STATUS[t.status][1]}">${t.unreadUser ? 'Нова відповідь' : TICKET_STATUS[t.status][0]}</span><a class="btn soft" href="#/support/${t.id}">Відкрити</a></li>`).join('')}</ul>` : ''}
+    <form class="pro-card stack" id="ticket-form" aria-labelledby="h-new-t" style="gap:12px;margin-top:12px">
+      <h2 id="h-new-t">Нове звернення</h2>
+      <label class="field"><span>Тема</span><select name="topic">${PLACE_TOPICS.map((k) => `<option value="${k}" ${k === pre.topic ? 'selected' : ''}>${TICKET_TOPICS[k]}</option>`).join('')}</select></label>
+      <label class="field"><span>Запис (необовʼязково)</span><select name="booking"><option value="">Не стосується запису</option>
+        ${recent.map((b) => `<option value="${b.id}" ${b.id === pre.booking ? 'selected' : ''}>${bookingNo(b)} · ${dayLabel(b.date, { day: 'numeric', month: 'short' })} ${b.time} · ${esc(who(b))}</option>`).join('')}</select></label>
+      <label class="field"><span>Опишіть питання</span><textarea name="text" rows="4" required maxlength="1000"></textarea></label>
+      ${photoPick()}
+      <button class="btn primary" type="submit">Надіслати</button>
+    </form>`;
+}
+const photoPick = () => `<label class="dropzone small-drop">${icon('camera', 20)}Додати фото (до 3)<span class="photo-count" aria-live="polite"></span><input class="sr-only" name="photos" type="file" accept="image/*" multiple></label>`;
+
+// ---------- аналітика й знижки на тихі години ----------
+
+const WD_SHORT = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
+const LOAD_WEEKS = 8;
+
+// Завантаження боксів по днях тижня й годинах за останні тижні: зайняті хвилини / робочі хвилини боксів.
+function demandGrid(weeks = LOAD_WEEKS) {
+  const p = place();
+  const t = todayIso();
+  const cells = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => ({ cap: 0, used: 0 })));
+  const byDay = new Map();
+  for (const b of own()) {
+    if (!['completed', 'noshow', ...BLOCKING].includes(b.state) || b.mobile) continue;
+    byDay.set(b.date, [...(byDay.get(b.date) ?? []), b]);
+  }
+  let orders = 0;
+  for (let i = 1; i <= weeks * 7; i++) {
+    const d = shiftDay(t, -i);
+    const h = hoursFor(p, d);
+    if (!h) continue;
+    const wd = (parseDate(d).getDay() + 6) % 7;
+    const list = byDay.get(d) ?? [];
+    orders += list.length;
+    for (let hr = Math.floor(h[0] / 60); hr < Math.ceil(h[1] / 60); hr++) {
+      const s = Math.max(hr * 60, h[0]);
+      const e = Math.min(hr * 60 + 60, h[1]);
+      if (e <= s) continue;
+      const c = cells[wd][hr];
+      c.cap += (e - s) * p.boxes;
+      c.used += list.reduce((a, b) => a + Math.max(0, Math.min(e, toMin(b.time) + b.minutes) - Math.max(s, toMin(b.time))), 0);
+    }
+  }
+  return { cells, orders };
+}
+const rateOf = (cells, days, from, to) => {
+  let cap = 0;
+  let used = 0;
+  for (const wd of days) for (let hr = from; hr < to; hr++) { cap += cells[wd][hr].cap; used += cells[wd][hr].used; }
+  return cap ? used / cap : null;
+};
+
+// Пропозиції знижки: найтихіше вікно 2–3 години в будні й у вихідні, якщо воно помітно тихіше за решту дня.
+function quietSuggestions() {
+  const { cells, orders } = demandGrid();
+  if (orders < 30) return { list: [], orders };
+  const p = place();
+  const deals = weeklyDealsOf(p.id);
+  const groups = [[[0, 1, 2, 3, 4], 'Пн–Пт'], [[5, 6], 'Сб–Нд']];
+  const list = [];
+  for (const [days, label] of groups) {
+    const open = days.filter((wd) => cells[wd].some((c) => c.cap));
+    if (!open.length) continue;
+    const hrs = [...Array(24).keys()].filter((hr) => open.every((wd) => cells[wd][hr].cap));
+    const avg = rateOf(cells, open, Math.min(...hrs), Math.max(...hrs) + 1);
+    let best = null;
+    for (const len of [3, 2]) {
+      for (const from of hrs) {
+        if (!hrs.includes(from + len - 1) || hrs.indexOf(from + len - 1) - hrs.indexOf(from) !== len - 1) continue;
+        const r = rateOf(cells, open, from, from + len);
+        if (r !== null && (!best || r < best.rate - 0.02)) best = { from, to: from + len, rate: r };
+      }
+    }
+    if (!best || avg === null || best.rate > Math.min(0.4, avg * 0.7)) continue;
+    const covered = deals.some((d) => open.some((wd) => d.days.includes(wd)) && d.from < best.to * 60 && d.to > best.from * 60);
+    const pct = best.rate < 0.15 ? 20 : best.rate < 0.3 ? 15 : 10;
+    list.push({ days: open, label, from: best.from * 60, to: best.to * 60, rate: best.rate, avg, pct, covered });
+  }
+  return { list, orders };
+}
+
+function suggestCard(compact = false) {
+  const { list, orders } = quietSuggestions();
+  const fresh = list.filter((x) => !x.covered);
+  const active = weeklyDealsOf(ui.place);
+  if (compact && !fresh.length) return '';
+  return `<section class="pro-card suggest" aria-labelledby="h-quiet">
+    <h2 id="h-quiet">${icon('bolt', 20)}Знижка на тихі години</h2>
+    ${!list.length ? `<p class="small muted" style="margin:0">${orders < 30 ? `Замало записів для аналізу: ${orders} з 30 за ${LOAD_WEEKS} тижнів.` : 'Тихих годин не знайшли — завантаження рівне.'}</p>` : ''}
+    ${fresh.map((x) => `<div class="suggest-item">
+      <p style="margin:0"><b>${x.label}, ${hhmm(x.from)}–${hhmm(x.to)}</b> — зайнято лише ${ratePct(x.rate)} боксів (у середньому за день ${ratePct(x.avg)}).
+        Знижка −${x.pct}% на цей час приведе клієнтів, які інакше поїхали б в інший час чи на іншу мийку.</p>
+      <button class="btn navy" type="button" data-action="quiet-on" data-days="${x.days.join(',')}" data-from="${x.from}" data-to="${x.to}" data-pct="${x.pct}">Увімкнути −${x.pct}%</button>
+    </div>`).join('')}
+    ${active.length ? `<ul class="plain-list">${active.map((d) => `<li><span><b>−${d.pct}%</b> ${daysText(d.days)}, ${hhmm(d.from)}–${hhmm(d.to)}</span><button class="btn soft" type="button" data-action="deal-off" data-id="${d.id}">Вимкнути</button></li>`).join('')}</ul>` : ''}
+    <p class="fine">Аналіз за ${LOAD_WEEKS} тижнів. Клієнти бачать знижку на час і ціну зі знижкою, коли обирають запис. Знижку оплачує мийка.</p>
+  </section>`;
+}
+
+// Стовпчики виручки по днях: одна серія, підписи — найбільший і останній день.
+function revenueBars(days) {
+  const t = todayIso();
+  const list = Array.from({ length: days }, (_, i) => shiftDay(t, -(days - 1 - i)));
+  const vals = list.map((d) => own().filter((b) => b.date === d).reduce((a, b) => a + revenue(b), 0));
+  const max = Math.max(1, ...vals);
+  return `<div class="rev-bars" role="img" aria-label="Виручка по днях: найбільше ${uah(Math.max(...vals))}">${list.map((d, i) => `<span class="rev-bar" style="height:${Math.max(2, (vals[i] / max) * 100)}%" title="${dayLabel(d, { day: 'numeric', month: 'short' })}: ${uah(vals[i])}"></span>`).join('')}</div>
+    <div class="rev-axis"><span>${dayLabel(list[0], { day: 'numeric', month: 'short' })}</span><span>максимум ${uah(Math.max(...vals))}</span><span>сьогодні</span></div>`;
+}
+
+function heatmap() {
+  const { cells } = demandGrid();
+  const p = place();
+  const hrs = [...Array(24).keys()].filter((hr) => cells.some((row) => row[hr].cap));
+  if (!hrs.length) return '';
+  const cell = (c) => {
+    if (!c.cap) return '<td class="off"></td>';
+    const r = c.used / c.cap;
+    const k = Math.round(8 + r * 80);
+    return `<td style="background:color-mix(in srgb, var(--navy) ${k}%, var(--bg));color:${k > 50 ? 'var(--on-navy)' : 'var(--text)'}" title="${ratePct(r)}">${Math.round(r * 100)}</td>`;
+  };
+  return `<div class="heat-wrap" tabindex="0" role="region" aria-label="Таблиця: зайнятість боксів по днях і годинах"><table class="heat">
+    <thead><tr><th scope="col"><span class="sr-only">День</span></th>${hrs.map((hr) => `<th scope="col">${hr}</th>`).join('')}</tr></thead>
+    <tbody>${WD_SHORT.map((w, wd) => `<tr><th scope="row">${w}</th>${hrs.map((hr) => cell(cells[wd][hr])).join('')}</tr>`).join('')}</tbody>
+  </table></div><p class="fine">% зайнятих боксів (${p.boxes}) за ${LOAD_WEEKS} тижнів; чим темніше, тим більше машин.</p>`;
+}
+
+function viewAnalytics() {
+  const n = ui.anPeriod ?? 30;
+  const t = todayIso();
+  const from = shiftDay(t, -(n - 1));
+  const list = own().filter((b) => b.date >= from && b.date <= t);
+  const done = list.filter((b) => b.state === 'completed');
+  const money = list.reduce((a, b) => a + revenue(b), 0);
+  const lost = list.filter((b) => ['cancelled', 'noshow'].includes(b.state) && !b.declined).length;
+  const past = list.filter((b) => b.state !== 'pending' && bookingStart(b) <= new Date()).length;
+  const key = (b) => (b.clientPhone ? phoneKey(b.clientPhone) : null);
+  const firstSeen = new Map();
+  for (const b of [...own()].sort((a, b) => a.date.localeCompare(b.date))) if (key(b) && !firstSeen.has(key(b))) firstSeen.set(key(b), b.date);
+  const clients = [...new Set(done.map(key).filter(Boolean))];
+  const fresh = clients.filter((k) => firstSeen.get(k) >= from).length;
+  const svc = new Map();
+  for (const b of done) for (const s of b.services) svc.set(s, (svc.get(s) ?? 0) + 1);
+  const top = [...svc].sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const maxSvc = Math.max(1, ...top.map(([, v]) => v));
+  const ch = Object.keys(CHANNEL).map((k) => [CHANNEL[k], done.filter((b) => channelOf(b) === k).length]).filter(([, v]) => v);
+  return `${backTo('#/wash', 'Мийка')}<h1>Аналітика</h1>
+    <div class="chips" role="group" aria-label="Період">${[7, 30, 90].map((d) => `<button class="chip" type="button" data-action="an-period" data-n="${d}" aria-pressed="${d === n}">${d} днів</button>`).join('')}</div>
+    <section class="tiles pro-tiles" aria-label="Підсумки за ${n} днів">
+      <div class="tile hero"><span>Виручка</span><b>${uah(money)}</b><small>${done.length} ${plural(done.length, 'машина', 'машини', 'машин')}</small></div>
+      <div class="tile"><span>Середній чек</span><b>${uah(done.length ? Math.round(done.reduce((a, b) => a + sumOf(b), 0) / done.length) : 0)}</b></div>
+      <div class="tile"><span>Клієнти</span><b>${clients.length}</b><small>нових ${fresh}, постійних ${clients.length - fresh}</small></div>
+      <div class="tile"><span>Скасування й неявки</span><b>${past ? ratePct(lost / past) : '0%'}</b><small>${lost} з ${past}</small></div>
+    </section>
+    ${suggestCard()}
+    <section class="pro-card" aria-labelledby="h-rev-days"><h2 id="h-rev-days">Виручка по днях</h2>${revenueBars(n)}</section>
+    <section class="pro-card" aria-labelledby="h-heat"><h2 id="h-heat">Завантаження по годинах</h2>${heatmap()}</section>
+    <section class="pro-card" aria-labelledby="h-top"><h2 id="h-top">Популярні послуги</h2>
+      ${top.length ? `<ul class="hbars">${top.map(([name, v]) => `<li><span>${esc(name)}</span><span class="hb"><i style="width:${(v / maxSvc) * 100}%"></i></span><b>${v}</b></li>`).join('')}</ul>` : '<p class="small muted" style="margin:0">Ще немає виконаних записів.</p>'}
+    </section>
+    <section class="pro-card" aria-labelledby="h-ch"><h2 id="h-ch">Звідки клієнти</h2>
+      ${ch.length ? `<ul class="hbars">${ch.map(([name, v]) => `<li><span>${name}</span><span class="hb"><i style="width:${(v / done.length) * 100}%"></i></span><b>${ratePct(v / done.length)}</b></li>`).join('')}</ul>` : '<p class="small muted" style="margin:0">Ще немає даних.</p>'}
+    </section>`;
+}
+
+// Демо-історія за 8 тижнів: вранці в будні тихо, увечері й у вихідні — людно. Так видно аналітику й пропозиції знижок.
+function demoHistory(p) {
+  let seed = 7;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const names = ['Олена', 'Андрій', 'Ірина', 'Сергій', 'Марина', 'Тарас', 'Оксана', 'Дмитро', 'Юлія', 'Богдан', 'Наталія', 'Олег', 'Катерина', 'Віталій', 'Світлана', 'Роман'];
+  const cars = ['Toyota Corolla', 'VW Golf', 'Skoda Octavia', 'Kia Sportage', 'Hyundai Tucson', 'Renault Duster', 'BMW X3', 'Mazda 6'];
+  const clients = Array.from({ length: 48 }, (_, i) => ({ name: `${names[i % names.length]} ${String.fromCharCode(1040 + (i * 7) % 28)}.`, phone: `+380 67 ${String(100 + i).padStart(3, '0')} ${String(10 + (i * 13) % 90).padStart(2, '0')} ${String(10 + (i * 31) % 90).padStart(2, '0')}`, car: cars[i % cars.length] }));
+  const mains = p.services.filter((s) => s.min <= 90);
+  const out = [];
+  const t = todayIso();
+  for (let i = LOAD_WEEKS * 7; i >= 1; i--) {
+    const d = shiftDay(t, -i);
+    const h = hoursFor(p, d);
+    if (!h) continue;
+    const wd = (parseDate(d).getDay() + 6) % 7;
+    for (let m = h[0]; m + 30 <= h[1]; m += 30) {
+      const hr = m / 60;
+      const want = wd >= 5 ? (hr >= 11 && hr < 17 ? 0.55 : 0.25) : hr < 12 ? 0.06 : hr < 16 ? 0.22 : hr < 20 ? 0.6 : 0.2;
+      for (let box = 0; box < p.boxes; box++) {
+        if (rnd() > want / 2) continue;
+        const s = mains[Math.floor(rnd() * mains.length)];
+        if (!s || m + s.min > h[1]) continue;
+        const busy = out.filter((b) => b.date === d && toMin(b.time) < m + s.min && toMin(b.time) + b.minutes > m).length;
+        if (busy >= p.boxes) continue;
+        const c = clients[Math.floor(rnd() * rnd() * clients.length)];
+        const r = rnd();
+        const channel = r < 0.6 ? 'carcar' : r < 0.9 ? 'phone' : 'walkin';
+        const price = s.price[0];
+        const b = { id: uid(), source: 'demo', channel, placeId: p.id, services: [s.name], total: price, paid: price, bonus: 0, minutes: s.min, date: d, time: hhmm(m), cls: 0,
+          car: c.car, clientName: c.name, clientPhone: c.phone, state: 'completed', payment: channel === 'carcar' ? undefined : 'card', createdAt: parseDate(d).getTime() - 864e5 };
+        if (rnd() < 0.05) Object.assign(b, { state: channel === 'carcar' ? 'noshow' : 'cancelled', placeAmount: channel === 'carcar' ? price : 0 });
+        else complete(b, parseDate(d).getTime() + (m + s.min) * 60000);
+        out.push(b);
+      }
+    }
+  }
+  return out;
 }
 
 // Приклад для демо: кілька записів на сьогодні й завтра, переписка й питання клієнта.
 function demoSeed() {
   const p = place();
+  bookings = bookings.filter((b) => !(b.source === 'demo' && b.placeId === p.id));
+  bookings.push(...demoHistory(p));
   const t = todayIso();
   const svc = p.services;
   const pick = (...i) => i.map((k) => svc[k % svc.length]).filter((x, j, a) => a.indexOf(x) === j);
@@ -3694,7 +4316,7 @@ const TABS = [['', 'Повідомлення', 'chat'], ['bookings', 'Запис
 
 function renderChrome(page) {
   const badge = { '': unreadCount(), bookings: unmarked().length };
-  const tabOf = page === 'chat' ? '' : page;
+  const tabOf = page === 'chat' ? '' : ['reviews', 'clients', 'payout', 'support'].includes(page) ? 'more' : page === 'analytics' ? 'wash' : page;
   $('#tabbar').innerHTML = TABS.map(([id, label, ic]) => `<a href="#/${id}" ${tabOf === id ? 'aria-current="page"' : ''}>
     <span class="tab-ic">${icon(ic, 24)}${badge[id] ? `<span class="tab-count" aria-label="${id ? 'Записи без позначки' : 'Непрочитані'}: ${badge[id]}">${badge[id]}</span>` : ''}</span>${label}</a>`).join('');
   const p = place();
@@ -3704,6 +4326,14 @@ function renderChrome(page) {
   fab.hidden = !['', 'bookings', 'wash'].includes(page);
   fab.innerHTML = `${icon('plus', 22)}<span>Запис</span>`;
   fab.setAttribute('aria-label', 'Новий запис');
+}
+
+function pickWash(id) {
+  ui.place = id;
+  store.set('partner', id);
+  const s = session();
+  if (s && !s.demo) store.set('biz.session', { ...s, placeId: id });
+  alerted.clear();
 }
 
 function notFound() { return '<h1>Не знайдено</h1><p class="muted">Можливо, запис видалили. <a href="#/">До повідомлень</a></p>'; }
@@ -3718,11 +4348,25 @@ function route() {
     $('#fab').hidden = true;
     return;
   }
-  if (s.placeId && placeById(s.placeId)) ui.place = s.placeId;
+  // Поточна мийка — одна з мийок акаунта.
+  const mine = accountPlaces(s);
+  if (!mine.includes(ui.place)) ui.place = mine.includes(s.placeId) ? s.placeId : mine[0] ?? ui.place;
   touchPresence(ui.place);
   if (expirePending(bookings)) save();
   checkWaitlist(bookings);
   const [, page = '', arg, id] = location.hash.replace(/^#/, '').split('/');
+  // Пряме посилання на запис (зі сповіщення): відкриваємо день запису й картку.
+  if (page === 'booking') {
+    const b = bookings.find((x) => x.id === arg);
+    if (b && accountPlaces(s).includes(b.placeId)) {
+      if (b.placeId !== ui.place) pickWash(b.placeId);
+      alerted.add(b.id);
+      history.replaceState(null, '', `#/bookings/${b.date}`);
+      route();
+      bookingSheet(b.id);
+      return;
+    }
+  }
   if (page === 'act') { alerted.add(id); history.replaceState(null, '', '#/'); route(); notifyAction(arg, id); return; }
   document.body.classList.toggle('in-chat', page === 'chat');
   renderChrome(page);
@@ -3733,6 +4377,11 @@ function route() {
   else if (page === 'wash') view.innerHTML = viewWash();
   else if (page === 'profile') view.innerHTML = viewProfile();
   else if (page === 'more') view.innerHTML = viewMore();
+  else if (page === 'reviews') view.innerHTML = viewReviews();
+  else if (page === 'clients') view.innerHTML = viewClients();
+  else if (page === 'payout') view.innerHTML = viewPayout();
+  else if (page === 'support') view.innerHTML = viewSupport(arg);
+  else if (page === 'analytics') view.innerHTML = viewAnalytics();
   else view.innerHTML = notFound();
   if (page === 'chat') {
     const list = $('.chat-msgs');
@@ -3900,6 +4549,46 @@ document.addEventListener('click', async (e) => {
     return;
   }
   if (action === 'svc-edit') { serviceSheet(id); return; }
+  if (action === 'wash-add') { addWashSheet(); return; }
+  if (action === 'an-period') { ui.anPeriod = Number(el.dataset.n); rerender(); return; }
+  if (action === 'quiet-on') {
+    const deal = { id: uid(), active: true, createdAt: Date.now(), source: 'quiet', days: el.dataset.days.split(',').map(Number), from: Number(el.dataset.from), to: Number(el.dataset.to), pct: Number(el.dataset.pct), services: [], until: null };
+    const all = store.get('biz.deals', {});
+    store.set('biz.deals', { ...all, [ui.place]: [...(all[ui.place] ?? []), deal] });
+    rerender();
+    toast(`Знижку −${deal.pct}% увімкнено: ${daysText(deal.days)}, ${hhmm(deal.from)}–${hhmm(deal.to)}. Клієнти вже її бачать`);
+    return;
+  }
+  if (action === 'deal-off') {
+    const all = store.get('biz.deals', {});
+    store.set('biz.deals', { ...all, [ui.place]: (all[ui.place] ?? []).map((x) => (x.id === id ? { ...x, active: false } : x)) });
+    rerender();
+    toast('Знижку вимкнено');
+    return;
+  }
+  if (action === 'review-report') {
+    const reason = prompt('Чому відгук порушує правила? Модератор CARCAR перевірить.', 'Клієнт не був на мийці');
+    if (!reason?.trim()) return;
+    reviews.find((x) => x.id === id).report = { reason: reason.trim(), at: Date.now(), status: 'open' };
+    save();
+    rerender();
+    toast('Скаргу надіслано модератору');
+    return;
+  }
+  if (action === 'nb-client') {
+    const c = clientsList().find((x) => x.key === el.dataset.key);
+    nbOpen({ name: c?.name ?? '', phone: c?.phone ?? '', car: c?.car ?? '', cls: c?.cls ?? 0 });
+    return;
+  }
+  if (action === 'wash-pick') { pickWash(id); rerender(); toast(`Мийка: ${place().name}`); return; }
+  if (action === 'ava-del') { savePhotos({ avatar: null }, 'Аватар прибрано'); return; }
+  if (action === 'photo-del' || action === 'photo-first') {
+    const photos = [...(place().photos ?? [])];
+    const [x] = photos.splice(Number(el.dataset.i), 1);
+    if (action === 'photo-first') photos.unshift(x);
+    savePhotos({ photos }, action === 'photo-del' ? 'Фото видалено' : 'Обкладинку змінено');
+    return;
+  }
   if (action === 'svc-new') { serviceSheet(null, el.dataset.req || null); return; }
   if (action === 'svc-del') {
     if (!confirm('Видалити послугу з прайсу?')) return;
@@ -3934,6 +4623,14 @@ document.addEventListener('click', async (e) => {
 });
 
 document.addEventListener('input', (e) => {
+  if (e.target.id === 'client-q') {
+    ui.clientQ = e.target.value;
+    rerender();
+    const q = $('#client-q');
+    q.focus();
+    q.setSelectionRange(q.value.length, q.value.length);
+    return;
+  }
   const f = e.target.form;
   if (f?.id !== 'nb-form' || !nb) return;
   const { name, value } = e.target;
@@ -3942,6 +4639,25 @@ document.addEventListener('input', (e) => {
 });
 
 document.addEventListener('change', async (e) => {
+  if (e.target.name === 'photos' && e.target.closest('form')?.querySelector('.photo-count')) {
+    const n = Math.min(e.target.files.length, 3);
+    e.target.closest('form').querySelector('.photo-count').textContent = n ? ` · обрано: ${n}` : '';
+    return;
+  }
+  if (e.target.id === 'pf-avatar' || e.target.id === 'pf-photos') {
+    const files = [...e.target.files];
+    if (!files.length) return;
+    const p = place();
+    if (e.target.id === 'pf-avatar') {
+      const avatar = await shrinkPhoto(files[0]);
+      if (avatar) savePhotos({ avatar }, 'Аватар оновлено — клієнти вже бачать його');
+      else toast('Не вдалося відкрити фото');
+      return;
+    }
+    const add = (await Promise.all(files.slice(0, MAX_PHOTOS - (p.photos?.length ?? 0)).map(shrinkPhoto))).filter(Boolean);
+    if (add.length) savePhotos({ photos: [...(p.photos ?? []), ...add] }, `Додано ${add.length} ${plural(add.length, 'фото', 'фото', 'фото')}`);
+    return;
+  }
   if (e.target.id === 'auto-confirm') {
     setAutoConfirm(ui.place, e.target.checked);
     rerender();
@@ -4001,6 +4717,18 @@ document.addEventListener('submit', async (e) => {
     toast('Відмовлено, клієнт отримав гроші назад');
     return;
   }
+  if (f.id === 'ready-form') {
+    const b = own().find((x) => x.id === f.dataset.id);
+    const photos = (await Promise.all(d.getAll('photos').filter((x) => x?.size).slice(0, 3).map(shrinkPhoto))).filter(Boolean);
+    Object.assign(b, { photos, note: String(d.get('note')).trim() || null, km: Number(d.get('km')) || null, doneAt: Date.now() });
+    complete(b);
+    // Фото не вмістилися в памʼять пристрою — зберігаємо запис без них.
+    if (!store.set('bookings', bookings) && photos.length) { b.photos = []; save(); } else save();
+    closeSheet();
+    rerender();
+    toast('Клієнт отримав сповіщення «Машина готова»');
+    return;
+  }
   if (f.id === 'done-form') {
     const b = own().find((x) => x.id === f.dataset.id);
     Object.assign(b, { state: 'completed', payment: d.get('payment'), paid: Number(d.get('paid')) || 0, completedAt: Date.now() });
@@ -4016,6 +4744,55 @@ document.addEventListener('submit', async (e) => {
     save();
     rerender();
     toast('Відповідь опубліковано на сторінці мийки');
+    return;
+  }
+  if (f.id === 'payout-form') {
+    const iban = normIban(d.get('iban'));
+    const code = String(d.get('code')).replace(/\D/g, '');
+    if (!ibanValid(iban)) { toast('Перевірте IBAN: UA і 27 цифр'); return; }
+    if (!codeValid(code.length === 8 ? 'tov' : 'fop', code)) { toast('Перевірте РНОКПП чи ЄДРПОУ'); return; }
+    const old = partnerOf(ui.place).payout ?? {};
+    const holder = String(d.get('holder')).trim();
+    const changed = normIban(old.iban) !== iban || old.holder !== holder || old.code !== code;
+    savePartner(ui.place, { payout: { iban, holder, code, verified: changed ? false : !!old.verified } });
+    rerender();
+    toast(changed ? 'Рахунок надіслано на перевірку CARCAR' : 'Нічого не змінилося');
+    return;
+  }
+  if (f.id === 'ticket-form' || f.id === 'ticket-reply' || f.id === 'dispute-note') {
+    const text = String(d.get('text')).trim();
+    const photos = (await Promise.all(d.getAll('photos').filter((x) => x?.size).slice(0, 3).map(shrinkPhoto))).filter(Boolean);
+    if (!text && !photos.length) { toast('Напишіть повідомлення'); return; }
+    if (f.id === 'ticket-reply') {
+      ticketReply(f.dataset.id, 'place', text || 'Фото', undefined, photos);
+      rerender();
+      toast('Надіслано в підтримку');
+      return;
+    }
+    const b = bookings.find((x) => x.id === (f.id === 'dispute-note' ? f.dataset.id : d.get('booking')));
+    const t = openTicket({ from: 'place', placeId: ui.place, bookingId: b?.id ?? null, topic: f.id === 'dispute-note' ? 'dispute' : d.get('topic'), text, clientName: b ? who(b) : '', photos });
+    ui.ticketPre = null;
+    closeSheet();
+    location.hash = `#/support/${t.id}`;
+    toast(`Звернення №${t.no} надіслано в CARCAR`);
+    return;
+  }
+  if (f.id === 'wash-form') {
+    const id = addAccountPlace(session(), { name: String(d.get('name')).trim(), city: d.get('city'), address: String(d.get('address')).trim(), phone: String(d.get('phone')).trim(), boxes: d.get('boxes') });
+    applyOverrides();
+    pickWash(id);
+    closeSheet();
+    location.hash = '#/profile';
+    toast('Мийку додано — заповніть профіль, графік і ціни, поки CARCAR її перевіряє');
+    return;
+  }
+  if (f.id === 'pf-info') {
+    const name = String(d.get('name')).trim();
+    const address = String(d.get('address')).trim();
+    if (!name || !address) { toast('Вкажіть назву й адресу'); return; }
+    saveOverride(ui.place, { name, address, about: String(d.get('about')).trim() });
+    rerender();
+    toast('Збережено — клієнти бачать оновлений профіль');
     return;
   }
   if (f.id === 'pf-main') {

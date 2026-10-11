@@ -1,5 +1,5 @@
 // Адмінка CARCAR: зведена статистика платформи, модерація підключення точок, відгуків і спорів, комісії.
-// Працює з тими самими даними, що й застосунок клієнта та панель бізнесу (сховище цього пристрою).
+// Працює з тими самими даними, що й застосунок клієнта та CarCar Business (сховище цього пристрою).
 // У робочій версії сюди мають доступ лише співробітники CARCAR (вхід із двофакторною автентифікацією).
 import { CATEGORIES, PLACES, PAYMENT } from './data.js';
 import {
@@ -11,7 +11,7 @@ import {
   addCustomPlace, uid, hash,
   enterView, bizApps, APP_STATUS, approveBizApp, rejectBizApp, bookingNo, findByNo, ticketPhotos, shrinkPhoto,
 } from './core.js';
-import { ENTITY, TAX, DOCS, OFFER, codeValid, ibanValid, ibanBank, formatIban, missingSteps } from './partners.js';
+import { ENTITY, TAX, DOCS, OFFER, codeValid, ibanValid, ibanBank, formatIban } from './partners.js';
 import { drawColumns, legend, tableView, hbars, hideTip } from './charts.js';
 
 // ---------- дані ----------
@@ -179,7 +179,7 @@ function viewOverview() {
           <td class="num">${r.count ? rating(r.avg) : '—'}</td><td class="num">${bookings.filter((b) => b.placeId === p.id && b.state === 'dispute').length}</td></tr>`;
       }).join('')}</tbody>
     </table></div>
-    ${cur.gmv ? '' : '<p class="small muted">Щоб побачити статистику, заповніть демо-історію для кількох точок у <a href="business.html">панелі бізнесу</a>.</p>'}`;
+    ${cur.gmv ? '' : '<p class="small muted">Щоб побачити статистику, заповніть демо-історію в <a href="pro.html#/more">CarCar Business</a> («Ще» → «Заповнити прикладом»).</p>'}`;
 }
 
 // ---------- точки ----------
@@ -245,9 +245,11 @@ function viewPlace(id) {
   const pt = partnerOf(id);
   const c = pt.company;
   const pay = pt.payout ?? {};
-  const miss = missingSteps(pt);
   const s = statsFor(rangeOf(30), id);
   const isUpdate = pt.status === 'approved' && (pt.update === 'pending' || (pay.iban && !pay.verified));
+  // Юрособу перевіряють під час схвалення заявки бізнесу. Нову мийку з CarCar Business модератор схвалює сам,
+  // а для рахунку достатньо правильних IBAN, отримувача й коду.
+  const miss = isUpdate ? [!ibanValid(pay.iban) && 'IBAN', !pay.holder?.trim() && 'отримувач', !(codeValid('fop', pay.code ?? '') || codeValid('tov', pay.code ?? '')) && 'код отримувача'].filter(Boolean) : [];
   return `<a class="back" href="#/places">${icon('chevL', 22)}Точки</a>
     <div class="title-row"><h1>${esc(p.name)}</h1><div class="row">${statusPill(pt.status)}${pt.update === 'pending' ? '<span class="pill warn">Зміни на перевірці</span>' : ''}</div></div>
     <p class="page-sub">${esc(p.district)}, ${esc(p.address)} · ${esc(p.phone)} · ${p.cats.map((x) => catById(x).name).join(', ')} · ${p.boxes} ${plural(p.boxes, 'бокс', 'бокси', 'боксів')}
@@ -294,7 +296,7 @@ function viewPlace(id) {
     </div>
     <section class="panel stack" aria-labelledby="h-mod" style="gap:12px;margin-top:16px">
       <h2 id="h-mod">Рішення</h2>
-      ${miss.length && !isUpdate && pt.status !== 'suspended' ? `<p class="notice warn" style="margin:0">Не заповнено: ${miss.join(', ').toLowerCase()}. Схвалити можна, лише коли все заповнено.</p>` : ''}
+      ${miss.length ? `<p class="notice warn" style="margin:0">Рахунок для виплат неповний: ${miss.join(', ')}. Підтвердити можна, коли мийка виправить.</p>` : ''}
       <form id="moderate-form" class="stack" data-id="${p.id}" style="gap:10px">
         <label class="field"><span>Коментар для точки</span><textarea name="note" rows="2" maxlength="500" placeholder="Обовʼязково, якщо просите виправлення чи відхиляєте"></textarea></label>
         <div class="row">
@@ -1256,7 +1258,7 @@ document.addEventListener('click', (e) => {
   else if (action === 'stats-demo') {
     const n = statsDemo();
     rerender();
-    toast(n ? `Згенеровано демо-активність для ${n} записів` : 'Спершу заповніть демо-історію хоча б для однієї точки в панелі бізнесу');
+    toast(n ? `Згенеровано демо-активність для ${n} записів` : 'Спершу заповніть демо-історію у CarCar Business («Ще» → «Заповнити прикладом»)');
   } else if (action === 'stats-demo-clear') {
     store.set('analytics', events().filter((e) => !e.demo));
     rerender();
@@ -1416,7 +1418,7 @@ window.addEventListener('storage', (e) => {
   rerender();
 });
 
-$('#to-biz').innerHTML = `${icon('chevL', 18)}Панель для бізнесу`;
+$('#to-biz').innerHTML = `${icon('chevL', 18)}CarCar Business`;
 $('#admin-badge').innerHTML = `${icon('shield', 18)}Демо-доступ модератора: у робочій версії — лише для співробітників CARCAR із двофакторним входом`;
 window.addEventListener('hashchange', () => { route(); window.scrollTo(0, 0); });
 route();

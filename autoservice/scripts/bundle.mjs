@@ -41,6 +41,5 @@ function bundle({ html, script, out, modules = [] }) {
 }
 
 bundle({ html: 'index.html', script: 'app.js', out: 'carcar-prototype.html', modules: ['ops.js', 'map.js', 'vehicles.js'] });
-bundle({ html: 'business.html', script: 'business.js', out: 'carcar-business.html', modules: ['ops.js', 'charts.js', 'partners.js'] });
-bundle({ html: 'pro.html', script: 'pro.js', out: 'carcar-business-app.html', modules: ['ops.js'] });
+bundle({ html: 'pro.html', script: 'pro.js', out: 'carcar-business-app.html', modules: ['ops.js', 'partners.js'] });
 bundle({ html: 'admin.html', script: 'admin.js', out: 'carcar-admin.html', modules: ['charts.js', 'partners.js'] });

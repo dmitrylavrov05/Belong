@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { PRO, proWash } from './helpers.js';
 
 // Неділя, 4 жовтня 2026, 10:00. Завтра — понеділок.
 // Тайли OpenStreetMap у тестах не завантажуємо з мережі — підставляємо порожню картинку.
@@ -30,7 +31,14 @@ test.afterEach(async ({ page }) => {
   expect(page.errors).toEqual([]);
 });
 
-const PANEL = '/business.html';
+// Щасливі години «Хвилі»: −15% у будні з 10:00 до 12:00 — у сховищі CarCar Business (carcar.biz.deals).
+const HAPPY = { id: 'happy-test', active: true, days: [0, 1, 2, 3, 4], from: 10 * 60, to: 12 * 60, pct: 15, services: [] };
+async function seedHappyHours(page) {
+  await page.evaluate((deal) => {
+    const all = JSON.parse(localStorage.getItem('carcar.biz.deals') ?? '{}');
+    localStorage.setItem('carcar.biz.deals', JSON.stringify({ ...all, hvylia: [...(all.hvylia ?? []), deal] }));
+  }, HAPPY);
+}
 
 test('карта: точки на схемі Києва, фільтри, вибір точки й запис', async ({ page }) => {
   await page.goto('/');
@@ -77,16 +85,13 @@ test('карта: точки на схемі Києва, фільтри, виб�
 });
 
 test('щасливі години: точка ставить щотижневу знижку, клієнт бачить її при записі й платить менше', async ({ page }) => {
-  await page.goto(`${PANEL}#/deals`);
-  await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
-  const f = page.locator('#weekly-form');
-  await expect(f.getByLabel('Понеділок')).toBeChecked();
-  await expect(f.getByLabel('Неділя')).not.toBeChecked();
-  await f.getByLabel('Щасливі години з').selectOption('10:00');
-  await f.getByLabel('Щасливі години до').selectOption('12:00');
-  await f.getByRole('button', { name: 'Додати щасливі години' }).click();
-  await expect(page.locator('#toast')).toHaveText('Щасливі години −15%: Пн–Пт, 10:00–12:00');
-  await expect(page.locator('.wb-deal')).toHaveCount(5);
+  // Мийка вмикає знижку в CarCar Business — вона зʼявляється серед активних в «Аналітиці».
+  await proWash(page, 'Автомийка «Хвиля»');
+  await seedHappyHours(page);
+  await page.goto(`${PRO}#/analytics`);
+  const quiet = page.getByRole('region', { name: /Знижка на тихі години/ });
+  const active = quiet.locator('.plain-list li', { hasText: 'Пн–Пт, 10:00–12:00' });
+  await expect(active).toContainText('−15%');
 
   await page.goto('/#/place/hvylia');
   const deals = page.getByRole('region', { name: 'Знижки за годинами' });
@@ -102,7 +107,10 @@ test('щасливі години: точка ставить щотижневу 
   await expect(monday).toContainText('−15%');
   await monday.click();
   await expect(page.locator('.day-deals')).toContainText('−15% з 10:00 до 12:00');
-  await expect(page.locator('.slot[data-time="10:00"]')).toContainText('−15% · 770 ₴');
+  const ten = page.locator('.slot[data-time="10:00"]');
+  await expect(ten).toContainText('−15%');
+  await expect(ten).toContainText('770 ₴');
+  await expect(ten).toHaveAttribute('aria-label', '10:00, знижка 15%, 770 ₴ замість 900 ₴');
   await expect(page.locator('.slot[data-time="12:00"]')).not.toContainText('−15%');
   await page.locator('.slot[data-time="10:30"]').click();
   await expect(page.locator('.save-pill')).toContainText('Щасливі години −15%: ви економите 130 ₴');
@@ -110,15 +118,20 @@ test('щасливі години: точка ставить щотижневу 
   await page.getByRole('button', { name: 'Оплатити 770 ₴' }).click();
   await expect(page.locator('article').first()).toContainText('770 ₴');
 
-  await page.goto(`${PANEL}#/deals`);
-  await expect(page.locator('.special-list li', { hasText: 'Пн–Пт' })).toContainText('записів зі знижкою: 1');
+  // Мийка вимикає знижку — клієнт її більше не бачить.
+  await page.goto(`${PRO}#/analytics`);
+  await active.getByRole('button', { name: 'Вимкнути' }).click();
+  await expect(page.locator('#toast')).toHaveText('Знижку вимкнено');
+  await page.goto('/#/place/hvylia');
+  await expect(page.getByRole('region', { name: 'Знижки за годинами' })).toHaveCount(0);
 });
 
 test('статистика застосунку: воронка з реальних дій і демо-активність', async ({ page }) => {
-  await page.goto(`${PANEL}`);
-  await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Блиск»' });
-  await page.getByRole('button', { name: 'Заповнити демо-історію' }).click();
-  await expect(page.locator('#toast')).toContainText('демо-записів');
+  // Демо-записи точки з CarCar Business — основа для демо-активності в статистиці.
+  await proWash(page, 'Автомийка «Блиск»');
+  await page.goto(`${PRO}#/more`);
+  await page.getByRole('button', { name: 'Заповнити прикладом: історія, записи й повідомлення' }).click();
+  await expect(page.locator('#toast')).toHaveText('Додано приклад записів і повідомлень');
 
   // Клієнт шукає, відкриває карту й записується.
   await page.goto('/');
@@ -155,13 +168,13 @@ test('статистика застосунку: воронка з реальн�
   await expect(funnel.locator('li').nth(3).locator('b')).toHaveText('1');
 });
 
-for (const path of ['/', '/admin.html#/stats', `${PANEL}#/deals`, '/#/book/hvylia/2026-10-05/10:00', '/#/place/hvylia']) {
+for (const path of ['/', '/admin.html#/stats', '/#/book/hvylia/2026-10-05/10:00', '/#/place/hvylia']) {
   test(`доступність і верстка ${path}`, async ({ page }) => {
-    await page.goto(`${PANEL}`);
-    await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
-    await page.getByRole('button', { name: 'Заповнити демо-історію' }).click();
-    await page.goto(`${PANEL}#/deals`);
-    await page.getByRole('button', { name: 'Додати щасливі години' }).click();
+    await proWash(page, 'Автомийка «Хвиля»');
+    await page.goto(`${PRO}#/more`);
+    await page.getByRole('button', { name: 'Заповнити прикладом: історія, записи й повідомлення' }).click();
+    await expect(page.locator('#toast')).toHaveText('Додано приклад записів і повідомлень');
+    await seedHappyHours(page);
     if (path === '/') {
       await page.goto('/');
       await page.getByRole('button', { name: 'Карта' }).click();

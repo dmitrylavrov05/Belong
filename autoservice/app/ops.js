@@ -1,10 +1,10 @@
-// Спільна логіка застосунку клієнта й панелі бізнесу для щоденної роботи точки:
+// Спільна логіка застосунку клієнта й CarCar Business для щоденної роботи точки:
 // гарячі вікна зі знижкою, жива черга, лист очікування, абонементи й сертифікати,
 // шинний готель і повідомлення клієнтам (розсилки, нагадування).
-import { PLACES, PAYMENT } from './data.js';
+import { PLACES } from './data.js';
 import {
   store, uid, isoDate, parseDate, hhmm, toMin, plural, hoursFor, scheduleOf, inBreak, BLOCKING, phoneKey, isListed, weekdayOf,
-  spanOf, laneCap, sameLane, MOBILE_ROAD, bookingStart, creditClient, confirmBy, offerBy,
+  spanOf, laneCap, sameLane, MOBILE_ROAD, creditClient, confirmBy, offerBy,
 } from './core.js';
 
 const opsToday = () => isoDate(new Date());

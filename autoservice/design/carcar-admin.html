@@ -1106,6 +1106,17 @@ body.in-auth #view { padding: 0; max-width: none; }
 .offer-when { display: inline; font-size: 16px; margin: 0; }
 .offer-note { font-style: italic; }
 .offer-due { font-size: 13px; color: var(--muted); }
+
+/* Фото й аватар, які мийка завантажила в CarCar Business */
+.pc-slide img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.place-h { display: flex; align-items: center; gap: 12px; }
+.place-ava { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; flex: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--line); }
+.place-about { margin: -4px 0 12px; font-size: 15px; line-height: 1.5; color: var(--text); white-space: pre-line; }
+
+/* Час зі знижкою: стара ціна закреслена, відсоток у куточку */
+.slot.hot { position: relative; height: 58px; display: grid; place-content: center; gap: 1px; font-weight: 700; }
+.slot.hot small s { opacity: .7; font-weight: 400; }
+.slot-pct { position: absolute; top: -8px; right: -6px; padding: 1px 6px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: 10px; font-weight: 800; box-shadow: 0 0 0 2px var(--bg); }
 </style>
   <style>
 /* Панель для бізнесу CARCAR: десктоп-перший макет поверх токенів і компонентів styles.css. */
@@ -1677,7 +1688,7 @@ body.locked #view { padding: 0; }
     <aside class="biz-side">
       <a class="brand" href="#/" aria-label="Адмінка CARCAR, огляд"><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#1e3a5f"/><path d="M15 10.5a6 6 0 1 0 0 11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/><path d="M24 10.5a6 6 0 1 0 0 11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".6"/></svg><span><span class="c1">CAR</span><span class="c2">CAR</span><small>адмінка</small></span></a>
       <nav class="biz-nav" id="nav" aria-label="Розділи адмінки"></nav>
-      <a class="to-app" id="to-biz" href="business.html"></a>
+      <a class="to-app" id="to-biz" href="pro.html"></a>
     </aside>
     <div class="biz-main">
       <header class="biz-top">
@@ -1939,7 +1950,7 @@ const REFERRAL = {
 // Запропонований інший час відмовою не вважається.
 const DECLINE_RULES = { days: 30, minRequests: 5, warnRate: 0.3, pauseRate: 0.5, pauseHours: 24 };
 
-// Спільна логіка застосунку клієнта (app.js) і панелі для бізнесу (business.js):
+// Спільна логіка застосунку клієнта (app.js), CarCar Business (pro.js) і адмінки (admin.js):
 // сховище, форматування, іконки, гроші, рейтинг і налаштування точок із CRM.
 
 // peek — для частого читання без змін: розбираємо JSON лише тоді, коли значення змінилося.
@@ -2178,7 +2189,10 @@ async function shrinkPhoto(file) {
 
 // Точка може змінити в панелі для бізнесу телефон, години, кількість боксів і прайс.
 // Зміни зберігаються в 'biz.places' і накладаються на дані з data.js в обох застосунках.
-const withBase = (p) => Object.assign(p, { basePhone: p.phone, baseHours: p.hours, baseBoxes: p.boxes, baseServices: p.services, baseCats: p.cats, baseMobile: p.mobile ?? null });
+const withBase = (p) => Object.assign(p, {
+  basePhone: p.phone, baseHours: p.hours, baseBoxes: p.boxes, baseServices: p.services, baseCats: p.cats, baseMobile: p.mobile ?? null,
+  baseName: p.name, baseAddress: p.address, baseAbout: p.about ?? '',
+});
 PLACES.forEach(withBase);
 
 // Нові точки, зареєстровані в панелі через «Підключення». Клієнти бачать їх лише після схвалення CARCAR.
@@ -2199,6 +2213,12 @@ function applyOverrides() {
   for (const p of PLACES) {
     const o = all[p.id] || {};
     p.phone = o.phone ?? p.basePhone;
+    // Профіль, який бачать клієнти: назва, адреса, опис, аватар і фото — з CarCar Business.
+    p.name = o.name ?? p.baseName;
+    p.address = o.address ?? p.baseAddress;
+    p.about = o.about ?? p.baseAbout;
+    p.avatar = o.avatar ?? null;
+    p.photos = o.photos ?? [];
     p.hours = o.hours !== undefined ? o.hours : p.baseHours;
     p.boxes = o.boxes ?? p.baseBoxes;
     p.schedule = o.schedule ?? null;
@@ -2651,6 +2671,31 @@ function rejectBizApp(id, reason) {
   saveBizApps(apps);
 }
 
+// Мийки акаунта: перша — зі схваленої заявки, далі — додані в CarCar Business.
+// Демо-кабінет бачить усі підключені демо-мийки й ті, що додали в демо.
+function accountPlaces(session) {
+  if (!session) return [];
+  if (session.demo) return [...PLACES.filter((p) => !p.custom).map((p) => p.id), ...store.get('biz.demoPlaces', [])].filter((id) => PLACES.some((p) => p.id === id));
+  const acc = bizAccounts().find((x) => x.login === session.login);
+  return [acc?.placeId ?? session.placeId, ...(acc?.places ?? [])].filter((id, i, a) => id && a.indexOf(id) === i && PLACES.some((p) => p.id === id));
+}
+
+// Ще одна мийка в тому ж акаунті: зʼявиться в каталозі після перевірки CARCAR.
+function addAccountPlace(session, f) {
+  const placeId = `p_${uid()}`;
+  const c = (CITIES.find((x) => x.name === f.city) ?? CITIES[0]).center;
+  addCustomPlace({
+    id: placeId, custom: true, name: f.name, cats: ['wash'], city: f.city || 'Київ', district: '', address: f.address, phone: f.phone,
+    boxes: Math.max(1, Number(f.boxes) || 1), hours: [8, 21], lat: c.lat + (Math.random() - 0.5) * 0.03, lng: c.lng + (Math.random() - 0.5) * 0.05,
+    tags: [], createdAt: Date.now(), services: Object.entries(SERVICE_TEMPLATES.wash).map(([sid, x]) => ({ id: sid, ...x, price: [...x.price] })),
+  });
+  const owner = session.demo ? 'демо-кабінет' : session.login;
+  savePartner(placeId, { status: 'pending', company: null, history: [{ at: Date.now(), by: 'partner', status: 'pending', note: `Нова мийка з кабінету ${owner}` }] });
+  if (session.demo) store.set('biz.demoPlaces', [...store.get('biz.demoPlaces', []), placeId]);
+  else store.set('biz.accounts', bizAccounts().map((x) => (x.login === session.login ? { ...x, places: [...(x.places ?? []), placeId] } : x)));
+  return placeId;
+}
+
 // Вхід у кабінет: повертає акаунт або null.
 async function checkBizLogin(login, pass) {
   const acc = bizAccounts().find((x) => x.login === login.trim().toLowerCase());
@@ -2715,7 +2760,7 @@ function liftPause(placeId) {
 const ratePct = (k) => `${Math.round(k * 100)}%`;
 const msText = (ms) => (ms === null ? '—' : ms < 60000 ? `${Math.max(1, Math.round(ms / 1000))} с` : `${Math.floor(ms / 60000)} хв${Math.round((ms % 60000) / 1000) ? ` ${Math.round((ms % 60000) / 1000)} с` : ''}`);
 
-// Графіки для панелі бізнесу й адмінки CARCAR: стовпчики (складені чи згруповані), горизонтальні
+// Графіки для адмінки CARCAR: стовпчики (складені чи згруповані), горизонтальні
 // смуги, легенда, таблиця під графіком і один тултип на сторінку. Палітра — змінні --series-1/2.
 
 const compact = (v) => (v >= 1000 ? `${(v / 1000).toLocaleString('uk-UA', { maximumFractionDigits: 1 })} тис.` : String(Math.round(v)));
@@ -2844,7 +2889,7 @@ document.addEventListener('focusin', (e) => {
 });
 
 // Підключення точки до CARCAR: перевірка кодів ФОП і ТОВ, IBAN і текст договору-оферти.
-// Спільне для панелі бізнесу (business.js) і адмінки CARCAR (admin.js).
+// Спільне для CarCar Business (pro.js) і адмінки CARCAR (admin.js).
 // Перевірки локальні: формат і контрольні суми. Звірку з ЄДР і банком робить модератор
 // (а в робочій версії — сервер через офіційні реєстри).
 
@@ -2949,7 +2994,7 @@ const offerHtml = (esc) => `<article class="offer">
 </article>`;
 
 // Адмінка CARCAR: зведена статистика платформи, модерація підключення точок, відгуків і спорів, комісії.
-// Працює з тими самими даними, що й застосунок клієнта та панель бізнесу (сховище цього пристрою).
+// Працює з тими самими даними, що й застосунок клієнта та CarCar Business (сховище цього пристрою).
 // У робочій версії сюди мають доступ лише співробітники CARCAR (вхід із двофакторною автентифікацією).
 
 // ---------- дані ----------
@@ -3117,7 +3162,7 @@ function viewOverview() {
           <td class="num">${r.count ? rating(r.avg) : '—'}</td><td class="num">${bookings.filter((b) => b.placeId === p.id && b.state === 'dispute').length}</td></tr>`;
       }).join('')}</tbody>
     </table></div>
-    ${cur.gmv ? '' : '<p class="small muted">Щоб побачити статистику, заповніть демо-історію для кількох точок у <a href="business.html">панелі бізнесу</a>.</p>'}`;
+    ${cur.gmv ? '' : '<p class="small muted">Щоб побачити статистику, заповніть демо-історію в <a href="pro.html#/more">CarCar Business</a> («Ще» → «Заповнити прикладом»).</p>'}`;
 }
 
 // ---------- точки ----------
@@ -3183,9 +3228,11 @@ function viewPlace(id) {
   const pt = partnerOf(id);
   const c = pt.company;
   const pay = pt.payout ?? {};
-  const miss = missingSteps(pt);
   const s = statsFor(rangeOf(30), id);
   const isUpdate = pt.status === 'approved' && (pt.update === 'pending' || (pay.iban && !pay.verified));
+  // Юрособу перевіряють під час схвалення заявки бізнесу. Нову мийку з CarCar Business модератор схвалює сам,
+  // а для рахунку достатньо правильних IBAN, отримувача й коду.
+  const miss = isUpdate ? [!ibanValid(pay.iban) && 'IBAN', !pay.holder?.trim() && 'отримувач', !(codeValid('fop', pay.code ?? '') || codeValid('tov', pay.code ?? '')) && 'код отримувача'].filter(Boolean) : [];
   return `<a class="back" href="#/places">${icon('chevL', 22)}Точки</a>
     <div class="title-row"><h1>${esc(p.name)}</h1><div class="row">${statusPill(pt.status)}${pt.update === 'pending' ? '<span class="pill warn">Зміни на перевірці</span>' : ''}</div></div>
     <p class="page-sub">${esc(p.district)}, ${esc(p.address)} · ${esc(p.phone)} · ${p.cats.map((x) => catById(x).name).join(', ')} · ${p.boxes} ${plural(p.boxes, 'бокс', 'бокси', 'боксів')}
@@ -3232,7 +3279,7 @@ function viewPlace(id) {
     </div>
     <section class="panel stack" aria-labelledby="h-mod" style="gap:12px;margin-top:16px">
       <h2 id="h-mod">Рішення</h2>
-      ${miss.length && !isUpdate && pt.status !== 'suspended' ? `<p class="notice warn" style="margin:0">Не заповнено: ${miss.join(', ').toLowerCase()}. Схвалити можна, лише коли все заповнено.</p>` : ''}
+      ${miss.length ? `<p class="notice warn" style="margin:0">Рахунок для виплат неповний: ${miss.join(', ')}. Підтвердити можна, коли мийка виправить.</p>` : ''}
       <form id="moderate-form" class="stack" data-id="${p.id}" style="gap:10px">
         <label class="field"><span>Коментар для точки</span><textarea name="note" rows="2" maxlength="500" placeholder="Обовʼязково, якщо просите виправлення чи відхиляєте"></textarea></label>
         <div class="row">
@@ -4194,7 +4241,7 @@ document.addEventListener('click', (e) => {
   else if (action === 'stats-demo') {
     const n = statsDemo();
     rerender();
-    toast(n ? `Згенеровано демо-активність для ${n} записів` : 'Спершу заповніть демо-історію хоча б для однієї точки в панелі бізнесу');
+    toast(n ? `Згенеровано демо-активність для ${n} записів` : 'Спершу заповніть демо-історію у CarCar Business («Ще» → «Заповнити прикладом»)');
   } else if (action === 'stats-demo-clear') {
     store.set('analytics', events().filter((e) => !e.demo));
     rerender();
@@ -4354,7 +4401,7 @@ window.addEventListener('storage', (e) => {
   rerender();
 });
 
-$('#to-biz').innerHTML = `${icon('chevL', 18)}Панель для бізнесу`;
+$('#to-biz').innerHTML = `${icon('chevL', 18)}CarCar Business`;
 $('#admin-badge').innerHTML = `${icon('shield', 18)}Демо-доступ модератора: у робочій версії — лише для співробітників CARCAR із двофакторним входом`;
 window.addEventListener('hashchange', () => { route(); window.scrollTo(0, 0); });
 route();

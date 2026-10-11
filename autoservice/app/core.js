@@ -1,4 +1,4 @@
-// Спільна логіка застосунку клієнта (app.js) і панелі для бізнесу (business.js):
+// Спільна логіка застосунку клієнта (app.js), CarCar Business (pro.js) і адмінки (admin.js):
 // сховище, форматування, іконки, гроші, рейтинг і налаштування точок із CRM.
 import { CATEGORIES, PLACES, PAYMENT, RELIABILITY, SERVICE_TEMPLATES, CITIES, DECLINE_RULES } from './data.js';
 
@@ -238,7 +238,10 @@ export async function shrinkPhoto(file) {
 
 // Точка може змінити в панелі для бізнесу телефон, години, кількість боксів і прайс.
 // Зміни зберігаються в 'biz.places' і накладаються на дані з data.js в обох застосунках.
-const withBase = (p) => Object.assign(p, { basePhone: p.phone, baseHours: p.hours, baseBoxes: p.boxes, baseServices: p.services, baseCats: p.cats, baseMobile: p.mobile ?? null });
+const withBase = (p) => Object.assign(p, {
+  basePhone: p.phone, baseHours: p.hours, baseBoxes: p.boxes, baseServices: p.services, baseCats: p.cats, baseMobile: p.mobile ?? null,
+  baseName: p.name, baseAddress: p.address, baseAbout: p.about ?? '',
+});
 PLACES.forEach(withBase);
 
 // Нові точки, зареєстровані в панелі через «Підключення». Клієнти бачать їх лише після схвалення CARCAR.
@@ -259,6 +262,12 @@ export function applyOverrides() {
   for (const p of PLACES) {
     const o = all[p.id] || {};
     p.phone = o.phone ?? p.basePhone;
+    // Профіль, який бачать клієнти: назва, адреса, опис, аватар і фото — з CarCar Business.
+    p.name = o.name ?? p.baseName;
+    p.address = o.address ?? p.baseAddress;
+    p.about = o.about ?? p.baseAbout;
+    p.avatar = o.avatar ?? null;
+    p.photos = o.photos ?? [];
     p.hours = o.hours !== undefined ? o.hours : p.baseHours;
     p.boxes = o.boxes ?? p.baseBoxes;
     p.schedule = o.schedule ?? null;
@@ -709,6 +718,31 @@ export function rejectBizApp(id, reason) {
   const a = apps.find((x) => x.id === id);
   if (a) Object.assign(a, { status: 'rejected', reason, decidedAt: Date.now() });
   saveBizApps(apps);
+}
+
+// Мийки акаунта: перша — зі схваленої заявки, далі — додані в CarCar Business.
+// Демо-кабінет бачить усі підключені демо-мийки й ті, що додали в демо.
+export function accountPlaces(session) {
+  if (!session) return [];
+  if (session.demo) return [...PLACES.filter((p) => !p.custom).map((p) => p.id), ...store.get('biz.demoPlaces', [])].filter((id) => PLACES.some((p) => p.id === id));
+  const acc = bizAccounts().find((x) => x.login === session.login);
+  return [acc?.placeId ?? session.placeId, ...(acc?.places ?? [])].filter((id, i, a) => id && a.indexOf(id) === i && PLACES.some((p) => p.id === id));
+}
+
+// Ще одна мийка в тому ж акаунті: зʼявиться в каталозі після перевірки CARCAR.
+export function addAccountPlace(session, f) {
+  const placeId = `p_${uid()}`;
+  const c = (CITIES.find((x) => x.name === f.city) ?? CITIES[0]).center;
+  addCustomPlace({
+    id: placeId, custom: true, name: f.name, cats: ['wash'], city: f.city || 'Київ', district: '', address: f.address, phone: f.phone,
+    boxes: Math.max(1, Number(f.boxes) || 1), hours: [8, 21], lat: c.lat + (Math.random() - 0.5) * 0.03, lng: c.lng + (Math.random() - 0.5) * 0.05,
+    tags: [], createdAt: Date.now(), services: Object.entries(SERVICE_TEMPLATES.wash).map(([sid, x]) => ({ id: sid, ...x, price: [...x.price] })),
+  });
+  const owner = session.demo ? 'демо-кабінет' : session.login;
+  savePartner(placeId, { status: 'pending', company: null, history: [{ at: Date.now(), by: 'partner', status: 'pending', note: `Нова мийка з кабінету ${owner}` }] });
+  if (session.demo) store.set('biz.demoPlaces', [...store.get('biz.demoPlaces', []), placeId]);
+  else store.set('biz.accounts', bizAccounts().map((x) => (x.login === session.login ? { ...x, places: [...(x.places ?? []), placeId] } : x)));
+  return placeId;
 }
 
 // Вхід у кабінет: повертає акаунт або null.

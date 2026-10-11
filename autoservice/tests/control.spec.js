@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { PRO, proBooking, proWash } from './helpers.js';
 
 // Неділя, 4 жовтня 2026, 10:00. Завтра — понеділок.
 test.beforeEach(async ({ page }, testInfo) => {
@@ -26,8 +27,6 @@ test.afterEach(async ({ page }) => {
   expect(page.errors).toEqual([]);
 });
 
-const PANEL = '/business.html';
-
 async function bookToday(page, time = '11:00') {
   await page.goto('/#/book/hvylia');
   await page.getByLabel(/Комплекс преміум/).check();
@@ -50,13 +49,15 @@ test('підтримка: клієнт пише про запис, модера�
   await expect(page.locator('#toast')).toHaveText('Звернення №1001 створено — відповімо в «Повідомленнях»');
   await expect(page.locator('h1')).toHaveText('Звернення №1001');
 
-  // Точка теж пише в підтримку.
-  await page.goto(`${PANEL}#/support`);
-  await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
+  // Точка теж пише в підтримку — з CarCar Business.
+  await proWash(page, 'Автомийка «Хвиля»');
+  await page.goto(`${PRO}#/support`);
   await page.getByLabel('Тема').selectOption({ label: 'Виплати й комісія' });
   await page.getByLabel('Опишіть питання').fill('Коли надійде виплата за вересень?');
   await page.getByRole('button', { name: 'Надіслати', exact: true }).click();
   await expect(page.locator('#toast')).toHaveText('Звернення №1002 надіслано в CARCAR');
+  await expect(page).toHaveURL(/#\/support\/.+/);
+  await expect(page.locator('.ticket-thread')).toContainText('Коли надійде виплата за вересень?');
 
   await page.goto('/admin.html#/support');
   await expect(page.locator('#nav a[href="#/support"] .count')).toHaveText('2');
@@ -94,12 +95,15 @@ test('підтримка: спір клієнта одразу створює з
   await page.locator('article').first().getByRole('button', { name: 'Відкрити спір' }).click();
   await expect(page.locator('article').first().getByRole('link', { name: 'Звернення в підтримку за цим записом' })).toBeVisible();
 
-  await page.goto(`${PANEL}#/schedule`);
-  await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
-  await page.locator('.slot-block').first().click();
-  await page.getByLabel('Пояснення для модератора').fill('Подряпина була до візиту, є в акті');
-  await page.getByRole('button', { name: 'Надіслати модератору' }).click();
+  // Мийка бачить спір у картці запису в CarCar Business і пояснює.
+  const sheet = await proBooking(page);
+  await expect(sheet).toContainText('Клієнт відкрив спір');
+  await sheet.getByLabel('Пояснення для модератора').fill('Подряпина була до візиту, є фото');
+  await sheet.getByRole('button', { name: 'Надіслати модератору' }).click();
   await expect(page.locator('#toast')).toHaveText('Звернення №1002 надіслано в CARCAR');
+  // Пояснення — звернення в «Підтримці CARCAR» мийки.
+  await expect(page).toHaveURL(/#\/support\/.+/);
+  await expect(page.locator('.ticket-thread')).toContainText('Подряпина була до візиту');
 
   await page.goto('/admin.html#/disputes');
   const d = page.getByRole('article', { name: /Спір: Автомийка «Хвиля»/ });
@@ -221,7 +225,7 @@ const PAGES = {
     await page.getByRole('button', { name: 'Надіслати в підтримку' }).click();
     await page.goto('/#/support');
   },
-  'панель: підтримка': async (page) => { await page.goto(`${PANEL}#/support`); },
+  'CarCar Business: підтримка': async (page) => { await page.goto(`${PRO}#/support`); },
 };
 
 for (const [name, setup] of Object.entries(PAGES)) {
@@ -360,33 +364,29 @@ test('бізнес: умови й заявка в застосунку → ад�
   await page.goto('/');
   await expect(page.locator('#list article')).toHaveCount(10);
 
-  // Окремий вхід у кабінет: невірний пароль — помилка, вірний — CRM лише цієї мийки.
-  await page.evaluate(() => localStorage.removeItem('carcar.biz.session'));
-  await page.goto('/business.html#/login');
-  await expect(page.getByRole('heading', { name: 'Вхід у кабінет мийки' })).toBeVisible();
+  // Окремий вхід у CarCar Business: невірний пароль — помилка, вірний — лише ця мийка.
+  await page.evaluate(() => { localStorage.removeItem('carcar.biz.session'); localStorage.removeItem('carcar.partner'); });
+  // #/login — щоб тестовий init-скрипт не відновив демо-сесію.
+  await page.goto(`${PRO}#/login`);
+  await expect(page.getByRole('heading', { name: 'CarCar Business' })).toBeVisible();
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-  await expect(page.locator('#nav')).toBeHidden();
+  await expect(page.locator('#tabbar a')).toHaveCount(0);
   await page.getByLabel('Логін').fill(login);
   await page.getByLabel('Пароль').fill('wrongpass');
   await page.getByRole('button', { name: 'Увійти' }).click();
   await expect(page.getByRole('alert')).toHaveText('Невірний логін або пароль.');
   await page.getByLabel('Пароль').fill(pass);
   await page.getByRole('button', { name: 'Увійти' }).click();
-  await expect(page.locator('#view h1')).toHaveText('Огляд');
-  await expect(page.locator('.page-sub').first()).toContainText('Автомийка «Хмаринка»');
-  await expect(page.getByLabel('Точка')).toBeHidden();
-  // Без зайвого: у меню немає черги, гарячих вікон, абонементів, розсилок, витрат, складу й імпорту.
-  const nav = page.locator('#nav');
-  for (const gone of ['Жива черга', 'Гарячі вікна', 'Абонементи', 'Розсилки', 'Витрати', 'Склад', 'Імпорт даних']) await expect(nav).not.toContainText(gone);
-  await expect(nav).toContainText('Розклад');
-  // Після перезавантаження сесія зберігається; «Вийти» повертає на екран входу.
+  await expect(page.locator('#view h1')).toHaveText('Повідомлення');
+  await expect(page.locator('#top')).toContainText('Автомийка «Хмаринка»');
+  // Після перезавантаження сесія зберігається; «Вийти» в «Ще» повертає на екран входу.
   await page.reload();
-  await expect(page.locator('#view h1')).toHaveText('Огляд');
+  await expect(page.locator('#view h1')).toHaveText('Повідомлення');
+  await page.goto(`${PRO}#/more`);
   page.once('dialog', (d) => d.accept());
-  const more = page.locator('#tabbar [data-action="menu-open"]');
-  if (await more.isVisible()) await more.click();
-  await page.locator('#logout').click();
-  await expect(page.getByRole('heading', { name: 'Вхід у кабінет мийки' })).toBeVisible();
+  await page.getByRole('button', { name: /^Вийти/ }).click();
+  await expect(page.getByRole('heading', { name: 'CarCar Business' })).toBeVisible();
+  await expect(page.getByLabel('Логін')).toBeVisible();
 });
 
 test('місто: каталог по всій Україні, порожнє місто запрошує мийки; вихід з акаунта', async ({ page }) => {
@@ -444,13 +444,9 @@ test('номер запису: видно клієнту, мийці й підт
   await expect(card.locator('.bk-no')).toHaveText(/^Запис № \d{6}$/);
   const no = (await card.locator('.bk-no').textContent()).replace(/\D/g, '');
 
-  // Мийка бачить той самий номер і знаходить запис за ним у пошуку.
-  await page.goto('/business.html#/clients');
-  await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
-  await page.locator('#biz-q').fill(no);
-  await page.locator('#biz-q-res').getByRole('button', { name: new RegExp(`№ ${no}`) }).click();
-  await expect(page.getByRole('dialog')).toContainText(`№ ${no}`);
-  await page.keyboard.press('Escape');
+  // Мийка бачить той самий номер у картці запису в CarCar Business.
+  const sheet = await proBooking(page);
+  await expect(sheet).toContainText(`№ ${no}`);
 
   // Клієнт пише в підтримку, вказавши номер і фото.
   await page.goto('/#/support');

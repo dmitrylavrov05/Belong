@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { PRO, proBooking, washReady, proWash, moderate } from './helpers.js';
 
 // Фіксований час: неділя, 4 жовтня 2026, 10:00 — сезон перевзування.
 test.beforeEach(async ({ page }, testInfo) => {
@@ -166,33 +167,18 @@ async function bookTomorrow(page) {
 // Вечір дня візиту: мийка підтверджує виконання («Машина готова»), клієнт відкриває завершені записи.
 async function confirmAfterVisit(page, day = 5) {
   await page.clock.setFixedTime(new Date(2026, 9, day, 21, 30));
-  await openJob(page, 'Автомийка «Хвиля»');
-  await page.getByRole('button', { name: 'Машина готова' }).click();
-  await expect(page.locator('#toast')).toHaveText('Клієнт отримав сповіщення «Машина готова»');
+  await washReady(page);
   await page.goto('/#/bookings');
   await page.getByRole('button', { name: /^Завершені/ }).click();
 }
 
-async function openPartner(page, name) {
-  await page.goto('/#/partner');
-  await page.getByLabel('Точка').selectOption({ label: name });
-}
-
-// Відкриває перший активний запис точки (екран «Запис клієнта»).
-async function openJob(page, name) {
-  await openPartner(page, name);
-  await page.locator('a.prow').first().click();
-  await expect(page.getByRole('heading', { name: 'Запис клієнта' })).toBeVisible();
-}
+const money = (page) => page.getByRole('region', { name: 'Гроші через CARCAR' });
 
 test('мийка підтверджує виконання, гроші заморожені 48 годин, комісія під час виведення', async ({ page }) => {
   await bookTomorrow(page);
-  await openPartner(page, 'Автомийка «Хвиля»');
-  const balance = page.getByRole('region', { name: 'Баланс' });
-  await expect(balance).toContainText('Доступно до виведення0 ₴');
-  await expect(balance).toContainText('Заморожено900 ₴');
-  await page.locator('a.prow').first().click();
-  await expect(page.getByLabel('Код клієнта')).toHaveCount(0);
+  await proWash(page, 'Автомийка «Хвиля»');
+  await expect(money(page)).toContainText('Можна вивести0 ₴');
+  await expect(money(page)).toContainText('Заморожено до підтвердження900 ₴');
 
   await confirmAfterVisit(page);
   const card = page.locator('article').first();
@@ -201,20 +187,18 @@ test('мийка підтверджує виконання, гроші замо�
   await expect(card).not.toContainText('Гроші точці');
   await expect(card.locator('.steps li')).toHaveText(['Оплачено', 'Виконано']);
 
-  // У точки замовлення виконане, але гроші ще заморожені на час для спору.
-  await openPartner(page, 'Автомийка «Хвиля»');
-  await expect(balance).toContainText('Доступно до виведення0 ₴');
-  await expect(balance).toContainText('Заморожено900 ₴');
-  await expect(balance).toContainText('Найближче розморожування: 900 ₴ — 7 жовтня о 21:30');
-  await expect(page.locator('a.prow').first()).toContainText('Підтверджено · гроші заморожені');
+  // У мийки замовлення виконане, але гроші ще заморожені на час для спору.
+  await page.goto(`${PRO}#/wash`);
+  await expect(money(page)).toContainText('Можна вивести0 ₴');
+  await expect(money(page)).toContainText('Заморожено до підтвердження900 ₴');
 
   await page.clock.setFixedTime(new Date(2026, 9, 7, 21, 31));
   await page.reload();
-  await expect(balance).toContainText('Доступно до виведення900 ₴');
-  await expect(balance).toContainText('Заморожено0 ₴');
+  await expect(money(page)).toContainText('Можна вивести900 ₴');
+  await expect(money(page)).toContainText('Заморожено до підтвердження0 ₴');
 
-  // Без перевірених реквізитів вивести не можна.
-  await expect(page.getByRole('link', { name: 'Вказати реквізити для виплат' })).toBeVisible();
+  // Без перевіреного рахунку вивести не можна.
+  await expect(money(page).getByRole('link', { name: 'Вказати рахунок для виплат' })).toBeVisible();
   await page.evaluate(() => localStorage.setItem('carcar.partners', JSON.stringify({
     hvylia: { status: 'approved', payout: { iban: 'UA223052990000026001234567890', holder: 'ФОП Тест', code: '1234567899', verified: true } },
   })));
@@ -222,62 +206,55 @@ test('мийка підтверджує виконання, гроші замо�
 
   // 10% від 900 ₴ = 90 ₴, на рахунок 810 ₴.
   page.once('dialog', (d) => { expect(d.message()).toContain('Комісія 90 ₴'); d.accept(); });
-  await page.getByRole('button', { name: 'Вивести 810 ₴ на рахунок UA…7890' }).click();
-  await expect(page.getByRole('heading', { name: 'Виплати' })).toBeVisible();
-  await expect(page.getByText('810 ₴ (комісія 90 ₴)')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Немає коштів для виведення' })).toBeDisabled();
+  await money(page).getByRole('button', { name: 'Вивести 810 ₴ на UA…7890' }).click();
+  await expect(money(page).locator('.plain-list')).toContainText('810 ₴');
+  await expect(money(page).getByRole('button', { name: 'Немає коштів для виведення' })).toBeDisabled();
 
   await page.goto('/#/bookings');
-  await expect(card).toContainText('Виконано');
-  await expect(card.getByRole('button', { name: 'Відкрити спір' })).toHaveCount(0);
+  await page.getByRole('button', { name: /^Завершені/ }).click();
+  await expect(page.locator('article').first()).toContainText('Виконано');
+  await expect(page.locator('article').first().getByRole('button', { name: 'Відкрити спір' })).toHaveCount(0);
 });
 
-test('протягом 48 годин після підтвердження можна відкрити спір', async ({ page }) => {
+test('протягом 48 годин після підтвердження можна відкрити спір, модератор передає гроші мийці', async ({ page }) => {
   await bookTomorrow(page);
   await confirmAfterVisit(page);
   page.once('dialog', (d) => d.accept('Залишились подряпини на диску'));
   await page.getByRole('button', { name: 'Відкрити спір' }).click();
   await expect(page.locator('article').first()).toContainText('Спір розглядається');
 
-  await openPartner(page, 'Автомийка «Хвиля»');
-  await page.getByRole('link', { name: /Модерація спорів/ }).click();
-  await page.getByRole('button', { name: 'Передати точці' }).click();
-  await page.getByRole('link', { name: 'Кабінет точки' }).click();
+  await moderate(page, 'place');
+  await expect(page.locator('#toast')).toHaveText('Гроші передано точці');
   // Рішення модератора остаточне: гроші доступні одразу.
-  await expect(page.getByRole('region', { name: 'Баланс' })).toContainText('Доступно до виведення900 ₴');
+  await proWash(page, 'Автомийка «Хвиля»');
+  await expect(money(page)).toContainText('Можна вивести900 ₴');
 });
 
-test('доплата на місці, спір і рішення модератора', async ({ page }) => {
+test('спір після «Машина готова»: модератор повертає гроші клієнту', async ({ page }) => {
   await bookTomorrow(page);
-  await openJob(page, 'Автомийка «Хвиля»');
-  const answers = ['150', 'Шиповані шини R17'];
-  page.on('dialog', (d) => d.accept(answers.shift()));
-  await page.getByRole('button', { name: 'Доплата', exact: true }).click();
-  await expect(page.getByText('Запит на доплату +150 ₴')).toBeVisible();
-
-  await page.goto('/#/bookings');
-  await page.getByRole('button', { name: 'Погодитися й доплатити' }).click();
-  await expect(page.locator('article').first()).toContainText('1 050 ₴');
-
-  await openJob(page, 'Автомийка «Хвиля»');
-  await page.getByRole('button', { name: 'Машина готова' }).click();
-
-  await page.goto('/#/bookings');
-  answers.push('Не відбалансували колеса');
+  await confirmAfterVisit(page);
+  page.once('dialog', (d) => d.accept('Не відмили диски'));
   await page.getByRole('button', { name: 'Відкрити спір' }).click();
   await expect(page.locator('article').first()).toContainText('Спір розглядається');
 
-  await openPartner(page, 'Автомийка «Хвиля»');
-  await page.getByRole('link', { name: /Модерація спорів/ }).click();
-  await expect(page.getByText('«Не відбалансували колеса»')).toBeVisible();
-  await page.getByRole('button', { name: 'Повернути клієнту' }).click();
-  await expect(page.getByText('Відкритих спорів немає.')).toBeVisible();
-  await page.getByRole('link', { name: 'Кабінет точки' }).click();
-  await expect(page.getByRole('region', { name: 'Баланс' })).toContainText('Доступно до виведення0 ₴');
-  await expect(page.getByRole('region', { name: 'Баланс' })).toContainText('Заморожено0 ₴');
+  // Мийка бачить спір у картці запису й пояснює модератору.
+  const sheet = await proBooking(page);
+  await expect(sheet).toContainText('«Не відмили диски»');
+  await sheet.getByLabel('Пояснення для модератора').fill('Диски відмили, фото є');
+  await sheet.getByRole('button', { name: 'Надіслати модератору' }).click();
+  await expect(page.locator('#toast')).toContainText('надіслано в CARCAR');
+
+  await page.goto('/admin.html#/disputes');
+  await expect(page.getByText('«Не відмили диски»')).toBeVisible();
+  await moderate(page, 'client');
+  await expect(page.getByText('Відкритих спорів немає')).toBeVisible();
+  await proWash(page, 'Автомийка «Хвиля»');
+  await expect(money(page)).toContainText('Можна вивести0 ₴');
+  await expect(money(page)).toContainText('Заморожено до підтвердження0 ₴');
 
   await page.goto('/#/bookings');
-  await expect(page.locator('article').first()).toContainText('Повернено 1 050 ₴');
+  await page.getByRole('button', { name: /^Завершені/ }).click();
+  await expect(page.locator('article').first()).toContainText('Повернено 900 ₴');
 });
 
 test('виконання підтверджує мийка: у клієнта лише відгук і спір, гроші точці — через 48 годин', async ({ page }) => {
@@ -289,19 +266,19 @@ test('виконання підтверджує мийка: у клієнта л
   await expect(card).toContainText('мийка відмітить це тут');
   await expect(card.getByRole('button', { name: /Підтвердити виконання|Усе добре/ })).toHaveCount(0);
 
-  await openJob(page, 'Автомийка «Хвиля»');
-  await page.getByRole('button', { name: 'Машина готова' }).click();
+  await washReady(page);
   await page.goto('/#/bookings');
+  await page.getByRole('button', { name: /^Завершені/ }).click();
   await expect(card).toContainText('Виконано');
   await expect(card.locator('.review-form')).toBeVisible();
   await expect(card.getByRole('button', { name: 'Відкрити спір' })).toBeVisible();
   await expect(card.getByRole('button', { name: /Підтвердити виконання|Усе добре/ })).toHaveCount(0);
-  await openPartner(page, 'Автомийка «Хвиля»');
-  await expect(page.getByRole('region', { name: 'Баланс' })).toContainText('Заморожено900 ₴');
+  await proWash(page, 'Автомийка «Хвиля»');
+  await expect(money(page)).toContainText('Заморожено до підтвердження900 ₴');
 
   await page.clock.setFixedTime(new Date(2026, 9, 7, 10, 31));
   await page.reload();
-  await expect(page.getByRole('region', { name: 'Баланс' })).toContainText('Доступно до виведення900 ₴');
+  await expect(money(page)).toContainText('Можна вивести900 ₴');
 });
 
 test('рейтинг точки складається з відгуків після завершених замовлень', async ({ page }) => {
@@ -340,8 +317,10 @@ test('рейтинг точки складається з відгуків пі�
   await expect(first).toContainText('Автомийка «Хвиля»');
   await expect(first).toContainText('4,5');
 
-  await openPartner(page, 'Автомийка «Хвиля»');
-  await expect(page.getByRole('link', { name: /Сторінка точки й відгуки/ })).toContainText('Рейтинг 4,5 · 2 відгуки');
+  // Мийка бачить відгуки в «Ще» → «Відгуки».
+  await page.goto(`${PRO}#/reviews`);
+  await expect(page.locator('.lead')).toContainText('4,5 · 2 відгуки');
+  await expect(page.locator('.pro-review')).toHaveCount(2);
 });
 
 test('пізніше ніж за 1,5 год до візиту скасування й неявка — оплата точці', async ({ page }) => {
@@ -360,11 +339,14 @@ test('пізніше ніж за 1,5 год до візиту скасуванн
 
   await bookTomorrow(page);
   await page.clock.setFixedTime(new Date(2026, 9, 5, 22, 0));
-  await openJob(page, 'Автомийка «Хвиля»');
+  const sheet = await proBooking(page);
   page.once('dialog', (d) => d.accept());
-  await page.getByRole('button', { name: 'Клієнт не приїхав' }).click();
-  await expect(page.getByRole('region', { name: 'Баланс' })).toContainText('Доступно до виведення1 800 ₴');
+  await sheet.getByRole('button', { name: 'Клієнт не приїхав' }).click();
+  await expect(page.locator('#toast')).toHaveText('Позначено неявку');
+  await page.goto(`${PRO}#/wash`);
+  await expect(money(page)).toContainText('Можна вивести1 800 ₴');
   await page.goto('/#/bookings');
+  await page.getByRole('button', { name: /^Завершені/ }).click();
   await expect(page.locator('article', { hasText: 'Неявка' })).toContainText('Ви не приїхали — оплату 900 ₴ зараховано точці');
 });
 
@@ -476,12 +458,13 @@ test.describe('приведи друга', () => {
     await page.goto('/');
     await expect(page.locator('.bonus-banner')).toHaveCount(0);
 
-    await openPartner(page, 'Автомийка «Хвиля»');
-    await expect(page.getByRole('region', { name: 'Баланс' })).toContainText('Заморожено900 ₴');
+    // Мийка отримує повну ціну: бонус доплачує CARCAR.
+    await proWash(page, 'Автомийка «Хвиля»');
+    await expect(money(page)).toContainText('Заморожено до підтвердження900 ₴');
     await confirmAfterVisit(page);
     await page.clock.setFixedTime(new Date(2026, 9, 7, 21, 31));
-    await openPartner(page, 'Автомийка «Хвиля»');
-    await expect(page.getByRole('region', { name: 'Баланс' })).toContainText('Доступно до виведення900 ₴');
+    await page.goto(`${PRO}#/wash`);
+    await expect(money(page)).toContainText('Можна вивести900 ₴');
   });
 
   test('бонус лише від 300 ₴, його можна не використовувати, а при скасуванні він повертається', async ({ page }) => {
@@ -561,15 +544,16 @@ async function addCar(page, extra = async () => {}) {
 test('«Машина готова» з фото потрапляє клієнту й у сервісну книжку', async ({ page }) => {
   await addCar(page);
   await bookTomorrow(page);
-  await openJob(page, 'Автомийка «Хвиля»');
-  await page.getByLabel(/Додати фото результату/).setInputFiles({ name: 'wheel.png', mimeType: 'image/png', buffer: PIXEL });
-  await expect(page.getByText('Обрано фото: 1')).toBeVisible();
-  await page.getByLabel('Пробіг, км').fill('84200');
-  await page.getByLabel('Коментар для клієнта').fill('Літні шини здали на зберігання');
-  await page.getByRole('button', { name: 'Машина готова' }).click();
+  const sheet = await proBooking(page);
+  await sheet.getByLabel(/Фото результату/).setInputFiles({ name: 'wheel.png', mimeType: 'image/png', buffer: PIXEL });
+  await expect(sheet.getByText('обрано: 1')).toBeVisible();
+  await sheet.getByLabel('Пробіг, км').fill('84200');
+  await sheet.getByLabel('Коментар для клієнта').fill('Літні шини здали на зберігання');
+  await sheet.getByRole('button', { name: 'Машина готова' }).click();
   await expect(page.locator('#toast')).toHaveText('Клієнт отримав сповіщення «Машина готова»');
 
-  await page.getByRole('link', { name: 'Мої записи' }).click();
+  await page.goto('/#/bookings');
+  await page.getByRole('button', { name: /^Завершені/ }).click();
   const card = page.locator('article').first();
   await expect(card).toContainText('Мийка підтвердила виконання');
   await expect(card.getByRole('img', { name: 'Фото результату 1' })).toBeVisible();
@@ -609,7 +593,7 @@ test('гараж нагадує помити авто й про поліс', asy
   await expect(page.locator('#list article')).toHaveCount(9);
 });
 
-for (const path of ['/', '/#/place/pina', '/#/book/blysk', '/#/bookings', '/#/garage', '/#/partner', '/#/disputes', '/#/invite']) {
+for (const path of ['/', '/#/place/pina', '/#/book/blysk', '/#/bookings', '/#/garage', '/#/invite']) {
   test(`доступність і верстка: ${path}`, async ({ page }) => {
     await page.goto(path);
     await page.locator('main *').first().waitFor();
@@ -639,7 +623,7 @@ test('файли для дизайну в design/ зібрано з поточн
   test.skip(test.info().project.name !== 'desktop', 'достатньо однієї перевірки');
   const dir = mkdtempSync(join(tmpdir(), 'carcar-'));
   execFileSync('node', ['scripts/bundle.mjs', dir]);
-  for (const f of ['carcar-prototype.html', 'carcar-business.html', 'carcar-business-app.html', 'carcar-admin.html']) {
+  for (const f of ['carcar-prototype.html', 'carcar-business-app.html', 'carcar-admin.html']) {
     expect(readFileSync(`design/${f}`, 'utf8') === readFileSync(join(dir, f), 'utf8'), `${f}: запустіть npm run bundle`).toBe(true);
   }
 });

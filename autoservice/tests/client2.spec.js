@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { PRO, proBooking, proWash, washReady } from './helpers.js';
 
 // Неділя, 4 жовтня 2026, 10:00.
 const TILE = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
@@ -30,14 +31,9 @@ test.afterEach(async ({ page }) => {
   expect(page.errors.filter((e) => !e.includes('tile.openstreetmap.org') && !e.includes('ERR_FAILED'))).toEqual([]);
 });
 
-const PANEL = '/business.html';
-
-// Мийка підтверджує виконання («Машина готова») у кабінеті точки; клієнт відкриває завершені записи.
-async function washDone(page, place = 'Автомийка «Хвиля»') {
-  await page.goto('/#/partner');
-  await page.getByLabel('Точка').selectOption({ label: place });
-  await page.locator('a.prow').first().click();
-  await page.getByRole('button', { name: 'Машина готова' }).click();
+// Мийка підтверджує виконання («Машина готова») у CarCar Business; клієнт відкриває завершені записи.
+async function washDone(page) {
+  await washReady(page);
   await page.goto('/#/bookings');
   await page.getByRole('button', { name: /^Завершені/ }).click();
 }
@@ -68,20 +64,18 @@ test('нагадування напередодні й за 2 години, «З
   await page.clock.setFixedTime(new Date(2026, 9, 5, 8, 15));
   await page.goto('/#/bookings');
 
-  await page.goto(`${PANEL}#/schedule/2026-10-05`);
-  await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
-  await expect(page.locator('.slot-block').first()).toContainText('запізниться на 15 хв');
+  // Мийка бачить попередження в картці запису в CarCar Business.
+  const sheet = await proBooking(page);
+  await expect(sheet).toContainText('Клієнт повідомив: запізниться на 15 хв');
 });
 
 test('запізнення понад 15 хв: мийка зараховує оплату собі, клієнт бачить причину', async ({ page }) => {
   await book(page);
   // Візит о 10:00, зараз 10:20 — клієнта немає.
   await page.clock.setFixedTime(new Date(2026, 9, 5, 10, 20));
-  await page.goto(`${PANEL}#/schedule/2026-10-05`);
-  await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
-  await page.locator('.slot-block').first().click();
+  const sheet = await proBooking(page);
   page.once('dialog', (d) => d.accept());
-  await page.getByRole('button', { name: 'Запізнення понад 15 хв — оплата нам' }).click();
+  await sheet.getByRole('button', { name: 'Запізнення понад 15 хв — оплата нам' }).click();
   await expect(page.locator('#toast')).toHaveText('Оплату 900 ₴ зараховано вам');
 
   await page.goto('/#/bookings');
@@ -192,11 +186,14 @@ test('відгук із фото й відповідь точки в спові�
   await page.goto('/#/place/hvylia');
   await expect(page.locator('.review img[alt="Фото клієнта 1"]')).toBeVisible();
 
-  await page.goto(`${PANEL}#/reviews`);
-  await page.getByLabel('Точка').selectOption({ label: 'Автомийка «Хвиля»' });
-  await expect(page.locator('article img[alt="Фото клієнта 1"]')).toBeVisible();
-  await page.getByLabel('Відповісти').fill('Дякуємо, чекаємо навесні!');
-  await page.getByRole('button', { name: 'Відповісти' }).click();
+  // Мийка відповідає у «Відгуках» CarCar Business.
+  await proWash(page, 'Автомийка «Хвиля»');
+  await page.goto(`${PRO}#/reviews`);
+  const rev = page.locator('.pro-review', { hasText: 'Швидко й акуратно' });
+  await expect(rev.locator('img[alt="Фото до відгуку 1"]')).toBeVisible();
+  await rev.getByLabel(/^Відповідь на відгук/).fill('Дякуємо, чекаємо навесні!');
+  await rev.getByRole('button', { name: 'Надіслати відповідь' }).click();
+  await expect(page.locator('#toast')).toHaveText('Відповідь опубліковано на сторінці мийки');
 
   await page.goto('/#/bookings');
   await expect(page.locator('.my-review .reply')).toContainText('Дякуємо, чекаємо навесні!');

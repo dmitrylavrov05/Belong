@@ -1096,3 +1096,14 @@ body.in-auth #view { padding: 0; max-width: none; }
 .offer-when { display: inline; font-size: 16px; margin: 0; }
 .offer-note { font-style: italic; }
 .offer-due { font-size: 13px; color: var(--muted); }
+
+/* Фото й аватар, які мийка завантажила в CarCar Business */
+.pc-slide img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.place-h { display: flex; align-items: center; gap: 12px; }
+.place-ava { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; flex: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--line); }
+.place-about { margin: -4px 0 12px; font-size: 15px; line-height: 1.5; color: var(--text); white-space: pre-line; }
+
+/* Час зі знижкою: стара ціна закреслена, відсоток у куточку */
+.slot.hot { position: relative; height: 58px; display: grid; place-content: center; gap: 1px; font-weight: 700; }
+.slot.hot small s { opacity: .7; font-weight: 400; }
+.slot-pct { position: absolute; top: -8px; right: -6px; padding: 1px 6px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: 10px; font-weight: 800; box-shadow: 0 0 0 2px var(--bg); }
