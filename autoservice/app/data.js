@@ -243,4 +243,4 @@ export const REFERRAL = {
 // частка відмов (свої відмови й мовчання) понад warnRate — мийка нижче в пошуку;
 // від pauseRate — онлайн-запис на паузі pauseHours годин після останньої відмови.
 // Запропонований інший час відмовою не вважається.
-export const DECLINE_RULES = { days: 30, minRequests: 5, warnRate: 0.15, pauseRate: 0.3, pauseHours: 24 };
+export const DECLINE_RULES = { days: 30, minRequests: 5, warnRate: 0.3, pauseRate: 0.5, pauseHours: 24 };
