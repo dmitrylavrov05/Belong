@@ -5,7 +5,7 @@ import {
   confirmBy, offerBy, pauseOf, responseStats, msText, AWAITING, staffOf, chargedOf, realOrder,
   applyOverrides, isListed, visibleReviews, ACTIVE, BLOCKING, HOUR, price, isFrozen, settleAll, ratingFor,
   powerOf, worksInBlackout, TICKET_TOPICS, CLIENT_TOPICS, TICKET_STATUS, ticketsAll, openTicket, ticketReply, setTicket, isBlocked, mobileOn, spanOf, laneCap, sameLane, MOBILE_ROAD, promosAll, promoCheck,
-  enterView, bizApps, saveBizApps, APP_STATUS, numberBookings, bookingNo, findByNo, ticketPhotos,
+  enterView, fitChatScreen, keepChatOnKeyboard, bizApps, saveBizApps, APP_STATUS, numberBookings, bookingNo, findByNo, ticketPhotos,
 } from './core.js';
 import {
   inboxFor, markRead, sendMessages, dealsOf, dealsOn, weeklyDealsOf, daysText, dealAt, dealPrice, dealCovers, hotDeals,
@@ -2582,6 +2582,7 @@ function route() {
   document.body.classList.toggle('in-chat', inChat);
   if (inChat) {
     ui.lastView = `${page}/${arg ?? ''}`;
+    fitChatScreen();
     const list = $('.chat-msgs');
     if (list) {
       const toEnd = () => { list.scrollTop = list.scrollHeight; };
@@ -3168,6 +3169,7 @@ function refreshPresence() {
 setInterval(refreshPresence, 30000);
 acceptCampaign();
 track('session', { view: ui.view });
+keepChatOnKeyboard();
 route();
 acceptInvite();
 

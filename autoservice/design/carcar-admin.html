@@ -1119,6 +1119,10 @@ body.in-auth #view { padding: 0; max-width: none; }
 .slot-pct { position: absolute; top: -8px; right: -6px; padding: 1px 6px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: 10px; font-weight: 800; box-shadow: 0 0 0 2px var(--bg); }
 .avatar.has-img { padding: 0; background: var(--surface-2, #eef2f6); }
 .avatar.has-img img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+
+/* Чат на телефоні: сторінка під ним не прокручується, коли відкривається клавіатура. */
+html:has(body.in-chat), body.in-chat { overflow: hidden; overscroll-behavior: none; }
+.chat-screen { will-change: transform; }
 </style>
   <style>
 /* Панель для бізнесу CARCAR: десктоп-перший макет поверх токенів і компонентів styles.css. */
@@ -2807,6 +2811,28 @@ function liftPause(placeId) {
 }
 const ratePct = (k) => `${Math.round(k * 100)}%`;
 const msText = (ms) => (ms === null ? '—' : ms < 60000 ? `${Math.max(1, Math.round(ms / 1000))} с` : `${Math.floor(ms / 60000)} хв${Math.round((ms % 60000) / 1000) ? ` ${Math.round((ms % 60000) / 1000)} с` : ''}`);
+
+// ---------- чат і клавіатура телефона ----------
+
+// На iPhone клавіатура не зменшує сторінку, а зсуває її вгору — чат «їде», шапка зникає з екрана.
+// Підганяємо екран чату під видиму частину (visualViewport): шапка лишається зверху, поле — над клавіатурою.
+function fitChatScreen() {
+  const vv = window.visualViewport;
+  const el = document.querySelector('.chat-screen');
+  if (!vv || !el) return;
+  const list = el.querySelector('.chat-msgs');
+  const atEnd = list ? list.scrollHeight - list.scrollTop - list.clientHeight < 40 : false;
+  const keyboard = window.innerHeight - vv.height > 80;
+  el.style.height = keyboard ? `${vv.height}px` : '';
+  el.style.transform = keyboard && vv.offsetTop ? `translateY(${vv.offsetTop}px)` : '';
+  if (list && atEnd) list.scrollTop = list.scrollHeight;
+}
+function keepChatOnKeyboard() {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  vv.addEventListener('resize', fitChatScreen);
+  vv.addEventListener('scroll', fitChatScreen);
+}
 
 // Спільна логіка застосунку клієнта й CarCar Business для щоденної роботи точки:
 // гарячі вікна зі знижкою, жива черга, лист очікування, абонементи й сертифікати,

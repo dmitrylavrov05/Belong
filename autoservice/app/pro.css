@@ -324,3 +324,15 @@ body.pro.locked .pro-tabs { display: none; }
 /* Мийку схвалено: перевірити профіль і опублікувати */
 .setup-card { border: 2px solid var(--warn, #c77700); }
 .setup-card .plain-list a { display: inline-flex; align-items: center; gap: 8px; color: inherit; }
+
+/* Розмір знижки й своя знижка на години */
+.pct-row { grid-auto-flow: row; grid-template-columns: repeat(4, 1fr); }
+.pct-row span { min-height: 38px; }
+.own-deal { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.wd-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin: 0; padding: 0; border: 0; }
+.wd-row label { position: relative; }
+.wd-row input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.wd-row span { display: grid; place-items: center; min-height: 40px; border-radius: 10px; background: var(--soft); font-size: 14px; font-weight: 600; color: var(--muted); }
+.wd-row input:checked + span { background: var(--navy); color: var(--on-navy); }
+.wd-row input:focus-visible + span, .pct-row input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.nb-dur small { display: block; margin-top: 4px; font-size: 12px; }

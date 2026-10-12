@@ -1109,3 +1109,7 @@ body.in-auth #view { padding: 0; max-width: none; }
 .slot-pct { position: absolute; top: -8px; right: -6px; padding: 1px 6px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: 10px; font-weight: 800; box-shadow: 0 0 0 2px var(--bg); }
 .avatar.has-img { padding: 0; background: var(--surface-2, #eef2f6); }
 .avatar.has-img img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+
+/* Чат на телефоні: сторінка під ним не прокручується, коли відкривається клавіатура. */
+html:has(body.in-chat), body.in-chat { overflow: hidden; overscroll-behavior: none; }
+.chat-screen { will-change: transform; }

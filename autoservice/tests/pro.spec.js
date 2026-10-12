@@ -126,6 +126,9 @@ test('нагадування: позначити минулі записи й п
   await seed(page, { bookings: [{ ...paid, id: 'b2', channel: 'phone', state: 'booked', date: '2026-10-03', time: '12:00', chat: undefined, chatUnreadBiz: false, clientName: 'Олег' }] });
   await page.goto(PRO);
   await expect(page.getByLabel('Записи без позначки: 1')).toBeVisible();
+  // На «Повідомленнях» нагадування не дублюється — лише лічильник на вкладці «Записи».
+  await expect(page.getByRole('button', { name: /чекає позначки/ })).toHaveCount(0);
+  await page.getByRole('link', { name: /Записи/ }).click();
   await page.getByRole('button', { name: /1 запис чекає позначки/ }).click();
   await expect(page.getByRole('dialog', { name: 'Чим закінчились записи' })).toContainText('Олег');
   await page.getByRole('button', { name: 'Виконано' }).click();
@@ -487,7 +490,12 @@ test('аналітика знаходить тихі години, мийка в
   await page.getByRole('link', { name: /Аналітика/ }).click();
   await expect(page.getByRole('region', { name: 'Завантаження по годинах', exact: true })).toBeVisible();
   await expect(page.getByRole('region', { name: /Підсумки за 30 днів/ })).toContainText('Виручка');
-  await page.getByRole('button', { name: 'Увімкнути −20%' }).first().click();
+  // Радимо −20%, але розмір обирає мийка: спершу −15%, потім передумали на −20%.
+  const item = page.locator('.suggest-item').first();
+  await item.getByRole('radio', { name: '−15%' }).check();
+  await expect(item.getByRole('button', { name: 'Увімкнути −15%' })).toBeVisible();
+  await item.getByRole('radio', { name: '−20%' }).check();
+  await item.getByRole('button', { name: 'Увімкнути −20%' }).click();
   await expect(page.locator('.toast')).toContainText('Знижку −20% увімкнено: Пн–Пт, 08:00–11:00');
   await expect(page.getByRole('region', { name: /Знижка на тихі години/ })).toContainText('−20% Пн–Пт, 08:00–11:00');
 
@@ -689,4 +697,60 @@ test('поля вводу не менші за 16px — iOS не збільшу�
   expect(await small()).toEqual([]);
   await page.goto(`${PRO}#/profile`);
   expect(await small()).toEqual([]);
+});
+
+test('тривалість: мийка уточнює її під час запису й після — бокс зайнятий на потрібний час', async ({ page }) => {
+  await page.goto(`${PRO}#/profile`);
+  await page.getByLabel('Боксів').fill('1');
+  await page.locator('#pf-main').getByRole('button', { name: 'Зберегти' }).click();
+  await page.goto(`${PRO}#/bookings/2026-10-05`);
+  await page.getByRole('button', { name: 'Новий запис' }).click();
+  const d = page.getByRole('dialog');
+  await d.getByLabel('Телефон', { exact: true }).fill('067 111 22 33');
+  await d.getByRole('button', { name: /Експрес-мийка кузова/ }).click();
+  await expect(d.getByLabel('Тривалість')).toHaveValue('20');
+  await d.getByLabel('Тривалість').selectOption('60');
+  await expect(d).toContainText('За прайсом 20 хв — змінено вручну');
+  await d.getByRole('group', { name: 'День' }).getByRole('button', { name: 'Завтра' }).click();
+  await d.getByRole('group', { name: 'Вільний час' }).getByRole('button', { name: '10:00' }).click();
+  await d.getByRole('button', { name: 'Записати на 10:00', exact: true }).click();
+  let b = await page.evaluate(() => JSON.parse(localStorage.getItem('carcar.bookings')).at(-1));
+  expect(b.minutes).toBe(60);
+  // Година зайнята: клієнт не бачить 10:30.
+  await page.goto('/#/book/blysk');
+  await page.getByLabel(/Експрес-мийка кузова/).check();
+  await page.locator('[data-action="to-time"]').click();
+  await page.getByRole('button', { name: /Завтра/ }).click();
+  await expect(page.locator('.slot[data-time="10:30"]')).toBeDisabled();
+  await expect(page.locator('.slot[data-time="11:00"]')).toBeEnabled();
+
+  // Після запису: машина виявилась брудніша — подовжуємо до 1,5 год.
+  await page.goto(`${PRO}#/booking/${b.id}`);
+  await page.getByRole('dialog').getByRole('button', { name: 'Уточнити' }).click();
+  const sheet = page.getByRole('dialog', { name: /Тривалість/ });
+  await sheet.getByLabel('Скільки триватиме').selectOption('90');
+  await sheet.getByRole('button', { name: 'Зберегти' }).click();
+  await expect(page.locator('.toast')).toContainText('Тривалість: 1 год 30 хв');
+  b = await page.evaluate(() => JSON.parse(localStorage.getItem('carcar.bookings')).at(-1));
+  expect(b.minutes).toBe(90);
+});
+
+test('знижка на тихі години: мийка сама обирає розмір і години', async ({ page }) => {
+  await page.goto(`${PRO}#/analytics`);
+  const form = page.locator('#deal-form');
+  await form.getByRole('checkbox', { name: 'Сб' }).check();
+  await form.locator('select[name="from"]').selectOption({ label: '08:00' });
+  await form.locator('select[name="to"]').selectOption({ label: '10:00' });
+  await form.getByRole('radio', { name: '−25%' }).check();
+  await form.getByRole('button', { name: 'Увімкнути знижку' }).click();
+  await expect(page.locator('.toast')).toContainText('Знижку −25% увімкнено: ');
+  await expect(page.locator('.toast')).toContainText('08:00–10:00');
+  await expect(page.getByRole('region', { name: /Знижка на тихі години/ })).toContainText('−25%');
+
+  // Клієнт бачить −25% о 08:00 у понеділок.
+  await page.goto('/#/book/blysk');
+  await page.getByLabel(/Експрес-мийка кузова/).check();
+  await page.locator('[data-action="to-time"]').click();
+  await page.getByRole('button', { name: /Завтра/ }).click();
+  await expect(page.locator('.slot[data-time="08:00"] .slot-pct')).toHaveText('−25%');
 });

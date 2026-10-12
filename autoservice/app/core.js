@@ -849,3 +849,25 @@ export function liftPause(placeId) {
 }
 export const ratePct = (k) => `${Math.round(k * 100)}%`;
 export const msText = (ms) => (ms === null ? '—' : ms < 60000 ? `${Math.max(1, Math.round(ms / 1000))} с` : `${Math.floor(ms / 60000)} хв${Math.round((ms % 60000) / 1000) ? ` ${Math.round((ms % 60000) / 1000)} с` : ''}`);
+
+// ---------- чат і клавіатура телефона ----------
+
+// На iPhone клавіатура не зменшує сторінку, а зсуває її вгору — чат «їде», шапка зникає з екрана.
+// Підганяємо екран чату під видиму частину (visualViewport): шапка лишається зверху, поле — над клавіатурою.
+export function fitChatScreen() {
+  const vv = window.visualViewport;
+  const el = document.querySelector('.chat-screen');
+  if (!vv || !el) return;
+  const list = el.querySelector('.chat-msgs');
+  const atEnd = list ? list.scrollHeight - list.scrollTop - list.clientHeight < 40 : false;
+  const keyboard = window.innerHeight - vv.height > 80;
+  el.style.height = keyboard ? `${vv.height}px` : '';
+  el.style.transform = keyboard && vv.offsetTop ? `translateY(${vv.offsetTop}px)` : '';
+  if (list && atEnd) list.scrollTop = list.scrollHeight;
+}
+export function keepChatOnKeyboard() {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  vv.addEventListener('resize', fitChatScreen);
+  vv.addEventListener('scroll', fitChatScreen);
+}
