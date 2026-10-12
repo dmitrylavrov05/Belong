@@ -676,3 +676,17 @@ test('кілька мийок: новий запис іншої мийки сп�
   await expect(page.locator('.pro-top')).toContainText('на Оболоні');
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('carcar.bookings'))[0].state)).toBe('paid');
 });
+
+test('поля вводу не менші за 16px — iOS не збільшує екран при натисканні', async ({ page }) => {
+  await seed(page, { bookings: [paid] });
+  const small = async () => page.evaluate(() => [...document.querySelectorAll('input:not([type=checkbox]):not([type=radio]):not([type=file]), textarea, select')]
+    .filter((el) => el.offsetParent && parseFloat(getComputedStyle(el).fontSize) < 16).map((el) => el.name || el.id || el.className));
+  await page.goto(`${PRO}#/chat/b-b1`);
+  await expect(page.getByLabel('Повідомлення клієнту')).toBeVisible();
+  expect(await small()).toEqual([]);
+  await page.goto('/#/chat/b1');
+  await expect(page.locator('.chat-form input[type="text"], .chat-form input:not([type])').first()).toBeVisible();
+  expect(await small()).toEqual([]);
+  await page.goto(`${PRO}#/profile`);
+  expect(await small()).toEqual([]);
+});
