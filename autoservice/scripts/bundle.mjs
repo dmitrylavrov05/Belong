@@ -31,6 +31,8 @@ function bundle({ html, script, out, modules = [] }) {
     .replace(/ *<link rel="preload"[^>]*>\n/, '')
     .replace(/<link rel="(icon|apple-touch-icon)" href="([\w-]+\.svg)"[^>]*>/g, (m, r, f) => m.replace(f, svgData(f)))
     .replace(/src="([\w-]+\.svg)"/g, (m, f) => `src="${svgData(f)}"`)
+    // Звук запуску вшиваємо як data:-адресу.
+    .replace(/src="([\w-]+\.mp3)"/g, (m, f) => `src="data:audio/mpeg;base64,${readFileSync(new URL(`../app/${f}`, import.meta.url)).toString('base64')}"`)
     .replace(/<link rel="stylesheet" href="([\w.]+\.css)">/g, (m, f) => `<style>\n${inlineFonts(app(f))}</style>`)
     .replace(`<script type="module" src="${script}"></script>`, () => `<script type="module">\n${code}</script>`);
 

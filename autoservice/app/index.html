@@ -64,6 +64,8 @@
       <div class="sp-word">CARCAR</div>
     </div>
   </div>
+  <!-- Звук запуску: окремо від заставки, щоб не обірвався, коли її приберуть. -->
+  <audio id="start-sound" src="start.mp3" preload="auto"></audio>
   <script>
     // Заставка лише раз за сесію і не для тих, хто просив зменшити рух.
     (() => {
@@ -80,6 +82,13 @@
         b.style.cssText = `left:${Math.random() * 100}%;width:${size}px;height:${size}px;--d:${2.2 + Math.random() * 1.6}s;--t:${Math.random() * 1.2}s;--x:${(Math.random() - 0.5) * 60}px`;
         el.append(b);
       }
+      // Звук запуску. Якщо браузер не дає грати звук без дотику (так роблять більшість телефонів),
+      // граємо його від першого дотику, поки заставка ще на екрані.
+      const sound = document.getElementById('start-sound');
+      const play = () => sound.play()?.catch(() => {});
+      sound.play()?.catch(() => {
+        addEventListener('pointerdown', () => { if (el.isConnected && !el.classList.contains('out')) play(); }, { once: true, capture: true });
+      });
       const done = () => { if (!el.isConnected || el.classList.contains('out')) return; el.classList.add('out'); setTimeout(() => el.remove(), 800); };
       el.addEventListener('click', done);
       setTimeout(done, 2400);
