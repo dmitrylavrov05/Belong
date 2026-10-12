@@ -609,3 +609,70 @@ test('доступність: вибір мийника й список мийн
   await page.getByRole('dialog', { name: 'Хто митиме?' }).waitFor();
   expect((await new AxeBuilder({ page }).analyze()).violations.map((v) => v.id)).toEqual([]);
 });
+
+test('клієнт скасував запис, поки мийка відповідала — шторка закривається, гроші повертаються на картку', async ({ page, context }) => {
+  await clientBooks(page);
+  await page.goto(PRO);
+  await expect(page.getByRole('dialog', { name: 'Новий запис' })).toBeVisible();
+  // Застосунок клієнта в іншій вкладці.
+  const client = await context.newPage();
+  await client.clock.setFixedTime(new Date(2026, 9, 4, 10, 1));
+  await client.goto('/#/bookings');
+  client.once('dialog', (d) => d.accept());
+  await client.locator('article.bk').first().getByRole('button', { name: 'Скасувати', exact: true }).click();
+  await expect(client.locator('#toast')).toHaveText('Запис скасовано, повернено 250 ₴ на картку');
+  await expect(page.locator('.toast')).toContainText('Запис уже скасовано');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Нові записи' })).toHaveCount(0);
+  await client.close();
+});
+
+test('неявку можна позначити лише через 15 хв після початку; оплата мийці заморожена на 48 год', async ({ page }) => {
+  await seed(page, { bookings: [{ ...paid, time: '10:00', chat: undefined, chatUnreadBiz: false }] });
+  await page.goto(`${PRO}#/booking/b1`);
+  const sheet = page.getByRole('dialog');
+  await expect(sheet).toContainText('позначити неявку можна через 15 хв після початку');
+  await expect(sheet.getByRole('button', { name: 'Клієнт не приїхав' })).toHaveCount(0);
+
+  await page.clock.setFixedTime(new Date(2026, 9, 4, 10, 16));
+  await page.goto('about:blank');
+  await page.goto(`${PRO}#/booking/b1`);
+  page.once('dialog', (d) => d.accept());
+  await page.getByRole('dialog').getByRole('button', { name: 'Клієнт не приїхав' }).click();
+  await expect(page.locator('.toast')).toHaveText('Позначено неявку');
+  const b = await page.evaluate(() => JSON.parse(localStorage.getItem('carcar.bookings'))[0]);
+  expect([b.state, b.refund, b.placeAmount]).toEqual(['noshow', 0, 550]);
+  expect(b.unfreezeAt).toBe(new Date(2026, 9, 6, 10, 16).getTime());
+
+  // Клієнт насправді приїхав — може оскаржити, поки гроші заморожені.
+  await page.goto('/#/bookings');
+  await page.getByRole('button', { name: /^Завершені/ }).click();
+  await page.locator('.done-item').first().click();
+  await expect(page.getByRole('button', { name: /Я приїхав — відкрити спір/ })).toBeVisible();
+});
+
+test('кілька мийок: новий запис іншої мийки сповіщає, «Прийняти» перемикає на неї', async ({ page }) => {
+  await page.goto(`${PRO}#/wash`);
+  await page.getByRole('group', { name: 'Ваші мийки' }).getByRole('button', { name: 'Додати мийку' }).click();
+  const form = page.getByRole('dialog', { name: 'Нова мийка' });
+  await form.getByLabel('Назва').fill('Автомийка «Блиск» на Оболоні');
+  await form.getByLabel('Адреса').fill('просп. Оболонський, 1');
+  await form.getByLabel('Телефон').fill('+380 44 000 11 22');
+  await form.getByRole('button', { name: 'Додати мийку' }).click();
+  const id = await page.evaluate(() => JSON.parse(localStorage.getItem('carcar.partner')));
+  await page.goto(`${PRO}#/wash`);
+  await page.getByRole('group', { name: 'Ваші мийки' }).getByRole('button', { name: /Автомийка «Блиск» Київ/ }).click();
+  await page.evaluate((placeId) => localStorage.setItem('carcar.bookings', JSON.stringify([{
+    id: 'm1', placeId, channel: 'carcar', services: ['Експрес-мийка кузова'], total: 250, paid: 250, bonus: 0, minutes: 30, date: '2026-10-05', time: '12:00',
+    car: 'Skoda Octavia', cls: 0, clientName: 'Марта', clientPhone: '+380 50 000 00 01', state: 'pending', needsConfirm: true, createdAt: Date.now(),
+  }])), id);
+  await page.goto('about:blank');
+  await page.goto(`${PRO}#/wash`);
+  await expect(page.getByRole('group', { name: 'Ваші мийки' }).getByRole('button', { name: /на Оболоні/ })).toContainText('1 новий запис');
+  const alert = page.getByRole('dialog', { name: 'Новий запис' });
+  await expect(alert).toContainText('на Оболоні');
+  await alert.getByRole('button', { name: 'Прийняти' }).click();
+  await expect(page.locator('.toast')).toContainText('Запис прийнято');
+  await expect(page.locator('.pro-top')).toContainText('на Оболоні');
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('carcar.bookings'))[0].state)).toBe('paid');
+});

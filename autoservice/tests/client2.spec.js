@@ -155,7 +155,7 @@ test('регулярна мийка кожні 2 тижні в суботу о 1
   await f.getByLabel('День').selectOption({ label: 'Субота' });
   await f.getByRole('combobox', { name: 'Час', exact: true }).selectOption('10:00');
   await f.getByRole('button', { name: 'Увімкнути' }).click();
-  await expect(page.locator('#toast')).toHaveText('Регулярний запис увімкнено — найближчий візит уже в «Моїх записах»');
+  await expect(page.locator('#toast')).toHaveText('Регулярний запис увімкнено — візити зʼявлятимуться в «Моїх записах» за тиждень наперед');
   const card = page.locator('.sub-card');
   await expect(card).toContainText('Кожні 2 тижні у суботу о 10:00');
   await expect(card).toContainText('Найближчий: сб, 10 жовтня, 10:00');
@@ -278,3 +278,15 @@ for (const path of ['/#/bookings', '/#/garage']) {
     expect(overflow).toBeLessThanOrEqual(0);
   });
 }
+
+test('умови для мийок відкриваються без входу клієнта; комісія — з налаштувань адміністрації', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => { localStorage.setItem('carcar.auth', 'null'); localStorage.setItem('carcar.admin.settings', '{"commission":0.12}'); });
+  await page.goto('/#/business');
+  await expect(page.getByRole('heading', { name: 'CARCAR для бізнесу' })).toBeVisible();
+  await expect(page.locator('.biz-terms')).toContainText('Комісія 12% із замовлень через CARCAR');
+  await expect(page.locator('.biz-steps')).toContainText('публікуєте мийку');
+  await page.getByRole('link', { name: 'Зареєструвати бізнес' }).click();
+  await expect(page.getByRole('heading', { name: 'Реєстрація мийки' })).toBeVisible();
+  await expect(page.locator('#biz-apply')).toContainText('12% із замовлень');
+});

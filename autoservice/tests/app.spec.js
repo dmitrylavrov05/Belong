@@ -364,7 +364,7 @@ test('скасування за 1,5 год і раніше: уся сума на
   await expect(page.locator('article').first()).toContainText('Перенести чи скасувати без втрат можна до 4 жовтня о 10:00');
   page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Скасувати', exact: true }).click();
-  await expect(page.locator('#toast')).toHaveText('Запис скасовано, 900 ₴ повернено на баланс');
+  await expect(page.locator('#toast')).toHaveText('Запис скасовано, повернено 900 ₴ на баланс CARCAR');
   await expect(page.locator('article', { hasText: 'Скасовано' })).toContainText('Повернено 900 ₴ на баланс CARCAR');
   // Баланс живе в профілі («Гараж» → «Гаманець»), а не в «Моїх записах».
   await expect(page.getByRole('region', { name: 'Баланс CARCAR' })).toHaveCount(0);

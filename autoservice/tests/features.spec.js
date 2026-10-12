@@ -259,7 +259,7 @@ test('обмеження одне: запис можна перенести не
     await page.goto('/#/bookings');
     await page.getByRole('button', { name: /^Активні/ }).click();
     await page.locator('article').first().getByRole('button', { name: 'Скасувати', exact: true }).click();
-    await expect(page.locator('#toast')).toHaveText('Запис скасовано, 900 ₴ повернено на баланс');
+    await expect(page.locator('#toast')).toHaveText('Запис скасовано, повернено 900 ₴ на баланс CARCAR');
   }
   // Чотири активні записи одночасно — можна.
   for (const time of ['10:00', '11:00', '12:00']) await book(page, { time, pay: /Оплатити/ });
@@ -423,7 +423,7 @@ test('промокоди: «Перша мийка −30%» сама, свій к
   // Безкоштовне скасування повертає оплачене й дозволяє скористатися кодом знову.
   page.once('dialog', (d) => d.accept());
   await page.locator('article.hl').getByRole('button', { name: 'Скасувати' }).click();
-  await expect(page.locator('#toast')).toHaveText('Запис скасовано, 765 ₴ повернено на баланс');
+  await expect(page.locator('#toast')).toHaveText('Запис скасовано, повернено 765 ₴ на баланс CARCAR');
 
   await page.goto('/admin.html#/promos');
   await expect(page.locator('tr', { hasText: 'CHYSTO15' })).toContainText('0 ₴');
