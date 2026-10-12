@@ -107,7 +107,7 @@ test('нова мийка: додається в CarCar Business, CARCAR пер�
   // Мийка вже в кабінеті, але клієнти її ще не бачать.
   await page.goto(`${PRO}#/wash`);
   await expect(page.getByRole('group', { name: 'Ваші мийки' })).toContainText('Автомийка «Хмаринка»');
-  await expect(page.locator('.notice.warn')).toContainText('Клієнти ще не бачать цю мийку: «На перевірці»');
+  await expect(page.locator('.notice.warn')).toContainText('Клієнти ще не бачать мийку: статус «На перевірці»');
   await expect(page.getByRole('link', { name: 'Вказати рахунок для виплат' })).toBeVisible();
   await page.goto('/');
   await expect(page.getByText('Автомийка «Хмаринка»')).toHaveCount(0);
@@ -126,9 +126,20 @@ test('нова мийка: додається в CarCar Business, CARCAR пер�
   await expect(page.locator('.queue')).toContainText('1 точка чекає перевірки');
   await page.locator('#nav').getByRole('link', { name: /Точки/ }).click();
   await page.getByRole('link', { name: 'Автомийка «Хмаринка»' }).click();
-  await expect(page.locator('.checks .bad-text')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Схвалити й додати в каталог' }).click();
-  await expect(page.locator('#toast')).toHaveText('Точку підключено — вона вже в каталозі');
+  // Фото мийка додає сама перед публікацією — це не перешкода для схвалення.
+  await expect(page.locator('.checks .bad-text')).toHaveText(['Немає фото мийки']);
+  await page.getByRole('button', { name: 'Схвалити', exact: true }).click();
+  await expect(page.locator('#toast')).toHaveText('Схвалено — мийка опублікує себе в CarCar Business після перевірки профілю');
+  expect(await page.evaluate((x) => JSON.parse(localStorage.getItem('carcar.partners'))[x].status, id)).toBe('setup');
+
+  // Поки мийка не опублікувалась, клієнти її не бачать.
+  await page.goto('/');
+  await expect(page.getByText('Автомийка «Хмаринка»')).toHaveCount(0);
+  await page.goto(`${PRO}#/wash`);
+  const setup = page.getByRole('region', { name: 'CARCAR схвалив мийку — залишився один крок' });
+  await expect(setup).toContainText('Послуги й ціниготово');
+  await setup.getByRole('button', { name: 'Опублікувати мийку' }).click();
+  await expect(page.locator('#toast')).toHaveText('Мийка в каталозі — клієнти вже можуть записатися');
 
   // Мийка в каталозі, до неї можна записатися, а виплати дозволені.
   await page.goto('/');
@@ -314,7 +325,7 @@ test('огляд платформи рахує оборот і комісію з
   await page.goto(ADMIN);
   const kpis = page.getByRole('region', { name: 'Показники платформи' });
   await expect(kpis.locator('.kpi.hero .value')).toHaveText(/\d[\d\s]* ₴/);
-  await expect(kpis).toContainText('Комісія нарахована');
+  await expect(kpis).toContainText('Комісія (оцінка за ставкою)');
   await expect(page.locator('#ch-gmv .hit')).toHaveCount(30);
   const row = page.getByRole('region', { name: 'Показники точок' }).locator('tbody tr').first();
   await expect(row).toContainText('Автомийка «Блиск»');

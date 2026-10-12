@@ -361,8 +361,9 @@ test('бізнес: умови й заявка в застосунку → ад�
   // Мийка бачить доступ у застосунку, а точка — у каталозі.
   await page.goto('/#/business');
   await expect(page.getByRole('region', { name: 'Ваша заявка' })).toContainText(login);
+  // Мийка ще перевіряє профіль у CarCar Business — у каталозі її поки немає.
   await page.goto('/');
-  await expect(page.locator('#list article')).toHaveCount(10);
+  await expect(page.locator('#list article')).toHaveCount(9);
 
   // Окремий вхід у CarCar Business: невірний пароль — помилка, вірний — лише ця мийка.
   await page.evaluate(() => { localStorage.removeItem('carcar.biz.session'); localStorage.removeItem('carcar.partner'); });
@@ -382,6 +383,12 @@ test('бізнес: умови й заявка в застосунку → ад�
   // Після перезавантаження сесія зберігається; «Вийти» в «Ще» повертає на екран входу.
   await page.reload();
   await expect(page.locator('#view h1')).toHaveText('Повідомлення');
+  // Мийка перевіряє профіль і сама публікує себе в каталозі.
+  await page.goto(`${PRO}#/wash`);
+  await page.getByRole('button', { name: 'Опублікувати мийку' }).click();
+  await expect(page.locator('#toast')).toHaveText('Мийка в каталозі — клієнти вже можуть записатися');
+  await page.goto('/');
+  await expect(page.locator('#list article')).toHaveCount(10);
   await page.goto(`${PRO}#/more`);
   page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: /^Вийти/ }).click();
@@ -418,6 +425,12 @@ test('місто: каталог по всій Україні, порожнє м
   await expect(page.getByRole('article', { name: 'Заявка Мийка «Лева»' })).toContainText('Львів');
   await page.getByRole('button', { name: 'Схвалити й видати доступ' }).click();
   await expect(page.getByRole('article', { name: 'Заявка Мийка «Лева»' })).toContainText('Доступ до кабінету видано');
+  // Мийка публікує себе в CarCar Business (тут — одразу, як після перевірки профілю).
+  await page.evaluate(() => {
+    const all = JSON.parse(localStorage.getItem('carcar.partners'));
+    for (const pt of Object.values(all)) if (pt.status === 'setup') Object.assign(pt, { status: 'approved', publishedAt: Date.now() });
+    localStorage.setItem('carcar.partners', JSON.stringify(all));
+  });
   await page.goto('/');
   await city.selectOption('Львів');
   await expect(page.locator('#count')).toHaveText('1 мийка');

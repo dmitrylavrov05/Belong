@@ -13,7 +13,7 @@ import {
 } from './core.js';
 import {
   openStarts, chatPost, chatTimeline, readMessages, msgPreview, touchPresence, BIZ_QUICK, sendMessages, checkWaitlist,
-  acceptBooking, declineBooking, expirePending, autoConfirmOf, setAutoConfirm, proposeTime, weeklyDealsOf, daysText,
+  acceptBooking, declineBooking, expirePending, autoConfirmOf, setAutoConfirm, proposeTime, weeklyDealsOf, daysText, markNoShow, noShowFrom,
 } from './ops.js';
 import { ibanValid, normIban, formatIban, codeValid } from './partners.js';
 
@@ -116,8 +116,13 @@ const ownRequests = () => requests.filter((r) => r.placeId === ui.place);
 
 // Записи, які вже минули, але мийка не позначила, чим вони закінчились.
 const unmarked = () => own().filter((b) => (b.state === 'paid' || b.state === 'booked') && isPast(b)).sort((a, b) => bookingStart(a) - bookingStart(b));
-const pendingList = () => own().filter((b) => b.state === 'pending').sort((a, b) => confirmBy(a) - confirmBy(b));
-const unreadCount = () => own().filter((b) => b.chatUnreadBiz || b.state === 'pending').length + ownRequests().filter((r) => r.unreadBiz).length;
+// Записи всіх мийок акаунта: нові заявки приходять і тоді, коли відкрита інша мийка.
+const allMine = () => { const ids = accountPlaces(session()); return bookings.filter((b) => ids.includes(b.placeId)); };
+const pendingList = () => allMine().filter((b) => b.state === 'pending').sort((a, b) => confirmBy(a) - confirmBy(b));
+const unreadCount = () => own().filter((b) => b.chatUnreadBiz && b.state !== 'pending').length + pendingList().length + ownRequests().filter((r) => r.unreadBiz).length;
+const washLabel = (b) => (b.placeId !== ui.place ? `<span class="pill">${esc(placeById(b.placeId)?.name ?? '')}</span>` : '');
+// Візит почався: тільки тоді можна «Машина готова»; неявку — через lateMinutes після початку.
+const started = (b) => bookingStart(b) <= new Date();
 
 // Розклад «перевірено»: мийка раз на день підтверджує, що вільний час у CARCAR відповідає дійсності.
 const checkedAt = () => store.get('biz.places', {})[ui.place]?.checkedAt ?? 0;
@@ -136,14 +141,10 @@ function boxFree(date, t, minutes, skip = null) {
 }
 
 // Вільні вікна дня, як їх бачать клієнти: суцільні проміжки по 30 хв, де є хоч один вільний бокс.
+// Вільний час так, як його бачать клієнти в застосунку (з урахуванням перерви й часу на підготовку).
 function freeWindows(date) {
-  const p = place();
-  const h = hoursFor(p, date);
-  if (!h || date < todayIso()) return [];
-  const from = date === todayIso() ? Math.ceil(minuteNow() / 30) * 30 : h[0];
   const out = [];
-  for (let t = Math.max(h[0], from); t + 30 <= h[1]; t += 30) {
-    if (!boxFree(date, t, 30)) continue;
+  for (const t of openStarts(place(), date, 30, bookings).map(toMin)) {
     const last = out.at(-1);
     if (last && last[1] === t) last[1] = t + 30;
     else out.push([t, t + 30]);
@@ -151,6 +152,40 @@ function freeWindows(date) {
   return out;
 }
 const windowsText = (list) => list.map(([s, e]) => `${hhmm(s)}–${hhmm(e)}`).join(', ');
+
+// Мийка в каталозі? Поки ні — зміни зберігаються, але клієнти їх ще не бачать.
+const listed = () => partnerOf(ui.place).status === 'approved';
+const seen = (text) => (listed() ? text : 'Збережено. Клієнти побачать це, коли мийка зʼявиться в каталозі');
+
+// Стан мийки в CARCAR: що бачать клієнти й що зробити далі.
+function statusCard() {
+  const pt = partnerOf(ui.place);
+  const st = pt.status;
+  if (st === 'approved') return '';
+  const note = [...(pt.history ?? [])].reverse().find((h) => h.by === 'admin' && h.note)?.note;
+  if (st === 'setup') {
+    const p = place();
+    const steps = [
+      [p.services?.length > 0, 'Послуги й ціни', '#/profile'],
+      [scheduleOf(p).week.some(Boolean), 'Графік роботи', '#/profile'],
+      [!!(p.photos?.length || p.avatar), 'Фото мийки', '#/profile'],
+    ];
+    const ready = steps[0][0] && steps[1][0];
+    return `<section class="pro-card setup-card" aria-labelledby="h-setup">
+      <h2 id="h-setup">CARCAR схвалив мийку — залишився один крок</h2>
+      <p class="small muted" style="margin:0">Перевірте, що клієнти побачать правильні ціни й години, і опублікуйте мийку. До публікації її немає в каталозі.</p>
+      <ul class="plain-list">${steps.map(([ok, label, href]) => `<li><a href="${href}">${icon(ok ? 'check' : 'warn', 18)}${label}</a><b>${ok ? 'готово' : 'перевірте'}</b></li>`).join('')}</ul>
+      <button class="btn primary block" type="button" data-action="publish" ${ready ? '' : 'disabled'}>Опублікувати мийку</button>
+      ${ready ? '' : '<p class="fine">Додайте послуги з цінами й графік — тоді мийку можна опублікувати.</p>'}
+    </section>`;
+  }
+  if (st === 'changes' || st === 'rejected') {
+    return `<section class="notice warn" aria-label="Стан мийки"><span><b>${PARTNER_STATUS[st][0]}</b>${note ? `Коментар CARCAR: «${esc(note)}». ` : ''}Клієнти поки не бачать мийку. Виправте дані в профілі й надішліть ще раз.</span>
+      <button class="btn" type="button" data-action="resubmit">Надіслати на перевірку знову</button></section>`;
+  }
+  if (st === 'suspended') return `<p class="notice warn">Мийку призупинено — клієнти її не бачать.${note ? ` Коментар CARCAR: «${esc(note)}».` : ''} Напишіть у підтримку, щоб відновити.</p>`;
+  return `<p class="notice warn">Клієнти ще не бачать мийку: статус «${PARTNER_STATUS[st][0]}». CARCAR перевіряє дані, зазвичай до 2 робочих днів.</p>`;
+}
 
 // ---------- вхід ----------
 
@@ -184,7 +219,7 @@ const notifyAsk = () => (canNotify() ? `<button class="btn soft notify-ask" type
 // Сповіщення про новий запис: шторка поверх будь-якого екрана з деталями й кнопками,
 // а коли застосунок згорнуто — системне сповіщення з кнопками «Прийняти» / «Відмовити».
 function alertSheet(b) {
-  const p = place();
+  const p = placeById(b.placeId);
   openSheet('Новий запис', `<div class="alert-card">
       <div class="alert-time"><b>${b.time}</b><span>${dayWord(b.date, true)}</span><small>до ${hhmm(toMin(b.time) + b.minutes)} · ${duration(b.minutes)}</small></div>
       <dl class="pro-kv">
@@ -193,7 +228,8 @@ function alertSheet(b) {
         <dt>Послуги</dt><dd>${esc(b.services.join(', '))}</dd>
         <dt>Оплачено</dt><dd><b>${uah(sumOf(b))}</b> через CARCAR</dd>
         ${b.mobile ? `<dt>Виїзд</dt><dd>${esc(b.mobile.address)}</dd>` : ''}
-        <dt>Бокси</dt><dd>${p.boxes - own().filter((x) => x !== b && x.date === b.date && BLOCKING.includes(x.state) && toMin(b.time) < toMin(x.time) + x.minutes && toMin(b.time) + b.minutes > toMin(x.time)).length} з ${p.boxes} вільні в цей час</dd>
+        ${b.placeId !== ui.place ? `<dt>Мийка</dt><dd><b>${esc(p.name)}</b></dd>` : ''}
+        ${b.mobile ? '' : `<dt>Бокси</dt><dd>${Math.max(0, p.boxes - bookings.filter((x) => x !== b && x.placeId === b.placeId && x.date === b.date && !x.mobile && BLOCKING.includes(x.state) && toMin(b.time) < toMin(x.time) + x.minutes && toMin(b.time) + b.minutes > toMin(x.time)).length)} з ${p.boxes} вільні в цей час</dd>`}
       </dl>
       <p class="pending-due big">${icon('clock', 18)}<span>Залишилось ${countdown(b)} — потім запис скасується сам, а гроші повернуться клієнту</span></p>
       <div class="grid2">
@@ -202,7 +238,7 @@ function alertSheet(b) {
         <button class="btn full" type="button" data-action="propose" data-id="${b.id}">${icon('calendar', 18)}Запропонувати інший час</button>
       </div>
       <button class="btn text-btn" type="button" data-action="sheet-close">Пізніше</button>
-    </div>`);
+    </div>`, b.id);
   $('.pro-sheet').classList.add('alert');
   // Вібрація дозволена лише після першого дотику до сторінки.
   if (navigator.userActivation?.hasBeenActive) navigator.vibrate?.([200, 100, 200]);
@@ -222,25 +258,35 @@ async function systemNotify(b) {
 }
 
 // Кожен новий запис сповіщаємо один раз: шторка, якщо нічого не відкрито, і системне сповіщення.
+// Шторка — по одній: наступна зʼявиться, коли закриють поточну. Системне сповіщення — одразу для кожного.
 const alerted = new Set();
+const notified = new Set();
 function alertPending() {
   if (!session()) return;
-  for (const b of pendingList()) {
-    if (alerted.has(b.id)) continue;
-    alerted.add(b.id);
-    systemNotify(b);
-    if (!$('#sheet-root').innerHTML) alertSheet(b);
-  }
+  const fresh = pendingList().filter((b) => !alerted.has(b.id));
+  for (const b of fresh) if (!notified.has(b.id)) { notified.add(b.id); systemNotify(b); }
+  if (!fresh.length || nb || $('#sheet-root').innerHTML) return;
+  alerted.add(fresh[0].id);
+  alertSheet(fresh[0]);
 }
 
 // Дія з системного сповіщення (або посилання #/act/...): прийняти, відмовити чи відкрити запис.
 function notifyAction(action, id) {
-  const b = own().find((x) => x.id === id);
+  if (!session()) { ui.pendingAct = [action, id]; return; }
+  const b = allMine().find((x) => x.id === id);
   if (!b || b.state !== 'pending') { toast(b ? 'На цей запис уже відповіли' : 'Запис не знайдено'); return; }
   alerted.add(id);
-  if (action === 'accept') { if (washers().length) washerSheet(b.id, 'accept'); else { acceptBooking(b); save(); rerender(); toast(`Запис прийнято: ${who(b)}, ${dayWord(b.date).toLowerCase()} о ${b.time}`); } }
+  if (b.placeId !== ui.place) { pickWash(b.placeId); rerender(); }
+  if (action === 'accept') { if (washers().length) washerSheet(b.id, 'accept'); else if (acceptBooking(b)) { save(); rerender(); toast(`Запис прийнято: ${who(b)}, ${dayWord(b.date).toLowerCase()} о ${b.time}`); } }
   else if (action === 'decline') declineSheet(id);
   else alertSheet(b);
+}
+
+// Дія зі сповіщення, натиснута до входу, — виконуємо одразу після входу.
+function runPendingAct() {
+  const act = ui.pendingAct;
+  ui.pendingAct = null;
+  if (act) notifyAction(...act);
 }
 
 // Нові записи з застосунку: мийка вирішує, чи приймати їх на цей час.
@@ -252,7 +298,7 @@ function pendingBlock() {
     ${list.map((b) => `<article class="pending-card" aria-label="Запис ${esc(who(b))}">
       <button class="pending-info" type="button" data-action="bk-open" data-id="${b.id}">
         <span class="bk-time"><b>${b.time}</b><small>${dayWord(b.date)}</small></span>
-        <span class="bk-main"><b>${esc(who(b))}</b><small>${esc(b.services.join(', '))}</small><small>${esc(b.car || '')} · ${uah(sumOf(b))} оплачено</small></span>
+        <span class="bk-main"><b>${esc(who(b))} ${washLabel(b)}</b><small>${esc(b.services.join(', '))}</small><small>${esc(b.car || '')} · ${uah(sumOf(b))} оплачено</small></span>
       </button>
       <p class="pending-due">${icon('clock', 14)}<span>Відповісти до ${clock(confirmBy(b))} · залишилось ${countdown(b)}. Інакше запис скасується, гроші повернуться клієнту</span></p>
       <div class="grid2">
@@ -273,7 +319,7 @@ function reminders() {
   else if (responseStats(ui.place, bookings).lowered) out.push(`<a class="remind warn" href="#/profile">${icon('warn', 22)}<span><b>Мийка нижче в пошуку через відмови</b>
       <small>Пропонуйте інший час замість відмови — це не рахується.</small></span>${icon('chevR', 18)}</a>`);
   const st = partnerOf(ui.place).status;
-  if (st !== 'approved') out.push(`<p class="notice warn">Клієнти ще не бачать мийку: статус «${PARTNER_STATUS[st][0]}». CARCAR перевіряє дані, зазвичай до 2 робочих днів.</p>`);
+  if (st !== 'approved') out.push(statusCard());
   const late = unmarked();
   if (late.length) {
     out.push(`<button class="remind warn" type="button" data-action="mark-open">${icon('warn', 22)}<span><b>${late.length} ${plural(late.length, 'запис чекає', 'записи чекають', 'записів чекають')} позначки</b>
@@ -282,8 +328,9 @@ function reminders() {
   const h = hoursFor(place(), todayIso());
   if (h && !checkedToday()) {
     const free = freeWindows(todayIso());
+    const hidden = pause || st !== 'approved';
     out.push(`<section class="remind sched" aria-label="Перевірка розкладу">${icon('calendar', 22)}<span><b>Розклад на сьогодні правильний?</b>
-      <small>${free.length ? `Клієнти бачать вільним: ${windowsText(free)}.` : 'Вільного часу на сьогодні вже немає.'} Якщо когось записали по телефону чи він приїхав сам, додайте запис, щоб цей час не продали двічі.</small>
+      <small>${hidden ? 'Зараз клієнти не можуть записатися онлайн.' : free.length ? `Клієнти бачать вільним: ${windowsText(free)}.` : 'Вільного часу на сьогодні вже немає.'} Якщо когось записали по телефону чи він приїхав сам, додайте запис, щоб цей час не продали двічі.</small>
       <span class="row"><a class="btn" href="#/bookings/${todayIso()}">${icon('calendar', 16)}Переглянути розклад</a><button class="btn navy" type="button" data-action="sched-ok">Так, усе вірно</button><button class="btn" type="button" data-action="nb-open">${icon('plus', 16)}Додати запис</button></span></span></section>`);
   }
   return out.length ? `<div class="reminders">${out.join('')}</div>` : '';
@@ -377,23 +424,26 @@ function viewThread(arg = '') {
   if (arg.startsWith('b-')) {
     const b = own().find((x) => x.id === id);
     if (!b) return notFound();
-    const seen = readMessages(b.chat, 'client');
-    if (b.chatUnreadBiz || seen) { b.chatUnreadBiz = false; save(); }
+    // «Прочитано» — лише коли екран справді перед очима (не у фоновій вкладці).
+    const visible = document.visibilityState === 'visible';
+    const seen = visible && readMessages(b.chat, 'client');
+    if (visible && (b.chatUnreadBiz || seen)) { b.chatUnreadBiz = false; save(); }
     const [label] = stateOf(b);
     const open = ACTIVE.includes(b.state);
     return `<section class="chat-screen" aria-label="Чат з ${esc(who(b))}">
       ${chatHead(who(b), `${label} · ${dayWord(b.date)}, ${b.time}`, b.clientPhone)}
       <button class="chat-pin" type="button" data-action="bk-open" data-id="${b.id}">${icon('calendar', 16)}<span>${b.no ? `${bookingNo(b)} · ` : ''}${esc(b.services.join(', '))} · ${uah(sumOf(b))}${b.car ? ` · ${esc(b.car)}` : ''}</span>${icon('chevR', 16)}</button>
       ${b.state === 'pending' ? `<div class="chat-actions"><button class="btn navy" type="button" data-action="accept" data-id="${b.id}">${icon('check', 18)}Прийняти запис</button><button class="btn" type="button" data-action="decline" data-id="${b.id}">Відмовити</button></div>` : ''}
-      ${b.state === 'paid' ? `<div class="chat-actions"><button class="btn navy" type="button" data-action="ready" data-id="${b.id}">${icon('check', 18)}Машина готова</button></div>` : ''}
+      ${b.state === 'paid' && started(b) ? `<div class="chat-actions"><button class="btn navy" type="button" data-action="ready" data-id="${b.id}">${icon('check', 18)}Машина готова</button></div>` : ''}
       <ol class="chat-msgs" aria-label="Повідомлення">${threadList(chatTimeline(b))}</ol>
       ${open ? compose(arg, true) : '<p class="chat-closed">Запис закрито — листування лише для читання.</p>'}
     </section>`;
   }
   const r = ownRequests().find((x) => x.id === id);
   if (!r) return notFound();
-  const seen = readMessages(r.messages, 'client');
-  if (r.unreadBiz || seen) { r.unreadBiz = false; save(); }
+  const visible = document.visibilityState === 'visible';
+  const seen = visible && readMessages(r.messages, 'client');
+  if (visible && (r.unreadBiz || seen)) { r.unreadBiz = false; save(); }
   const [label] = REQ_STATE[reqState(r)];
   const open = !r.closed;
   return `<section class="chat-screen" aria-label="Чат з ${esc(r.clientName || 'клієнтом')}">
@@ -506,7 +556,12 @@ function hourRows(day, list, h) {
 
 // ---------- шторка ----------
 
-function openSheet(title, body) {
+// Шторка, відкрита для конкретного запису: якщо запис тим часом змінився (скасувався сам, клієнт скасував),
+// шторку закриваємо, щоб не діяти над застарілим станом.
+const sheetFor = { id: null, state: null };
+function openSheet(title, body, forId = null) {
+  sheetFor.id = forId;
+  sheetFor.state = forId ? bookings.find((x) => x.id === forId)?.state ?? null : null;
   $('#sheet-root').innerHTML = `<div class="sheet-dim" data-action="sheet-close"></div>
     <section class="pro-sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-h">
       <div class="sheet-head"><h2 id="sheet-h">${title}</h2><button class="icon-btn" type="button" data-action="sheet-close" aria-label="Закрити">${icon('x', 22)}</button></div>
@@ -520,6 +575,18 @@ function closeSheet() {
   $('#sheet-root').innerHTML = '';
   document.body.classList.remove('sheet-open');
   nb = null;
+  sheetFor.id = null;
+  // Наступна нова заявка, що чекала, поки закриють шторку.
+  setTimeout(alertPending, 0);
+}
+
+function checkSheet() {
+  if (!sheetFor.id || !$('#sheet-root').innerHTML) return false;
+  const b = bookings.find((x) => x.id === sheetFor.id);
+  if (b && b.state === sheetFor.state) return false;
+  closeSheet();
+  toast(!b ? 'Запис видалено' : b.state === 'cancelled' ? 'Запис уже скасовано — гроші повернуто клієнту' : 'Запис змінився — перегляньте ще раз');
+  return true;
 }
 
 // ---------- картка запису ----------
@@ -528,7 +595,6 @@ function bookingSheet(id) {
   const b = own().find((x) => x.id === id);
   if (!b) return;
   const [label, cls] = stateOf(b);
-  const started = bookingStart(b) <= new Date();
   let actions = '';
   if (b.state === 'pending') {
     actions = `<p class="notice warn">Клієнт оплатив запис. Підтвердіть до ${clock(confirmBy(b))} (залишилось ${countdown(b)}), інакше запис скасується, а гроші повернуться клієнту.</p>
@@ -549,12 +615,12 @@ function bookingSheet(id) {
       </form>
       <div class="grid2">
         <button class="btn" type="button" data-action="move" data-id="${b.id}">Перенести</button>
-        <button class="btn" type="button" data-action="crm-noshow" data-id="${b.id}">Не приїхав</button>
+        ${started(b) ? `<button class="btn" type="button" data-action="crm-noshow" data-id="${b.id}">Не приїхав</button>` : ''}
         <button class="btn text-danger full" type="button" data-action="crm-cancel" data-id="${b.id}">Скасувати запис</button>
       </div>`;
   } else if (b.state === 'paid') {
-    const late = Date.now() > bookingStart(b).getTime() + PAYMENT.lateMinutes * 60000;
-    actions = `<form class="stack ready-form" id="ready-form" data-id="${b.id}" style="gap:10px">
+    const late = Date.now() >= noShowFrom(b);
+    actions = !started(b) ? `<p class="notice">«Машина готова» можна позначити, коли почнеться візит — ${dayWord(b.date).toLowerCase()} о ${b.time}.</p>` : `<form class="stack ready-form" id="ready-form" data-id="${b.id}" style="gap:10px">
         <label class="dropzone small-drop">${icon('camera', 20)}Фото результату (до 3, необовʼязково)<span class="photo-count" aria-live="polite"></span>
           <input class="sr-only" name="photos" type="file" accept="image/*" multiple></label>
         <div class="grid2">
@@ -564,10 +630,11 @@ function bookingSheet(id) {
         <button class="btn primary" type="submit">${icon('check', 18)}Машина готова</button>
         <p class="fine">Так ви підтверджуєте виконання. Клієнт отримає сповіщення, а фото й пробіг потраплять у сервісну книжку авто. Гроші ${PAYMENT.freezeHours} год чекають на випадок спору.</p>
       </form>
-      ${late ? `<button class="btn" type="button" data-action="late-forfeit" data-id="${b.id}">Запізнення понад ${PAYMENT.lateMinutes} хв — оплата нам</button>` : ''}
-      ${started ? `<button class="btn text-danger" type="button" data-action="carcar-noshow" data-id="${b.id}">Клієнт не приїхав</button>` : ''}`;
+      ${late ? `<button class="btn" type="button" data-action="late-forfeit" data-id="${b.id}">Запізнення понад ${PAYMENT.lateMinutes} хв — оплата нам</button>
+        <button class="btn text-danger" type="button" data-action="carcar-noshow" data-id="${b.id}">Клієнт не приїхав</button>
+        <p class="fine">Оплата неявки ${PAYMENT.freezeHours} год заморожена: клієнт може оскаржити.</p>` : started(b) ? `<p class="fine">Якщо клієнт не приїде, позначити неявку можна через ${PAYMENT.lateMinutes} хв після початку.</p>` : ''}`;
   } else if (b.state === 'dispute') {
-    const t = ticketsAll().find((x) => x.bookingId === b.id && x.from === 'place');
+    const t = ticketsAll().find((x) => x.bookingId === b.id && x.from === 'place' && x.topic === 'dispute');
     actions = `<p class="notice warn"><b>Клієнт відкрив спір</b>«${esc(b.disputeReason ?? '')}». Гроші заморожені, доки модератор CARCAR не вирішить.</p>
       ${t ? `<a class="btn" href="#/support/${t.id}" data-action="sheet-close">Ваше пояснення: звернення №${t.no}</a>` : `<form class="stack" id="dispute-note" data-id="${b.id}" style="gap:8px">
         <label class="field"><span>Пояснення для модератора</span><textarea name="text" rows="3" required maxlength="1000" placeholder="Що було зроблено, фото, домовленості з клієнтом"></textarea></label>
@@ -596,7 +663,7 @@ function bookingSheet(id) {
       ${b.clientPhone ? `<a class="btn" href="${telHref(b.clientPhone)}">${icon('phone', 18)}Подзвонити</a>` : ''}
       ${isCarcar(b) ? `<a class="btn" href="#/chat/b-${b.id}" data-action="sheet-close">${icon('chat', 18)}Написати</a>` : ''}
     </div>
-    ${actions}`);
+    ${actions}`, b.id);
 }
 
 const DECLINE_REASONS = ['Усі бокси зайняті на цей час', 'Не робимо цю послугу', 'Мийка не працюватиме в цей час', 'Немає майстра'];
@@ -611,7 +678,7 @@ function declineSheet(id) {
     </fieldset>
     <label class="field"><span>Повідомлення клієнту (необовʼязково)</span><input name="note" maxlength="300" autocomplete="off" placeholder="Наприклад, можемо о 14:00 — запишіться ще раз"></label>
     <button class="btn primary" type="submit">Відмовити й повернути гроші</button>
-  </form>`);
+  </form>`, b.id);
 }
 
 // Інший час замість відмови: день і вільний час, необовʼязковий коментар. Відмовою не рахується.
@@ -620,15 +687,18 @@ function proposeSheet(id, date) {
   const d = date ?? b.date;
   const t = todayIso();
   const note = $('#propose-note')?.value ?? '';
-  const starts = openStarts(place(), d, b.minutes, bookings, { lead: 0, skip: b }).filter((x) => !(d === b.date && x === b.time));
+  const starts = proposeStarts(b, d);
   openSheet(`Інший час: ${esc(who(b))}`, `
     <p class="small muted" style="margin:0">Клієнт просив ${dayWord(b.date).toLowerCase()}, ${b.time} · ${esc(b.services.join(', '))}. Оберіть час, який можете прийняти, — клієнт погодиться одним дотиком.</p>
     <div class="chips day-chips" role="group" aria-label="День">${Array.from({ length: 7 }, (_, i) => shiftDay(t, i)).map((x) => `<button class="chip" type="button" data-action="propose-day" data-id="${b.id}" data-date="${x}" aria-pressed="${x === d}" ${hoursFor(place(), x) ? '' : 'disabled'}>${dayWord(x)}</button>`).join('')}</div>
     <label class="field"><span>Коментар клієнту (необовʼязково)</span><input id="propose-note" maxlength="200" autocomplete="off" placeholder="Наприклад, о 14:30 точно буде вільний бокс" value="${esc(note)}"></label>
     ${starts.length ? `<div class="slots" role="group" aria-label="Запропонувати час">${starts.map((x) => `<button class="slot" type="button" data-action="propose-to" data-id="${b.id}" data-date="${d}" data-time="${x}">${x}</button>`).join('')}</div>`
       : '<p class="muted">На цей день вільних боксів немає — оберіть інший.</p>'}
-    <p class="fine">Час одразу закріплюється за клієнтом. На відповідь у нього ${PAYMENT.offerMinutes} хв; не погодиться — гроші повернуться йому, а вам це не рахується як відмова.</p>`);
+    <p class="fine">Час одразу закріплюється за клієнтом. На відповідь у нього ${PAYMENT.offerMinutes} хв; не погодиться — гроші повернуться йому, а вам це не рахується як відмова.</p>`, b.id);
 }
+
+// Час, який можна запропонувати клієнту: вільний бокс (для виїзду — з урахуванням дороги), не той самий час.
+const proposeStarts = (b, d) => openStarts(place(), d, b.minutes, bookings, { skip: b, mobile: !!b.mobile }).filter((x) => !(d === b.date && x === b.time));
 
 // Хто митиме машину: під час прийняття запису з застосунку або пізніше в картці запису.
 function washerSheet(id, mode) {
@@ -645,7 +715,7 @@ function washerSheet(id, mode) {
       }).join('')}
       <button class="washer-opt" type="button" data-action="washer-pick" data-mode="${mode}" data-id="${b.id}" data-m=""><span class="avatar none" aria-hidden="true">?</span><span><b>Без мийника</b><small>${mode === 'accept' ? 'оберете пізніше в картці запису' : 'зняти з запису'}</small></span></button>
     </div>
-    ${mode === 'accept' ? '<p class="fine">Клієнт отримає підтвердження запису й імʼя мийника.</p>' : ''}`);
+    ${mode === 'accept' ? '<p class="fine">Клієнт отримає підтвердження запису й імʼя мийника.</p>' : ''}`, b.id);
 }
 
 function moveSheet(id, date) {
@@ -654,9 +724,9 @@ function moveSheet(id, date) {
   const t = todayIso();
   const starts = openStarts(place(), d, b.minutes, bookings, { lead: 0, skip: b });
   openSheet(`Перенести: ${esc(who(b))}`, `
-    <div class="chips day-chips" role="group" aria-label="День">${Array.from({ length: 7 }, (_, i) => shiftDay(t, i)).map((x) => `<button class="chip" type="button" data-action="move-day" data-id="${b.id}" data-date="${x}" aria-pressed="${x === d}">${dayWord(x)}</button>`).join('')}</div>
+    <div class="chips day-chips" role="group" aria-label="День">${Array.from({ length: 7 }, (_, i) => shiftDay(t, i)).map((x) => `<button class="chip" type="button" data-action="move-day" data-id="${b.id}" data-date="${x}" aria-pressed="${x === d}" ${hoursFor(place(), x) ? '' : 'disabled'}>${dayWord(x)}</button>`).join('')}</div>
     ${starts.length ? `<div class="slots" role="group" aria-label="Вільний час">${starts.map((s) => `<button class="slot" type="button" data-action="move-to" data-id="${b.id}" data-date="${d}" data-time="${s}">${s}</button>`).join('')}</div>`
-      : '<p class="muted">На цей день вільних боксів немає.</p>'}`);
+      : '<p class="muted">На цей день вільних боксів немає.</p>'}`, b.id);
 }
 
 // Позначити минулі записи: усе в одному списку, по кнопці на кожен.
@@ -701,11 +771,12 @@ function nbTimes() {
   const out = openStarts(place(), nb.date, nbMinutes(), bookings, { lead: 0 });
   // Клієнт уже біля боксу: «Зараз» — із поточної хвилини, якщо є вільний бокс.
   if (nb.channel === 'walkin' && nb.date === todayIso()) {
-    const now = hhmm(Math.floor(minuteNow() / 5) * 5);
+    const now = nbNow();
     if (!out.includes(now) && boxFree(nb.date, toMin(now), nbMinutes())) out.unshift(now);
   }
   return out;
 }
+const nbNow = () => hhmm(Math.floor(minuteNow() / 5) * 5);
 
 function nbRender() {
   const p = place();
@@ -714,7 +785,7 @@ function nbRender() {
   const times = nbTimes();
   if (!times.includes(nb.time)) nb.time = times[0] ?? '';
   const t = todayIso();
-  const nowTime = nb.channel === 'walkin' && nb.date === t ? times[0] : null;
+  const nowTime = nb.channel === 'walkin' && nb.date === t && times[0] === nbNow() ? times[0] : null;
   $('#nb-dyn').innerHTML = `
     <div><span class="lbl">Клас авто</span><div class="chips nb-chips" role="group" aria-label="Клас авто">${CAR_CLASSES.map((c, i) => `<button class="chip" type="button" data-action="nb-cls" data-i="${i}" aria-pressed="${i === nb.cls}">${c}</button>`).join('')}</div></div>
     <div><span class="lbl">Послуги</span><div class="svc-chips" role="group" aria-label="Послуги">${p.services.map((s) => `<button class="svc-chip" type="button" data-action="nb-svc" data-id="${s.id}" aria-pressed="${nb.services.has(s.id)}"><b>${esc(s.name)}</b><small>${uah(s.price[nb.cls])} · ${duration(s.min)}</small></button>`).join('')}</div></div>
@@ -724,7 +795,7 @@ function nbRender() {
         const busy = nb.time && washerBusy(w.id, { date: nb.date, time: nb.time, minutes: nbMinutes() });
         return `<button class="chip" type="button" data-action="nb-washer" data-m="${w.id}" aria-pressed="${nb.masterId === w.id}">${esc(w.name)}${busy ? ' · зайнятий' : ''}</button>`;
       }).join('')}</div></div>` : ''}
-    <div><span class="lbl">День</span><div class="chips nb-chips" role="group" aria-label="День">${Array.from({ length: 7 }, (_, i) => shiftDay(t, i)).map((d) => `<button class="chip" type="button" data-action="nb-day" data-date="${d}" aria-pressed="${d === nb.date}" ${hoursFor(p, d) ? '' : 'disabled'}>${dayWord(d)}</button>`).join('')}</div></div>
+    <div><span class="lbl">День</span><div class="chips nb-chips" role="group" aria-label="День">${Array.from({ length: 7 }, (_, i) => shiftDay(t, i)).map((d) => `<button class="chip" type="button" data-action="nb-day" data-date="${d}" aria-pressed="${d === nb.date}" ${hoursFor(p, d) && (nb.channel !== 'walkin' || d === t) ? '' : 'disabled'}>${dayWord(d)}</button>`).join('')}</div></div>
     <div><span class="lbl">Час</span>${times.length ? `<div class="slots" role="group" aria-label="Вільний час">${times.map((x) => `<button class="slot" type="button" data-action="nb-time" data-time="${x}" aria-pressed="${x === nb.time}">${x === nowTime && nb.channel === 'walkin' ? 'Зараз' : x}</button>`).join('')}</div>`
       : `<p class="muted small" style="margin:6px 0 0">${hoursFor(p, nb.date) ? 'Вільних боксів на цей день немає.' : 'Цього дня мийка не працює.'}</p>`}</div>
     <div class="nb-foot"><span><b>${chosen.length ? uah(total) : 'Оберіть послуги'}</b><small>${chosen.length ? duration(nbMinutes()) : ''}</small></span>
@@ -749,6 +820,9 @@ function nbSubmit() {
   const chosen = nbChosen();
   if (!chosen.length || !nb.time) return;
   if (nb.channel === 'phone' && !phoneKey(nb.phone)) { toast('Вкажіть телефон клієнта'); $('#nb-form [name="phone"]').focus(); return; }
+  // Форму могли тримати відкритою довго: минулий час уже не записуємо.
+  if (nb.date < todayIso() || (nb.date === todayIso() && toMin(nb.time) < minuteNow() - 5)) { toast('Цей час уже минув — оберіть інший'); nbRender(); return; }
+  if (nb.channel === 'walkin' && nb.date !== todayIso()) { toast('«Приїхав сам» — лише на сьогодні'); return; }
   // Час могли зайняти, поки заповнювали форму (наприклад, клієнт записався в застосунку).
   if (!boxFree(nb.date, toMin(nb.time), nbMinutes())) { toast('Цей час щойно зайняли — оберіть інший'); nbRender(); return; }
   const total = chosen.reduce((a, s) => a + s.price[nb.cls], 0);
@@ -771,7 +845,7 @@ function nbSubmit() {
 
 function revenue(b) {
   if (b.state === 'completed') return isCarcar(b) ? price(b) : b.paid;
-  if (isCarcar(b) && (b.state === 'cancelled' || b.state === 'noshow')) return b.placeAmount ?? 0;
+  if (isCarcar(b) && ['cancelled', 'noshow', 'refunded'].includes(b.state)) return b.placeAmount ?? 0;
   return 0;
 }
 
@@ -803,13 +877,12 @@ function viewWash() {
   const month = periodStats(30);
   const bal = balanceFor(p.id, bookings, payouts);
   const fee = Math.round(bal.available * commissionFor(p.id));
-  const st = partnerOf(p.id).status;
   const mine = payouts.filter((x) => x.placeId === p.id).sort((a, b) => b.at - a.at).slice(0, 3);
   const loadToday = loadPct(t);
   const loadTomorrow = loadPct(shiftDay(t, 1));
   return `<h1>Мийка</h1>
     ${washSwitch()}
-    ${st !== 'approved' ? `<p class="notice warn">Клієнти ще не бачать цю мийку: «${PARTNER_STATUS[st][0]}». ${st === 'pending' ? 'CARCAR перевіряє дані, зазвичай до 2 робочих днів.' : ''}</p>` : ''}
+    ${statusCard()}
     <section class="tiles pro-tiles" aria-label="Виручка">
       <div class="tile hero"><span>Сьогодні</span><b>${uah(day.money)}</b><small>${day.orders} ${plural(day.orders, 'машина', 'машини', 'машин')}${loadToday === null ? '' : ` · завантаження ${loadToday}%`}</small></div>
       <div class="tile"><span>7 днів</span><b>${uah(week.money)}</b><small>${week.orders} ${plural(week.orders, 'машина', 'машини', 'машин')}</small></div>
@@ -837,7 +910,8 @@ function washSwitch() {
     ${ids.map((id) => {
       const x = placeById(id);
       const st = partnerOf(id).status;
-      return `<button class="wash-chip" type="button" data-action="wash-pick" data-id="${id}" aria-pressed="${id === ui.place}"><b>${esc(x.name)}</b><small>${esc(x.city ?? 'Київ')}, ${esc(x.address)}${st === 'approved' ? '' : ` · ${PARTNER_STATUS[st][0].toLowerCase()}`}</small></button>`;
+      const wait = pendingList().filter((b) => b.placeId === id).length;
+      return `<button class="wash-chip" type="button" data-action="wash-pick" data-id="${id}" aria-pressed="${id === ui.place}"><b>${esc(x.name)}${wait ? ` <span class="pill warn">${wait} ${plural(wait, 'новий запис', 'нові записи', 'нових записів')}</span>` : ''}</b><small>${esc(x.city ?? 'Київ')}, ${esc(x.address)}${st === 'approved' ? '' : ` · ${PARTNER_STATUS[st][0].toLowerCase()}`}</small></button>`;
     }).join('')}
     <button class="wash-chip add" type="button" data-action="wash-add">${icon('plus', 18)}<b>Додати мийку</b></button>
   </div>`;
@@ -1078,7 +1152,6 @@ function viewReviews() {
 function clientsList() {
   const map = new Map();
   for (const b of own()) {
-    if (b.source === 'demo-hist' && !b.clientPhone) continue;
     const key = b.clientPhone ? phoneKey(b.clientPhone) : `name:${(b.clientName || '').toLowerCase()}`;
     if (!key || key === 'name:') continue;
     const c = map.get(key) ?? { key, name: b.clientName || 'Клієнт', phone: b.clientPhone || '', cars: new Set(), visits: 0, spent: 0, last: '', cls: b.cls ?? 0, car: '' };
@@ -1140,16 +1213,15 @@ function viewSupport(openId) {
         ${photoPick()}<button class="btn primary" type="submit">Надіслати</button></form>`}`;
   }
   const recent = own().filter(isCarcar).sort((a, b) => bookingStart(b) - bookingStart(a)).slice(0, 20);
-  const pre = ui.ticketPre ?? {};
   return `${backTo('#/more', 'Ще')}<h1>Підтримка CARCAR</h1>
     <p class="lead">Термінові питання про гроші й спори розглядаємо до 2 годин, решту — протягом доби.</p>
     ${list.length ? `<ul class="client-list">${list.map((t) => `<li><span class="cl-main"><b>№${t.no} · ${TICKET_TOPICS[t.topic]}</b><small>${esc(t.messages.at(-1).text)}</small></span>
       <span class="pill ${t.unreadUser ? 'warn' : TICKET_STATUS[t.status][1]}">${t.unreadUser ? 'Нова відповідь' : TICKET_STATUS[t.status][0]}</span><a class="btn soft" href="#/support/${t.id}">Відкрити</a></li>`).join('')}</ul>` : ''}
     <form class="pro-card stack" id="ticket-form" aria-labelledby="h-new-t" style="gap:12px;margin-top:12px">
       <h2 id="h-new-t">Нове звернення</h2>
-      <label class="field"><span>Тема</span><select name="topic">${PLACE_TOPICS.map((k) => `<option value="${k}" ${k === pre.topic ? 'selected' : ''}>${TICKET_TOPICS[k]}</option>`).join('')}</select></label>
+      <label class="field"><span>Тема</span><select name="topic">${PLACE_TOPICS.map((k) => `<option value="${k}">${TICKET_TOPICS[k]}</option>`).join('')}</select></label>
       <label class="field"><span>Запис (необовʼязково)</span><select name="booking"><option value="">Не стосується запису</option>
-        ${recent.map((b) => `<option value="${b.id}" ${b.id === pre.booking ? 'selected' : ''}>${bookingNo(b)} · ${dayLabel(b.date, { day: 'numeric', month: 'short' })} ${b.time} · ${esc(who(b))}</option>`).join('')}</select></label>
+        ${recent.map((b) => `<option value="${b.id}">${bookingNo(b)} · ${dayLabel(b.date, { day: 'numeric', month: 'short' })} ${b.time} · ${esc(who(b))}</option>`).join('')}</select></label>
       <label class="field"><span>Опишіть питання</span><textarea name="text" rows="4" required maxlength="1000"></textarea></label>
       ${photoPick()}
       <button class="btn primary" type="submit">Надіслати</button>
@@ -1185,7 +1257,10 @@ function demandGrid(weeks = LOAD_WEEKS) {
       const e = Math.min(hr * 60 + 60, h[1]);
       if (e <= s) continue;
       const c = cells[wd][hr];
-      c.cap += (e - s) * p.boxes;
+      // Перерва — не робочий час: не рахуємо її ні в ємності, ні як «тиху» годину.
+      const brk = scheduleOf(p).brk;
+      const off = brk ? Math.max(0, Math.min(e, brk[1]) - Math.max(s, brk[0])) : 0;
+      c.cap += (e - s - off) * p.boxes;
       c.used += list.reduce((a, b) => a + Math.max(0, Math.min(e, toMin(b.time) + b.minutes) - Math.max(s, toMin(b.time))), 0);
     }
   }
@@ -1353,6 +1428,7 @@ function demoHistory(p) {
 function demoSeed() {
   const p = place();
   bookings = bookings.filter((b) => !(b.source === 'demo' && b.placeId === p.id));
+  requests = requests.filter((r) => !(r.demo && r.placeId === p.id));
   bookings.push(...demoHistory(p));
   const t = todayIso();
   const svc = p.services;
@@ -1414,7 +1490,6 @@ function pickWash(id) {
   store.set('partner', id);
   const s = session();
   if (s && !s.demo) store.set('biz.session', { ...s, placeId: id });
-  alerted.clear();
 }
 
 function notFound() { return '<h1>Не знайдено</h1><p class="muted">Можливо, запис видалили. <a href="#/">До повідомлень</a></p>'; }
@@ -1432,7 +1507,7 @@ function route() {
   // Поточна мийка — одна з мийок акаунта.
   const mine = accountPlaces(s);
   if (!mine.includes(ui.place)) ui.place = mine.includes(s.placeId) ? s.placeId : mine[0] ?? ui.place;
-  touchPresence(ui.place);
+  for (const id of mine) touchPresence(id);
   if (expirePending(bookings)) save();
   checkWaitlist(bookings);
   const [, page = '', arg, id] = location.hash.replace(/^#/, '').split('/');
@@ -1496,7 +1571,10 @@ document.addEventListener('click', async (e) => {
   const el = e.target.closest('[data-action]');
   if (!el) return;
   const { action, id } = el.dataset;
-  const b = id ? own().find((x) => x.id === id) : null;
+  const b = id ? allMine().find((x) => x.id === id) ?? null : null;
+  // Запис іншої мийки акаунта (наприклад, зі сповіщення) — перемикаємось на неї.
+  if (b && b.placeId !== ui.place) pickWash(b.placeId);
+  const gone = () => { closeSheet(); rerender(); toast('На цей запис уже відповіли або його скасовано'); };
   const fromMark = el.dataset.from === 'mark';
   const after = (text) => {
     save();
@@ -1508,7 +1586,7 @@ document.addEventListener('click', async (e) => {
   };
 
   if (action === 'sheet-close') { closeSheet(); return; }
-  if (action === 'demo-login') { store.set('biz.session', { demo: true, at: Date.now() }); location.hash = '#/'; route(); return; }
+  if (action === 'demo-login') { store.set('biz.session', { demo: true, at: Date.now() }); location.hash = '#/'; route(); runPendingAct(); return; }
   if (action === 'logout') {
     if (!confirm('Вийти з CarCar Business?')) return;
     store.set('biz.session', null);
@@ -1546,8 +1624,9 @@ document.addEventListener('click', async (e) => {
   }
   if (action === 'accept') {
     // Є мийники — спершу обираємо, хто митиме.
+    if (b?.state !== 'pending') { gone(); return; }
     if (washers().length) { washerSheet(b.id, 'accept'); return; }
-    acceptBooking(b);
+    if (!acceptBooking(b)) { gone(); return; }
     save();
     closeSheet();
     rerender();
@@ -1557,6 +1636,7 @@ document.addEventListener('click', async (e) => {
   if (action === 'washer') { washerSheet(id, 'assign'); return; }
   if (action === 'washer-pick') {
     const m = el.dataset.m || null;
+    if (el.dataset.mode === 'accept' && b?.state !== 'pending') { gone(); return; }
     b.masterId = m;
     const name = m ? washerName(m) : null;
     if (el.dataset.mode === 'accept') {
@@ -1583,12 +1663,13 @@ document.addEventListener('click', async (e) => {
     toast(`${x.name} більше не в списку`);
     return;
   }
+  if (['decline', 'propose', 'propose-day', 'propose-to'].includes(action) && b?.state !== 'pending') { gone(); return; }
   if (action === 'decline') { declineSheet(id); return; }
   if (action === 'propose') { proposeSheet(id); return; }
   if (action === 'propose-day') { proposeSheet(id, el.dataset.date); return; }
   if (action === 'propose-to') {
-    if (!boxFree(el.dataset.date, toMin(el.dataset.time), b.minutes, b)) { toast('Цей час щойно зайняли — оберіть інший'); proposeSheet(id, el.dataset.date); return; }
-    proposeTime(b, el.dataset.date, el.dataset.time, ($('#propose-note')?.value ?? '').trim());
+    if (!proposeStarts(b, el.dataset.date).includes(el.dataset.time)) { toast('Цей час щойно зайняли — оберіть інший'); proposeSheet(id, el.dataset.date); return; }
+    if (!proposeTime(b, el.dataset.date, el.dataset.time, ($('#propose-note')?.value ?? '').trim())) { gone(); return; }
     save();
     closeSheet();
     rerender();
@@ -1614,15 +1695,17 @@ document.addEventListener('click', async (e) => {
     return;
   }
   if (action === 'carcar-noshow') {
+    if (Date.now() < noShowFrom(b)) { toast(`Неявку можна позначити з ${clock(noShowFrom(b))}`); return; }
     const placeAmount = Math.round(price(b) * PAYMENT.noShowShare);
-    if (!confirm(`Позначити неявку? Клієнт не скасував запис вчасно, тож оплата ${uah(placeAmount)} зараховується вам.`)) return;
-    Object.assign(b, { state: 'noshow', placeAmount, refund: price(b) - placeAmount, closedAt: Date.now() });
+    if (!confirm(`Позначити неявку? Клієнт не скасував запис вчасно, тож оплата ${uah(placeAmount)} зараховується вам. ${PAYMENT.freezeHours} год гроші чекають на випадок спору.`)) return;
+    if (!markNoShow(b)) { gone(); return; }
     after('Позначено неявку');
     return;
   }
   if (action === 'late-forfeit') {
+    if (Date.now() < noShowFrom(b)) { toast(`Позначити запізнення можна з ${clock(noShowFrom(b))}`); return; }
     if (!confirm(`Клієнт запізнюється понад ${PAYMENT.lateMinutes} хв: зарахувати оплату ${uah(price(b))} вам і закрити запис?`)) return;
-    Object.assign(b, { state: 'noshow', placeAmount: price(b), refund: 0, lateForfeit: true, closedAt: Date.now() });
+    if (!markNoShow(b, true)) { gone(); return; }
     sendMessages([{ placeId: b.placeId, clientKey: 'device', channel: 'app', kind: 'late', bookingId: b.id, link: `#/bookings/${b.id}`,
       text: `${place().name}: ви запізнилися більше ніж на ${PAYMENT.lateMinutes} хв, тому візит вважається неявкою — оплату зараховано мийці. Якщо це помилка, напишіть у підтримку.` }]);
     after(`Оплату ${uah(price(b))} зараховано вам`);
@@ -1631,6 +1714,8 @@ document.addEventListener('click', async (e) => {
   if (action === 'move') { moveSheet(id); return; }
   if (action === 'move-day') { moveSheet(id, el.dataset.date); return; }
   if (action === 'move-to') {
+    if (!openStarts(place(), el.dataset.date, b.minutes, bookings, { lead: 0, skip: b }).includes(el.dataset.time)) { toast('Цей час щойно зайняли — оберіть інший'); moveSheet(id, el.dataset.date); return; }
+    b.moves = [...(b.moves ?? []), { date: b.date, time: b.time, at: Date.now() }];
     Object.assign(b, { date: el.dataset.date, time: el.dataset.time });
     after(`Перенесено на ${dayWord(b.date).toLowerCase()}, ${b.time}`);
     return;
@@ -1658,18 +1743,34 @@ document.addEventListener('click', async (e) => {
   if (action === 'power') {
     setPower(ui.place, el.dataset.k);
     rerender();
-    toast('Клієнти бачать оновлений статус');
+    toast(seen('Клієнти бачать оновлений статус'));
     return;
   }
   if (action === 'svc-edit') { serviceSheet(id); return; }
   if (action === 'wash-add') { addWashSheet(); return; }
+  if (action === 'publish') {
+    const pt = partnerOf(ui.place);
+    if (pt.status !== 'setup') return;
+    savePartner(ui.place, { status: 'approved', publishedAt: Date.now(), history: [...pt.history, { at: Date.now(), by: 'place', status: 'approved', note: 'Мийка опублікувала профіль' }] });
+    rerender();
+    toast('Мийка в каталозі — клієнти вже можуть записатися');
+    return;
+  }
+  if (action === 'resubmit') {
+    const pt = partnerOf(ui.place);
+    if (!['changes', 'rejected'].includes(pt.status)) return;
+    savePartner(ui.place, { status: 'pending', history: [...pt.history, { at: Date.now(), by: 'place', status: 'pending', note: 'Дані виправлено, надіслано на перевірку' }] });
+    rerender();
+    toast('Надіслано — CARCAR перевірить до 2 робочих днів');
+    return;
+  }
   if (action === 'an-period') { ui.anPeriod = Number(el.dataset.n); rerender(); return; }
   if (action === 'quiet-on') {
     const deal = { id: uid(), active: true, createdAt: Date.now(), source: 'quiet', days: el.dataset.days.split(',').map(Number), from: Number(el.dataset.from), to: Number(el.dataset.to), pct: Number(el.dataset.pct), services: [], until: null };
     const all = store.get('biz.deals', {});
     store.set('biz.deals', { ...all, [ui.place]: [...(all[ui.place] ?? []), deal] });
     rerender();
-    toast(`Знижку −${deal.pct}% увімкнено: ${daysText(deal.days)}, ${hhmm(deal.from)}–${hhmm(deal.to)}. Клієнти вже її бачать`);
+    toast(`Знижку −${deal.pct}% увімкнено: ${daysText(deal.days)}, ${hhmm(deal.from)}–${hhmm(deal.to)}. ${listed() ? 'Клієнти вже її бачать' : 'Клієнти побачать її після публікації мийки'}`);
     return;
   }
   if (action === 'deal-off') {
@@ -1763,7 +1864,7 @@ document.addEventListener('change', async (e) => {
     const p = place();
     if (e.target.id === 'pf-avatar') {
       const avatar = await shrinkPhoto(files[0]);
-      if (avatar) savePhotos({ avatar }, 'Аватар оновлено — клієнти вже бачать його');
+      if (avatar) savePhotos({ avatar }, seen('Аватар оновлено — клієнти вже бачать його'));
       else toast('Не вдалося відкрити фото');
       return;
     }
@@ -1775,12 +1876,6 @@ document.addEventListener('change', async (e) => {
     setAutoConfirm(ui.place, e.target.checked);
     rerender();
     toast(e.target.checked ? 'Записи прийматимуться автоматично' : 'Тепер кожен запис підтверджуєте ви');
-    return;
-  }
-  if (e.target.id === 'pro-place') {
-    ui.place = e.target.value;
-    store.set('partner', ui.place);
-    rerender();
     return;
   }
   if (e.target.form?.id === 'nb-form' && e.target.name === 'channel') {
@@ -1811,6 +1906,7 @@ document.addEventListener('submit', async (e) => {
     store.set('partner', ui.place);
     location.hash = '#/';
     route();
+    runPendingAct();
     return;
   }
   if (f.id === 'pro-chat') {
@@ -1822,7 +1918,7 @@ document.addEventListener('submit', async (e) => {
   if (f.id === 'decline-form') {
     const b = own().find((x) => x.id === f.dataset.id);
     const note = String(d.get('note')).trim();
-    declineBooking(b, String(d.get('reason')));
+    if (!b || !declineBooking(b, String(d.get('reason')))) { closeSheet(); rerender(); toast('На цей запис уже відповіли або його скасовано'); return; }
     if (note) chatPost(b, 'biz', note, 'client');
     save();
     closeSheet();
@@ -1853,7 +1949,9 @@ document.addEventListener('submit', async (e) => {
   }
   if (f.matches('.rev-reply')) {
     const r = reviews.find((x) => x.id === f.dataset.id);
-    r.reply = { text: String(d.get('reply')).trim(), at: Date.now() };
+    const text = String(d.get('reply')).trim();
+    if (!text) { toast('Напишіть відповідь'); return; }
+    r.reply = { text, at: Date.now() };
     save();
     rerender();
     toast('Відповідь опубліковано на сторінці мийки');
@@ -1893,7 +1991,6 @@ document.addEventListener('submit', async (e) => {
     }
     const b = bookings.find((x) => x.id === (f.id === 'dispute-note' ? f.dataset.id : d.get('booking')));
     const t = openTicket({ from: 'place', placeId: ui.place, bookingId: b?.id ?? null, topic: f.id === 'dispute-note' ? 'dispute' : d.get('topic'), text, clientName: b ? who(b) : '', photos });
-    ui.ticketPre = null;
     closeSheet();
     location.hash = `#/support/${t.id}`;
     toast(`Звернення №${t.no} надіслано в CARCAR`);
@@ -1914,13 +2011,13 @@ document.addEventListener('submit', async (e) => {
     if (!name || !address) { toast('Вкажіть назву й адресу'); return; }
     saveOverride(ui.place, { name, address, about: String(d.get('about')).trim() });
     rerender();
-    toast('Збережено — клієнти бачать оновлений профіль');
+    toast(seen('Збережено — клієнти бачать оновлений профіль'));
     return;
   }
   if (f.id === 'pf-main') {
     saveOverride(ui.place, { phone: String(d.get('phone')).trim(), boxes: Math.max(1, Number(d.get('boxes')) || 1) });
     rerender();
-    toast('Збережено — клієнти бачать нові дані');
+    toast(seen('Збережено — клієнти бачать нові дані'));
     return;
   }
   if (f.id === 'pf-hours') {
@@ -1933,7 +2030,7 @@ document.addEventListener('submit', async (e) => {
     const s = scheduleOf(place());
     saveOverride(ui.place, { schedule: { week, brk, special: s.special, horizon: Number(d.get('horizon')), lead: Number(d.get('lead')) } });
     rerender();
-    toast('Графік збережено — клієнти бачать новий вільний час');
+    toast(seen('Графік збережено — клієнти бачать новий вільний час'));
     return;
   }
   if (f.id === 'day-form') {
@@ -1970,7 +2067,7 @@ document.addEventListener('submit', async (e) => {
     }
     closeSheet();
     rerender();
-    toast(r ? 'Послугу додано, клієнт отримав відповідь' : 'Прайс збережено — клієнти вже бачать нові ціни');
+    toast(r ? 'Послугу додано, клієнт отримав відповідь' : seen('Прайс збережено — клієнти вже бачать нові ціни'));
   }
 });
 
@@ -1982,11 +2079,12 @@ document.addEventListener('keydown', (e) => {
 window.addEventListener('storage', (e) => {
   if (!e.key?.startsWith('carcar.')) return;
   load();
+  checkSheet();
   if (nb || document.body.classList.contains('sheet-open')) { renderChrome(location.hash.split('/')[1] ?? ''); alertPending(); return; }
   const input = $('#pro-chat [name="text"]');
   const draft = input?.value ?? '';
   const focused = document.activeElement === input;
-  if (document.activeElement?.matches('input, textarea, select') && !focused) return;
+  if (document.activeElement?.matches('input, textarea, select') && !focused) { renderChrome(location.hash.split('/')[1] ?? ''); alertPending(); return; }
   rerender();
   const again = $('#pro-chat [name="text"]');
   if (again) { again.value = draft; if (focused) again.focus(); }
@@ -1994,7 +2092,7 @@ window.addEventListener('storage', (e) => {
 
 // Перехід між екранами закриває шторки — крім сповіщення про новий запис: воно чекає відповіді.
 window.addEventListener('hashchange', () => { if (nb || ($('#sheet-root').innerHTML && !$('.pro-sheet.alert'))) closeSheet(); route(); });
-setInterval(() => { if (session()) touchPresence(ui.place); }, 30000);
+setInterval(() => { const s = session(); if (s) for (const id of accountPlaces(s)) touchPresence(id); }, 30000);
 
 // Щосекунди: зворотний відлік на відповідь; час минув — запис скасовується, екран оновлюється.
 setInterval(() => {
@@ -2004,12 +2102,16 @@ setInterval(() => {
   if ([...timers].some((el) => Number(el.dataset.due) <= Date.now()) && expirePending(bookings)) {
     save();
     if ($('.pro-sheet.alert') || $('#decline-form')) closeSheet();
+    else checkSheet();
     rerender();
     toast('Час на підтвердження минув — запис скасовано, гроші повернуто клієнту');
   }
 }, 1000);
 
 // Кнопки системного сповіщення: service worker передає дію відкритому застосунку.
+// Повернулись у застосунок з відкритим чатом — позначаємо прочитане.
+document.addEventListener('visibilitychange', () => { if (!document.hidden && location.hash.startsWith('#/chat/') && !$('#sheet-root').innerHTML) rerender(); });
+
 navigator.serviceWorker?.addEventListener('message', (e) => {
   if (e.data?.type === 'pending-action') { load(); notifyAction(e.data.action, e.data.id); }
 });

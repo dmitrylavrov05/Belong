@@ -320,3 +320,7 @@ body.pro.locked .pro-tabs { display: none; }
 .washer-dd { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .washer-dd .btn { min-height: 34px; font-size: 13px; padding: 0 10px; }
 .bk-washer { display: inline-flex; align-items: center; gap: 4px; color: var(--navy) !important; font-weight: 600; }
+
+/* Мийку схвалено: перевірити профіль і опублікувати */
+.setup-card { border: 2px solid var(--warn, #c77700); }
+.setup-card .plain-list a { display: inline-flex; align-items: center; gap: 8px; color: inherit; }

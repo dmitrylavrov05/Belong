@@ -1,10 +1,10 @@
 // Спільна логіка застосунку клієнта й CarCar Business для щоденної роботи точки:
 // гарячі вікна зі знижкою, жива черга, лист очікування, абонементи й сертифікати,
 // шинний готель і повідомлення клієнтам (розсилки, нагадування).
-import { PLACES } from './data.js';
+import { PLACES, PAYMENT } from './data.js';
 import {
   store, uid, isoDate, parseDate, hhmm, toMin, plural, hoursFor, scheduleOf, inBreak, BLOCKING, phoneKey, isListed, weekdayOf,
-  spanOf, laneCap, sameLane, MOBILE_ROAD, creditClient, confirmBy, offerBy,
+  spanOf, laneCap, sameLane, MOBILE_ROAD, creditClient, creditBonus, chargedOf, confirmBy, offerBy, pauseOf, price, HOUR,
 } from './core.js';
 
 const opsToday = () => isoDate(new Date());
@@ -42,7 +42,8 @@ export const telegramLink = (phone) => `https://t.me/+${String(phone).replace(/\
 // (для виїзного запису — вільна бригада з урахуванням дороги). skip — запис, який переносять.
 export function openStarts(place, date, minutes, bookings, { lead = scheduleOf(place).lead, skip, mobile = false } = {}) {
   const h = hoursFor(place, date);
-  if (!h) return [];
+  // Минулі дні (застосунок відкрили до півночі) — без вільного часу.
+  if (!h || date < opsToday()) return [];
   const spans = bookings.filter((b) => b.placeId === place.id && b.date === date && BLOCKING.includes(b.state) && b !== skip && sameLane(b, mobile))
     .map(spanOf);
   const need = minutes + (mobile ? MOBILE_ROAD : 0);
@@ -128,7 +129,7 @@ export const weeklyDealsOf = (placeId) => dealsOf(placeId).filter((d) => d.days)
 // Усі знижки, що діють на дату, — разові й щотижневі, з датою для зручності.
 export function dealsOn(placeId, date) {
   const wd = weekdayOf(date);
-  return dealsOf(placeId).filter((d) => (d.days ? d.days.includes(wd) : d.date === date)).map((d) => ({ ...d, date }))
+  return dealsOf(placeId).filter((d) => (d.days ? d.days.includes(wd) && (!d.until || date <= d.until) : d.date === date)).map((d) => ({ ...d, date }))
     .sort((a, b) => a.from - b.from);
 }
 
@@ -155,13 +156,18 @@ export function daysText(days) {
 }
 
 // Гарячі пропозиції для каталогу: знижки на сьогодні й завтра, у яких ще є вільний час.
-export function hotDeals(bookings) {
+export function hotDeals(bookings, city = null) {
   const out = [];
-  const days = [opsToday(), isoDate(new Date(Date.now() + 864e5))];
-  for (const p of PLACES.filter(isListed)) {
-    const minMin = Math.min(...p.services.map((s) => s.min));
+  const next = parseDate(opsToday());
+  next.setDate(next.getDate() + 1);
+  const days = [opsToday(), isoDate(next)];
+  // Лише мийки обраного міста, без паузи онлайн-запису; час — для послуг, на які діє знижка.
+  for (const p of PLACES.filter((x) => isListed(x) && (!city || (x.city ?? 'Київ') === city) && !pauseOf(x.id, bookings))) {
     for (const date of days) {
       for (const d of dealsOn(p.id, date)) {
+        const covered = p.services.filter((s) => dealCovers(d, s.id));
+        if (!covered.length) continue;
+        const minMin = Math.min(...covered.map((s) => s.min));
         const free = openStarts(p, date, minMin, bookings).filter((x) => toMin(x) >= d.from && toMin(x) < d.to);
         if (free.length) out.push({ place: p, deal: d, free });
       }
@@ -238,8 +244,8 @@ export function checkWaitlist(bookings) {
     if (w.status !== 'active') continue;
     if (w.date < opsToday()) { w.status = 'expired'; continue; }
     const p = opsPlace(w.placeId);
-    if (!p) continue;
-    const slot = openStarts(p, w.date, w.minutes, bookings).find((t) => toMin(t) >= w.from && toMin(t) + w.minutes <= w.to);
+    if (!p || !isListed(p) || pauseOf(p.id, bookings)) continue;
+    const slot = openStarts(p, w.date, w.minutes, bookings, { mobile: !!w.mobile }).find((t) => toMin(t) >= w.from && toMin(t) + w.minutes <= w.to);
     if (!slot) continue;
     Object.assign(w, { status: 'notified', notifiedAt: Date.now(), slot });
     sent.push({
@@ -336,58 +342,72 @@ function clientNote(b, kind, text) {
   chatPost(b, 'sys', text.replace(/^[^:]+: /, ''), 'client');
   sendMessages([{ placeId: b.placeId, clientKey: 'device', channel: 'app', kind, bookingId: b.id, text, link: `#/bookings/${b.id}` }]);
 }
-const placeName = (b) => opsPlace(b.placeId)?.name ?? 'Мийка';
+const opsPlaceName = (b) => opsPlace(b.placeId)?.name ?? 'Мийка';
 const whenText = (b) => `${parseDate(b.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })} о ${b.time}`;
 
+// Дії мийки виконуються лише над записом, що досі чекає відповіді: інакше повертають false
+// (запис міг скасуватися сам чи його скасував клієнт, поки була відкрита шторка).
 export function acceptBooking(b) {
+  if (b?.state !== 'pending') return false;
   Object.assign(b, { state: 'paid', confirmedAt: Date.now(), respondedAt: b.respondedAt ?? Date.now() });
-  clientNote(b, 'confirm', `${placeName(b)}: запис на ${whenText(b)} підтверджено. Чекаємо вас!`);
+  clientNote(b, 'confirm', `${opsPlaceName(b)}: запис на ${whenText(b)} підтверджено. Чекаємо вас!`);
+  return true;
 }
 
 // Відмова чи мовчання мийки: усе повертаємо клієнту — картку на картку, баланс і бонуси на рахунок CARCAR,
 // візит абонемента й промокод знову доступні.
 // by: place — мийка відмовила; timeout — мийка не відповіла; proposal — клієнт не прийняв інший час.
 export function declineBooking(b, reason, by = 'place') {
+  if (by === 'proposal' ? b?.state !== 'offer' : b?.state !== 'pending') return false;
   const fromBalance = b.fromBalance || 0;
+  // Повертаємо те, що клієнт справді заплатив (за оплати частинами — перший платіж, решту банк скасовує).
+  const refund = chargedOf(b);
   Object.assign(b, {
-    state: 'cancelled', declined: by, declineReason: reason, refund: b.paid, placeAmount: 0, refundTo: fromBalance >= b.paid ? 'balance' : 'card',
-    closedAt: Date.now(), cancelBy: by === 'place' ? 'place' : by === 'proposal' ? 'client' : 'system',
+    state: 'cancelled', declined: by, declineReason: reason, refund, placeAmount: 0, refundTo: fromBalance >= refund ? 'balance' : 'card',
+    // Мовчання мийки й непідтверджений клієнтом інший час — не скасування клієнтом.
+    closedAt: Date.now(), cancelBy: by === 'place' ? 'place' : 'system',
     ...(by === 'place' && !b.respondedAt ? { respondedAt: Date.now() } : {}),
+    ...(b.installments ? { installments: { ...b.installments, cancelled: Date.now() } } : {}),
   });
-  if (fromBalance) creditClient(fromBalance, `Повернення: ${placeName(b)} не підтвердила запис`);
+  const why = by === 'proposal' ? 'інший час не підійшов' : `${opsPlaceName(b)} не підтвердила запис`;
+  if (fromBalance) creditClient(Math.min(fromBalance, refund), `Повернення: ${why}`);
   if (b.bonus && !b.bonusReturned) {
-    const w = { bonus: 0, money: 0, history: [], ...store.get('wallet', {}) };
-    w.bonus += b.bonus;
-    w.history.unshift({ amount: b.bonus, text: `Повернення бонусу: ${placeName(b)} не підтвердила запис`, at: Date.now() });
-    store.set('wallet', w);
+    creditBonus(b.bonus, `Повернення бонусу: ${why}`);
     b.bonusReturned = true;
   }
   if (b.passUse) { restorePass(b.placeId, b.passUse); b.passUse = null; }
   if (b.promo) b.promo.returned = true;
   if (by === 'proposal') return;
   clientNote(b, 'decline', by === 'timeout'
-    ? `${placeName(b)} не відповіла на запис на ${whenText(b)}. Запис скасовано, гроші повернуто. Оберіть інший час чи мийку.`
-    : `${placeName(b)} не може прийняти запис на ${whenText(b)}${reason ? `: ${reason}` : ''}. Гроші повернуто. Оберіть інший час чи мийку.`);
+    ? `${opsPlaceName(b)} не відповіла на запис на ${whenText(b)}. Запис скасовано, гроші повернуто. Оберіть інший час чи мийку.`
+    : `${opsPlaceName(b)} не може прийняти запис на ${whenText(b)}${reason ? `: ${reason}` : ''}. Гроші повернуто. Оберіть інший час чи мийку.`);
+  return true;
 }
 
 // Замість відмови мийка пропонує інший вільний час. Запис одразу переходить на нього (щоб час не зайняли),
 // а клієнт погоджується або скасовує без втрат.
 export function proposeTime(b, date, time, note = '') {
+  if (b?.state !== 'pending') return false;
   const from = { date: b.date, time: b.time };
   Object.assign(b, { state: 'offer', date, time, offer: { from, at: Date.now(), note }, respondedAt: b.respondedAt ?? Date.now() });
-  clientNote(b, 'offer', `${placeName(b)} не може прийняти вас ${parseDate(from.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })} о ${from.time} і пропонує ${whenText(b)}.${note ? ` ${note}` : ''} Погодьтеся в записі або скасуйте без втрат.`);
+  clientNote(b, 'offer', `${opsPlaceName(b)} не може прийняти вас ${parseDate(from.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })} о ${from.time} і пропонує ${whenText(b)}.${note ? ` ${note}` : ''} Погодьтеся в записі або скасуйте без втрат.`);
+  return true;
 }
 
 export function acceptOffer(b) {
+  if (b?.state !== 'offer') return false;
   Object.assign(b, { state: 'paid', confirmedAt: Date.now(), offer: { ...b.offer, accepted: Date.now() } });
   chatPost(b, 'sys', `Клієнт погодився на ${whenText(b)}`, 'biz');
+  return true;
 }
 
 export function rejectOffer(b, timeout = false) {
+  if (b?.state !== 'offer') return false;
   // Повертаємо початковий час, щоб у журналі було видно, на що клієнт записувався.
   Object.assign(b, { date: b.offer.from.date, time: b.offer.from.time, offer: { ...b.offer, rejected: Date.now() } });
   declineBooking(b, timeout ? 'клієнт не відповів на запропонований час' : 'клієнту не підійшов запропонований час', 'proposal');
   chatPost(b, 'sys', timeout ? 'Клієнт не відповів на запропонований час — запис скасовано, гроші повернуто' : 'Клієнту не підійшов запропонований час — запис скасовано, гроші повернуто', 'biz');
+  return true;
 }
 
 // Заявки, на які мийка не відповіла вчасно, скасовуються самі. Повертає true, якщо щось змінилося.
@@ -398,4 +418,15 @@ export function expirePending(bookings) {
     if (b.state === 'offer' && Date.now() >= offerBy(b)) { rejectOffer(b, true); changed = true; }
   }
   return changed;
+}
+
+// Неявка чи запізнення понад lateMinutes: оплата точці, але, як і після «Машина готова»,
+// гроші заморожені на freezeHours — клієнт може оскаржити. Позначити можна лише після початку + lateMinutes.
+export const noShowFrom = (b) => bookingStartMs(b) + PAYMENT.lateMinutes * 60000;
+const bookingStartMs = (b) => { const d = parseDate(b.date); d.setMinutes(toMin(b.time)); return d.getTime(); };
+export function markNoShow(b, late = false) {
+  if (b?.state !== 'paid' || Date.now() < noShowFrom(b)) return false;
+  const placeAmount = Math.round(price(b) * PAYMENT.noShowShare);
+  Object.assign(b, { state: 'noshow', placeAmount, refund: 0, closedAt: Date.now(), unfreezeAt: Date.now() + PAYMENT.freezeHours * HOUR, ...(late ? { lateForfeit: true } : {}) });
+  return true;
 }

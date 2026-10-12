@@ -295,6 +295,8 @@ applyOverrides();
 export const PARTNER_STATUS = {
   draft: ['Чернетка', 'muted'], pending: ['На перевірці', 'warn'], changes: ['Потрібні виправлення', 'warn'],
   approved: ['Підключено', 'ok'], rejected: ['Відхилено', 'muted'], suspended: ['Призупинено', 'muted'],
+  // Бізнес схвалено, але мийка ще не перевірила профіль, графік і ціни — клієнти її поки не бачать.
+  setup: ['Налаштування', 'warn'],
 };
 
 export function partnerOf(placeId) {
@@ -313,7 +315,11 @@ export function savePartner(placeId, patch) {
 export const isListed = (p) => partnerOf(p.id).status === 'approved';
 
 // Виводити гроші можна лише на перевірені реквізити.
-export const payoutReady = (placeId) => !!partnerOf(placeId).payout?.verified && partnerOf(placeId).status !== 'rejected';
+// Виводити можна лише на перевірений CARCAR рахунок із правильним IBAN; призупиненій чи відхиленій точці — ні.
+export const payoutReady = (placeId) => {
+  const pt = partnerOf(placeId);
+  return !!pt.payout?.verified && /^UA\d{27}$/.test(String(pt.payout.iban ?? '')) && !['rejected', 'suspended'].includes(pt.status);
+};
 export const maskIban = (iban) => `UA…${String(iban).slice(-4)}`;
 
 // Комісія CARCAR: індивідуальна для точки або загальна з адмінки, інакше — з data.js.
@@ -338,10 +344,40 @@ export function resolveDispute(b, placePart, note = '') {
     b.unfreezeAt = Date.now(); // модератор уже перевірив замовлення
     return;
   }
-  const refund = Math.min(b.paid, full - toPlace);
+  const refund = Math.min(chargedOf(b), full - toPlace);
   Object.assign(b, { state: 'refunded', refund, placeAmount: toPlace, refundTo: 'balance', closedAt: Date.now() });
   if (refund) creditClient(refund, `Повернення за спором: ${name}`);
+  // Усе клієнту — повертаємо й бонус, візит абонемента та промокод.
+  if (toPlace === 0) {
+    if (b.bonus && !b.bonusReturned) { creditBonus(b.bonus, `Повернення бонусу за спором: ${name}`); b.bonusReturned = true; }
+    if (b.passUse) { returnPassUse(b.placeId, b.passUse); b.passUse = null; }
+    if (b.promo) b.promo.returned = true;
+  }
+  if (b.installments) b.installments = { ...b.installments, cancelled: Date.now() };
 }
+
+// Скільки клієнт справді заплатив: за оплати частинами — лише перший платіж (решту банк скасовує) і частину з балансу.
+export const chargedOf = (b) => (b.installments ? Math.max(0, b.paid - (b.installments.card ?? b.paid) + b.installments.first) : b.paid);
+
+export function creditBonus(amount, text) {
+  const w = { bonus: 0, money: 0, history: [], ...store.get('wallet', {}) };
+  w.bonus += amount;
+  w.history.unshift({ amount, text, at: Date.now() });
+  store.set('wallet', w);
+}
+
+// Повернути візит абонемента чи суму сертифіката (без залежності від ops.js).
+function returnPassUse(placeId, use) {
+  const all = store.get('biz.passes', {});
+  const s = all[placeId]?.sold?.find((x) => x.id === use.soldId);
+  if (!s) return;
+  if (s.kind === 'sub') s.visitsLeft += 1; else s.balance += use.amount ?? 0;
+  store.set('biz.passes', all);
+}
+
+// Справжнє замовлення клієнта (для «першого замовлення» й конверсій): не враховуємо скасовані без оплати точці —
+// відмови й мовчання мийки, вчасні скасування клієнтом.
+export const realOrder = (b) => !(['cancelled', 'refunded'].includes(b.state) && !(b.placeAmount > 0));
 
 // ---------- персональні послуги й витрати ----------
 
@@ -468,7 +504,7 @@ export function promoCheck(pr, { place, items, mine, all }) {
   if (!base) return { ok: false, why: 'Промокод не діє на обрані послуги' };
   if (pr.minOrder && base < pr.minOrder) return { ok: false, why: `Промокод діє на замовлення від ${uah(pr.minOrder)}` };
   if (mine.some((b) => b.promo?.code === pr.code && !b.promo.returned)) return { ok: false, why: 'Ви вже скористалися цим промокодом' };
-  if (pr.firstOnly && mine.some((b) => !(b.state === 'cancelled' && b.refundTo === 'balance') && PLACES.find((x) => x.id === b.placeId)?.cats.some(inCats))) {
+  if (pr.firstOnly && mine.some((b) => realOrder(b) && PLACES.find((x) => x.id === b.placeId)?.cats.some(inCats))) {
     return { ok: false, why: 'Промокод діє лише на перше замовлення' };
   }
   const amount = pr.kind === 'pct' ? Math.min(pr.max || Infinity, Math.round((base * pr.value) / 100)) : Math.min(pr.value, base);
@@ -481,7 +517,8 @@ export function complete(b, at = Date.now()) {
   Object.assign(b, { state: 'completed', completedAt: at, unfreezeAt: at + PAYMENT.freezeHours * HOUR });
 }
 
-export const isFrozen = (b) => b.state === 'completed' && Date.now() < (b.unfreezeAt ?? 0);
+// Гроші точки заморожені на час для спору: після «Машина готова», а також після неявки чи запізнення.
+export const isFrozen = (b) => ['completed', 'noshow'].includes(b.state) && Date.now() < (b.unfreezeAt ?? 0);
 
 // Скільки з оплати клієнта належить точці (до комісії).
 export function placeShare(b) {
@@ -498,7 +535,8 @@ export function balanceFor(placeId, bookings, payouts) {
   const earned = own.filter((b) => !isFrozen(b)).reduce((a, b) => a + placeShare(b), 0);
   const withdrawn = payouts.filter((x) => x.placeId === placeId).reduce((a, x) => a + x.gross, 0);
   // Непідтверджений запис ще не гроші точки: якщо мийка відмовить, їх повернуть клієнту.
-  const frozen = own.filter((b) => (ACTIVE.includes(b.state) && !AWAITING.includes(b.state)) || isFrozen(b)).reduce((a, b) => a + price(b), 0);
+  const frozen = own.filter((b) => ACTIVE.includes(b.state) && !AWAITING.includes(b.state)).reduce((a, b) => a + price(b), 0)
+    + own.filter(isFrozen).reduce((a, b) => a + placeShare(b), 0);
   const next = own.filter(isFrozen).sort((a, b) => a.unfreezeAt - b.unfreezeAt)[0];
   // Абонементи й сертифікати, куплені в застосунку: гроші точці через ті самі 48 годин.
   const sales = (store.peek('biz.passes', {})[placeId]?.sold ?? []).filter((x) => x.source === 'carcar');
@@ -700,9 +738,10 @@ export async function approveBizApp(id) {
     boxes: Math.max(1, Number(a.boxes) || 1), hours: [8, 21], lat, lng, tags: [], createdAt: Date.now(),
     services: Object.entries(SERVICE_TEMPLATES.wash).map(([sid, x]) => ({ id: sid, ...x, price: [...x.price] })),
   });
+  // Клієнти побачать мийку, коли вона сама перевірить профіль, графік і ціни в CarCar Business.
   savePartner(placeId, {
-    status: 'approved', company: { type: a.type, code: a.code, name: a.legalName || a.contact },
-    history: [{ at: Date.now(), by: 'admin', status: 'approved', note: 'Заявку схвалено, доступ до кабінету видано' }],
+    status: 'setup', company: { type: a.type, code: a.code, name: a.legalName || a.contact },
+    history: [{ at: Date.now(), by: 'admin', status: 'setup', note: 'Заявку схвалено, доступ до кабінету видано' }],
   });
   let login = slug(a.name);
   while (bizAccounts().some((x) => x.login === login)) login = `${slug(a.name)}${Math.floor(10 + Math.random() * 90)}`;
@@ -781,7 +820,9 @@ export const offerBy = (b) => Math.min((b.offer?.at ?? Date.now()) + PAYMENT.off
 // Відмови й швидкість відповіді мийки за останні DECLINE_RULES.days днів.
 export function responseStats(placeId, bookings, now = Date.now()) {
   const from = now - DECLINE_RULES.days * 24 * HOUR;
-  const list = bookings.filter((b) => b.placeId === placeId && b.needsConfirm && (b.createdAt ?? 0) >= from && !AWAITING.includes(b.state));
+  // Заявки, які клієнт сам скасував до відповіді мийки, не рахуємо.
+  const list = bookings.filter((b) => b.placeId === placeId && b.needsConfirm && (b.createdAt ?? 0) >= from && !AWAITING.includes(b.state)
+    && !(b.cancelBy === 'client' && !b.respondedAt && !b.declined));
   const declined = list.filter((b) => b.declined === 'place' || b.declined === 'timeout');
   const answered = list.filter((b) => b.respondedAt);
   const avgMs = answered.length ? answered.reduce((a, b) => a + Math.max(0, b.respondedAt - confirmStart(b)), 0) / answered.length : null;

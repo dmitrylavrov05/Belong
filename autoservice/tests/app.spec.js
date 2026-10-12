@@ -344,7 +344,9 @@ test('пізніше ніж за 1,5 год до візиту скасуванн
   await sheet.getByRole('button', { name: 'Клієнт не приїхав' }).click();
   await expect(page.locator('#toast')).toHaveText('Позначено неявку');
   await page.goto(`${PRO}#/wash`);
-  await expect(money(page)).toContainText('Можна вивести1 800 ₴');
+  // Оплата пізнього скасування доступна одразу, неявка — після 48 год на випадок спору.
+  await expect(money(page)).toContainText('Можна вивести900 ₴');
+  await expect(money(page)).toContainText('Заморожено до підтвердження900 ₴');
   await page.goto('/#/bookings');
   await page.getByRole('button', { name: /^Завершені/ }).click();
   await expect(page.locator('article', { hasText: 'Неявка' })).toContainText('Ви не приїхали — оплату 900 ₴ зараховано точці');
@@ -544,6 +546,8 @@ async function addCar(page, extra = async () => {}) {
 test('«Машина готова» з фото потрапляє клієнту й у сервісну книжку', async ({ page }) => {
   await addCar(page);
   await bookTomorrow(page);
+  // «Машина готова» — коли візит уже почався.
+  await page.clock.setFixedTime(new Date(2026, 9, 5, 21, 30));
   const sheet = await proBooking(page);
   await sheet.getByLabel(/Фото результату/).setInputFiles({ name: 'wheel.png', mimeType: 'image/png', buffer: PIXEL });
   await expect(sheet.getByText('обрано: 1')).toBeVisible();

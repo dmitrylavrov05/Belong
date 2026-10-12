@@ -57,11 +57,12 @@ test('без входу — екран логіна; демо відкриває
 });
 
 test('повідомлення: зі статусом запису, відповідь клієнту й «Машина готова»', async ({ page }) => {
-  await seed(page, { bookings: [paid] });
+  // Візит уже почався: «Машина готова» доступна лише після початку.
+  await seed(page, { bookings: [{ ...paid, time: '09:30' }] });
   await page.goto(PRO);
   const convo = page.locator('.convo', { hasText: 'Ірина' });
   await expect(convo).toContainText('Можна приїхати раніше?');
-  await expect(convo).toContainText('Оплачено');
+  await expect(convo).toContainText('Зараз на мийці');
   await expect(convo.getByLabel('Нове повідомлення')).toBeVisible();
   await expect(page.getByLabel('Непрочитані: 1')).toBeVisible();
 
@@ -132,7 +133,7 @@ test('нагадування: позначити минулі записи й п
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('carcar.bookings'))[0].state)).toBe('completed');
   await expect(page.getByRole('button', { name: /чекає позначки/ })).toHaveCount(0);
 
-  await expect(page.getByRole('region', { name: 'Перевірка розкладу' })).toContainText('Клієнти бачать вільним: 10:00–22:00');
+  await expect(page.getByRole('region', { name: 'Перевірка розкладу' })).toContainText('Клієнти бачать вільним: 10:30–22:00');
   await page.getByRole('button', { name: 'Так, усе вірно' }).click();
   await expect(page.getByRole('region', { name: 'Перевірка розкладу' })).toHaveCount(0);
   await page.goto('/#/place/blysk');
@@ -467,7 +468,7 @@ test('кілька мийок: додати другу мийку, переми�
 
   await page.getByRole('link', { name: 'Мийка' }).click();
   await expect(page.getByRole('group', { name: 'Ваші мийки' }).getByRole('button', { name: /на Оболоні/ })).toContainText('на перевірці');
-  await expect(page.locator('main')).toContainText('Клієнти ще не бачать цю мийку');
+  await expect(page.locator('main')).toContainText('Клієнти ще не бачать мийку: статус «На перевірці»');
   await page.getByRole('group', { name: 'Ваші мийки' }).getByRole('button', { name: /Автомийка «Блиск» Київ/ }).click();
   await expect(page.locator('.pro-top')).toContainText('Автомийка «Блиск»');
 

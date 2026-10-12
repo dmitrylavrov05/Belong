@@ -5,14 +5,15 @@ import { CATEGORIES, PLACES, PAYMENT } from './data.js';
 import {
   store, icon, esc, uah, pad, isoDate, parseDate, plural, dayLabel, rating, fmtTime, fmtDate, catById, WEEKDAYS, bookingStart, HOUR,
   PARTNER_STATUS, partnerOf, savePartner, commissionFor, isCarcar, price, placeShare, isFrozen,
-  responseStats, pauseOf, liftPause, ratePct, msText,
+  responseStats, pauseOf, liftPause, ratePct, msText, realOrder,
   ratingFor, visibleReviews, ACTIVE, resolveDispute, settleAll, applyOverrides, promosAll, savePromos, promoUses, promoText,
   TICKET_TOPICS, TICKET_STATUS, ticketsAll, ticketReply, setTicket, ticketOverdue, slaHours, fraudState, saveFraud, staffOf, phoneKey,
   addCustomPlace, uid, hash,
   enterView, bizApps, APP_STATUS, approveBizApp, rejectBizApp, bookingNo, findByNo, ticketPhotos, shrinkPhoto,
 } from './core.js';
-import { ENTITY, TAX, DOCS, OFFER, codeValid, ibanValid, ibanBank, formatIban } from './partners.js';
+import { ENTITY, TAX, codeValid, ibanValid, ibanBank, formatIban } from './partners.js';
 import { drawColumns, legend, tableView, hbars, hideTip } from './charts.js';
+import { expirePending } from './ops.js';
 
 // ---------- дані ----------
 
@@ -23,7 +24,9 @@ function load() {
   payouts = store.get('payouts', []);
   reviews = store.get('reviews', []);
   applyOverrides();
-  if (settleAll(bookings)) store.set('bookings', bookings);
+  // Прострочені заявки й пропозиції часу скасовуються й тут, щоб не висіли в утриманих коштах.
+  const settled = settleAll(bookings);
+  if (expirePending(bookings) || settled) store.set('bookings', bookings);
 }
 
 function save() {
@@ -149,7 +152,7 @@ function viewOverview() {
     <section class="kpis" aria-label="Показники платформи">
       <div class="kpi hero"><span class="label">Оборот через CARCAR</span><span class="value">${uah(cur.gmv)}</span>${delta(cur.gmv, prev.gmv)}
         <span class="kpi-note">${cur.orders} ${plural(cur.orders, 'замовлення', 'замовлення', 'замовлень')} · середній чек ${uah(Math.round(cur.avg))}</span></div>
-      <div class="kpi"><span class="label">Комісія нарахована</span><span class="value">${uah(cur.fee)}</span>${delta(cur.fee, prev.fee)}<span class="kpi-note">утримано з виплат ${uah(collected)}</span></div>
+      <div class="kpi"><span class="label">Комісія (оцінка за ставкою)</span><span class="value">${uah(cur.fee)}</span>${delta(cur.fee, prev.fee)}<span class="kpi-note">утримано з виплат ${uah(collected)}</span></div>
       <div class="kpi"><span class="label">Утримується зараз</span><span class="value">${uah(escrow)}</span><span class="kpi-note">замовлення в роботі й заморожені</span></div>
       <div class="kpi"><span class="label">Клієнтів</span><span class="value">${cur.clients}</span>${delta(cur.clients, prev.clients)}</div>
       <div class="kpi"><span class="label">Скасування й неявки</span><span class="value">${Math.round(cur.lostPct)}%</span>${delta(cur.lostPct, prev.lostPct, false, 'pp')}</div>
@@ -187,7 +190,7 @@ function viewOverview() {
 const PLACE_FILTERS = {
   queue: ['На перевірці', (pt) => inQueue(pt)],
   approved: ['Підключені', (pt) => pt.status === 'approved'],
-  other: ['Чернетки й відхилені', (pt) => ['draft', 'changes', 'rejected'].includes(pt.status)],
+  other: ['Налаштування, чернетки й відхилені', (pt) => ['setup', 'draft', 'changes', 'rejected'].includes(pt.status)],
   suspended: ['Призупинені', (pt) => pt.status === 'suspended'],
   all: ['Усі', () => true],
 };
@@ -252,7 +255,7 @@ function viewPlace(id) {
   const miss = isUpdate ? [!ibanValid(pay.iban) && 'IBAN', !pay.holder?.trim() && 'отримувач', !(codeValid('fop', pay.code ?? '') || codeValid('tov', pay.code ?? '')) && 'код отримувача'].filter(Boolean) : [];
   return `<a class="back" href="#/places">${icon('chevL', 22)}Точки</a>
     <div class="title-row"><h1>${esc(p.name)}</h1><div class="row">${statusPill(pt.status)}${pt.update === 'pending' ? '<span class="pill warn">Зміни на перевірці</span>' : ''}</div></div>
-    <p class="page-sub">${esc(p.district)}, ${esc(p.address)} · ${esc(p.phone)} · ${p.cats.map((x) => catById(x).name).join(', ')} · ${p.boxes} ${plural(p.boxes, 'бокс', 'бокси', 'боксів')}
+    <p class="page-sub">${[p.city, p.district, p.address].filter(Boolean).map(esc).join(', ')} · ${esc(p.phone)} · ${p.cats.map((x) => catById(x).name).join(', ')} · ${p.boxes} ${plural(p.boxes, 'бокс', 'бокси', 'боксів')}
       · <a href="index.html#/place/${p.id}" target="_blank" rel="noopener">сторінка для клієнтів</a></p>
     ${relPanel(p.id)}
     <div class="grid-2" style="margin-top:8px">
@@ -267,20 +270,19 @@ function viewPlace(id) {
           <dt>Адреса</dt><dd>${esc(c.address || '—')}</dd>
           <dt>Контакти</dt><dd>${esc(c.email)} · ${esc(c.phone)}</dd>
         </dl>` : `<p class="muted" style="margin:0">${pt.demo ? 'Демо-точка: дані юрособи ще не заповнені.' : 'Дані ще не заповнені.'}</p>`}
-        <h3>Автоматичні перевірки</h3>
+        <h3>Перевірки</h3>
         <ul class="checks">
-          ${check(c && codeValid(c.type, c.code), 'Код має правильну контрольну суму', 'Код юрособи відсутній або некоректний')}
-          ${check(DOCS.filter(([, , r]) => r).every(([k]) => pt.docs?.[k]), 'Обовʼязкові документи завантажено', 'Немає виписки чи витягу з ЄДР')}
-          ${check(ibanValid(pay.iban), `IBAN коректний${pay.iban ? ` · ${esc(ibanBank(pay.iban))}` : ''}`, 'IBAN відсутній або некоректний')}
-          ${check(c && pay.code === c.code, 'Код отримувача збігається з кодом юрособи', 'Код отримувача не збігається з кодом юрособи')}
-          ${check(pt.offer?.version === OFFER.version, `Оферту ${OFFER.version} прийнято${pt.offer ? ` ${fmtTime(pt.offer.acceptedAt)} · ${esc(pt.offer.signer)}` : ''}`, `Оферту ${OFFER.version} не прийнято`)}
+          ${check(c && codeValid(c.type, c.code), 'Код юрособи має правильну контрольну суму', 'Код юрособи відсутній або некоректний')}
+          ${check(p.name && p.address && p.phone, 'Назва, адреса й телефон заповнені', 'Немає назви, адреси чи телефону')}
+          ${check((p.photos ?? []).length, `Фото мийки: ${(p.photos ?? []).length}`, 'Немає фото мийки')}
+          ${check(p.services.length, `Послуг у прайсі: ${p.services.length}`, 'Прайс порожній')}
+          ${check(ibanValid(pay.iban), `IBAN коректний${pay.iban ? ` · ${esc(ibanBank(pay.iban))}` : ''}`, 'IBAN ще не вказано — виплати неможливі')}
+          ${check(!pay.iban || !c?.code || pay.code === c.code, 'Код отримувача збігається з кодом юрособи', 'Код отримувача не збігається з кодом юрособи')}
         </ul>
-        <p class="fine">Перед схваленням звірте назву, код і керівника з Єдиним державним реєстром (usr.minjust.gov.ua) і документами нижче.</p>
+        <p class="fine">Перед схваленням звірте назву й код з Єдиним державним реєстром (usr.minjust.gov.ua). Після схвалення мийка сама перевіряє профіль, графік і ціни та публікує себе в каталозі.</p>
       </section>
       <section class="panel stack" aria-labelledby="h-pay" style="gap:10px">
-        <h2 id="h-pay">Документи й реквізити</h2>
-        <ul class="doc-list plain">${DOCS.map(([k, name, req]) => `<li>${icon(pt.docs?.[k] ? 'checkCircle' : 'info', 18)}<span><b>${name}${req ? '' : ' (необовʼязково)'}</b>
-          <small>${pt.docs?.[k] ? `${esc(pt.docs[k].name)} · ${Math.max(1, Math.round(pt.docs[k].size / 1024))} КБ · ${fmtTime(pt.docs[k].at)}` : 'не завантажено'}</small></span></li>`).join('')}</ul>
+        <h2 id="h-pay">Рахунок для виплат</h2>
         <dl class="kv">
           <dt>IBAN</dt><dd>${pay.iban ? esc(formatIban(pay.iban)) : '—'}</dd>
           <dt>Отримувач</dt><dd>${esc(pay.holder || '—')}${pay.code ? ` · код ${esc(pay.code)}` : ''}</dd>
@@ -302,7 +304,7 @@ function viewPlace(id) {
         <div class="row">
           ${isUpdate ? `<button class="btn primary" type="submit" value="approve-update" ${miss.length ? 'disabled' : ''}>${icon('check', 18)}Підтвердити зміни й реквізити</button>
             <button class="btn" type="submit" value="reject-update">Повернути зміни на виправлення</button>` : ''}
-          ${['pending', 'changes', 'draft', 'rejected'].includes(pt.status) ? `<button class="btn primary" type="submit" value="approve" ${miss.length ? 'disabled' : ''}>${icon('check', 18)}Схвалити й додати в каталог</button>
+          ${['pending', 'changes', 'draft', 'rejected'].includes(pt.status) ? `<button class="btn primary" type="submit" value="approve" ${miss.length ? 'disabled' : ''}>${icon('check', 18)}${pt.publishedAt || pt.demo ? 'Схвалити й додати в каталог' : 'Схвалити'}</button>
             <button class="btn" type="submit" value="changes">Потрібні виправлення</button>
             <button class="btn text-danger" type="submit" value="reject">Відхилити</button>` : ''}
           ${pt.status === 'approved' ? '<button class="btn text-danger" type="submit" value="suspend">Призупинити в каталозі</button>' : ''}
@@ -315,23 +317,33 @@ function viewPlace(id) {
       <span>${h.status ? statusPill(h.status) : ''} ${esc(h.note ?? '')}</span></li>`).join('')}</ol>` : '<p class="muted">Подій ще не було.</p>'}`;
 }
 
+const patchStatusText = (id) => (partnerOf(id).status === 'setup' ? 'Схвалено — мийка опублікує себе в CarCar Business після перевірки профілю' : 'Точку підключено — вона вже в каталозі');
+
+// Стани запису українською.
+const BOOKING_STATE = {
+  pending: 'Чекає підтвердження мийки', offer: 'Мийка запропонувала інший час', paid: 'Оплачено', booked: 'Запис мийки (оплата на місці)',
+  completed: 'Виконано', cancelled: 'Скасовано', noshow: 'Неявка', refunded: 'Повернено клієнту', done: 'Виконано',
+};
+
 function moderate(id, action, note) {
   const pt = partnerOf(id);
   const needNote = ['changes', 'reject', 'suspend', 'reject-update'].includes(action);
   if (needNote && !note) { toast('Напишіть коментар для точки'); return; }
-  const status = { approve: 'approved', changes: 'changes', reject: 'rejected', suspend: 'suspended', restore: 'approved' }[action];
+  // Схвалена мийка, яка ще не публікувалась, спершу перевіряє профіль і публікує себе сама.
+  const status = { approve: pt.publishedAt || pt.demo ? 'approved' : 'setup', changes: 'changes', reject: 'rejected', suspend: 'suspended', restore: 'approved' }[action];
   const patch = { history: [...pt.history, { at: Date.now(), by: 'admin', status: status ?? pt.status, note: note || {
     approve: 'Заявку схвалено', restore: 'Точку відновлено в каталозі', 'approve-update': 'Зміни й реквізити підтверджено',
   }[action] }] };
   if (status) patch.status = status;
   if (action === 'approve' || action === 'approve-update') {
-    Object.assign(patch, { update: null, payout: { ...pt.payout, verified: true }, approvedAt: Date.now() });
+    // Рахунок вважаємо перевіреним, лише якщо мийка вказала правильний IBAN.
+    Object.assign(patch, { update: null, approvedAt: Date.now(), ...(ibanValid(pt.payout?.iban) ? { payout: { ...pt.payout, verified: true } } : {}) });
   }
   if (action === 'reject-update') patch.update = 'changes';
   savePartner(id, patch);
   route();
   toast({
-    approve: 'Точку підключено — вона вже в каталозі', changes: 'Точка отримала запит на виправлення', reject: 'Заявку відхилено',
+    approve: patchStatusText(id), changes: 'Точка отримала запит на виправлення', reject: 'Заявку відхилено',
     suspend: 'Точку призупинено: клієнти її не бачать', restore: 'Точку відновлено в каталозі',
     'approve-update': 'Зміни підтверджено, виплати дозволені', 'reject-update': 'Зміни повернуто на виправлення',
   }[action]);
@@ -365,7 +377,7 @@ function viewReviews() {
           <button class="btn text-danger" type="submit" value="hide">Приховати</button>
           ${r.report?.status === 'open' ? '<button class="btn" type="submit" value="keep">Залишити відгук</button>' : ''}
         </form>`}
-    </article>`).join('') : `<div class="empty-state">${icon('star', 32)}<h2>${ui.reviews === 'reported' ? 'Скарг немає' : 'Нічого не знайдено'}</h2><p>Точки можуть поскаржитися на відгук у своїй панелі.</p></div>`}
+    </article>`).join('') : `<div class="empty-state">${icon('star', 32)}<h2>${ui.reviews === 'reported' ? 'Скарг немає' : 'Нічого не знайдено'}</h2><p>Мийки скаржаться на відгук у CarCar Business («Ще» → «Відгуки»).</p></div>`}
     </div>`;
 }
 
@@ -512,7 +524,7 @@ function viewTicket(id) {
             <dt>Візит</dt><dd>${dayLabel(b.date, { weekday: 'short', day: 'numeric', month: 'long' })}, ${b.time} · ${esc(b.services.join(', '))}</dd>
             <dt>Клієнт</dt><dd>${esc(b.clientName || '—')}${b.clientPhone ? ` · ${esc(b.clientPhone)}` : ''}</dd>
             <dt>Сума</dt><dd>${uah(price(b))}${b.promo && !b.promo.returned ? ` · промокод ${esc(b.promo.code)}` : ''}</dd>
-            <dt>Стан</dt><dd>${b.state === 'dispute' ? '<span class="pill warn">Спір — гроші заморожено</span>' : esc(b.state)}${b.resolution ? ` · рішення ${fmtTime(b.resolution.at)}: точці ${uah(b.resolution.placePart)}` : ''}</dd>
+            <dt>Стан</dt><dd>${b.state === 'dispute' ? '<span class="pill warn">Спір — гроші заморожено</span>' : esc(BOOKING_STATE[b.state] ?? b.state)}${b.declined ? ` (${{ place: 'відмова мийки', timeout: 'мийка не відповіла', proposal: 'інший час не підійшов' }[b.declined]})` : ''}${b.resolution ? ` · рішення ${fmtTime(b.resolution.at)}: точці ${uah(b.resolution.placePart)}` : ''}</dd>
           </dl>
           ${relatedTickets(b, t.id)}
           ${b.state === 'dispute' ? `<p class="notice warn" style="margin:0"><b>Скарга клієнта</b>«${esc(b.disputeReason ?? '')}»</p>
@@ -599,9 +611,10 @@ function fraudSignals() {
   const byCl = new Map();
   for (const b of carcar) byCl.set(clientOf(b), [...(byCl.get(clientOf(b)) ?? []), b]);
   for (const [k, list] of byCl) {
-    const lost = list.filter((b) => b.state === 'cancelled' || b.state === 'noshow');
+    // Рахуємо лише скасування самим клієнтом і неявки, а не відмови чи мовчання мийки.
+    const lost = list.filter((b) => (b.state === 'cancelled' && b.cancelBy === 'client' && !b.declined) || b.state === 'noshow');
     if (lost.length >= 3) {
-      const free = lost.filter((b) => b.refundTo === 'balance' && b.state === 'cancelled').length;
+      const free = lost.filter((b) => b.state === 'cancelled' && !b.placeAmount).length;
       add({ key: `cancel:${k}:${lost.length}`, kind: 'cancels', level: lost.length >= 5 ? 'high' : 'medium', client: k, title: `Масові скасування: ${esc(list.find((b) => b.clientName)?.clientName ?? (k === 'device' ? 'клієнт цього пристрою' : k.replace('tel:', '+')))}`,
         detail: `${lost.length} скасувань і неявок за 14 днів (безкоштовних — ${free}) з ${list.length} записів. Може займати вільні вікна в точках.`,
         lines: lost.map((b) => `<li>${esc(placeName(b.placeId))} · ${dayLabel(b.date, { day: 'numeric', month: 'short' })} ${b.time} · ${b.state === 'noshow' ? 'неявка' : 'скасовано'}</li>`) });
@@ -719,7 +732,7 @@ function fraudDemo() {
   const self = mk({ placeId: 'keramika', clientName: 'Вигаданий клієнт', clientPhone: '+380 44 000 00 09', state: 'completed', date: addDays(d, -2), completedAt: now - 2 * DAY });
   bookings.push(self);
   reviews.push({ id: uid(), placeId: 'keramika', bookingId: self.id, stars: 5, text: 'Ідеально, рекомендую', services: 'Експрес-мийка кузова', date: addDays(d, -1), at: now - DAY, demoFraud: true });
-  ['blysk', 'hvylia', 'pina', 'aqua24'].forEach((pid, i) => bookings.push(mk({ placeId: pid, clientName: 'Вигаданий Скасувальник', clientPhone: '+380 67 000 00 99', state: 'cancelled', refundTo: 'balance', refund: 250, placeAmount: 0, date: addDays(d, -i - 1) })));
+  ['blysk', 'hvylia', 'pina', 'aqua24'].forEach((pid, i) => bookings.push(mk({ placeId: pid, clientName: 'Вигаданий Скасувальник', clientPhone: '+380 67 000 00 99', state: 'cancelled', cancelBy: 'client', refundTo: 'balance', refund: 250, placeAmount: 0, date: addDays(d, -i - 1) })));
   for (let i = 0; i < 5; i++) bookings.push(mk({ placeId: 'kraplia', clientName: `Вигаданий клієнт ${i + 1}`, clientPhone: `+380 63 000 00 2${i}`, state: i < 3 ? 'noshow' : 'completed', placeAmount: 250, date: addDays(d, -i - 1) }));
   for (let i = 0; i < 3; i++) bookings.push(mk({ placeId: 'blysk', clientPhone: `+380 93 000 00 3${i}`, plate: 'AA0000AA', promo: { code: 'PERSHA30', amount: 75 }, paid: 175, state: 'completed', date: addDays(d, -i - 1) }));
   const twin = PLACES.find((x) => x.id === 'blysk');
@@ -756,7 +769,7 @@ const mSettings = () => ({ ordersPerYear: 6, ...store.get('admin.settings', {}) 
 function campaignStats(c) {
   const rate = store.get('admin.settings', {}).commission ?? PAYMENT.commission;
   const real = bookings.filter((b) => isCarcar(b) && !b.source && (b.campaign === c.id || (c.code && b.promo?.code === c.code && !b.promo.returned))
-    && !(b.state === 'cancelled' && b.refundTo === 'balance'))
+    && realOrder(b))
     .map((b) => ({ amount: price(b), promo: b.promo && !b.promo.returned ? b.promo.amount : 0, newClient: !!b.firstOrder, done: b.state === 'completed' }));
   const rows = [...real, ...store.get('admin.campaignDemo', []).filter((x) => x.c === c.id)];
   const visits = events().filter((e) => e.t === 'campaign_visit' && (e.c === c.id || (!e.c && c.code && e.code === c.code))).length;
@@ -1039,20 +1052,13 @@ function viewStats() {
 
   // Функції застосунку.
   const wl = store.get('waitlist', []);
-  const passesSold = PLACES.flatMap((p) => (store.peek('biz.passes', {})[p.id]?.sold ?? [])).filter((x) => x.soldAt >= parseDate(range[0]).getTime());
-  const intakes = bookings.filter((b) => b.intake && inRange(b, range));
   const reqs = store.get('requests', []).filter((r) => r.at >= parseDate(range[0]).getTime());
-  const camps = store.get('biz.campaigns', []).filter((c) => c.at >= parseDate(range[0]).getTime());
   const vis = visibleReviews(reviews).filter((r) => r.at >= parseDate(range[0]).getTime());
   const features = [
     ['Карта', `${count(ev, 'map_open')} відкриттів · ${count(ev, 'map_pin')} натискань на точки`],
     ['Гарячі вікна й щасливі години', `${count(ev, 'hot_click')} переходів з головної · ${app.filter((b) => b.deal).length} записів зі знижкою · знижок на ${uah(app.filter((b) => b.deal).reduce((a, b) => a + ((b.listTotal ?? b.total) - b.total), 0))}`],
-    ['Абонементи й сертифікати', `${passesSold.length} продано на ${uah(passesSold.reduce((a, x) => a + x.price, 0))}, з них у застосунку ${passesSold.filter((x) => x.source === 'carcar').length}`],
     ['Лист очікування', `${count(ev, 'waitlist_join')} заявок · сповіщено ${wl.filter((w) => w.status === 'notified').length} · чекають ${wl.filter((w) => w.status === 'active').length}`],
-    ['Жива черга', `${count(ev, 'queue_join')} клієнтів стали в чергу з телефона`],
-    ['Акт приймання', `${intakes.length} актів · підтверджено ${intakes.filter((b) => b.intake.ack?.ok).length} · із зауваженнями ${intakes.filter((b) => b.intake.ack && !b.intake.ack.ok).length}`],
     ['Запити «не знайшов послугу»', `${reqs.length} запитів · відповіли ${reqs.filter((r) => r.messages.some((m) => m.from === 'biz')).length} · додано послуг ${reqs.filter((r) => r.service).length}`],
-    ['Розсилки точок', `${camps.length} розсилок · ${camps.reduce((a, c) => a + c.count, 0)} отримувачів`],
     ['Відгуки', `${vis.length} нових · середня оцінка ${vis.length ? rating(vis.reduce((a, r) => a + r.stars, 0) / vis.length) : '—'} · з відповіддю точки ${share(vis.filter((r) => r.reply).length, vis.length)}`],
   ];
 
@@ -1082,7 +1088,7 @@ function viewStats() {
       <div class="kpi"><span class="label">Оплачених записів</span><span class="value">${paidN}</span>${delta(paidN, count(prevEv, 'paid'))}</div>
       <div class="kpi"><span class="label">Конверсія сеансу в запис</span><span class="value">${share(paidN, sessions)}</span></div>
       <div class="kpi"><span class="label">Повертаються</span><span class="value">${share(repeat.length, clients.length)}</span><span class="kpi-note">${repeat.length} з ${clients.length} клієнтів · ${gaps.length ? `між візитами ≈ ${Math.round(gaps.reduce((a, x) => a + x, 0) / gaps.length)} ${daysWord(Math.round(gaps.reduce((a, x) => a + x, 0) / gaps.length))}` : ''}</span></div>
-      <div class="kpi"><span class="label">Скасовано клієнтами</span><span class="value">${app.filter((b) => b.state === 'cancelled').length}</span><span class="kpi-note">вчасно ${app.filter((b) => b.state === 'cancelled' && !b.placeAmount).length} · пізно ${app.filter((b) => b.state === 'cancelled' && b.placeAmount).length}</span></div>
+      <div class="kpi"><span class="label">Скасовано клієнтами</span><span class="value">${app.filter((b) => b.state === 'cancelled' && b.cancelBy === 'client' && !b.declined).length}</span><span class="kpi-note">вчасно ${app.filter((b) => b.state === 'cancelled' && b.cancelBy === 'client' && !b.declined && !b.placeAmount).length} · пізно ${app.filter((b) => b.state === 'cancelled' && b.placeAmount).length} · відмов мийок ${app.filter((b) => b.declined === 'place' || b.declined === 'timeout').length}</span></div>
       <div class="kpi"><span class="label">Неявки</span><span class="value">${share(app.filter((b) => b.state === 'noshow').length, app.length)}</span></div>
     </section>
     <div class="grid-2" style="margin-top:16px">
@@ -1157,7 +1163,6 @@ function statsDemo() {
     if (rnd() < 0.2) ev('filter', at - 240000, { name: ['openNow', 'blackout', 'mobileOnly', 'favOnly'][Math.floor(rnd() * 4)] });
     if (rnd() < 0.15) { ev('map_open', at - 230000); ev('map_pin', at - 220000, { placeId: p.id }); }
     if (rnd() < 0.05) ev('hot_click', at - 210000, { placeId: p.id });
-    if (rnd() < 0.02) ev('queue_join', at, { placeId: p.id });
     if (rnd() < 0.015) ev('waitlist_join', at, { placeId: p.id });
   }
   out.sort((a, b) => a.at - b.at);
