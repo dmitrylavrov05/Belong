@@ -284,7 +284,7 @@ test('умови для мийок відкриваються без входу 
   await page.evaluate(() => { localStorage.setItem('carcar.auth', 'null'); localStorage.setItem('carcar.admin.settings', '{"commission":0.12}'); });
   await page.goto('/#/business');
   await expect(page.getByRole('heading', { name: 'CARCAR для бізнесу' })).toBeVisible();
-  await expect(page.locator('.biz-terms')).toContainText('Комісія 12% із замовлень через CARCAR');
+  await expect(page.locator('.biz-terms')).toContainText('12% лише з онлайн-записів');
   await expect(page.locator('.biz-steps')).toContainText('публікуєте мийку');
   await page.getByRole('link', { name: 'Зареєструвати бізнес' }).click();
   await expect(page.getByRole('heading', { name: 'Реєстрація мийки' })).toBeVisible();

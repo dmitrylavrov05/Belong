@@ -1123,6 +1123,9 @@ body.in-auth #view { padding: 0; max-width: none; }
 /* Чат на телефоні: сторінка під ним не прокручується, коли відкривається клавіатура. */
 html:has(body.in-chat), body.in-chat { overflow: hidden; overscroll-behavior: none; }
 .chat-screen { will-change: transform; }
+.biz-login { margin-top: 20px; }
+body.guest .tabs { display: none; }
+body.guest { --tabs-h: 0px; }
 </style>
   <style>
 /* Панель для бізнесу CARCAR: десктоп-перший макет поверх токенів і компонентів styles.css. */

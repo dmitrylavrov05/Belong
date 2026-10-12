@@ -1124,6 +1124,9 @@ body.in-auth #view { padding: 0; max-width: none; }
 /* Чат на телефоні: сторінка під ним не прокручується, коли відкривається клавіатура. */
 html:has(body.in-chat), body.in-chat { overflow: hidden; overscroll-behavior: none; }
 .chat-screen { will-change: transform; }
+.biz-login { margin-top: 20px; }
+body.guest .tabs { display: none; }
+body.guest { --tabs-h: 0px; }
 </style>
   <style>
     /* Заставка під час запуску: піна, бульбашки, логотип із відблиском і розкриття застосунку колом.
@@ -5193,27 +5196,24 @@ function viewBusiness(sub) {
   const a = myApp();
   if (sub === 'apply' && !(a && a.status !== 'rejected')) return `${head}<h1>Реєстрація мийки</h1>${bizApplyForm()}`;
   const terms = [
-    ['cash', `Комісія ${feePct()}% із замовлень через CARCAR`, 'Абонплати немає, за підключення не платите. Записи, які ви вносите самі, без комісії.'],
-    ['check', 'Ви вирішуєте, чи приймати запис', `Клієнт обирає час і платить, а ви підтверджуєте запис у CarCar Business. Не відповіли за ${PAYMENT.confirmMinutes} хв робочого часу — запис скасовується, гроші повертаються клієнту. Можна ввімкнути автопідтвердження.`],
-    ['card', 'Клієнт платить одразу під час запису', `Коли авто готове, ви натискаєте «Машина готова». Гроші ${PAYMENT.freezeHours} годин чекають на випадок спору, потім виводите їх на рахунок ФОП або ТОВ.`],
-    ['shield', 'Неявку оплачує клієнт', `Скасував пізніше ніж за ${cancelWindow()}, не приїхав чи запізнився більш ніж на ${PAYMENT.lateMinutes} хв — гроші лишаються вам. Один запис можна перенести не більше ${MOVE_LIMIT} разів.`],
-    ['calendar', 'Застосунок CarCar Business безкоштовно', 'Повідомлення клієнтів, записи по днях, швидкий запис дзвінка за кілька секунд, гроші й профіль мийки — з телефона.'],
-    ['star', 'Відгуки тільки від справжніх клієнтів', 'Відгук може залишити лише той, хто був у вас на мийці. Відповісти можна публічно.'],
+    ['cash', `${feePct()}% лише з онлайн-записів`, 'Підключення й застосунок безкоштовні. Клієнти, яких ви записали самі, — без комісії.'],
+    ['check', 'Запис приймаєте ви', `Клієнт обирає час і платить, ви підтверджуєте. Не відповіли за ${PAYMENT.confirmMinutes} хв — гроші повертаються клієнту.`],
+    ['card', 'Гроші — після мийки', `Натиснули «Машина готова» — через ${PAYMENT.freezeHours} год гроші можна вивести на рахунок ФОП чи ТОВ.`],
+    ['shield', 'Неявку оплачує клієнт', `Скасував пізніше ніж за ${cancelWindow()} чи не приїхав — оплата ваша.`],
+    ['star', 'Чесні відгуки', 'Відгук лишає тільки той, хто справді був у вас.'],
   ];
   return `${head}<h1>CARCAR для бізнесу</h1>
-    <p class="lead">Люди по всій Україні знаходять мийку поруч, записуються й одразу платять. Вам лишається мити.</p>
+    <p class="lead">Клієнти поруч знаходять вашу мийку й одразу платять за запис.</p>
     ${a ? bizAppStatus(a) : ''}
-    <h2>Умови роботи</h2>
+    <h2>Умови</h2>
     <ul class="biz-terms">${terms.map(([ic, t, d]) => `<li>${icon(ic, 22)}<span><b>${t}</b>${d}</span></li>`).join('')}</ul>
-    <h2>Що потрібно</h2>
-    <ul class="biz-need"><li>ФОП або ТОВ і рахунок IBAN для виплат</li><li>Адреса, фото, графік і кількість боксів</li><li>Прайс. Шаблон уже готовий, лишиться поправити ціни</li></ul>
+    <h2>Що знадобиться</h2>
+    <ul class="biz-need"><li>ФОП або ТОВ і рахунок IBAN</li><li>Адреса, фото й графік роботи</li><li>Ціни — шаблон уже є, лише поправите</li></ul>
     <h2>Як підключитися</h2>
-    <ol class="biz-steps"><li><span><b>Заявка</b>, 2 хвилини</span></li><li><span><b>Перевірка</b>, до 2 робочих днів</span></li><li><span><b>Логін і пароль</b> приходять у SMS</span></li><li><span><b>Профіль, графік і ціни</b> — перевіряєте в CarCar Business і публікуєте мийку</span></li><li><span><b>Перші записи</b> в CarCar Business</span></li></ol>
-    <div class="dock-space"></div>
-    <div class="dock biz-dock">
-      ${a && a.status !== 'rejected' ? '' : '<a class="btn primary block" href="#/business/apply">Зареєструвати бізнес</a>'}
-      <a class="btn block" href="pro.html">${icon('shield', 18)}Увійти в CarCar Business</a>
-    </div>`;
+    <ol class="biz-steps"><li><span><b>Заявка</b> — 2 хвилини</span></li><li><span><b>Перевірка</b> — до 2 робочих днів</span></li><li><span><b>Логін і пароль</b> — у SMS</span></li><li><span>Перевіряєте профіль і ціни й <b>публікуєте мийку</b></span></li></ol>
+    <a class="btn block biz-login" href="pro.html">${icon('shield', 18)}Увійти в CarCar Business</a>
+    ${a && a.status !== 'rejected' ? '' : `<div class="dock-space"></div>
+    <div class="dock biz-dock"><a class="btn primary block" href="#/business/apply">Зареєструвати бізнес</a></div>`}`;
 }
 
 function bizAppStatus(a) {
@@ -5549,9 +5549,11 @@ function route() {
   const [, page = '', arg, sub, extra] = location.hash.replace(/^#/, '').split('/');
   // Вхід за номером телефону — перед будь-яким екраном застосунку.
   const authed = !!(store.get('auth', null) ?? login.session);
-  document.body.classList.toggle('in-auth', !authed);
   // Умови для мийок і заявку видно й без входу клієнта: власник мийки не мусить реєструватися як клієнт.
-  if (!authed && page === 'business') {
+  const guest = !authed && page === 'business';
+  document.body.classList.toggle('in-auth', !authed && !guest);
+  document.body.classList.toggle('guest', guest);
+  if (guest) {
     $('#view').innerHTML = viewBusiness(arg);
     return;
   }

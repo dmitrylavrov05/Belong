@@ -1124,6 +1124,9 @@ body.in-auth #view { padding: 0; max-width: none; }
 /* Чат на телефоні: сторінка під ним не прокручується, коли відкривається клавіатура. */
 html:has(body.in-chat), body.in-chat { overflow: hidden; overscroll-behavior: none; }
 .chat-screen { will-change: transform; }
+.biz-login { margin-top: 20px; }
+body.guest .tabs { display: none; }
+body.guest { --tabs-h: 0px; }
 </style>
   <style>
 /* CarCar Business — застосунок мийки для телефона. Базові кнопки, поля, чат і шторки — зі styles.css. */
