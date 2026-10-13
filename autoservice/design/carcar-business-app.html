@@ -1176,6 +1176,12 @@ body.guest { --tabs-h: 0px; }
 }
 @keyframes call-ring { 50% { box-shadow: 0 0 0 16px rgb(255 255 255 / 10%), 0 0 0 34px rgb(255 255 255 / 4%); } }
 .call-warn { margin: 0; min-height: 1em; font-size: 13px; color: #ffd28a; }
+
+/* Дзвінки в списку повідомлень */
+button.convo.call-row { width: 100%; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.call-text { display: flex; align-items: center; gap: 6px; }
+.call-text svg { flex: none; color: var(--muted); }
+.call-row.missed .call-text, .call-row.missed .call-text svg { color: var(--bad, #c8402b); font-weight: 600; }
 </style>
   <style>
 /* CarCar Business — застосунок мийки для телефона. Базові кнопки, поля, чат і шторки — зі styles.css. */
@@ -3380,11 +3386,38 @@ function callLogText(c) {
   if (c.state === 'ended' && c.answeredAt) return `Дзвінок через CARCAR · ${callClock(c.endedAt - c.answeredAt)}`;
   return c.state === 'declined' ? `Дзвінок від ${by} відхилено` : `Пропущений дзвінок від ${by}`;
 }
+// Кожен дзвінок — у журналі дзвінків («Повідомлення» в обох застосунках), а дзвінок за записом — ще й у чаті запису.
 function logCall(bookings, c, save) {
+  const answered = c.state === 'ended' && !!c.answeredAt;
+  const log = store.peek('callLog', []);
+  if (!log.some((x) => x.id === c.id)) {
+    store.set('callLog', [...log, {
+      id: c.id, placeId: c.placeId, bookingId: c.bookingId ?? null, from: c.from, state: answered ? 'ended' : c.state, at: c.endedAt ?? Date.now(),
+      dur: answered ? c.endedAt - c.answeredAt : null, clientName: c.clientName ?? '', placeName: c.placeName ?? '',
+      // Пропущений дзвінок — непрочитаний для того, кому дзвонили.
+      unreadClient: !answered && c.from === 'place', unreadBiz: !answered && c.from === 'client',
+    }].slice(-300));
+  }
   const b = c.bookingId && bookings.find((x) => x.id === c.bookingId);
   if (!b) return;
   chatPost(b, 'sys', callLogText(c), c.from === 'client' ? 'biz' : 'client');
   save();
+}
+
+const callHistory = () => store.peek('callLog', []);
+// Підпис у списку повідомлень з погляду side ('client' або 'place').
+function callRowText(x, side) {
+  const out = x.from === side;
+  if (x.state === 'ended') return `${out ? 'Вихідний' : 'Вхідний'} дзвінок · ${callClock(x.dur ?? 0)}`;
+  if (out) return x.state === 'declined' ? 'Дзвінок відхилено' : 'Не відповіли на дзвінок';
+  return 'Пропущений дзвінок';
+}
+const callMissed = (x, side) => (side === 'client' ? x.unreadClient : x.unreadBiz);
+function markCallsRead(side, pick) {
+  const log = store.peek('callLog', []);
+  const key = side === 'client' ? 'unreadClient' : 'unreadBiz';
+  if (!log.some((x) => x[key] && pick(x))) return;
+  store.set('callLog', log.map((x) => (x[key] && pick(x) ? { ...x, [key]: false } : x)));
 }
 
 // CarCar Business — окремий застосунок мийки для телефона.
@@ -3494,7 +3527,8 @@ const unmarked = () => own().filter((b) => (b.state === 'paid' || b.state === 'b
 // Записи всіх мийок акаунта: нові заявки приходять і тоді, коли відкрита інша мийка.
 const allMine = () => { const ids = accountPlaces(session()); return bookings.filter((b) => ids.includes(b.placeId)); };
 const pendingList = () => allMine().filter((b) => b.state === 'pending').sort((a, b) => confirmBy(a) - confirmBy(b));
-const unreadCount = () => own().filter((b) => b.chatUnreadBiz && b.state !== 'pending').length + pendingList().length + ownRequests().filter((r) => r.unreadBiz).length;
+const unreadCount = () => own().filter((b) => b.chatUnreadBiz && b.state !== 'pending').length + pendingList().length + ownRequests().filter((r) => r.unreadBiz).length
+  + callHistory().filter((x) => x.placeId === ui.place && callMissed(x, 'place')).length;
 const washLabel = (b) => (b.placeId !== ui.place ? `<span class="pill">${esc(placeById(b.placeId)?.name ?? '')}</span>` : '');
 // Візит почався: тільки тоді можна «Машина готова»; неявку — через lateMinutes після початку.
 const started = (b) => bookingStart(b) <= new Date();
@@ -3734,10 +3768,24 @@ function threads() {
       live: !r.closed && !r.service,
     };
   });
-  return [...bk, ...rq].sort((a, b) => (b.unread - a.unread) || (b.live - a.live) || (b.at - a.at));
+  // Дзвінки клієнтів через CARCAR: торкнутися — передзвонити.
+  const cl = callHistory().filter((x) => x.placeId === ui.place).map((x) => ({
+    id: x.id, kind: 'call', call: x, name: x.clientName || 'Клієнт CARCAR', at: x.at, unread: !!x.unreadBiz,
+    label: x.state === 'ended' ? 'Дзвінок' : x.from === 'client' ? 'Пропущений' : 'Без відповіді', cls: x.state === 'ended' ? '' : x.from === 'client' ? 'warn' : '',
+    text: callRowText(x, 'place'), sub: 'Натисніть, щоб передзвонити', live: !!x.unreadBiz,
+  }));
+  return [...bk, ...rq, ...cl].sort((a, b) => (b.unread - a.unread) || (b.live - a.live) || (b.at - a.at));
 }
 
-const MSG_FILTERS = [['all', 'Усі'], ['new', 'Нові'], ['booking', 'За записами'], ['request', 'Питання']];
+const MSG_FILTERS = [['all', 'Усі'], ['new', 'Нові'], ['booking', 'За записами'], ['request', 'Питання'], ['call', 'Дзвінки']];
+
+// Дзвінок у списку повідомлень: кнопка «передзвонити» (за записом — тому самому клієнту запису).
+const callRow = (t) => `<li><button class="convo call-row${t.unread ? ' unread missed' : ''}" type="button" data-action="call" data-place="${t.call.placeId}" data-name="${esc(t.name)}" ${t.call.bookingId && bookings.some((b) => b.id === t.call.bookingId) ? `data-id="${t.call.bookingId}"` : ''} aria-label="${esc(t.name)}: ${esc(t.text)}. Передзвонити">
+    <span class="avatar" aria-hidden="true">${firstLetter(t.name)}</span>
+    <span class="convo-body"><span class="convo-top"><b>${esc(t.name)}</b><time>${whenShort(t.at)}</time></span>
+      <span class="convo-text call-text">${icon('phone', 15)}${esc(t.text)}</span>
+      <span class="convo-meta"><span class="pill ${t.cls}">${t.label}</span><small>${esc(t.sub)}</small></span></span>
+    ${t.unread ? '<span class="dot" aria-hidden="true"></span>' : ''}</button></li>`;
 
 function viewMessages() {
   const all = threads();
@@ -3748,12 +3796,12 @@ function viewMessages() {
     ${pendingBlock()}
     ${reminders()}
     <div class="chips" role="group" aria-label="Які повідомлення показати">${MSG_FILTERS.map(([f, label]) => `<button class="chip" type="button" data-action="msg-filter" data-f="${f}" aria-pressed="${ui.filter === f}">${label}${count(f) ? ` · ${count(f)}` : ''}</button>`).join('')}</div>
-    ${list.length ? `<ul class="convos pro-convos">${list.map((t) => `<li><a class="convo${t.unread ? ' unread' : ''}${t.live ? '' : ' over'}" href="#/chat/${t.id}">
+    ${list.length ? `<ul class="convos pro-convos">${list.map((t) => (t.kind === 'call' ? callRow(t) : `<li><a class="convo${t.unread ? ' unread' : ''}${t.live ? '' : ' over'}" href="#/chat/${t.id}">
       <span class="avatar${t.kind === 'request' ? ' req' : ''}" aria-hidden="true">${firstLetter(t.name)}</span>
       <span class="convo-body"><span class="convo-top"><b>${esc(t.name)}</b><time>${whenShort(t.at)}</time></span>
         <span class="convo-text">${esc(t.text.length > 80 ? `${t.text.slice(0, 80).trimEnd()}…` : t.text)}</span>
         <span class="convo-meta"><span class="pill ${t.cls}">${t.label}</span><small>${esc(t.sub)}</small></span></span>
-      ${t.unread ? '<span class="dot" aria-label="Нове повідомлення"></span>' : ''}</a></li>`).join('')}</ul>`
+      ${t.unread ? '<span class="dot" aria-label="Нове повідомлення"></span>' : ''}</a></li>`)).join('')}</ul>`
       : `<div class="pro-empty">${icon('chat', 32)}<b>${all.length ? 'Тут порожньо' : 'Повідомлень ще немає'}</b>
         <span>Клієнти пишуть сюди про оплачені записи й питають про послуги зі сторінки мийки.</span></div>`}`;
 }
@@ -4950,6 +4998,8 @@ function route() {
     }
   }
   if (page === 'act') { alerted.add(id); history.replaceState(null, '', '#/'); route(); notifyAction(arg, id); return; }
+  // Пішли з «Повідомлень» — пропущені дзвінки переглянуто.
+  if (ui.lastView === '/' && page !== '') markCallsRead('place', (x) => x.placeId === ui.place);
   document.body.classList.toggle('in-chat', page === 'chat');
   renderChrome(page);
   const view = $('#view');
@@ -5072,9 +5122,10 @@ document.addEventListener('click', async (e) => {
   }
   if (action === 'washer') { washerSheet(id, 'assign'); return; }
   if (action === 'call') {
+    if (el.matches('.call-row')) markCallsRead('place', (x) => x.placeId === (el.dataset.place ?? ui.place));
     const r = el.dataset.req ? requests.find((x) => x.id === el.dataset.req) : null;
-    const pid = b?.placeId ?? r?.placeId ?? ui.place;
-    startCall({ bookingId: b?.id ?? null, reqId: r?.id ?? null, placeId: pid, placeName: placeById(pid)?.name ?? '', clientName: b ? who(b) : r?.clientName || 'Клієнт' });
+    const pid = b?.placeId ?? r?.placeId ?? el.dataset.place ?? ui.place;
+    startCall({ bookingId: b?.id ?? null, reqId: r?.id ?? null, placeId: pid, placeName: placeById(pid)?.name ?? '', clientName: b ? who(b) : r?.clientName || el.dataset.name || 'Клієнт' });
     return;
   }
   if (action === 'dur') { durSheet(id); return; }

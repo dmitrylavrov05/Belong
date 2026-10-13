@@ -13,7 +13,7 @@ import {
   chatPost, chatTimeline, readMessages, msgPreview, presenceOf, PRESENCE_KEY, CLIENT_QUICK, ITEM_KIND, itemSum, estimateTotal, warrantyUntil,
 } from './ops.js';
 import { mountMap } from './map.js';
-import { initCalls, startCall, logCall } from './call.js';
+import { initCalls, startCall, logCall, callHistory, callRowText, callMissed, markCallsRead } from './call.js';
 import { lookupPlate, normPlate, DEMO_PLATES } from './vehicles.js';
 
 // ---------- сховище (лише на цьому пристрої) ----------
@@ -1833,22 +1833,32 @@ function conversations() {
       return { at: last.at, href: `#/ask/${r.placeId}`, name: placeById(r.placeId)?.name ?? 'Мийка', sub: `Запит про послугу · ${reqStatus(r)[1]}`,
         text: `${last.from === 'client' ? 'Ви: ' : ''}${msgPreview(last)}`, unread: !!r.unreadClient, placeId: r.placeId, over: !!r.closed && !r.unreadClient };
     }),
+    // Дзвінки через CARCAR: торкнутися — передзвонити.
+    ...callHistory().filter((x) => placeById(x.placeId)).map((x) => ({ at: x.at, call: x, name: placeById(x.placeId).name, placeId: x.placeId,
+      sub: 'Натисніть, щоб передзвонити', text: callRowText(x, 'client'), unread: !!x.unreadClient })),
     ...myTickets().map((t) => {
       const last = t.messages.at(-1);
       return { at: last.at, href: `#/support/t/${t.id}`, name: 'Підтримка CARCAR', sub: `№${t.no}`, text: `${last.from === 'client' ? 'Ви: ' : ''}${last.text}`, unread: !!t.unreadUser, support: true };
     }),
   ].sort((a, c) => c.at - a.at);
   if (!rows.length) return '';
-  const item = (r) => `<li><a class="convo${r.unread ? ' unread' : ''}${r.over ? ' over' : ''}" href="${r.href}">
+  const item = (r) => (r.call ? callItem(r) : `<li><a class="convo${r.unread ? ' unread' : ''}${r.over ? ' over' : ''}" href="${r.href}">
     ${r.support ? `<span class="avatar support" aria-hidden="true">${icon('shield', 20)}</span>` : avatar(r.name, !r.over && !!r.placeId && presenceOf(r.placeId).online, r.placeId ? placeById(r.placeId)?.avatar : null)}
     <span class="convo-body"><span class="convo-top"><b>${esc(r.name)}</b><time>${shortTime(r.at)}</time></span>
       <span class="convo-text">${esc(r.text.length > 80 ? `${r.text.slice(0, 80).trimEnd()}…` : r.text)}</span>
       <small>${esc(r.sub)}${r.status ? ` · <span class="convo-state${r.over ? '' : ' live'}">${esc(r.status)}</span>` : ''}</small></span>
-    ${r.unread ? '<span class="dot" aria-label="непрочитане"></span>' : ''}</a></li>`;
+    ${r.unread ? '<span class="dot" aria-label="непрочитане"></span>' : ''}</a></li>`);
+  // Дзвінок: торкнутися — передзвонити тій самій мийці (за тим самим записом, якщо дзвінок був за записом).
+  const callItem = (r) => `<li><button class="convo call-row${r.unread ? ' unread missed' : ''}" type="button" data-action="call" data-place="${r.placeId}" ${r.call.bookingId && bookings.some((b) => b.id === r.call.bookingId) ? `data-id="${r.call.bookingId}"` : ''} aria-label="${esc(r.name)}: ${esc(r.text)}. Передзвонити">
+    ${avatar(r.name, false, placeById(r.placeId)?.avatar)}
+    <span class="convo-body"><span class="convo-top"><b>${esc(r.name)}</b><time>${shortTime(r.at)}</time></span>
+      <span class="convo-text call-text">${icon('phone', 15)}${esc(r.text)}</span>
+      <small>${esc(r.sub)}</small></span>
+    ${r.unread ? '<span class="dot" aria-hidden="true"></span>' : ''}</button></li>`;
   // Завершені записи й закриті запити — окремо й згорнуто, щоб не змішувались з актуальними.
   const live = rows.filter((r) => !r.over);
   const over = rows.filter((r) => r.over);
-  return `<h2>Чати</h2>
+  return `<h2>Чати й дзвінки</h2>
     ${live.length ? `<ul class="convos">${live.map(item).join('')}</ul>` : '<p class="small muted">Активних переписок немає.</p>'}
     ${over.length ? `<details class="fold convo-archive"><summary>${icon('checkCircle', 20)}Завершені<span class="fold-note">${over.length}</span></summary>
       <ul class="convos">${over.map(item).join('')}</ul></details>` : ''}`;
@@ -2175,7 +2185,7 @@ function viewInbox() {
 
 // Лічильник на вкладці «Повідомлення»: непрочитані сповіщення й нові відповіді точок у чатах.
 function updateInboxBadge() {
-  const unread = inboxFor(myKeys()).filter((m) => !m.read && ((m.kind === 'waitlist' && !staleNote(m)) || m.kind === 'sub')).length + requests.filter((r) => r.unreadClient).length + mine().filter((b) => b.chatUnreadClient).length + myTickets().filter((t) => t.unreadUser).length;
+  const unread = inboxFor(myKeys()).filter((m) => !m.read && ((m.kind === 'waitlist' && !staleNote(m)) || m.kind === 'sub')).length + requests.filter((r) => r.unreadClient).length + mine().filter((b) => b.chatUnreadClient).length + myTickets().filter((t) => t.unreadUser).length + callHistory().filter((x) => callMissed(x, 'client')).length;
   const count = $('#inbox-tab .tab-count');
   count.textContent = unread > 9 ? '9+' : unread;
   count.hidden = !unread;
@@ -2571,6 +2581,8 @@ function route() {
   const tab = ['invite'].includes(page) ? '' : ['support', 'wallet', 'business'].includes(page) ? 'garage' : page === 'move' ? 'bookings' : page === 'chat' ? 'inbox' : ['bookings', 'garage', 'inbox'].includes(page) ? page : 'catalog';
   settle();
   watchAnswers();
+  // Пішли з «Повідомлень» — пропущені дзвінки переглянуто.
+  if (ui.lastView?.startsWith('inbox/') && page !== 'inbox') markCallsRead('client', () => true);
   // Хтось скасував запис — можливо, звільнився час для листа очікування.
   checkWaitlist(bookings);
   runSubscriptions();
@@ -2763,6 +2775,7 @@ document.addEventListener('click', (e) => {
     const b = bookings.find((x) => x.id === id);
     if (b && bookingActions[action](b) !== false) { ui.bookFocus = b.id; save(); route(); }
   } else if (action === 'call') {
+    if (el.matches('.call-row')) markCallsRead('client', (x) => x.placeId === el.dataset.place);
     const b = id ? bookings.find((x) => x.id === id) : null;
     const p = placeById(b?.placeId ?? el.dataset.place);
     if (p) startCall({ bookingId: b?.id ?? null, placeId: p.id, placeName: p.name, clientName: profile.name || 'Клієнт CARCAR' });

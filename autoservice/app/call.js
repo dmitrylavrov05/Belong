@@ -201,9 +201,36 @@ export function callLogText(c) {
   if (c.state === 'ended' && c.answeredAt) return `Дзвінок через CARCAR · ${callClock(c.endedAt - c.answeredAt)}`;
   return c.state === 'declined' ? `Дзвінок від ${by} відхилено` : `Пропущений дзвінок від ${by}`;
 }
+// Кожен дзвінок — у журналі дзвінків («Повідомлення» в обох застосунках), а дзвінок за записом — ще й у чаті запису.
 export function logCall(bookings, c, save) {
+  const answered = c.state === 'ended' && !!c.answeredAt;
+  const log = store.peek('callLog', []);
+  if (!log.some((x) => x.id === c.id)) {
+    store.set('callLog', [...log, {
+      id: c.id, placeId: c.placeId, bookingId: c.bookingId ?? null, from: c.from, state: answered ? 'ended' : c.state, at: c.endedAt ?? Date.now(),
+      dur: answered ? c.endedAt - c.answeredAt : null, clientName: c.clientName ?? '', placeName: c.placeName ?? '',
+      // Пропущений дзвінок — непрочитаний для того, кому дзвонили.
+      unreadClient: !answered && c.from === 'place', unreadBiz: !answered && c.from === 'client',
+    }].slice(-300));
+  }
   const b = c.bookingId && bookings.find((x) => x.id === c.bookingId);
   if (!b) return;
   chatPost(b, 'sys', callLogText(c), c.from === 'client' ? 'biz' : 'client');
   save();
+}
+
+export const callHistory = () => store.peek('callLog', []);
+// Підпис у списку повідомлень з погляду side ('client' або 'place').
+export function callRowText(x, side) {
+  const out = x.from === side;
+  if (x.state === 'ended') return `${out ? 'Вихідний' : 'Вхідний'} дзвінок · ${callClock(x.dur ?? 0)}`;
+  if (out) return x.state === 'declined' ? 'Дзвінок відхилено' : 'Не відповіли на дзвінок';
+  return 'Пропущений дзвінок';
+}
+export const callMissed = (x, side) => (side === 'client' ? x.unreadClient : x.unreadBiz);
+export function markCallsRead(side, pick) {
+  const log = store.peek('callLog', []);
+  const key = side === 'client' ? 'unreadClient' : 'unreadBiz';
+  if (!log.some((x) => x[key] && pick(x))) return;
+  store.set('callLog', log.map((x) => (x[key] && pick(x) ? { ...x, [key]: false } : x)));
 }

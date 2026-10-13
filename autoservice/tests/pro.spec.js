@@ -815,6 +815,39 @@ test('дзвінок через CARCAR: клієнт дзвонить з кар�
   // Дзвінок записано в чат запису.
   const b = await page.evaluate(() => JSON.parse(localStorage.getItem('carcar.bookings'))[0]);
   expect(b.chat.at(-1).text).toMatch(/^Дзвінок через CARCAR · \d+:\d\d$/);
+  // Дзвінок видно в «Повідомленнях» обох застосунків.
+  await page.goto('/#/inbox');
+  await expect(page.locator('.call-row').first()).toContainText(/Вихідний дзвінок · \d+:\d\d/);
+  await pro.goto(`${PRO}#/`);
+  await expect(pro.locator('.call-row').first()).toContainText(/Вхідний дзвінок · \d+:\d\d/);
+  await pro.close();
+});
+
+test('пропущений дзвінок зі сторінки мийки видно в «Повідомленнях» мийки — можна передзвонити', async ({ page, context }) => {
+  const pro = await context.newPage();
+  await pro.clock.setFixedTime(new Date(2026, 9, 4, 10, 0));
+  await pro.goto(`${PRO}#/bookings`);
+  await page.goto('/#/place/blysk');
+  await page.getByRole('button', { name: 'Подзвонити', exact: true }).click();
+  await expect(pro.locator('#call-screen')).toContainText('Вхідний дзвінок CARCAR');
+  // Клієнт поклав трубку, поки мийка не відповіла.
+  await page.locator('#call-screen').getByRole('button', { name: 'Завершити' }).click();
+  await expect(pro.locator('#call-screen')).toContainText('Пропущений дзвінок');
+  await pro.locator('#call-screen').getByRole('button', { name: 'Закрити' }).click();
+
+  await pro.goto(`${PRO}#/`);
+  await expect(pro.getByLabel(/Непрочитані: \d/)).toBeVisible();
+  await pro.getByRole('button', { name: 'Дзвінки' }).click();
+  const row = pro.locator('.call-row').first();
+  await expect(row).toContainText('Пропущений дзвінок');
+  await expect(row).toContainText('Пропущений');
+  await row.click();
+  await expect(pro.locator('#call-screen')).toContainText('Дзвонимо…');
+  await pro.locator('#call-screen').getByRole('button', { name: 'Завершити' }).click();
+
+  // У клієнта — його вихідний дзвінок без відповіді.
+  await page.goto('/#/inbox');
+  await expect(page.locator('.call-row', { hasText: 'Не відповіли на дзвінок' })).toBeVisible();
   await pro.close();
 });
 

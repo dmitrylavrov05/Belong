@@ -1176,6 +1176,12 @@ body.guest { --tabs-h: 0px; }
 }
 @keyframes call-ring { 50% { box-shadow: 0 0 0 16px rgb(255 255 255 / 10%), 0 0 0 34px rgb(255 255 255 / 4%); } }
 .call-warn { margin: 0; min-height: 1em; font-size: 13px; color: #ffd28a; }
+
+/* Дзвінки в списку повідомлень */
+button.convo.call-row { width: 100%; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.call-text { display: flex; align-items: center; gap: 6px; }
+.call-text svg { flex: none; color: var(--muted); }
+.call-row.missed .call-text, .call-row.missed .call-text svg { color: var(--bad, #c8402b); font-weight: 600; }
 </style>
   <style>
     /* Заставка під час запуску: піна, бульбашки, логотип із відблиском і розкриття застосунку колом.
@@ -3320,11 +3326,38 @@ function callLogText(c) {
   if (c.state === 'ended' && c.answeredAt) return `Дзвінок через CARCAR · ${callClock(c.endedAt - c.answeredAt)}`;
   return c.state === 'declined' ? `Дзвінок від ${by} відхилено` : `Пропущений дзвінок від ${by}`;
 }
+// Кожен дзвінок — у журналі дзвінків («Повідомлення» в обох застосунках), а дзвінок за записом — ще й у чаті запису.
 function logCall(bookings, c, save) {
+  const answered = c.state === 'ended' && !!c.answeredAt;
+  const log = store.peek('callLog', []);
+  if (!log.some((x) => x.id === c.id)) {
+    store.set('callLog', [...log, {
+      id: c.id, placeId: c.placeId, bookingId: c.bookingId ?? null, from: c.from, state: answered ? 'ended' : c.state, at: c.endedAt ?? Date.now(),
+      dur: answered ? c.endedAt - c.answeredAt : null, clientName: c.clientName ?? '', placeName: c.placeName ?? '',
+      // Пропущений дзвінок — непрочитаний для того, кому дзвонили.
+      unreadClient: !answered && c.from === 'place', unreadBiz: !answered && c.from === 'client',
+    }].slice(-300));
+  }
   const b = c.bookingId && bookings.find((x) => x.id === c.bookingId);
   if (!b) return;
   chatPost(b, 'sys', callLogText(c), c.from === 'client' ? 'biz' : 'client');
   save();
+}
+
+const callHistory = () => store.peek('callLog', []);
+// Підпис у списку повідомлень з погляду side ('client' або 'place').
+function callRowText(x, side) {
+  const out = x.from === side;
+  if (x.state === 'ended') return `${out ? 'Вихідний' : 'Вхідний'} дзвінок · ${callClock(x.dur ?? 0)}`;
+  if (out) return x.state === 'declined' ? 'Дзвінок відхилено' : 'Не відповіли на дзвінок';
+  return 'Пропущений дзвінок';
+}
+const callMissed = (x, side) => (side === 'client' ? x.unreadClient : x.unreadBiz);
+function markCallsRead(side, pick) {
+  const log = store.peek('callLog', []);
+  const key = side === 'client' ? 'unreadClient' : 'unreadBiz';
+  if (!log.some((x) => x[key] && pick(x))) return;
+  store.set('callLog', log.map((x) => (x[key] && pick(x) ? { ...x, [key]: false } : x)));
 }
 
 
@@ -5145,22 +5178,32 @@ function conversations() {
       return { at: last.at, href: `#/ask/${r.placeId}`, name: placeById(r.placeId)?.name ?? 'Мийка', sub: `Запит про послугу · ${reqStatus(r)[1]}`,
         text: `${last.from === 'client' ? 'Ви: ' : ''}${msgPreview(last)}`, unread: !!r.unreadClient, placeId: r.placeId, over: !!r.closed && !r.unreadClient };
     }),
+    // Дзвінки через CARCAR: торкнутися — передзвонити.
+    ...callHistory().filter((x) => placeById(x.placeId)).map((x) => ({ at: x.at, call: x, name: placeById(x.placeId).name, placeId: x.placeId,
+      sub: 'Натисніть, щоб передзвонити', text: callRowText(x, 'client'), unread: !!x.unreadClient })),
     ...myTickets().map((t) => {
       const last = t.messages.at(-1);
       return { at: last.at, href: `#/support/t/${t.id}`, name: 'Підтримка CARCAR', sub: `№${t.no}`, text: `${last.from === 'client' ? 'Ви: ' : ''}${last.text}`, unread: !!t.unreadUser, support: true };
     }),
   ].sort((a, c) => c.at - a.at);
   if (!rows.length) return '';
-  const item = (r) => `<li><a class="convo${r.unread ? ' unread' : ''}${r.over ? ' over' : ''}" href="${r.href}">
+  const item = (r) => (r.call ? callItem(r) : `<li><a class="convo${r.unread ? ' unread' : ''}${r.over ? ' over' : ''}" href="${r.href}">
     ${r.support ? `<span class="avatar support" aria-hidden="true">${icon('shield', 20)}</span>` : avatar(r.name, !r.over && !!r.placeId && presenceOf(r.placeId).online, r.placeId ? placeById(r.placeId)?.avatar : null)}
     <span class="convo-body"><span class="convo-top"><b>${esc(r.name)}</b><time>${shortTime(r.at)}</time></span>
       <span class="convo-text">${esc(r.text.length > 80 ? `${r.text.slice(0, 80).trimEnd()}…` : r.text)}</span>
       <small>${esc(r.sub)}${r.status ? ` · <span class="convo-state${r.over ? '' : ' live'}">${esc(r.status)}</span>` : ''}</small></span>
-    ${r.unread ? '<span class="dot" aria-label="непрочитане"></span>' : ''}</a></li>`;
+    ${r.unread ? '<span class="dot" aria-label="непрочитане"></span>' : ''}</a></li>`);
+  // Дзвінок: торкнутися — передзвонити тій самій мийці (за тим самим записом, якщо дзвінок був за записом).
+  const callItem = (r) => `<li><button class="convo call-row${r.unread ? ' unread missed' : ''}" type="button" data-action="call" data-place="${r.placeId}" ${r.call.bookingId && bookings.some((b) => b.id === r.call.bookingId) ? `data-id="${r.call.bookingId}"` : ''} aria-label="${esc(r.name)}: ${esc(r.text)}. Передзвонити">
+    ${avatar(r.name, false, placeById(r.placeId)?.avatar)}
+    <span class="convo-body"><span class="convo-top"><b>${esc(r.name)}</b><time>${shortTime(r.at)}</time></span>
+      <span class="convo-text call-text">${icon('phone', 15)}${esc(r.text)}</span>
+      <small>${esc(r.sub)}</small></span>
+    ${r.unread ? '<span class="dot" aria-hidden="true"></span>' : ''}</button></li>`;
   // Завершені записи й закриті запити — окремо й згорнуто, щоб не змішувались з актуальними.
   const live = rows.filter((r) => !r.over);
   const over = rows.filter((r) => r.over);
-  return `<h2>Чати</h2>
+  return `<h2>Чати й дзвінки</h2>
     ${live.length ? `<ul class="convos">${live.map(item).join('')}</ul>` : '<p class="small muted">Активних переписок немає.</p>'}
     ${over.length ? `<details class="fold convo-archive"><summary>${icon('checkCircle', 20)}Завершені<span class="fold-note">${over.length}</span></summary>
       <ul class="convos">${over.map(item).join('')}</ul></details>` : ''}`;
@@ -5487,7 +5530,7 @@ function viewInbox() {
 
 // Лічильник на вкладці «Повідомлення»: непрочитані сповіщення й нові відповіді точок у чатах.
 function updateInboxBadge() {
-  const unread = inboxFor(myKeys()).filter((m) => !m.read && ((m.kind === 'waitlist' && !staleNote(m)) || m.kind === 'sub')).length + requests.filter((r) => r.unreadClient).length + mine().filter((b) => b.chatUnreadClient).length + myTickets().filter((t) => t.unreadUser).length;
+  const unread = inboxFor(myKeys()).filter((m) => !m.read && ((m.kind === 'waitlist' && !staleNote(m)) || m.kind === 'sub')).length + requests.filter((r) => r.unreadClient).length + mine().filter((b) => b.chatUnreadClient).length + myTickets().filter((t) => t.unreadUser).length + callHistory().filter((x) => callMissed(x, 'client')).length;
   const count = $('#inbox-tab .tab-count');
   count.textContent = unread > 9 ? '9+' : unread;
   count.hidden = !unread;
@@ -5883,6 +5926,8 @@ function route() {
   const tab = ['invite'].includes(page) ? '' : ['support', 'wallet', 'business'].includes(page) ? 'garage' : page === 'move' ? 'bookings' : page === 'chat' ? 'inbox' : ['bookings', 'garage', 'inbox'].includes(page) ? page : 'catalog';
   settle();
   watchAnswers();
+  // Пішли з «Повідомлень» — пропущені дзвінки переглянуто.
+  if (ui.lastView?.startsWith('inbox/') && page !== 'inbox') markCallsRead('client', () => true);
   // Хтось скасував запис — можливо, звільнився час для листа очікування.
   checkWaitlist(bookings);
   runSubscriptions();
@@ -6075,6 +6120,7 @@ document.addEventListener('click', (e) => {
     const b = bookings.find((x) => x.id === id);
     if (b && bookingActions[action](b) !== false) { ui.bookFocus = b.id; save(); route(); }
   } else if (action === 'call') {
+    if (el.matches('.call-row')) markCallsRead('client', (x) => x.placeId === el.dataset.place);
     const b = id ? bookings.find((x) => x.id === id) : null;
     const p = placeById(b?.placeId ?? el.dataset.place);
     if (p) startCall({ bookingId: b?.id ?? null, placeId: p.id, placeName: p.name, clientName: profile.name || 'Клієнт CARCAR' });

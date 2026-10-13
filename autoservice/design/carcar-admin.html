@@ -1175,6 +1175,12 @@ body.guest { --tabs-h: 0px; }
 }
 @keyframes call-ring { 50% { box-shadow: 0 0 0 16px rgb(255 255 255 / 10%), 0 0 0 34px rgb(255 255 255 / 4%); } }
 .call-warn { margin: 0; min-height: 1em; font-size: 13px; color: #ffd28a; }
+
+/* Дзвінки в списку повідомлень */
+button.convo.call-row { width: 100%; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.call-text { display: flex; align-items: center; gap: 6px; }
+.call-text svg { flex: none; color: var(--muted); }
+.call-row.missed .call-text, .call-row.missed .call-text svg { color: var(--bad, #c8402b); font-weight: 600; }
 </style>
   <style>
 /* Панель для бізнесу CARCAR: десктоп-перший макет поверх токенів і компонентів styles.css. */

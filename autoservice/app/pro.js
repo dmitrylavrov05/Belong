@@ -16,7 +16,7 @@ import {
   acceptBooking, declineBooking, expirePending, autoConfirmOf, setAutoConfirm, proposeTime, weeklyDealsOf, daysText, markNoShow, noShowFrom,
 } from './ops.js';
 import { ibanValid, normIban, formatIban, codeValid } from './partners.js';
-import { initCalls, startCall, logCall } from './call.js';
+import { initCalls, startCall, logCall, callHistory, callRowText, callMissed, markCallsRead } from './call.js';
 
 // ---------- дані ----------
 
@@ -120,7 +120,8 @@ const unmarked = () => own().filter((b) => (b.state === 'paid' || b.state === 'b
 // Записи всіх мийок акаунта: нові заявки приходять і тоді, коли відкрита інша мийка.
 const allMine = () => { const ids = accountPlaces(session()); return bookings.filter((b) => ids.includes(b.placeId)); };
 const pendingList = () => allMine().filter((b) => b.state === 'pending').sort((a, b) => confirmBy(a) - confirmBy(b));
-const unreadCount = () => own().filter((b) => b.chatUnreadBiz && b.state !== 'pending').length + pendingList().length + ownRequests().filter((r) => r.unreadBiz).length;
+const unreadCount = () => own().filter((b) => b.chatUnreadBiz && b.state !== 'pending').length + pendingList().length + ownRequests().filter((r) => r.unreadBiz).length
+  + callHistory().filter((x) => x.placeId === ui.place && callMissed(x, 'place')).length;
 const washLabel = (b) => (b.placeId !== ui.place ? `<span class="pill">${esc(placeById(b.placeId)?.name ?? '')}</span>` : '');
 // Візит почався: тільки тоді можна «Машина готова»; неявку — через lateMinutes після початку.
 const started = (b) => bookingStart(b) <= new Date();
@@ -360,10 +361,24 @@ function threads() {
       live: !r.closed && !r.service,
     };
   });
-  return [...bk, ...rq].sort((a, b) => (b.unread - a.unread) || (b.live - a.live) || (b.at - a.at));
+  // Дзвінки клієнтів через CARCAR: торкнутися — передзвонити.
+  const cl = callHistory().filter((x) => x.placeId === ui.place).map((x) => ({
+    id: x.id, kind: 'call', call: x, name: x.clientName || 'Клієнт CARCAR', at: x.at, unread: !!x.unreadBiz,
+    label: x.state === 'ended' ? 'Дзвінок' : x.from === 'client' ? 'Пропущений' : 'Без відповіді', cls: x.state === 'ended' ? '' : x.from === 'client' ? 'warn' : '',
+    text: callRowText(x, 'place'), sub: 'Натисніть, щоб передзвонити', live: !!x.unreadBiz,
+  }));
+  return [...bk, ...rq, ...cl].sort((a, b) => (b.unread - a.unread) || (b.live - a.live) || (b.at - a.at));
 }
 
-const MSG_FILTERS = [['all', 'Усі'], ['new', 'Нові'], ['booking', 'За записами'], ['request', 'Питання']];
+const MSG_FILTERS = [['all', 'Усі'], ['new', 'Нові'], ['booking', 'За записами'], ['request', 'Питання'], ['call', 'Дзвінки']];
+
+// Дзвінок у списку повідомлень: кнопка «передзвонити» (за записом — тому самому клієнту запису).
+const callRow = (t) => `<li><button class="convo call-row${t.unread ? ' unread missed' : ''}" type="button" data-action="call" data-place="${t.call.placeId}" data-name="${esc(t.name)}" ${t.call.bookingId && bookings.some((b) => b.id === t.call.bookingId) ? `data-id="${t.call.bookingId}"` : ''} aria-label="${esc(t.name)}: ${esc(t.text)}. Передзвонити">
+    <span class="avatar" aria-hidden="true">${firstLetter(t.name)}</span>
+    <span class="convo-body"><span class="convo-top"><b>${esc(t.name)}</b><time>${whenShort(t.at)}</time></span>
+      <span class="convo-text call-text">${icon('phone', 15)}${esc(t.text)}</span>
+      <span class="convo-meta"><span class="pill ${t.cls}">${t.label}</span><small>${esc(t.sub)}</small></span></span>
+    ${t.unread ? '<span class="dot" aria-hidden="true"></span>' : ''}</button></li>`;
 
 function viewMessages() {
   const all = threads();
@@ -374,12 +389,12 @@ function viewMessages() {
     ${pendingBlock()}
     ${reminders()}
     <div class="chips" role="group" aria-label="Які повідомлення показати">${MSG_FILTERS.map(([f, label]) => `<button class="chip" type="button" data-action="msg-filter" data-f="${f}" aria-pressed="${ui.filter === f}">${label}${count(f) ? ` · ${count(f)}` : ''}</button>`).join('')}</div>
-    ${list.length ? `<ul class="convos pro-convos">${list.map((t) => `<li><a class="convo${t.unread ? ' unread' : ''}${t.live ? '' : ' over'}" href="#/chat/${t.id}">
+    ${list.length ? `<ul class="convos pro-convos">${list.map((t) => (t.kind === 'call' ? callRow(t) : `<li><a class="convo${t.unread ? ' unread' : ''}${t.live ? '' : ' over'}" href="#/chat/${t.id}">
       <span class="avatar${t.kind === 'request' ? ' req' : ''}" aria-hidden="true">${firstLetter(t.name)}</span>
       <span class="convo-body"><span class="convo-top"><b>${esc(t.name)}</b><time>${whenShort(t.at)}</time></span>
         <span class="convo-text">${esc(t.text.length > 80 ? `${t.text.slice(0, 80).trimEnd()}…` : t.text)}</span>
         <span class="convo-meta"><span class="pill ${t.cls}">${t.label}</span><small>${esc(t.sub)}</small></span></span>
-      ${t.unread ? '<span class="dot" aria-label="Нове повідомлення"></span>' : ''}</a></li>`).join('')}</ul>`
+      ${t.unread ? '<span class="dot" aria-label="Нове повідомлення"></span>' : ''}</a></li>`)).join('')}</ul>`
       : `<div class="pro-empty">${icon('chat', 32)}<b>${all.length ? 'Тут порожньо' : 'Повідомлень ще немає'}</b>
         <span>Клієнти пишуть сюди про оплачені записи й питають про послуги зі сторінки мийки.</span></div>`}`;
 }
@@ -1576,6 +1591,8 @@ function route() {
     }
   }
   if (page === 'act') { alerted.add(id); history.replaceState(null, '', '#/'); route(); notifyAction(arg, id); return; }
+  // Пішли з «Повідомлень» — пропущені дзвінки переглянуто.
+  if (ui.lastView === '/' && page !== '') markCallsRead('place', (x) => x.placeId === ui.place);
   document.body.classList.toggle('in-chat', page === 'chat');
   renderChrome(page);
   const view = $('#view');
@@ -1698,9 +1715,10 @@ document.addEventListener('click', async (e) => {
   }
   if (action === 'washer') { washerSheet(id, 'assign'); return; }
   if (action === 'call') {
+    if (el.matches('.call-row')) markCallsRead('place', (x) => x.placeId === (el.dataset.place ?? ui.place));
     const r = el.dataset.req ? requests.find((x) => x.id === el.dataset.req) : null;
-    const pid = b?.placeId ?? r?.placeId ?? ui.place;
-    startCall({ bookingId: b?.id ?? null, reqId: r?.id ?? null, placeId: pid, placeName: placeById(pid)?.name ?? '', clientName: b ? who(b) : r?.clientName || 'Клієнт' });
+    const pid = b?.placeId ?? r?.placeId ?? el.dataset.place ?? ui.place;
+    startCall({ bookingId: b?.id ?? null, reqId: r?.id ?? null, placeId: pid, placeName: placeById(pid)?.name ?? '', clientName: b ? who(b) : r?.clientName || el.dataset.name || 'Клієнт' });
     return;
   }
   if (action === 'dur') { durSheet(id); return; }
