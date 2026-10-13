@@ -1127,6 +1127,55 @@ html:has(body.in-chat), body.in-chat { overflow: hidden; overscroll-behavior: no
 .biz-login { margin-top: 20px; }
 body.guest .tabs { display: none; }
 body.guest { --tabs-h: 0px; }
+
+/* Очікування підтвердження мийкою */
+.wait-box { display: flex; gap: 12px; align-items: flex-start; padding: 14px; border-radius: 16px; background: var(--warn-soft, #fff4e5); }
+.wait-box b { display: block; }
+.wait-box small { display: block; margin-top: 2px; color: var(--muted); font-size: 13px; }
+.wait-box .countdown { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--text); }
+.wait-dots { display: flex; gap: 4px; padding-top: 7px; flex: none; }
+.wait-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: wait-dot 1.2s infinite ease-in-out; }
+.wait-dots i:nth-child(2) { animation-delay: .15s; }
+.wait-dots i:nth-child(3) { animation-delay: .3s; }
+@keyframes wait-dot { 0%, 80%, 100% { opacity: .25; transform: scale(.8); } 40% { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .wait-dots i { animation: none; opacity: .7; } }
+/* Мийка відповіла на запис */
+.answer-banner { position: fixed; z-index: 60; left: 12px; right: 12px; top: calc(10px + env(safe-area-inset-top)); max-width: 560px; margin: 0 auto;
+  display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 18px; background: var(--bg); color: var(--text); text-decoration: none;
+  box-shadow: 0 10px 30px rgb(16 24 40 / 22%); border-left: 5px solid var(--ok); animation: banner-in .35s var(--ease, ease) both; }
+.answer-banner.warn { border-left-color: var(--warn, #c77700); }
+.answer-banner.bad { border-left-color: var(--bad, #c8402b); }
+.answer-banner > svg { flex: none; color: var(--ok); margin-top: 1px; }
+.answer-banner.warn > svg { color: var(--warn, #c77700); }
+.answer-banner.bad > svg { color: var(--bad, #c8402b); }
+.answer-banner span { display: grid; gap: 2px; font-size: 14px; color: var(--muted); }
+.answer-banner b { color: var(--text); font-size: 16px; }
+@keyframes banner-in { from { transform: translateY(-120%); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .answer-banner { animation: none; } }
+
+/* Дзвінок через CARCAR (у застосунку клієнта й у CarCar Business) */
+.call-screen { position: fixed; inset: 0; z-index: 90; display: flex; flex-direction: column; justify-content: space-between; align-items: center;
+  padding: calc(48px + env(safe-area-inset-top)) 24px calc(40px + env(safe-area-inset-bottom)); color: #fff; text-align: center;
+  background: radial-gradient(120% 80% at 50% 20%, #2b3a55, #10151c 70%); }
+.call-who { display: grid; justify-items: center; gap: 10px; }
+.call-ava { width: 112px; height: 112px; border-radius: 50%; display: grid; place-items: center; font-size: 46px; font-weight: 800;
+  background: linear-gradient(135deg, #f6a05a, #c8402b 55%, #8f2414); box-shadow: 0 0 0 10px rgb(255 255 255 / 6%), 0 0 0 22px rgb(255 255 255 / 3%); }
+.call-who h2 { margin: 8px 0 0; font-size: 26px; }
+.call-status { margin: 0; font-size: 17px; opacity: .85; font-variant-numeric: tabular-nums; }
+.call-note { display: inline-flex; align-items: center; gap: 6px; margin: 6px 0 0; font-size: 13px; opacity: .65; }
+.call-actions { display: flex; gap: 40px; align-items: center; justify-content: center; flex-wrap: wrap; }
+.call-actions .btn { min-width: 140px; }
+.call-btn { width: 68px; height: 68px; border-radius: 50%; border: 0; display: grid; place-items: center; cursor: pointer; color: #fff; background: rgb(255 255 255 / 14%); }
+.call-btn[aria-pressed="true"] { background: #fff; color: #10151c; }
+.call-btn.ok { background: #22a95b; }
+.call-btn.end { background: #e0402b; }
+.call-btn.end svg { transform: rotate(135deg); }
+.call-btn:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+@media (prefers-reduced-motion: no-preference) {
+  .call-screen:has(.call-btn.ok) .call-ava { animation: call-ring 1.4s ease-in-out infinite; }
+}
+@keyframes call-ring { 50% { box-shadow: 0 0 0 16px rgb(255 255 255 / 10%), 0 0 0 34px rgb(255 255 255 / 4%); } }
+.call-warn { margin: 0; min-height: 1em; font-size: 13px; color: #ffd28a; }
 </style>
   <style>
 /* CarCar Business — застосунок мийки для телефона. Базові кнопки, поля, чат і шторки — зі styles.css. */
@@ -1708,7 +1757,6 @@ const RELIABILITY = { days: 30, noShowDays: 60 };
 // Нагадування в гаражі.
 const MAINTENANCE = {
   washDays: 14, // нагадати помити авто, якщо після останньої мийки минуло стільки днів
-  insuranceWarnDays: 30, // попереджати про кінець поліса за N днів
 };
 
 // «Приведи друга»: обом по bonus ₴ на наступне замовлення. Бонус оплачує CARCAR,
@@ -1784,6 +1832,7 @@ const ICONS = {
   car: '<path d="M5 16.5V12l1.8-4.6A2 2 0 0 1 8.7 6h6.6a2 2 0 0 1 1.9 1.4L19 12v4.5"/><rect x="3.5" y="12" width="17" height="5" rx="1.5"/><path d="M6 17v2M18 17v2"/>',
   carSide: '<path d="M5 16.5V12l1.8-4.6A2 2 0 0 1 8.7 6h6.6a2 2 0 0 1 1.9 1.4L19 12v4.5"/><rect x="3.5" y="12" width="17" height="5" rx="1.5"/>',
   bolt: '<path d="M13 3 5 13.5h6L10 21l8-10.5h-6z"/>',
+  mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/>',
   phone: '<path d="M5 4h3.5l1.5 4-2 1.3a11 11 0 0 0 6.7 6.7L16 14l4 1.5V19a1.5 1.5 0 0 1-1.6 1.5A16 16 0 0 1 3.5 5.6 1.5 1.5 0 0 1 5 4z"/>',
   route: '<circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8.5 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.5"/>',
   check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
@@ -3130,6 +3179,214 @@ const offerHtml = (esc) => `<article class="offer">
   ${OFFER.sections.map(([h, t]) => `<h3>${esc(h)}</h3><p>${esc(t)}</p>`).join('')}
 </article>`;
 
+// Дзвінки всередині CARCAR: клієнт і мийка говорять через застосунок, не бачачи номерів одне одного,
+// тож мийка не може записати клієнта CARCAR «собі» в обхід платформи.
+// Демо: виклик і обмін даними зʼєднання — через localStorage (працює між вкладками на одному пристрої),
+// голос — WebRTC без сервера. У робочій версії — сервер сигналізації (або VoIP-сервіс) і push про вхідний дзвінок.
+
+const RING_MS = 30000;
+const CALL_KEY = 'call';
+
+let callSide = null; // 'client' або 'place'
+let callMine = () => false; // чи стосується вхідний дзвінок цього застосунку
+let callPeer = null;
+let callStream = null;
+let callTick = null;
+let callRingTimer = null;
+let callHooks = { onLog: () => {} };
+let callWarn = ''; // мікрофон недоступний тощо
+
+const callGet = () => store.peek(CALL_KEY, null);
+const callSet = (c) => store.set(CALL_KEY, c);
+const callOther = (c) => (c.from === callSide ? 'out' : 'in');
+const callName = (c) => (callSide === 'client' ? c.placeName : c.clientName || 'Клієнт CARCAR');
+const callClock = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+
+// side — хто цей застосунок; mine(call) — чи показувати вхідний дзвінок; onLog(call) — дзвінок завершився.
+function initCalls(side, mine, hooks = {}) {
+  callSide = side;
+  callMine = mine;
+  callHooks = { ...callHooks, ...hooks };
+  window.addEventListener('storage', (e) => { if (e.key === `carcar.${CALL_KEY}`) callSync(); });
+  document.addEventListener('click', callClick);
+  // Застарілий дзвінок (вкладку закрили під час розмови) — прибираємо.
+  const c = callGet();
+  if (c && ['ringing', 'active'].includes(c.state) && Date.now() - (c.answeredAt ?? c.at) > (c.state === 'ringing' ? RING_MS : 3 * 3600e3)) callSet({ ...c, state: 'ended', endedAt: Date.now() });
+  callSync();
+}
+
+// Почати дзвінок. who: { bookingId, placeId, placeName, clientName }.
+async function startCall(who) {
+  const cur = callGet();
+  if (cur && ['ringing', 'active'].includes(cur.state)) { callSync(); return; }
+  const c = { id: `c${Date.now().toString(36)}`, from: callSide, state: 'ringing', at: Date.now(), ...who };
+  callSet(c);
+  callRender(c);
+  const sdp = await callPrepare(c, null);
+  const now = callGet();
+  if (now?.id === c.id && ['ringing', 'active'].includes(now.state) && sdp) callSet({ ...now, offer: sdp });
+}
+
+function callClick(e) {
+  const el = e.target.closest('[data-call]');
+  if (!el) return;
+  const c = callGet();
+  const act = el.dataset.call;
+  if (act === 'close') { callClose(); return; }
+  if (!c) return;
+  if (act === 'answer') callAnswer(c);
+  else if (act === 'decline') callEnd(c, 'declined');
+  else if (act === 'hangup') callEnd(c, c.state === 'ringing' ? 'cancelled' : 'ended');
+  else if (act === 'mute' && callStream) {
+    const t = callStream.getAudioTracks()[0];
+    if (t) t.enabled = !t.enabled;
+    el.setAttribute('aria-pressed', String(!t?.enabled));
+  }
+}
+
+async function callAnswer(c) {
+  const on = { ...c, state: 'active', answeredAt: Date.now() };
+  callSet(on);
+  callRender(on);
+  // Дані зʼєднання від того, хто дзвонить, можуть ще готуватися (дозвіл на мікрофон) — чекаємо до 15 с.
+  let offer = c.offer;
+  for (let i = 0; !offer && i < 75; i++) {
+    await new Promise((ok) => setTimeout(ok, 200));
+    const now = callGet();
+    if (now?.id !== c.id || now.state !== 'active') return;
+    offer = now.offer;
+  }
+  if (!offer) { callStatus('Співрозмовник не дав доступ до мікрофона — напишіть у чат'); return; }
+  const sdp = await callPrepare(c, offer);
+  const now = callGet();
+  if (now?.id === c.id && sdp) callSet({ ...now, answer: sdp });
+}
+
+function callEnd(c, state) {
+  const done = { ...c, state, endedAt: Date.now() };
+  callSet(done);
+  callHooks.onLog(done);
+  callStop();
+  callRender(done);
+}
+
+// Мікрофон і WebRTC. remoteOffer — для того, хто відповідає. Повертає SDP, коли зібрано всі кандидати.
+async function callPrepare(c, remoteOffer) {
+  if (!('RTCPeerConnection' in window) || !navigator.mediaDevices?.getUserMedia) return null;
+  try {
+    callStream = await Promise.race([navigator.mediaDevices.getUserMedia({ audio: true }), new Promise((_, no) => setTimeout(() => no(new Error('timeout')), 8000))]);
+  } catch {
+    callStatus('Мікрофон недоступний — дозвольте його в налаштуваннях браузера');
+    return null;
+  }
+  callPeer = new RTCPeerConnection();
+  callStream.getTracks().forEach((t) => callPeer.addTrack(t, callStream));
+  callPeer.ontrack = (ev) => { const a = document.getElementById('call-audio'); if (a) a.srcObject = ev.streams[0]; };
+  if (remoteOffer) {
+    await callPeer.setRemoteDescription({ type: 'offer', sdp: remoteOffer });
+    await callPeer.setLocalDescription(await callPeer.createAnswer());
+  } else {
+    await callPeer.setLocalDescription(await callPeer.createOffer());
+  }
+  await new Promise((ok) => {
+    if (callPeer.iceGatheringState === 'complete') { ok(); return; }
+    callPeer.addEventListener('icegatheringstatechange', () => callPeer?.iceGatheringState === 'complete' && ok());
+    setTimeout(ok, 2000);
+  });
+  return callPeer?.localDescription?.sdp ?? null;
+}
+
+function callStop() {
+  callStream?.getTracks().forEach((t) => t.stop());
+  callPeer?.close();
+  callStream = null;
+  callPeer = null;
+  clearInterval(callTick);
+  clearTimeout(callRingTimer);
+}
+
+// Інша сторона змінила дзвінок: відповіла, поклала трубку, надіслала дані зʼєднання.
+function callSync() {
+  const c = callGet();
+  if (!c) { callClose(); return; }
+  const dir = callOther(c);
+  if (dir === 'in' && !callMine(c)) return;
+  if (dir === 'out' && c.answer && callPeer && !callPeer.currentRemoteDescription) callPeer.setRemoteDescription({ type: 'answer', sdp: c.answer }).catch(() => {});
+  if (['ended', 'declined', 'cancelled', 'missed'].includes(c.state)) callStop();
+  // Вхідний дзвінок, що вже закінчився до відкриття застосунку, не показуємо.
+  if (dir === 'in' && !document.getElementById('call-screen') && c.state !== 'ringing') return;
+  callRender(c);
+}
+
+function callRender(c) {
+  let el = document.getElementById('call-screen');
+  if (!el) {
+    el = document.createElement('section');
+    el.id = 'call-screen';
+    el.className = 'call-screen';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    el.setAttribute('aria-labelledby', 'call-name');
+    document.body.append(el);
+  }
+  const dir = callOther(c);
+  const name = callName(c);
+  const live = c.state === 'active';
+  const status = c.state === 'ringing' ? (dir === 'out' ? 'Дзвонимо…' : 'Вхідний дзвінок CARCAR')
+    : live ? `<span id="call-time">${callClock(Date.now() - c.answeredAt)}</span>`
+      : { declined: dir === 'out' ? 'Не може відповісти зараз' : 'Дзвінок відхилено', missed: 'Не відповідає', cancelled: dir === 'out' ? 'Дзвінок скасовано' : 'Пропущений дзвінок', ended: 'Дзвінок завершено' }[c.state];
+  const buttons = c.state === 'ringing' && dir === 'in'
+    ? `<button class="call-btn end" type="button" data-call="decline" aria-label="Відхилити">${icon('phone', 28)}</button>
+       <button class="call-btn ok" type="button" data-call="answer" aria-label="Відповісти">${icon('phone', 28)}</button>`
+    : ['ringing', 'active'].includes(c.state)
+      ? `<button class="call-btn" type="button" data-call="mute" aria-pressed="false" aria-label="Вимкнути мікрофон">${icon('mic', 26)}</button>
+         <button class="call-btn end" type="button" data-call="hangup" aria-label="Завершити">${icon('phone', 28)}</button>`
+      : `<button class="btn" type="button" data-call="close">Закрити</button>
+         ${c.bookingId && callSide === 'client' && ['declined', 'missed'].includes(c.state) ? `<a class="btn primary" href="#/chat/${c.bookingId}" data-call="close">Написати в чат</a>` : ''}`;
+  el.innerHTML = `<div class="call-who">
+      <span class="call-ava" aria-hidden="true">${esc([...String(name).replace(/^(Автомийка|Детейлінг-мийка)\s*/, '').replace(/[«»"]/g, '')][0] ?? 'C')}</span>
+      <h2 id="call-name">${esc(name)}</h2>
+      <p class="call-status" aria-live="polite">${status}</p>
+      <p class="call-note">${icon('shield', 14)}Дзвінок через CARCAR — номери телефонів приховані</p>
+      <p class="call-warn" role="status">${esc(callWarn)}</p>
+    </div>
+    <div class="call-actions">${buttons}</div>
+    <audio id="call-audio" autoplay></audio>`;
+  if (callPeer && live) { const a = document.getElementById('call-audio'); const r = callPeer.getReceivers()[0]?.track; if (a && r) a.srcObject = new MediaStream([r]); }
+  clearInterval(callTick);
+  if (live) callTick = setInterval(() => { const t = document.getElementById('call-time'); if (t) t.textContent = callClock(Date.now() - c.answeredAt); }, 1000);
+  clearTimeout(callRingTimer);
+  // Ніхто не відповів за 30 с — дзвінок пропущено (рахує той, хто дзвонить).
+  if (c.state === 'ringing' && dir === 'out') callRingTimer = setTimeout(() => { const now = callGet(); if (now?.id === c.id && now.state === 'ringing') callEnd(now, 'missed'); }, Math.max(0, RING_MS - (Date.now() - c.at)));
+  if (!['ringing', 'active'].includes(c.state)) setTimeout(() => { if (callGet()?.id === c.id) callClose(); }, 6000);
+  if (c.state === 'ringing' && dir === 'in' && navigator.userActivation?.hasBeenActive) navigator.vibrate?.([300, 200, 300]);
+}
+
+function callStatus(text) {
+  callWarn = text;
+  const p = document.querySelector('#call-screen .call-warn');
+  if (p) p.textContent = text;
+}
+
+function callClose() {
+  callWarn = '';
+  document.getElementById('call-screen')?.remove();
+  callStop();
+}
+
+// Запис у чат запису: «Дзвінок через CARCAR · 1:23» або «Пропущений дзвінок».
+function callLogText(c) {
+  const by = c.from === 'client' ? 'клієнта' : 'мийки';
+  if (c.state === 'ended' && c.answeredAt) return `Дзвінок через CARCAR · ${callClock(c.endedAt - c.answeredAt)}`;
+  return c.state === 'declined' ? `Дзвінок від ${by} відхилено` : `Пропущений дзвінок від ${by}`;
+}
+function logCall(bookings, c, save) {
+  const b = c.bookingId && bookings.find((x) => x.id === c.bookingId);
+  if (!b) return;
+  chatPost(b, 'sys', callLogText(c), c.from === 'client' ? 'biz' : 'client');
+  save();
+}
+
 // CarCar Business — окремий застосунок мийки для телефона.
 // Головне під пальцем: повідомлення клієнтів, записи по днях, показники мийки й профіль, який бачать клієнти.
 // Дані спільні із застосунком клієнта (на цьому пристрої — localStorage): запис, внесений тут, одразу
@@ -3341,7 +3598,7 @@ function alertSheet(b) {
   openSheet('Новий запис', `<div class="alert-card">
       <div class="alert-time"><b>${b.time}</b><span>${dayWord(b.date, true)}</span><small>до ${hhmm(toMin(b.time) + b.minutes)} · ${duration(b.minutes)}</small></div>
       <dl class="pro-kv">
-        <dt>Клієнт</dt><dd><b>${esc(who(b))}</b>${b.clientPhone ? ` · <a href="${telHref(b.clientPhone)}">${esc(b.clientPhone)}</a>` : ''}</dd>
+        <dt>Клієнт</dt><dd><b>${esc(who(b))}</b> · дзвінок через CARCAR</dd>
         <dt>Авто</dt><dd>${esc(b.car || '—')}</dd>
         <dt>Послуги</dt><dd>${esc(b.services.join(', '))}</dd>
         <dt>Оплачено</dt><dd><b>${uah(sumOf(b))}</b> через CARCAR</dd>
@@ -3529,12 +3786,13 @@ const compose = (thread, quick) => `<div class="chat-compose">
     </form>
   </div>`;
 
-function chatHead(name, sub, phone) {
+// Клієнти CARCAR — дзвінок лише через застосунок, номер прихований.
+function chatHead(name, sub, call) {
   return `<header class="chat-head">
       <a class="icon-btn" href="#/" aria-label="До повідомлень">${icon('chevL', 24)}</a>
       <span class="avatar" aria-hidden="true">${firstLetter(name)}</span>
       <div class="chat-who"><h1>${esc(name)}</h1><small>${sub}</small></div>
-      ${phone ? `<a class="icon-btn" href="${telHref(phone)}" aria-label="Зателефонувати клієнту">${icon('phone', 20)}</a>` : ''}
+      <button class="icon-btn" type="button" data-action="call" ${call} aria-label="Подзвонити клієнту через CARCAR">${icon('phone', 20)}</button>
     </header>`;
 }
 
@@ -3550,7 +3808,7 @@ function viewThread(arg = '') {
     const [label] = stateOf(b);
     const open = ACTIVE.includes(b.state);
     return `<section class="chat-screen" aria-label="Чат з ${esc(who(b))}">
-      ${chatHead(who(b), `${label} · ${dayWord(b.date)}, ${b.time}`, b.clientPhone)}
+      ${chatHead(who(b), `${label} · ${dayWord(b.date)}, ${b.time}`, `data-id="${b.id}"`)}
       <button class="chat-pin" type="button" data-action="bk-open" data-id="${b.id}">${icon('calendar', 16)}<span>${b.no ? `${bookingNo(b)} · ` : ''}${esc(b.services.join(', '))} · ${uah(sumOf(b))}${b.car ? ` · ${esc(b.car)}` : ''}</span>${icon('chevR', 16)}</button>
       ${b.state === 'pending' ? `<div class="chat-actions"><button class="btn navy" type="button" data-action="accept" data-id="${b.id}">${icon('check', 18)}Прийняти запис</button><button class="btn" type="button" data-action="decline" data-id="${b.id}">Відмовити</button></div>` : ''}
       ${b.state === 'paid' && started(b) ? `<div class="chat-actions"><button class="btn navy" type="button" data-action="ready" data-id="${b.id}">${icon('check', 18)}Машина готова</button></div>` : ''}
@@ -3566,7 +3824,7 @@ function viewThread(arg = '') {
   const [label] = REQ_STATE[reqState(r)];
   const open = !r.closed;
   return `<section class="chat-screen" aria-label="Чат з ${esc(r.clientName || 'клієнтом')}">
-    ${chatHead(r.clientName || 'Клієнт', `${label}${r.car ? ` · ${esc(r.car)}` : ''}`, r.clientPhone)}
+    ${chatHead(r.clientName || 'Клієнт', `${label}${r.car ? ` · ${esc(r.car)}` : ''}`, `data-req="${r.id}"`)}
     ${open ? `<div class="chat-actions">
       <button class="btn navy" type="button" data-action="nb-open" data-req="${r.id}">${icon('calendar', 16)}Записати</button>
       ${r.service ? '' : `<button class="btn" type="button" data-action="svc-new" data-req="${r.id}">${icon('plus', 16)}Додати послугу</button>`}
@@ -3781,7 +4039,8 @@ function bookingSheet(id) {
     </dl>
     ${etaText(b) ? `<p class="notice ok" style="margin:0">${icon('bell', 18)}<span>Клієнт повідомив: ${etaText(b)} (${fmtTime(b.etaAt)}).</span></p>` : ''}
     <div class="grid2">
-      ${b.clientPhone ? `<a class="btn" href="${telHref(b.clientPhone)}">${icon('phone', 18)}Подзвонити</a>` : ''}
+      ${isCarcar(b) ? `<button class="btn" type="button" data-action="call" data-id="${b.id}">${icon('phone', 18)}Подзвонити через CARCAR</button>`
+        : b.clientPhone ? `<a class="btn" href="${telHref(b.clientPhone)}">${icon('phone', 18)}Подзвонити</a>` : ''}
       ${isCarcar(b) ? `<a class="btn" href="#/chat/b-${b.id}" data-action="sheet-close">${icon('chat', 18)}Написати</a>` : ''}
     </div>
     ${actions}`, b.id);
@@ -4294,7 +4553,9 @@ function clientsList() {
   for (const b of own()) {
     const key = b.clientPhone ? phoneKey(b.clientPhone) : `name:${(b.clientName || '').toLowerCase()}`;
     if (!key || key === 'name:') continue;
-    const c = map.get(key) ?? { key, name: b.clientName || 'Клієнт', phone: b.clientPhone || '', cars: new Set(), visits: 0, spent: 0, last: '', cls: b.cls ?? 0, car: '' };
+    const c = map.get(key) ?? { key, name: b.clientName || 'Клієнт', phone: '', cars: new Set(), visits: 0, spent: 0, last: '', cls: b.cls ?? 0, car: '' };
+    // Номер клієнта CARCAR мийка не бачить — лише тих, кого записала сама.
+    if (!isCarcar(b) && b.clientPhone) c.phone = b.clientPhone;
     if (b.car) c.cars.add(b.car);
     if (b.state === 'completed') { c.visits += 1; c.spent += sumOf(b); }
     if (b.date > c.last) { c.last = b.date; c.name = b.clientName || c.name; c.car = b.car || c.car; c.cls = b.cls ?? c.cls; }
@@ -4778,7 +5039,7 @@ document.addEventListener('click', async (e) => {
     const r = el.dataset.req ? ownRequests().find((x) => x.id === el.dataset.req) : null;
     nbOpen({
       ...(el.dataset.date ? { date: el.dataset.date } : {}), ...(el.dataset.time ? { want: el.dataset.time } : {}),
-      ...(r ? { name: r.clientName ?? '', phone: r.clientPhone ?? '', car: r.car ?? '', cls: r.cls ?? 0 } : {}),
+      ...(r ? { name: r.clientName ?? '', car: r.car ?? '', cls: r.cls ?? 0 } : {}),
     });
     return;
   }
@@ -4810,6 +5071,12 @@ document.addEventListener('click', async (e) => {
     return;
   }
   if (action === 'washer') { washerSheet(id, 'assign'); return; }
+  if (action === 'call') {
+    const r = el.dataset.req ? requests.find((x) => x.id === el.dataset.req) : null;
+    const pid = b?.placeId ?? r?.placeId ?? ui.place;
+    startCall({ bookingId: b?.id ?? null, reqId: r?.id ?? null, placeId: pid, placeName: placeById(pid)?.name ?? '', clientName: b ? who(b) : r?.clientName || 'Клієнт' });
+    return;
+  }
   if (action === 'dur') { durSheet(id); return; }
   if (action === 'washer-pick') {
     const m = el.dataset.m || null;
@@ -5323,6 +5590,8 @@ navigator.serviceWorker?.addEventListener('message', (e) => {
   if (e.data?.type === 'pending-action') { load(); notifyAction(e.data.action, e.data.id); }
 });
 keepChatOnKeyboard();
+// Вхідні дзвінки клієнтів CARCAR — у будь-яку мийку акаунта.
+initCalls('place', (c) => c.from === 'client' && !!session() && accountPlaces(session()).includes(c.placeId), { onLog: (c) => logCall(bookings, c, save) });
 route();
 
 </script>

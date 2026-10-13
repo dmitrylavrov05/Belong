@@ -249,7 +249,7 @@ test('запис із застосунку чекає підтвердження
   await clientBooks(page);
   const card = page.locator('article.bk').first();
   await expect(card).toContainText('Чекає підтвердження мийки');
-  await expect(card).toContainText('Мийка підтвердить запис до 10:05');
+  await expect(card.locator('.wait-box')).toContainText('Відповідь — протягом 5:00');
 
   await page.goto(PRO);
   // Поверх екрана — сповіщення з деталями запису й відліком 5 хвилин.
@@ -753,4 +753,76 @@ test('знижка на тихі години: мийка сама обирає 
   await page.locator('[data-action="to-time"]').click();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await expect(page.locator('.slot[data-time="08:00"] .slot-pct')).toHaveText('−25%');
+});
+
+test('клієнт чекає підтвердження з відліком і бачить сповіщення, щойно мийка прийняла запис', async ({ page, context }) => {
+  await page.clock.install({ time: new Date(2026, 9, 4, 10, 0) });
+  await clientBooks(page);
+  const card = page.locator('article.bk').first();
+  await expect(card.locator('.wait-box')).toContainText('Чекаємо підтвердження мийки');
+  await expect(card.locator('.countdown')).toHaveText('5:00');
+  await page.clock.runFor(3000);
+  await expect(card.locator('.countdown')).toHaveText('4:57');
+
+  // Мийка приймає запис у CarCar Business в іншій вкладці.
+  const pro = await context.newPage();
+  await pro.clock.setFixedTime(new Date(2026, 9, 4, 10, 1));
+  await pro.goto(PRO);
+  await pro.getByRole('dialog', { name: 'Новий запис' }).getByRole('button', { name: 'Прийняти' }).click();
+  await expect(pro.locator('.toast')).toContainText('Запис прийнято');
+
+  const banner = page.locator('.answer-banner');
+  await expect(banner).toContainText('Запис підтверджено');
+  await expect(banner).toContainText('Автомийка «Блиск» чекає вас');
+  await expect(card).toContainText('Оплачено');
+  await expect(card.locator('.wait-box')).toHaveCount(0);
+  await pro.close();
+});
+
+test('дзвінок через CARCAR: клієнт дзвонить з картки запису, мийка відповідає, номерів не видно', async ({ page, context }) => {
+  await clientBooks(page);
+  const id = await page.evaluate(() => JSON.parse(localStorage.getItem('carcar.bookings'))[0].id);
+  const pro = await context.newPage();
+  await pro.clock.setFixedTime(new Date(2026, 9, 4, 10, 0));
+  await pro.goto(`${PRO}#/bookings/2026-10-05`);
+  await pro.getByRole('dialog', { name: 'Новий запис' }).getByRole('button', { name: 'Прийняти' }).click();
+  await expect(pro.locator('.toast')).toContainText('Запис прийнято');
+  // Мийка не бачить номер клієнта CARCAR — лише дзвінок через застосунок.
+  await pro.goto(`${PRO}#/booking/${id}`);
+  const sheet = pro.getByRole('dialog', { name: /Ірина|Клієнт/ });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.locator('a[href^="tel:"]')).toHaveCount(0);
+  await expect(sheet.getByRole('button', { name: 'Подзвонити через CARCAR' })).toBeVisible();
+  await pro.keyboard.press('Escape');
+
+  // Клієнт дзвонить — у застосунку немає звичайних телефонних посилань.
+  await page.goto('/#/bookings');
+  await expect(page.locator('a[href^="tel:"]')).toHaveCount(0);
+  await page.locator('article.bk').first().getByRole('button', { name: 'Подзвонити' }).click();
+  const out = page.getByRole('dialog', { name: 'Автомийка «Блиск»' });
+  await expect(out).toContainText('Дзвонимо…');
+  await expect(out).toContainText('номери телефонів приховані');
+
+  const inc = pro.locator('#call-screen');
+  await expect(inc).toContainText('Вхідний дзвінок CARCAR');
+  await inc.getByRole('button', { name: 'Відповісти' }).click();
+  await expect(inc.locator('#call-time')).toBeVisible();
+  await expect(out.locator('#call-time')).toBeVisible();
+  expect((await new AxeBuilder({ page: pro }).include('#call-screen').analyze()).violations).toEqual([]);
+  await out.getByRole('button', { name: 'Завершити' }).click();
+  await expect(out).toContainText('Дзвінок завершено');
+  await expect(inc).toContainText('Дзвінок завершено');
+  // Дзвінок записано в чат запису.
+  const b = await page.evaluate(() => JSON.parse(localStorage.getItem('carcar.bookings'))[0]);
+  expect(b.chat.at(-1).text).toMatch(/^Дзвінок через CARCAR · \d+:\d\d$/);
+  await pro.close();
+});
+
+test('клієнти CARCAR у списку клієнтів мийки — без номера телефону', async ({ page }) => {
+  await seed(page, { bookings: [{ ...paid, state: 'completed', chat: undefined, chatUnreadBiz: false, date: '2026-10-01' },
+    { ...paid, id: 'b9', channel: 'phone', source: 'crm', state: 'completed', chat: undefined, chatUnreadBiz: false, date: '2026-10-02', clientName: 'Олег', clientPhone: '+380 67 000 11 22' }] });
+  await page.goto(`${PRO}#/clients`);
+  const list = page.locator('.client-list');
+  await expect(list.locator('li', { hasText: 'Ірина' }).locator('a[href^="tel:"]')).toHaveCount(0);
+  await expect(list.locator('li', { hasText: 'Олег' }).locator('a[href^="tel:"]')).toHaveCount(1);
 });

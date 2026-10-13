@@ -229,7 +229,6 @@ export const RELIABILITY = { days: 30, noShowDays: 60 };
 // Нагадування в гаражі.
 export const MAINTENANCE = {
   washDays: 14, // нагадати помити авто, якщо після останньої мийки минуло стільки днів
-  insuranceWarnDays: 30, // попереджати про кінець поліса за N днів
 };
 
 // «Приведи друга»: обом по bonus ₴ на наступне замовлення. Бонус оплачує CARCAR,

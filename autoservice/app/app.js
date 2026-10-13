@@ -1,6 +1,6 @@
 import { CITY, CITIES, CATEGORIES, CAR_CLASSES, PLACES, PAYMENT, MAINTENANCE, REFERRAL } from './data.js';
 import {
-  store, icon, esc, uah, pad, hhmm, toMin, isoDate, parseDate, uid, placeById, plural, duration, dayLabel, rating, tel,
+  store, icon, esc, uah, pad, hhmm, toMin, isoDate, parseDate, uid, placeById, plural, duration, dayLabel, rating,
   hoursFor, scheduleOf, inBreak, rangeText, WEEKDAY_NAMES, weekdayOf, phoneKey, offersOf, offerAsService, isOpenNow, hoursText, bookingStart, fmtTime, fmtDate, km, serviceCat, catById, shrinkPhoto,
   confirmBy, offerBy, pauseOf, responseStats, msText, AWAITING, staffOf, chargedOf, realOrder,
   applyOverrides, isListed, visibleReviews, ACTIVE, BLOCKING, HOUR, price, isFrozen, settleAll, ratingFor,
@@ -13,6 +13,7 @@ import {
   chatPost, chatTimeline, readMessages, msgPreview, presenceOf, PRESENCE_KEY, CLIENT_QUICK, ITEM_KIND, itemSum, estimateTotal, warrantyUntil,
 } from './ops.js';
 import { mountMap } from './map.js';
+import { initCalls, startCall, logCall } from './call.js';
 import { lookupPlate, normPlate, DEMO_PLATES } from './vehicles.js';
 
 // ---------- сховище (лише на цьому пристрої) ----------
@@ -165,6 +166,51 @@ const myKeys = () => [phoneKey(profile.phone), ...cars.map((c) => `car:${carLabe
 const personalFor = (p) => offersOf(p.id).filter((o) => myKeys().includes(o.clientKey)).map(offerAsService);
 // Усе, що клієнт може замовити в точці: спершу персональні послуги, далі прайс.
 const bookable = (p) => [...personalFor(p), ...p.services];
+
+// ---------- підтвердження запису мийкою ----------
+
+// Скільки лишилось: «4:52». Оновлюється щосекунди.
+const leftText = (due) => { const sec = Math.max(0, Math.ceil((due - Date.now()) / 1000)); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; };
+// Дзвінок мийці — лише через CARCAR: номер мийки клієнту не потрібен, а мийка не бачить номер клієнта.
+const callBtn = (b, cls = '') => `<button class="btn${cls}" data-action="call" data-id="${b.id}">${icon('phone', 18)}Подзвонити</button>`;
+const canAskNotify = () => 'Notification' in window && Notification.permission === 'default';
+
+// Мийка відповіла на запис, поки клієнт чекав (або поки застосунок був закритий) — показуємо це одразу:
+// банер зверху, вібрація й системне сповіщення, якщо клієнт дозволив.
+function watchAnswers() {
+  const seen = store.get('seenStates', {});
+  let changed = false;
+  for (const b of mine()) {
+    const was = seen[b.id];
+    if (was === b.state) continue;
+    if (was && AWAITING.includes(was)) answerNotice(b);
+    seen[b.id] = b.state;
+    changed = true;
+  }
+  if (changed) store.set('seenStates', seen);
+}
+
+function answerNotice(b) {
+  const p = placeById(b.placeId);
+  const when = `${dayLabel(b.date, { weekday: 'short', day: 'numeric', month: 'long' })} о ${b.time}`;
+  const [cls, title, text] = b.state === 'paid' ? ['ok', 'Запис підтверджено', `${p?.name ?? 'Мийка'} чекає вас ${when}${washerOf(b) ? `, мийник — ${washerOf(b)}` : ''}.`]
+    : b.state === 'offer' ? ['warn', 'Мийка пропонує інший час', `${p?.name ?? 'Мийка'}: ${when}. Підтвердіть або скасуйте без втрат.`]
+      : ['bad', 'Мийка не підтвердила запис', `${p?.name ?? 'Мийка'} не змогла прийняти запис. Гроші повернуто — оберіть інший час чи мийку.`];
+  const el = document.createElement('a');
+  el.className = `answer-banner ${cls}`;
+  el.href = `#/bookings/${b.id}`;
+  el.setAttribute('role', 'alert');
+  el.innerHTML = `${icon(cls === 'ok' ? 'checkCircle' : cls === 'warn' ? 'clock' : 'x', 22)}<span><b>${title}</b>${esc(text)}</span>`;
+  el.addEventListener('click', () => el.remove());
+  document.querySelector('.answer-banner')?.remove();
+  document.body.append(el);
+  setTimeout(() => el.remove(), 9000);
+  if (navigator.userActivation?.hasBeenActive) navigator.vibrate?.([120, 60, 120]);
+  if ('Notification' in window && Notification.permission === 'granted') {
+    const opts = { body: text, tag: `answer-${b.id}`, icon: 'icon.svg', data: { url: `index.html#/bookings/${b.id}` } };
+    navigator.serviceWorker?.getRegistration().then((reg) => (reg ? reg.showNotification(title, opts) : new Notification(title, opts))).catch(() => {});
+  }
+}
 
 function toast(text) {
   const el = $('#toast');
@@ -673,7 +719,7 @@ function viewPlace(id) {
     <div class="infobox">
       <div class="addr">${icon('pin', 18)}${[p.district, p.address].filter(Boolean).map(esc).join(', ')}</div>
       <div class="grid2">
-        <a class="btn" href="${tel(p)}">${icon('phone', 18)}Зателефонувати</a>
+        <button class="btn" data-action="call" data-place="${p.id}">${icon('phone', 18)}Подзвонити</button>
         <a class="btn" href="${maps}" target="_blank" rel="noopener">${icon('route', 18)}Маршрут</a>
       </div>
     </div>
@@ -766,7 +812,7 @@ const ASK_QUICK = ['Чи робите хімчистку салону?', 'Чи �
 function askBlock(p) {
   const unread = requestsOf(p.id).some((r) => r.unreadClient);
   return `<a class="card link-card ask-link" href="#/ask/${p.id}">${icon('chat', 22)}<span>Не знайшли потрібну послугу?
-    <small>Напишіть мийці в чат — відповідь прийде сюди й у «Повідомлення»</small></span>
+    <small>Напишіть мийці — відповідь прийде в «Повідомлення»</small></span>
     ${unread ? '<span class="count" aria-label="нова відповідь">1</span>' : ''}${icon('chevR', 18)}</a>`;
 }
 
@@ -802,7 +848,7 @@ function viewAsk(id) {
       <button class="icon-btn" data-action="chat-back" aria-label="Назад">${icon('chevL', 24)}</button>
       ${avatar(p.name, presenceOf(p.id).online, p.avatar)}
       <div class="chat-who"><h1>${esc(p.name)}</h1>${presenceLine(p.id)}</div>
-      <a class="icon-btn" href="${tel(p)}" aria-label="Зателефонувати">${icon('phone', 20)}</a>
+      <button class="icon-btn" data-action="call" data-place="${p.id}" aria-label="Подзвонити через CARCAR">${icon('phone', 20)}</button>
     </header>
     <div class="chat-pin">${icon('chat', 16)}<span>Запит про послугу${list.length ? ` · ${reqStatus(list.at(-1))[1]}` : ''}</span></div>
     <ol class="chat-msgs" aria-label="Повідомлення">
@@ -917,7 +963,7 @@ function viewBook(id, date, time) {
   if (pause) {
     return `${back(`#/place/${p.id}`, esc(p.name))}<h1>Онлайн-запис на паузі</h1>
       <p class="notice warn">Мийка часто не підтверджувала записи, тому CARCAR призупинив онлайн-запис до ${fmtTime(pause.until)}. Можна зателефонувати мийці або обрати іншу поруч.</p>
-      <div class="grid2"><a class="btn" href="${tel(p)}">${icon('phone', 18)}Зателефонувати</a><a class="btn primary" href="#/">Інші мийки</a></div>`;
+      <div class="grid2"><button class="btn" data-action="call" data-place="${p.id}">${icon('phone', 18)}Подзвонити</button><a class="btn primary" href="#/">Інші мийки</a></div>`;
   }
   if (isBlocked(myKeys())) {
     return `${back(`#/place/${p.id}`, esc(p.name))}<h1>Запис обмежено</h1>
@@ -1444,9 +1490,16 @@ function bookingCard(b, highlight) {
   let body = lines;
   const started = bookingStart(b) <= new Date();
   if (b.state === 'pending') {
-    body += `<div class="notice ic-row">${icon('clock', 18)}<span>Оплату отримано. Мийка підтвердить запис до ${new Date(confirmBy(b)).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}${isoDate(new Date(confirmBy(b))) === isoDate(new Date()) ? '' : `, ${dayLabel(isoDate(new Date(confirmBy(b))), { day: 'numeric', month: 'long' })}`}. Якщо не зможе прийняти — гроші повернемо.</span></div>
+    const due = confirmBy(b);
+    const soon = due - Date.now() < 60 * 60000;
+    body += `<div class="wait-box" role="status">
+        <span class="wait-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span><b>Чекаємо підтвердження мийки</b>
+          <small>${soon ? `Відповідь — протягом <span class="countdown" data-due="${due}">${leftText(due)}</span>.` : `Мийка відповість до ${new Date(due).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}${isoDate(new Date(due)) === isoDate(new Date()) ? '' : `, ${dayLabel(isoDate(new Date(due)), { day: 'numeric', month: 'long' })}`}.`} Ми повідомимо, щойно мийка підтвердить. Якщо не зможе прийняти — гроші повернемо.</small></span>
+      </div>
+      ${canAskNotify() ? `<button class="btn soft block" data-action="notify-on">${icon('bell', 18)}Надіслати сповіщення, коли мийка підтвердить</button>` : ''}
       <div class="grid2">
-        ${p ? `<a class="btn" href="${tel(p)}">${icon('phone', 18)}Зателефонувати</a>` : ''}
+        ${p ? callBtn(b) : ''}
         <button class="btn text-danger" data-action="cancel" data-id="${b.id}">Скасувати</button>
       </div>`;
   } else if (b.state === 'offer') {
@@ -1470,14 +1523,14 @@ function bookingCard(b, highlight) {
         </div></div>` : ''}
       ${started ? `<div class="notice ic-row">${icon('clock', 18)}Коли авто буде готове, мийка відмітить це тут. Тоді зможете залишити відгук.</div>
         <div class="grid2">
-          ${p ? `<a class="btn" href="${tel(p)}">${icon('phone', 18)}Зателефонувати</a>` : ''}
+          ${p ? callBtn(b) : ''}
           <button class="btn line-danger" data-action="dispute" data-id="${b.id}">Відкрити спір</button>
         </div>`
       : `<div class="notice ic-row">${icon('shield', 18)}Оплачено. Після візиту мийка підтвердить виконання.</div>
       <div class="grid2">
         ${canMove ? `<a class="btn" href="#/move/${b.id}">${icon('calendar', 18)}Перенести</a>` : ''}
         <button class="btn" data-action="ics" data-id="${b.id}">${icon('calendar', 18)}У календар</button>
-        ${p ? `<a class="btn${canMove ? ' full' : ''}" href="${tel(p)}">${icon('phone', 18)}Зателефонувати</a>` : ''}
+        ${p ? callBtn(b, canMove ? ' full' : '') : ''}
         <button class="btn text-danger full" data-action="cancel" data-id="${b.id}">${t.kind === 'free' ? 'Скасувати' : 'Скасувати без повернення'}</button>
       </div>
       <p class="terms">${t.kind === 'free'
@@ -1635,7 +1688,7 @@ function viewChat(id) {
       <button class="icon-btn" data-action="chat-back" aria-label="Назад">${icon('chevL', 24)}</button>
       ${avatar(p.name, presenceOf(p.id).online, p.avatar)}
       <div class="chat-who"><h1>${esc(p.name)}</h1>${presenceLine(p.id)}</div>
-      <a class="icon-btn" href="${tel(p)}" aria-label="Зателефонувати">${icon('phone', 20)}</a>
+      <button class="icon-btn" data-action="call" data-id="${b.id}" aria-label="Подзвонити через CARCAR">${icon('phone', 20)}</button>
     </header>
     <a class="chat-pin" href="#/bookings/${b.id}">${icon('calendar', 16)}<span>${b.no ? `${bookingNo(b)} · ` : ''}${dayLabel(b.date, { weekday: 'short', day: 'numeric', month: 'short' })}, ${b.time} · ${esc(b.services[0])}${b.services.length > 1 ? ` +${b.services.length - 1}` : ''}</span>${icon('chevR', 16)}</a>
     <ol class="chat-msgs" aria-label="Повідомлення">
@@ -2298,7 +2351,7 @@ function historyOf(car) {
 
 const currentKm = (car) => Math.max(car.mileage || 0, ...historyOf(car).map((h) => h.km || 0));
 
-// Нагадування в гаражі: час помити авто (за останньою мийкою) і поліс ОСЦПВ.
+// Нагадування в гаражі: час помити авто (за останньою мийкою).
 function reminders(car) {
   const out = [];
   const now = new Date();
@@ -2308,12 +2361,6 @@ function reminders(car) {
   else if (days >= MAINTENANCE.washDays) out.push({ level: 'due', text: `Авто не мили ${days} ${plural(days, 'день', 'дні', 'днів')} — час на мийку`, cat: 'wash' });
   else out.push({ level: 'ok', text: `Остання мийка ${fmtDate(last.date)}` });
 
-  if (car.insuranceUntil) {
-    const left = Math.ceil((parseDate(car.insuranceUntil) - now) / (24 * HOUR));
-    if (left < 0) out.push({ level: 'due', text: 'Поліс ОСЦПВ прострочено' });
-    else if (left <= MAINTENANCE.insuranceWarnDays) out.push({ level: 'due', text: `Поліс ОСЦПВ закінчується через ${left} ${plural(left, 'день', 'дні', 'днів')}` });
-    else out.push({ level: 'ok', text: `Поліс ОСЦПВ до ${fmtDate(car.insuranceUntil)}` });
-  }
   return out;
 }
 
@@ -2363,8 +2410,7 @@ function viewGarage() {
       <label class="field"><span>Марка</span><input name="make" required placeholder="Наприклад, Skoda" autocomplete="off"></label>
       <label class="field"><span>Модель</span><input name="model" required placeholder="Наприклад, Octavia" autocomplete="off"></label>
       <label class="field"><span>Рік випуску (необовʼязково)</span><input name="year" type="number" inputmode="numeric" min="1950" max="${new Date().getFullYear() + 1}" autocomplete="off"></label>
-      <label class="field"><span>Клас</span><select name="cls">${CAR_CLASSES.map((c, i) => `<option value="${i}">${c}</option>`).join('')}</select></label>
-      <label class="field"><span>Поліс ОСЦПВ дійсний до (необовʼязково)</span><input name="insuranceUntil" type="date"></label>`, 'Зберегти')}
+      <label class="field"><span>Клас</span><select name="cls">${CAR_CLASSES.map((c, i) => `<option value="${i}">${c}</option>`).join('')}</select></label>`, 'Зберегти')}
     </details>
     ${businessEntry()}
     ${logoutBlock()}`;
@@ -2524,6 +2570,7 @@ function route() {
   const view = $('#view');
   const tab = ['invite'].includes(page) ? '' : ['support', 'wallet', 'business'].includes(page) ? 'garage' : page === 'move' ? 'bookings' : page === 'chat' ? 'inbox' : ['bookings', 'garage', 'inbox'].includes(page) ? page : 'catalog';
   settle();
+  watchAnswers();
   // Хтось скасував запис — можливо, звільнився час для листа очікування.
   checkWaitlist(bookings);
   runSubscriptions();
@@ -2715,6 +2762,15 @@ document.addEventListener('click', (e) => {
   } else if (bookingActions[action]) {
     const b = bookings.find((x) => x.id === id);
     if (b && bookingActions[action](b) !== false) { ui.bookFocus = b.id; save(); route(); }
+  } else if (action === 'call') {
+    const b = id ? bookings.find((x) => x.id === id) : null;
+    const p = placeById(b?.placeId ?? el.dataset.place);
+    if (p) startCall({ bookingId: b?.id ?? null, placeId: p.id, placeName: p.name, clientName: profile.name || 'Клієнт CARCAR' });
+  } else if (action === 'notify-on') {
+    Notification.requestPermission().then((res) => {
+      route();
+      toast(res === 'granted' ? 'Готово — повідомимо, щойно мийка відповість' : 'Сповіщення вимкнені в налаштуваннях браузера. Відповідь мийки побачите тут');
+    });
   } else if (action === 'ics') {
     downloadIcs(bookings.find((x) => x.id === id));
   } else if (action === 'repeat') {
@@ -2730,7 +2786,7 @@ document.addEventListener('click', (e) => {
     if (time) setTimeout(() => toast(`Той самий запис: ${dayLabel(date, { weekday: 'short', day: 'numeric', month: 'long' })} о ${time} — лишилось оплатити`), 0);
   } else if (action === 'plate-check') {
     const f = $('#carform');
-    const r = lookupPlate(f.elements.plate.value, isoDate(new Date()));
+    const r = lookupPlate(f.elements.plate.value);
     const box = $('#plate-result');
     track('plate_check', { found: !!r.car });
     if (r.error) { box.innerHTML = `<p class="notice warn" style="margin:0">${r.error}.</p>`; return; }
@@ -2741,18 +2797,14 @@ document.addEventListener('click', (e) => {
       f.elements.model.value = r.car.model;
       f.elements.year.value = r.car.year;
       f.elements.cls.value = r.car.cls;
-      if (r.insurance?.until) f.elements.insuranceUntil.value = r.insurance.until;
       f.dataset.color = r.car.color;
     }
-    const ins = !r.insurance ? '' : r.insurance.state === 'ok' ? `<li class="ok-text">${icon('checkCircle', 16)}Поліс ОСЦПВ діє до ${fmtDate(r.insurance.until)}</li>`
-      : r.insurance.state === 'expired' ? `<li class="bad-text">${icon('warn', 16)}Поліс ОСЦПВ закінчився ${fmtDate(r.insurance.until)} — без нього їздити не можна</li>`
-        : `<li class="bad-text">${icon('warn', 16)}Чинного поліса ОСЦПВ не знайдено</li>`;
     box.innerHTML = `<div class="notice plate-card">
       <b>${esc(r.plate)}${r.region ? ` · ${r.region}` : ''}</b>
-      ${r.car ? `<ul><li>${esc(r.car.make)} ${esc(r.car.model)}, ${r.car.year} р., ${esc(r.car.color)}, ${esc(r.car.fuel)} ${esc(r.car.engine)}</li>${ins}</ul>
+      ${r.car ? `<ul><li>${esc(r.car.make)} ${esc(r.car.model)}, ${r.car.year} р., ${esc(r.car.color)}, ${esc(r.car.fuel)} ${esc(r.car.engine)}</li></ul>
         <span class="small muted">Дані підставлено у форму — перевірте й збережіть.</span>`
         : `<span class="small">Авто з цим номером немає в демо-реєстрі. Заповніть дані вручну.</span>`}
-      <span class="fine">Демо: перевірка знаходить лише вигадані номери ${Object.keys(DEMO_PLATES).join(', ')}. У робочій версії дані беремо з відкритого реєстру МВС і бази полісів МТСБУ.</span>
+      <span class="fine">Демо: перевірка знаходить лише вигадані номери ${Object.keys(DEMO_PLATES).join(', ')}. У робочій версії дані беремо з відкритого реєстру МВС.</span>
     </div>`;
   } else if (action === 'eta-late') {
     const b = bookings.find((x) => x.id === id);
@@ -3134,7 +3186,6 @@ document.addEventListener('submit', async (e) => {
     plate: normPlate(f.get('plate')),
     cls: Number(f.get('cls')),
     mileage: 0,
-    insuranceUntil: f.get('insuranceUntil') || null,
     log: [],
   };
   cars.push(car);
@@ -3148,8 +3199,16 @@ document.addEventListener('submit', async (e) => {
 renderCity();
 window.addEventListener('hashchange', route);
 // CarCar Business в іншій вкладці змінила записи, прайс чи години — перечитуємо й перемальовуємо.
+// Щосекунди: відлік до відповіді мийки; час минув — запис скасовується сам, екран оновлюється.
+setInterval(() => {
+  const timers = document.querySelectorAll('[data-due]');
+  for (const el of timers) el.textContent = leftText(Number(el.dataset.due));
+  if ([...timers].some((el) => Number(el.dataset.due) <= Date.now()) && !draft?.paying) route();
+}, 1000);
+
 window.addEventListener('storage', (e) => {
   if (!e.key?.startsWith('carcar.')) return;
+  if (e.key === 'carcar.seenStates') return;
   // Мийка відкрила чи закрила панель — оновлюємо лише «у мережі», без перемальовування.
   if (e.key === `carcar.${PRESENCE_KEY}`) { refreshPresence(); return; }
   bookings = store.get('bookings', []);
@@ -3173,6 +3232,8 @@ setInterval(refreshPresence, 30000);
 acceptCampaign();
 track('session', { view: ui.view });
 keepChatOnKeyboard();
+// Вхідні дзвінки від мийок — за записами клієнта.
+initCalls('client', (c) => c.from === 'place' && (!c.bookingId || mine().some((b) => b.id === c.bookingId)), { onLog: (c) => logCall(bookings, c, save) });
 route();
 acceptInvite();
 

@@ -16,6 +16,7 @@ import {
   acceptBooking, declineBooking, expirePending, autoConfirmOf, setAutoConfirm, proposeTime, weeklyDealsOf, daysText, markNoShow, noShowFrom,
 } from './ops.js';
 import { ibanValid, normIban, formatIban, codeValid } from './partners.js';
+import { initCalls, startCall, logCall } from './call.js';
 
 // ---------- дані ----------
 
@@ -223,7 +224,7 @@ function alertSheet(b) {
   openSheet('Новий запис', `<div class="alert-card">
       <div class="alert-time"><b>${b.time}</b><span>${dayWord(b.date, true)}</span><small>до ${hhmm(toMin(b.time) + b.minutes)} · ${duration(b.minutes)}</small></div>
       <dl class="pro-kv">
-        <dt>Клієнт</dt><dd><b>${esc(who(b))}</b>${b.clientPhone ? ` · <a href="${telHref(b.clientPhone)}">${esc(b.clientPhone)}</a>` : ''}</dd>
+        <dt>Клієнт</dt><dd><b>${esc(who(b))}</b> · дзвінок через CARCAR</dd>
         <dt>Авто</dt><dd>${esc(b.car || '—')}</dd>
         <dt>Послуги</dt><dd>${esc(b.services.join(', '))}</dd>
         <dt>Оплачено</dt><dd><b>${uah(sumOf(b))}</b> через CARCAR</dd>
@@ -411,12 +412,13 @@ const compose = (thread, quick) => `<div class="chat-compose">
     </form>
   </div>`;
 
-function chatHead(name, sub, phone) {
+// Клієнти CARCAR — дзвінок лише через застосунок, номер прихований.
+function chatHead(name, sub, call) {
   return `<header class="chat-head">
       <a class="icon-btn" href="#/" aria-label="До повідомлень">${icon('chevL', 24)}</a>
       <span class="avatar" aria-hidden="true">${firstLetter(name)}</span>
       <div class="chat-who"><h1>${esc(name)}</h1><small>${sub}</small></div>
-      ${phone ? `<a class="icon-btn" href="${telHref(phone)}" aria-label="Зателефонувати клієнту">${icon('phone', 20)}</a>` : ''}
+      <button class="icon-btn" type="button" data-action="call" ${call} aria-label="Подзвонити клієнту через CARCAR">${icon('phone', 20)}</button>
     </header>`;
 }
 
@@ -432,7 +434,7 @@ function viewThread(arg = '') {
     const [label] = stateOf(b);
     const open = ACTIVE.includes(b.state);
     return `<section class="chat-screen" aria-label="Чат з ${esc(who(b))}">
-      ${chatHead(who(b), `${label} · ${dayWord(b.date)}, ${b.time}`, b.clientPhone)}
+      ${chatHead(who(b), `${label} · ${dayWord(b.date)}, ${b.time}`, `data-id="${b.id}"`)}
       <button class="chat-pin" type="button" data-action="bk-open" data-id="${b.id}">${icon('calendar', 16)}<span>${b.no ? `${bookingNo(b)} · ` : ''}${esc(b.services.join(', '))} · ${uah(sumOf(b))}${b.car ? ` · ${esc(b.car)}` : ''}</span>${icon('chevR', 16)}</button>
       ${b.state === 'pending' ? `<div class="chat-actions"><button class="btn navy" type="button" data-action="accept" data-id="${b.id}">${icon('check', 18)}Прийняти запис</button><button class="btn" type="button" data-action="decline" data-id="${b.id}">Відмовити</button></div>` : ''}
       ${b.state === 'paid' && started(b) ? `<div class="chat-actions"><button class="btn navy" type="button" data-action="ready" data-id="${b.id}">${icon('check', 18)}Машина готова</button></div>` : ''}
@@ -448,7 +450,7 @@ function viewThread(arg = '') {
   const [label] = REQ_STATE[reqState(r)];
   const open = !r.closed;
   return `<section class="chat-screen" aria-label="Чат з ${esc(r.clientName || 'клієнтом')}">
-    ${chatHead(r.clientName || 'Клієнт', `${label}${r.car ? ` · ${esc(r.car)}` : ''}`, r.clientPhone)}
+    ${chatHead(r.clientName || 'Клієнт', `${label}${r.car ? ` · ${esc(r.car)}` : ''}`, `data-req="${r.id}"`)}
     ${open ? `<div class="chat-actions">
       <button class="btn navy" type="button" data-action="nb-open" data-req="${r.id}">${icon('calendar', 16)}Записати</button>
       ${r.service ? '' : `<button class="btn" type="button" data-action="svc-new" data-req="${r.id}">${icon('plus', 16)}Додати послугу</button>`}
@@ -663,7 +665,8 @@ function bookingSheet(id) {
     </dl>
     ${etaText(b) ? `<p class="notice ok" style="margin:0">${icon('bell', 18)}<span>Клієнт повідомив: ${etaText(b)} (${fmtTime(b.etaAt)}).</span></p>` : ''}
     <div class="grid2">
-      ${b.clientPhone ? `<a class="btn" href="${telHref(b.clientPhone)}">${icon('phone', 18)}Подзвонити</a>` : ''}
+      ${isCarcar(b) ? `<button class="btn" type="button" data-action="call" data-id="${b.id}">${icon('phone', 18)}Подзвонити через CARCAR</button>`
+        : b.clientPhone ? `<a class="btn" href="${telHref(b.clientPhone)}">${icon('phone', 18)}Подзвонити</a>` : ''}
       ${isCarcar(b) ? `<a class="btn" href="#/chat/b-${b.id}" data-action="sheet-close">${icon('chat', 18)}Написати</a>` : ''}
     </div>
     ${actions}`, b.id);
@@ -1176,7 +1179,9 @@ function clientsList() {
   for (const b of own()) {
     const key = b.clientPhone ? phoneKey(b.clientPhone) : `name:${(b.clientName || '').toLowerCase()}`;
     if (!key || key === 'name:') continue;
-    const c = map.get(key) ?? { key, name: b.clientName || 'Клієнт', phone: b.clientPhone || '', cars: new Set(), visits: 0, spent: 0, last: '', cls: b.cls ?? 0, car: '' };
+    const c = map.get(key) ?? { key, name: b.clientName || 'Клієнт', phone: '', cars: new Set(), visits: 0, spent: 0, last: '', cls: b.cls ?? 0, car: '' };
+    // Номер клієнта CARCAR мийка не бачить — лише тих, кого записала сама.
+    if (!isCarcar(b) && b.clientPhone) c.phone = b.clientPhone;
     if (b.car) c.cars.add(b.car);
     if (b.state === 'completed') { c.visits += 1; c.spent += sumOf(b); }
     if (b.date > c.last) { c.last = b.date; c.name = b.clientName || c.name; c.car = b.car || c.car; c.cls = b.cls ?? c.cls; }
@@ -1660,7 +1665,7 @@ document.addEventListener('click', async (e) => {
     const r = el.dataset.req ? ownRequests().find((x) => x.id === el.dataset.req) : null;
     nbOpen({
       ...(el.dataset.date ? { date: el.dataset.date } : {}), ...(el.dataset.time ? { want: el.dataset.time } : {}),
-      ...(r ? { name: r.clientName ?? '', phone: r.clientPhone ?? '', car: r.car ?? '', cls: r.cls ?? 0 } : {}),
+      ...(r ? { name: r.clientName ?? '', car: r.car ?? '', cls: r.cls ?? 0 } : {}),
     });
     return;
   }
@@ -1692,6 +1697,12 @@ document.addEventListener('click', async (e) => {
     return;
   }
   if (action === 'washer') { washerSheet(id, 'assign'); return; }
+  if (action === 'call') {
+    const r = el.dataset.req ? requests.find((x) => x.id === el.dataset.req) : null;
+    const pid = b?.placeId ?? r?.placeId ?? ui.place;
+    startCall({ bookingId: b?.id ?? null, reqId: r?.id ?? null, placeId: pid, placeName: placeById(pid)?.name ?? '', clientName: b ? who(b) : r?.clientName || 'Клієнт' });
+    return;
+  }
   if (action === 'dur') { durSheet(id); return; }
   if (action === 'washer-pick') {
     const m = el.dataset.m || null;
@@ -2205,6 +2216,8 @@ navigator.serviceWorker?.addEventListener('message', (e) => {
   if (e.data?.type === 'pending-action') { load(); notifyAction(e.data.action, e.data.id); }
 });
 keepChatOnKeyboard();
+// Вхідні дзвінки клієнтів CARCAR — у будь-яку мийку акаунта.
+initCalls('place', (c) => c.from === 'client' && !!session() && accountPlaces(session()).includes(c.placeId), { onLog: (c) => logCall(bookings, c, save) });
 route();
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {

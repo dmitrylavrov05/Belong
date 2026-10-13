@@ -573,14 +573,12 @@ test('«Машина готова» з фото потрапляє клієнт�
   await expect(log.getByRole('img', { name: 'Фото 1' })).toBeVisible();
 });
 
-test('гараж нагадує помити авто й про поліс', async ({ page }) => {
-  await addCar(page, async () => {
-    await page.getByLabel('Поліс ОСЦПВ дійсний до (необовʼязково)').fill('2026-10-24');
-  });
-  await expect(page.getByRole('link', { name: /Skoda Octavia/ })).toContainText('Поліс ОСЦПВ закінчується через 20 днів');
+test('гараж нагадує помити авто', async ({ page }) => {
+  await addCar(page);
+  // Поліса ОСЦПВ у формі авто більше немає.
+  await expect(page.getByLabel(/Поліс ОСЦПВ/)).toHaveCount(0);
   await page.getByRole('link', { name: /Skoda Octavia/ }).click();
   await expect(page.getByText('Ще немає мийок цього авто в CARCAR')).toBeVisible();
-  await expect(page.getByText('Поліс ОСЦПВ закінчується через 20 днів')).toBeVisible();
 
   await page.locator('summary', { hasText: 'Додати мийку вручну' }).click();
   await page.getByLabel('Дата').fill('2026-09-01');

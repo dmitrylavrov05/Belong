@@ -24,19 +24,17 @@ export function plateRegion(p) {
 
 // Демо-реєстр: вигадані авто для показу, як працюватиме перевірка.
 export const DEMO_PLATES = {
-  AA1234BB: { make: 'Skoda', model: 'Octavia', year: 2019, color: 'сірий', fuel: 'бензин', engine: '1,4 л', cls: 0, insurance: { until: '2027-03-12' } },
-  KA0001AA: { make: 'Toyota', model: 'RAV4', year: 2021, color: 'білий', fuel: 'гібрид', engine: '2,5 л', cls: 1, insurance: { until: '2026-09-20' } },
-  AI7777KE: { make: 'Volkswagen', model: 'Passat', year: 2016, color: 'чорний', fuel: 'дизель', engine: '2,0 л', cls: 0, insurance: null },
+  AA1234BB: { make: 'Skoda', model: 'Octavia', year: 2019, color: 'сірий', fuel: 'бензин', engine: '1,4 л', cls: 0 },
+  KA0001AA: { make: 'Toyota', model: 'RAV4', year: 2021, color: 'білий', fuel: 'гібрид', engine: '2,5 л', cls: 1 },
+  AI7777KE: { make: 'Volkswagen', model: 'Passat', year: 2016, color: 'чорний', fuel: 'дизель', engine: '2,0 л', cls: 0 },
 };
 
-// Результат перевірки: регіон, дані авто (якщо знайдено) і стан поліса ОСЦПВ на сьогодні.
-export function lookupPlate(raw, today) {
+// Результат перевірки: регіон і дані авто (якщо знайдено).
+export function lookupPlate(raw) {
   const plate = normPlate(raw);
   if (!plateValid(plate)) return { plate, error: 'Номер має вигляд AA1234BB: дві літери, чотири цифри, дві літери' };
   const car = DEMO_PLATES[plate] ?? null;
-  const ins = car?.insurance;
   return {
     plate, region: plateRegion(plate), car,
-    insurance: !car ? null : !ins ? { state: 'none' } : ins.until >= today ? { state: 'ok', until: ins.until } : { state: 'expired', until: ins.until },
   };
 }

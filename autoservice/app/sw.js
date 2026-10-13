@@ -1,10 +1,10 @@
 // Кеш для роботи без мережі: застосунок відкривається, навіть якщо зник інтернет
 // (зокрема під час відключень світла).
-const CACHE = 'carcar-v58';
+const CACHE = 'carcar-v60';
 const FILES = [
   './', 'index.html', 'styles.css', 'app.js', 'core.js', 'data.js', 'icon.svg', 'manifest.webmanifest',
   'business.html', 'admin.css', 'charts.js', 'partners.js', 'ops.js', 'map.js', 'vehicles.js', 'admin.html', 'admin.js',
-  'pro.html', 'pro.js', 'pro.css', 'pro.webmanifest', 'pro-icon.svg', 'start.mp3',
+  'pro.html', 'pro.js', 'pro.css', 'pro.webmanifest', 'pro-icon.svg', 'start.mp3', 'call.js',
   'fonts/onest-cyrillic.woff2', 'fonts/onest-cyrillic-ext.woff2', 'fonts/onest-latin.woff2',
 ];
 
@@ -38,6 +38,16 @@ self.addEventListener('fetch', (e) => {
 // Відкритому застосунку передаємо дію повідомленням, інакше відкриваємо його з дією в адресі.
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();
+  // Сповіщення клієнту (мийка відповіла на запис): відкриваємо застосунок на цьому записі.
+  const url = e.notification.data?.url;
+  if (url) {
+    e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      const win = list.find((c) => !new URL(c.url).pathname.endsWith('/pro.html') && !new URL(c.url).pathname.endsWith('/admin.html'));
+      if (win) return win.navigate(url).then((w) => (w ?? win).focus()).catch(() => win.focus());
+      return self.clients.openWindow(url);
+    }));
+    return;
+  }
   const id = e.notification.data?.id;
   if (!id) return;
   const action = e.action || 'open';

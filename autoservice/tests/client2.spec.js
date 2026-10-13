@@ -211,14 +211,14 @@ test('перевірка авто за номером: регіон, марка,
   const r = page.locator('#plate-result');
   await expect(r).toContainText('AA1234BB · Київ');
   await expect(r).toContainText('Skoda Octavia, 2019 р., сірий, бензин 1,4 л');
-  await expect(r).toContainText('Поліс ОСЦПВ діє до 12 березня 2027');
+  await expect(r).not.toContainText('ОСЦПВ');
   await expect(f.getByLabel('Держномер')).toHaveValue('AA1234BB');
   await expect(f.getByLabel('Марка')).toHaveValue('Skoda');
   await expect(f.getByLabel('Рік випуску (необовʼязково)')).toHaveValue('2019');
 
   await f.getByLabel('Держномер').fill('KA0001AA');
   await f.getByRole('button', { name: 'Перевірити' }).click();
-  await expect(r).toContainText('Поліс ОСЦПВ закінчився 20 вересня 2026');
+  await expect(r).toContainText('Toyota RAV4');
   await expect(f.getByLabel('Клас')).toHaveValue('1');
 
   await f.getByLabel('Держномер').fill('BC5555AA');
