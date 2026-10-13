@@ -1700,7 +1700,7 @@ const PAYMENT = {
   installments: { minTotal: 3000, parts: [3, 4, 6] },
 };
 
-// Обмеження для клієнта одне: запис можна перенести не більше 3 разів (MOVE_LIMIT в app.js).
+// Обмеження для клієнта одне: сам він переносить запис один раз, далі — через чат з мийкою (MOVE_LIMIT в app.js).
 // Тут — лише вікно для підказки мийці «Клієнт часто змінює плани»: скасування й перенесення за days днів,
 // неявки за noShowDays днів.
 const RELIABILITY = { days: 30, noShowDays: 60 };
@@ -3739,7 +3739,8 @@ function bookingSheet(id) {
       </div>`;
   } else if (b.state === 'paid') {
     const late = Date.now() >= noShowFrom(b);
-    actions = !started(b) ? `<p class="notice">«Машина готова» можна позначити, коли почнеться візит — ${dayWord(b.date).toLowerCase()} о ${b.time}.</p>` : `<form class="stack ready-form" id="ready-form" data-id="${b.id}" style="gap:10px">
+    actions = !started(b) ? `<p class="notice">«Машина готова» можна позначити, коли почнеться візит — ${dayWord(b.date).toLowerCase()} о ${b.time}.</p>
+      <button class="btn" type="button" data-action="move" data-id="${b.id}">${icon('calendar', 18)}Перенести за домовленістю з клієнтом</button>` : `<form class="stack ready-form" id="ready-form" data-id="${b.id}" style="gap:10px">
         <label class="dropzone small-drop">${icon('camera', 20)}Фото результату (до 3, необовʼязково)<span class="photo-count" aria-live="polite"></span>
           <input class="sr-only" name="photos" type="file" accept="image/*" multiple></label>
         <div class="grid2">
@@ -4891,8 +4892,12 @@ document.addEventListener('click', async (e) => {
   if (action === 'move-day') { moveSheet(id, el.dataset.date); return; }
   if (action === 'move-to') {
     if (!openStarts(place(), el.dataset.date, b.minutes, bookings, { lead: 0, skip: b }).includes(el.dataset.time)) { toast('Цей час щойно зайняли — оберіть інший'); moveSheet(id, el.dataset.date); return; }
-    b.moves = [...(b.moves ?? []), { date: b.date, time: b.time, at: Date.now() }];
+    b.moves = [...(b.moves ?? []), { date: b.date, time: b.time, at: Date.now(), by: 'place' }];
+    const from = `${dayWord(b.date).toLowerCase()}, ${b.time}`;
     Object.assign(b, { date: el.dataset.date, time: el.dataset.time });
+    // Нагадування й «Їду» стосувалися старого часу; клієнт бачить новий час у чаті запису.
+    for (const k of ['remindDay', 'remind2h', 'eta', 'late', 'etaAt']) delete b[k];
+    if (isCarcar(b)) chatPost(b, 'sys', `Мийка перенесла запис з ${from} на ${dayWord(b.date).toLowerCase()}, ${b.time}`, 'client');
     after(`Перенесено на ${dayWord(b.date).toLowerCase()}, ${b.time}`);
     return;
   }

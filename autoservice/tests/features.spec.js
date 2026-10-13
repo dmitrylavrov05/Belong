@@ -251,7 +251,7 @@ test('чат: фото, «Прочитано / Не прочитано» і ми
   await expect((await proChat(page)).locator('.read-state')).toHaveText(/^Прочитано/);
 });
 
-test('обмеження одне: запис можна перенести не більше 3 разів; скасування й кількість записів не обмежені', async ({ page }) => {
+test('обмеження одне: сам клієнт переносить запис один раз, далі — через чат; скасування й кількість записів не обмежені', async ({ page }) => {
   page.on('dialog', (d) => d.accept());
   // Скасовуємо 5 разів поспіль — без штрафів і без блокувань.
   for (let i = 0; i < 5; i++) {
@@ -267,23 +267,23 @@ test('обмеження одне: запис можна перенести не
   await expect(page.getByRole('heading', { name: 'Забагато активних записів' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Запис' })).toBeVisible();
 
-  // Перенесення одного запису: тричі можна, учетверте — ні.
+  // Перенесення: сам клієнт — один раз, далі через чат з мийкою.
   await page.goto('/#/bookings');
   await page.getByRole('button', { name: /^Активні/ }).click();
   const id = (await page.locator('article').first().getAttribute('id')).slice(2);
-  for (const [n, time] of [[0, '14:00'], [1, '15:00'], [2, '16:00']]) {
-    await page.goto(`/#/move/${id}`);
-    await page.locator(`.slot[data-time="${time}"]`).click();
-    await page.locator('[data-action="move-confirm"]').click();
-    await expect(page.locator('#toast')).toContainText('Запис перенесено');
-    expect(n).toBeLessThan(3);
-  }
+  await page.goto(`/#/move/${id}`);
+  await page.locator('.slot[data-time="14:00"]').click();
+  await page.locator('[data-action="move-confirm"]').click();
+  await expect(page.locator('#toast')).toContainText('Запис перенесено');
   await page.goto('/#/bookings');
   const card = page.locator(`#b-${id}`);
   await expect(card.getByRole('link', { name: 'Перенести' })).toHaveCount(0);
-  await expect(card).toContainText('Запис уже переносили 3 рази');
+  await expect(card).toContainText('Запис уже переносили. Щоб змінити час ще раз, напишіть мийці в чат');
+  await expect(card.getByRole('link', { name: 'Домовитися про інший час у чаті' })).toHaveAttribute('href', `#/chat/${id}`);
   await page.goto(`/#/move/${id}`);
-  await expect(page.locator('.notice.warn')).toContainText('Запис уже переносили 3 рази, більше не можна');
+  await expect(page.locator('.notice.warn')).toContainText('Ще раз змінити час можна через чат з мийкою');
+  await page.getByRole('link', { name: 'Написати мийці' }).click();
+  await expect(page.locator('.chat-screen')).toBeVisible();
 });
 
 test('виїзд до вас: мийка біля дому з адресою на карті, адреса в картці запису CarCar Business', async ({ page }) => {
@@ -498,3 +498,26 @@ for (const [name, setup] of Object.entries(PAGES)) {
     expect(overflow).toBeLessThanOrEqual(0);
   });
 }
+
+test('після свого переносу клієнт домовляється в чаті, мийка переносить запис — клієнт бачить новий час', async ({ page }) => {
+  page.on('dialog', (d) => d.accept());
+  await book(page, { pay: /Оплатити/ });
+  await page.goto('/#/bookings');
+  await page.getByRole('button', { name: /^Активні/ }).click();
+  const id = (await page.locator('article').first().getAttribute('id')).slice(2);
+  await page.goto(`/#/move/${id}`);
+  await page.locator('.slot[data-time="14:00"]').click();
+  await page.locator('[data-action="move-confirm"]').click();
+  await expect(page.locator('#toast')).toContainText('Запис перенесено');
+
+  // Мийка переносить у CarCar Business — це не забирає в клієнта його перенос.
+  await page.goto(`/pro.html#/booking/${id}`);
+  await page.getByRole('dialog').getByRole('button', { name: /Перенести за домовленістю/ }).click();
+  await page.getByRole('dialog').locator('.slot[data-time="16:00"]').click();
+  await expect(page.locator('.toast')).toContainText('Перенесено на');
+  await page.goto(`/#/chat/${id}`);
+  await expect(page.locator('.chat-screen')).toContainText('Мийка перенесла запис з');
+  const b = await page.evaluate((x) => JSON.parse(localStorage.getItem('carcar.bookings')).find((y) => y.id === x), id);
+  expect(b.time).toBe('16:00');
+  expect(b.moves.map((m) => m.by ?? 'client')).toEqual(['client', 'place']);
+});

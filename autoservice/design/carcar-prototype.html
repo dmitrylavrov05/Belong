@@ -1449,7 +1449,7 @@ const PAYMENT = {
   installments: { minTotal: 3000, parts: [3, 4, 6] },
 };
 
-// Обмеження для клієнта одне: запис можна перенести не більше 3 разів (MOVE_LIMIT в app.js).
+// Обмеження для клієнта одне: сам він переносить запис один раз, далі — через чат з мийкою (MOVE_LIMIT в app.js).
 // Тут — лише вікно для підказки мийці «Клієнт часто змінює плани»: скасування й перенесення за days днів,
 // неявки за noShowDays днів.
 const RELIABILITY = { days: 30, noShowDays: 60 };
@@ -4519,7 +4519,7 @@ function bookingCard(b, highlight) {
       </div>`;
   } else if (b.state === 'paid') {
     const t = cancelTerms(b);
-    const canMove = t.inWindow && (b.moves?.length ?? 0) < MOVE_LIMIT;
+    const canMove = t.inWindow && clientMoves(b) < MOVE_LIMIT;
     body += `${b.extra ? `<div class="notice">
         <b>Майстер пропонує доплату +${uah(b.extra.amount)}</b>${esc(b.extra.reason)}
         <div class="grid2" style="margin-top:10px">
@@ -4541,7 +4541,8 @@ function bookingCard(b, highlight) {
       <p class="terms">${t.kind === 'free'
         ? `Перенести чи скасувати без втрат можна до ${fmtTime(t.deadline)}. Тоді ${uah(t.refund)} повернемо на баланс CARCAR.`
         : `Скасувати з поверненням можна було до ${fmtTime(t.deadline)}. Тепер оплата йде мийці, навіть якщо ви не приїдете.`}
-        ${t.inWindow && !canMove ? ` Запис уже переносили ${MOVE_LIMIT} рази. Якщо треба інший час, напишіть мийці в чат.` : ''}</p>`}`;
+        ${t.inWindow && !canMove ? ' Запис уже переносили. Щоб змінити час ще раз, напишіть мийці в чат — вона перенесе запис.' : ''}</p>
+      ${t.inWindow && !canMove ? `<a class="btn block" href="#/chat/${b.id}">${icon('chat', 18)}Домовитися про інший час у чаті</a>` : ''}`}`;
   } else if (b.state === 'dispute') {
     body += `<div class="notice warn"><div class="label">Ваша скарга</div>«${esc(b.disputeReason)}». Модератор перевірить і вирішить, кому передати гроші.</div>${result(b)}`;
   } else if (b.state === 'completed') {
@@ -4923,7 +4924,10 @@ function supportCard() {
 // ---------- перенесення запису ----------
 
 // Перенести можна до кінця безкоштовного скасування: оплата, знижки й бонуси лишаються як були.
-const MOVE_LIMIT = 3;
+// Сам клієнт переносить запис один раз; далі — домовляється з мийкою в чаті, а переносить мийка.
+const MOVE_LIMIT = 1;
+// Рахуємо лише перенесення самого клієнта: якщо час змінила мийка, клієнт свій перенос не втрачає.
+const clientMoves = (b) => (b.moves ?? []).filter((m) => m.by !== 'place').length;
 let move = null; // { id, date, time }
 
 function viewMove(id) {
@@ -4934,7 +4938,8 @@ function viewMove(id) {
   const head = `${back(`#/bookings/${b.id}`, 'Мої записи')}<h1>Перенести запис</h1>
     <p class="lead">${esc(p.name)} · ${esc(b.services.join(', '))}<br>Зараз: ${dayLabel(b.date, { weekday: 'short', day: 'numeric', month: 'long' })}, ${b.time}</p>`;
   if (!t.inWindow) return `${head}<p class="notice warn">Перенести можна було до ${fmtTime(t.deadline)}. Напишіть точці в чаті запису — можливо, вона знайде інший час.</p>`;
-  if ((b.moves?.length ?? 0) >= MOVE_LIMIT) return `${head}<p class="notice warn">Запис уже переносили ${MOVE_LIMIT} рази, більше не можна. Напишіть мийці в чат або скасуйте запис безкоштовно до ${fmtTime(t.deadline)}.</p>`;
+  if (clientMoves(b) >= MOVE_LIMIT) return `${head}<p class="notice warn">Запис уже переносили. Ще раз змінити час можна через чат з мийкою — вона перенесе запис. Або скасуйте його безкоштовно до ${fmtTime(t.deadline)}.</p>
+    <a class="btn primary block" href="#/chat/${b.id}">${icon('chat', 18)}Написати мийці</a>`;
   if (move?.id !== id) move = { id, date: b.date, time: null };
   return `${head}<p class="notice ok ic-row">${icon('shield', 18)}Оплата ${uah(b.paid)} не скасовується й не списується вдруге — змінюється лише час. Ціна лишається тією самою.</p>
     <div id="move"></div>`;
@@ -4977,7 +4982,7 @@ function confirmMove() {
   const b = bookings.find((x) => x.id === move.id);
   if (!cancelTerms(b).inWindow) { toast('Час для перенесення минув'); route(); return; }
   if (!moveSlots(b, move.date).some((x) => x.time === move.time && !x.busy)) { move.time = null; renderMove(); toast('Цей час щойно зайняли — оберіть інший'); return; }
-  if ((b.moves?.length ?? 0) >= MOVE_LIMIT) { toast('Ліміт перенесень вичерпано'); route(); return; }
+  if (clientMoves(b) >= MOVE_LIMIT) { toast('Запис уже переносили — напишіть мийці в чат'); route(); return; }
   const from = `${dayLabel(b.date, { day: 'numeric', month: 'long' })}, ${b.time}`;
   const to = `${dayLabel(move.date, { day: 'numeric', month: 'long' })}, ${move.time}`;
   b.moves = [...(b.moves ?? []), { date: b.date, time: b.time, at: Date.now() }];
