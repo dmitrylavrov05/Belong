@@ -9,7 +9,7 @@ import {
   ACTIVE, BLOCKING, isCarcar, price, complete, isFrozen, balanceFor, settleAll, ratingFor, partnerOf, PARTNER_STATUS,
   confirmBy, offerBy, responseStats, pauseOf, ratePct, msText, accountPlaces, addAccountPlace,
   ticketsAll, openTicket, ticketReply, setTicket, TICKET_TOPICS, TICKET_STATUS, PLACE_TOPICS, ticketPhotos,
-  payoutReady, maskIban, hidePhones, fitChatScreen, keepChatOnKeyboard, commissionFor, savePartner, staffOf, checkBizLogin, numberBookings, bookingNo, POWER, powerOf, setPower,
+  payoutReady, maskIban, hidePhones, themePicker, setTheme, fitChatScreen, keepChatOnKeyboard, commissionFor, savePartner, staffOf, checkBizLogin, numberBookings, bookingNo, POWER, powerOf, setPower,
 } from './core.js';
 import {
   openStarts, chatPost, chatTimeline, readMessages, msgPreview, touchPresence, BIZ_QUICK, sendMessages, checkWaitlist,
@@ -215,7 +215,17 @@ function viewLogin(error = '') {
 const leftText = (due) => { const sec = Math.max(0, Math.ceil((due - Date.now()) / 1000)); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; };
 const countdown = (b) => `<span class="countdown" data-due="${confirmBy(b)}">${leftText(confirmBy(b))}</span>`;
 
-const canNotify = () => 'Notification' in window && Notification.permission === 'default';
+// Налаштування сповіщень мийки: on — сповіщення на телефон; quiet — мовчати поза робочим часом мийки.
+const notifySet = () => ({ on: true, quiet: false, ...store.get('biz.notify', {}) });
+// Зараз неробочий час мийки (сьогодні вихідний, ще не відкрились або вже закрились).
+const offHours = (placeId) => {
+  const h = hoursFor(placeById(placeId), todayIso());
+  const now = minuteNow();
+  return !h || now < h[0] || now >= h[1];
+};
+// Чи можна зараз турбувати мийку сповіщенням (системним і вібрацією).
+const mayNotify = (placeId) => { const s = notifySet(); return s.on && !(s.quiet && offHours(placeId)); };
+const canNotify = () => notifySet().on && 'Notification' in window && Notification.permission === 'default';
 const notifyAsk = () => (canNotify() ? `<button class="btn soft notify-ask" type="button" data-action="notify-on">${icon('bell', 18)}Сповіщення про нові записи на телефон</button>` : '');
 
 // Сповіщення про новий запис: шторка поверх будь-якого екрана з деталями й кнопками,
@@ -243,11 +253,11 @@ function alertSheet(b) {
     </div>`, b.id);
   $('.pro-sheet').classList.add('alert');
   // Вібрація дозволена лише після першого дотику до сторінки.
-  if (navigator.userActivation?.hasBeenActive) navigator.vibrate?.([200, 100, 200]);
+  if (mayNotify(b.placeId) && navigator.userActivation?.hasBeenActive) navigator.vibrate?.([200, 100, 200]);
 }
 
 async function systemNotify(b) {
-  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (!('Notification' in window) || Notification.permission !== 'granted' || !mayNotify(b.placeId)) return;
   const title = `Новий запис: ${dayWord(b.date).toLowerCase()} о ${b.time}`;
   const body = `${who(b)} · ${b.services.join(', ')} · ${uah(sumOf(b))}. Відповісти до ${clock(confirmBy(b))}`;
   const opts = { body, tag: `pending-${b.id}`, requireInteraction: true, renotify: true, icon: 'pro-icon.svg', data: { id: b.id },
@@ -1202,8 +1212,19 @@ function viewMore() {
     ['#/payout', 'card', 'Рахунок для виплат', pt.payout?.iban ? `${maskIban(pt.payout.iban)} · ${pt.payout.verified ? 'перевірено' : 'на перевірці'}` : 'Вкажіть IBAN, щоб виводити гроші', pt.payout?.iban ? 0 : 1],
     ['#/support', 'info', 'Підтримка CARCAR', answers ? `Нові відповіді: ${answers}` : 'Виплати, спори, відгуки', answers],
   ];
+  const ns = notifySet();
+  const denied = 'Notification' in window && Notification.permission === 'denied';
+  const h = hoursFor(place(), todayIso());
   return `<h1>Ще</h1>
     ${notifyAsk() ? `<div style="margin-top:12px">${notifyAsk()}</div>` : ''}
+    <section class="pro-card stack settings" aria-labelledby="h-settings" style="gap:12px;margin-top:12px">
+      <h2 id="h-settings">Налаштування</h2>
+      <label class="check-row"><input class="check" type="checkbox" id="set-notify" ${ns.on ? 'checked' : ''}><span><b>Сповіщення про нові записи</b>
+        <small>На телефон, навіть коли застосунок згорнуто${denied && ns.on ? '. Зараз вони заборонені в налаштуваннях браузера — дозвольте їх там' : ''}</small></span></label>
+      <label class="check-row"><input class="check" type="checkbox" id="set-quiet" ${ns.quiet ? 'checked' : ''} ${ns.on ? '' : 'disabled'}><span><b>Вимикати поза робочим часом</b>
+        <small>${h ? `Сьогодні сповіщення лише з ${hhmm(h[0])} до ${hhmm(h[1])}` : 'Сьогодні вихідний — сповіщень не буде'}. Нові записи чекатимуть у застосунку, а час на відповідь почнеться з відкриття мийки</small></span></label>
+      <div><span class="lbl">Тема</span>${themePicker(store.get('biz.theme', 'system'))}</div>
+    </section>
     <div class="stack" style="gap:8px;margin-top:12px">${links.map(([href, ic, title, sub, n]) => `<a class="pro-link" href="${href}">${icon(ic, 22)}<span><b>${title}</b><small>${sub}</small></span>${n ? `<span class="count-dot" aria-hidden="true">${n}</span>` : ''}${icon('chevR', 18)}</a>`).join('')}</div>
     ${s?.demo ? `<button class="btn block" type="button" data-action="demo-seed" style="margin-top:16px">Заповнити прикладом: історія, записи й повідомлення</button>` : ''}
     <p class="fine" style="margin-top:16px">Щоб CarCar Business був під рукою, додайте його на головний екран: меню браузера → «Встановити застосунок» або «На екран “Додому”».</p>
@@ -2021,6 +2042,16 @@ document.addEventListener('change', async (e) => {
     }
     const add = (await Promise.all(files.slice(0, MAX_PHOTOS - (p.photos?.length ?? 0)).map(shrinkPhoto))).filter(Boolean);
     if (add.length) savePhotos({ photos: [...(p.photos ?? []), ...add] }, `Додано ${add.length} ${plural(add.length, 'фото', 'фото', 'фото')}`);
+    return;
+  }
+  if (e.target.name === 'theme' && e.target.closest('.settings')) { setTheme('biz.theme', e.target.value); return; }
+  if (e.target.id === 'set-notify' || e.target.id === 'set-quiet') {
+    const on = e.target.id === 'set-notify';
+    store.set('biz.notify', { ...notifySet(), [on ? 'on' : 'quiet']: e.target.checked });
+    if (on && e.target.checked && 'Notification' in window && Notification.permission === 'default') await Notification.requestPermission();
+    rerender();
+    toast(on ? (e.target.checked ? 'Сповіщення ввімкнено' : 'Сповіщення вимкнено — нові записи побачите в застосунку')
+      : e.target.checked ? 'Поза робочим часом сповіщення не приходитимуть' : 'Сповіщення приходитимуть цілодобово');
     return;
   }
   if (e.target.id === 'auto-confirm') {

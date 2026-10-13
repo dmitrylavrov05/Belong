@@ -872,6 +872,18 @@ export function liftPause(placeId) {
 export const ratePct = (k) => `${Math.round(k * 100)}%`;
 export const msText = (ms) => (ms === null ? '—' : ms < 60000 ? `${Math.max(1, Math.round(ms / 1000))} с` : `${Math.floor(ms / 60000)} хв${Math.round((ms % 60000) / 1000) ? ` ${Math.round((ms % 60000) / 1000)} с` : ''}`);
 
+// ---------- тема ----------
+
+// Тема: system — як у телефоні, light / dark — вибрана в налаштуваннях. key — окремо для застосунку клієнта й мийки.
+export const THEMES = [['system', 'Системна'], ['light', 'Світла'], ['dark', 'Темна']];
+export function setTheme(key, value) {
+  store.set(key, value);
+  if (value === 'light' || value === 'dark') document.documentElement.dataset.theme = value;
+  else delete document.documentElement.dataset.theme;
+}
+export const themePicker = (cur) => `<div class="seg-row theme-row" role="radiogroup" aria-label="Тема">${THEMES.map(([v, label]) =>
+  `<label><input type="radio" name="theme" value="${v}" ${v === cur ? 'checked' : ''}><span>${label}</span></label>`).join('')}</div>`;
+
 // ---------- чат і клавіатура телефона ----------
 
 // На iPhone клавіатура не зменшує сторінку, а зсуває її вгору — чат «їде», шапка зникає з екрана.

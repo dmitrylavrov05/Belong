@@ -53,7 +53,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #10151c;
     --soft: #1a212b;
     --line: #2a3140;
@@ -76,6 +76,28 @@
     color-scheme: dark;
   }
 }
+:root[data-theme="dark"] {
+    --bg: #10151c;
+    --soft: #1a212b;
+    --line: #2a3140;
+    --text: #e8ecf3;
+    --muted: #a3acbd;
+    --faint: #7d8798;
+    --box: #5b6577;
+    --accent: #ff7a66;
+    --accent-hover: #ff9585;
+    --on-accent: #10151c;
+    --accent-soft: #3a1d18;
+    --navy: #9db8dc;
+    --on-navy: #10151c;
+    --ok: #5fd48f;
+    --ok-soft: #15301f;
+    --warn: #f3b850;
+    --warn-soft: #33270f;
+    --danger: #ff8a80;
+    --dim: rgb(0 0 0 / 55%);
+    color-scheme: dark;
+  }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; }
@@ -586,6 +608,7 @@ label.item { cursor: pointer; padding: 10px 14px; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .map { --map-out: #141a22; --map-land: #1b222c; --map-edge: #3a4555; --map-water: #24476d; }
 }
+:root[data-theme="dark"] .map { --map-out: #141a22; --map-land: #1b222c; --map-edge: #3a4555; --map-water: #24476d; }
 .slot.hot small { color: var(--accent-hover); }
 .slot.hot[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: var(--on-navy); }
 .slot.hot[aria-pressed="true"] small { color: var(--on-navy); }
@@ -603,6 +626,7 @@ label.item { cursor: pointer; padding: 10px 14px; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .map-tiles img { filter: invert(1) hue-rotate(180deg) brightness(.85) contrast(.9); }
 }
+:root[data-theme="dark"] .map-tiles img { filter: invert(1) hue-rotate(180deg) brightness(.85) contrast(.9); }
 
 /* нагадування, регулярні записи, перевірка номера, фото у відгуках */
 .visit-bar { display: grid; gap: 8px; margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: var(--ok-soft); }
@@ -672,7 +696,10 @@ label.item { cursor: pointer; padding: 10px 14px; }
 /* ---------- рух і глибина ----------
    Анімації вмикаються лише для тих, хто не просив зменшити рух (prefers-reduced-motion). */
 :root { --ease: cubic-bezier(.2, .8, .2, 1); --shadow-1: 0 1px 2px rgba(16, 21, 28, .05), 0 3px 10px rgba(16, 21, 28, .04); --shadow-2: 0 10px 28px rgba(16, 21, 28, .12); }
-@media (prefers-color-scheme: dark) { :root { --shadow-1: 0 1px 2px rgba(0, 0, 0, .4); --shadow-2: 0 10px 28px rgba(0, 0, 0, .5); } }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --shadow-1: 0 1px 2px rgba(0, 0, 0, .4); --shadow-2: 0 10px 28px rgba(0, 0, 0, .5); }
+}
+:root[data-theme="dark"] { --shadow-1: 0 1px 2px rgba(0, 0, 0, .4); --shadow-2: 0 10px 28px rgba(0, 0, 0, .5); }
 .card, .bk, .panel, .kpi { box-shadow: var(--shadow-1); }
 .tabs { background: var(--bg); }
 .promo-banner { background: linear-gradient(120deg, var(--ok-soft), var(--soft)); }
@@ -834,7 +861,12 @@ label.item { cursor: pointer; padding: 10px 14px; }
 .pay-screen > * + * { margin-top: 14px; }
 .pay-dock .btn.gpay { background: #10151c; border-color: #10151c; color: #fff; }
 .g-mark { font-family: Arial, sans-serif; font-weight: 800; font-size: 20px; background: conic-gradient(from -45deg, #ea4335 0 25%, #fbbc05 0 50%, #34a853 0 75%, #4285f4 0); -webkit-background-clip: text; background-clip: text; color: transparent; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .receipt { background: #1b2230; color: #e8ecf2; } :root:not([data-theme="light"]) .receipt .rc-lines li span:last-child { color: #c9d1dc; } }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .receipt { background: #1b2230; color: #e8ecf2; }
+  :root:not([data-theme="light"]) .receipt .rc-lines li span:last-child { color: #c9d1dc; }
+}
+:root[data-theme="dark"] .receipt { background: #1b2230; color: #e8ecf2; }
+:root[data-theme="dark"] .receipt .rc-lines li span:last-child { color: #c9d1dc; }
 /* Невидимий перемикач на всю картку: натиск будь-де по картці обирає її. */
 .svc-card, .method { position: relative; }
 .cover-input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; z-index: 1; appearance: none; }
@@ -1182,6 +1214,16 @@ button.convo.call-row { width: 100%; border: 0; background: none; font: inherit;
 .call-text { display: flex; align-items: center; gap: 6px; }
 .call-text svg { flex: none; color: var(--muted); }
 .call-row.missed .call-text, .call-row.missed .call-text svg { color: var(--bad, #c8402b); font-weight: 600; }
+
+/* Перемикач-сегменти (тема, оплата) і налаштування */
+.lbl { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+.seg-row { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px; border-radius: 14px; background: var(--soft); }
+.seg-row label { position: relative; }
+.seg-row input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.seg-row span { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 42px; padding: 0 8px; border-radius: 10px; font-size: 14px; font-weight: 600; color: var(--muted); text-align: center; }
+.seg-row input:checked + span { background: var(--bg); color: var(--text); box-shadow: 0 1px 3px rgb(16 24 40 / 12%); }
+.seg-row input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.settings .check-row small { display: block; font-weight: 400; margin-top: 2px; }
 </style>
   <style>
 /* CarCar Business — застосунок мийки для телефона. Базові кнопки, поля, чат і шторки — зі styles.css. */
@@ -1526,6 +1568,10 @@ body.pro.locked .pro-tabs { display: none; }
 .warn-text { color: var(--warn); font-weight: 600; }
 .pill.lead { background: var(--warn-soft); color: var(--text); }
 </style>
+  <script>
+    // Тема з налаштувань — до малювання сторінки, щоб не блимала.
+    try { const t = JSON.parse(localStorage.getItem('carcar.biz.theme')); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch { /* немає доступу до сховища */ }
+  </script>
 </head>
 <body class="pro">
   <header class="pro-top" id="top"></header>
@@ -2654,6 +2700,18 @@ function liftPause(placeId) {
 const ratePct = (k) => `${Math.round(k * 100)}%`;
 const msText = (ms) => (ms === null ? '—' : ms < 60000 ? `${Math.max(1, Math.round(ms / 1000))} с` : `${Math.floor(ms / 60000)} хв${Math.round((ms % 60000) / 1000) ? ` ${Math.round((ms % 60000) / 1000)} с` : ''}`);
 
+// ---------- тема ----------
+
+// Тема: system — як у телефоні, light / dark — вибрана в налаштуваннях. key — окремо для застосунку клієнта й мийки.
+const THEMES = [['system', 'Системна'], ['light', 'Світла'], ['dark', 'Темна']];
+function setTheme(key, value) {
+  store.set(key, value);
+  if (value === 'light' || value === 'dark') document.documentElement.dataset.theme = value;
+  else delete document.documentElement.dataset.theme;
+}
+const themePicker = (cur) => `<div class="seg-row theme-row" role="radiogroup" aria-label="Тема">${THEMES.map(([v, label]) =>
+  `<label><input type="radio" name="theme" value="${v}" ${v === cur ? 'checked' : ''}><span>${label}</span></label>`).join('')}</div>`;
+
 // ---------- чат і клавіатура телефона ----------
 
 // На iPhone клавіатура не зменшує сторінку, а зсуває її вгору — чат «їде», шапка зникає з екрана.
@@ -3646,7 +3704,17 @@ function viewLogin(error = '') {
 const leftText = (due) => { const sec = Math.max(0, Math.ceil((due - Date.now()) / 1000)); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; };
 const countdown = (b) => `<span class="countdown" data-due="${confirmBy(b)}">${leftText(confirmBy(b))}</span>`;
 
-const canNotify = () => 'Notification' in window && Notification.permission === 'default';
+// Налаштування сповіщень мийки: on — сповіщення на телефон; quiet — мовчати поза робочим часом мийки.
+const notifySet = () => ({ on: true, quiet: false, ...store.get('biz.notify', {}) });
+// Зараз неробочий час мийки (сьогодні вихідний, ще не відкрились або вже закрились).
+const offHours = (placeId) => {
+  const h = hoursFor(placeById(placeId), todayIso());
+  const now = minuteNow();
+  return !h || now < h[0] || now >= h[1];
+};
+// Чи можна зараз турбувати мийку сповіщенням (системним і вібрацією).
+const mayNotify = (placeId) => { const s = notifySet(); return s.on && !(s.quiet && offHours(placeId)); };
+const canNotify = () => notifySet().on && 'Notification' in window && Notification.permission === 'default';
 const notifyAsk = () => (canNotify() ? `<button class="btn soft notify-ask" type="button" data-action="notify-on">${icon('bell', 18)}Сповіщення про нові записи на телефон</button>` : '');
 
 // Сповіщення про новий запис: шторка поверх будь-якого екрана з деталями й кнопками,
@@ -3674,11 +3742,11 @@ function alertSheet(b) {
     </div>`, b.id);
   $('.pro-sheet').classList.add('alert');
   // Вібрація дозволена лише після першого дотику до сторінки.
-  if (navigator.userActivation?.hasBeenActive) navigator.vibrate?.([200, 100, 200]);
+  if (mayNotify(b.placeId) && navigator.userActivation?.hasBeenActive) navigator.vibrate?.([200, 100, 200]);
 }
 
 async function systemNotify(b) {
-  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (!('Notification' in window) || Notification.permission !== 'granted' || !mayNotify(b.placeId)) return;
   const title = `Новий запис: ${dayWord(b.date).toLowerCase()} о ${b.time}`;
   const body = `${who(b)} · ${b.services.join(', ')} · ${uah(sumOf(b))}. Відповісти до ${clock(confirmBy(b))}`;
   const opts = { body, tag: `pending-${b.id}`, requireInteraction: true, renotify: true, icon: 'pro-icon.svg', data: { id: b.id },
@@ -4633,8 +4701,19 @@ function viewMore() {
     ['#/payout', 'card', 'Рахунок для виплат', pt.payout?.iban ? `${maskIban(pt.payout.iban)} · ${pt.payout.verified ? 'перевірено' : 'на перевірці'}` : 'Вкажіть IBAN, щоб виводити гроші', pt.payout?.iban ? 0 : 1],
     ['#/support', 'info', 'Підтримка CARCAR', answers ? `Нові відповіді: ${answers}` : 'Виплати, спори, відгуки', answers],
   ];
+  const ns = notifySet();
+  const denied = 'Notification' in window && Notification.permission === 'denied';
+  const h = hoursFor(place(), todayIso());
   return `<h1>Ще</h1>
     ${notifyAsk() ? `<div style="margin-top:12px">${notifyAsk()}</div>` : ''}
+    <section class="pro-card stack settings" aria-labelledby="h-settings" style="gap:12px;margin-top:12px">
+      <h2 id="h-settings">Налаштування</h2>
+      <label class="check-row"><input class="check" type="checkbox" id="set-notify" ${ns.on ? 'checked' : ''}><span><b>Сповіщення про нові записи</b>
+        <small>На телефон, навіть коли застосунок згорнуто${denied && ns.on ? '. Зараз вони заборонені в налаштуваннях браузера — дозвольте їх там' : ''}</small></span></label>
+      <label class="check-row"><input class="check" type="checkbox" id="set-quiet" ${ns.quiet ? 'checked' : ''} ${ns.on ? '' : 'disabled'}><span><b>Вимикати поза робочим часом</b>
+        <small>${h ? `Сьогодні сповіщення лише з ${hhmm(h[0])} до ${hhmm(h[1])}` : 'Сьогодні вихідний — сповіщень не буде'}. Нові записи чекатимуть у застосунку, а час на відповідь почнеться з відкриття мийки</small></span></label>
+      <div><span class="lbl">Тема</span>${themePicker(store.get('biz.theme', 'system'))}</div>
+    </section>
     <div class="stack" style="gap:8px;margin-top:12px">${links.map(([href, ic, title, sub, n]) => `<a class="pro-link" href="${href}">${icon(ic, 22)}<span><b>${title}</b><small>${sub}</small></span>${n ? `<span class="count-dot" aria-hidden="true">${n}</span>` : ''}${icon('chevR', 18)}</a>`).join('')}</div>
     ${s?.demo ? `<button class="btn block" type="button" data-action="demo-seed" style="margin-top:16px">Заповнити прикладом: історія, записи й повідомлення</button>` : ''}
     <p class="fine" style="margin-top:16px">Щоб CarCar Business був під рукою, додайте його на головний екран: меню браузера → «Встановити застосунок» або «На екран “Додому”».</p>
@@ -5452,6 +5531,16 @@ document.addEventListener('change', async (e) => {
     }
     const add = (await Promise.all(files.slice(0, MAX_PHOTOS - (p.photos?.length ?? 0)).map(shrinkPhoto))).filter(Boolean);
     if (add.length) savePhotos({ photos: [...(p.photos ?? []), ...add] }, `Додано ${add.length} ${plural(add.length, 'фото', 'фото', 'фото')}`);
+    return;
+  }
+  if (e.target.name === 'theme' && e.target.closest('.settings')) { setTheme('biz.theme', e.target.value); return; }
+  if (e.target.id === 'set-notify' || e.target.id === 'set-quiet') {
+    const on = e.target.id === 'set-notify';
+    store.set('biz.notify', { ...notifySet(), [on ? 'on' : 'quiet']: e.target.checked });
+    if (on && e.target.checked && 'Notification' in window && Notification.permission === 'default') await Notification.requestPermission();
+    rerender();
+    toast(on ? (e.target.checked ? 'Сповіщення ввімкнено' : 'Сповіщення вимкнено — нові записи побачите в застосунку')
+      : e.target.checked ? 'Поза робочим часом сповіщення не приходитимуть' : 'Сповіщення приходитимуть цілодобово');
     return;
   }
   if (e.target.id === 'auto-confirm') {

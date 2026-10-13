@@ -5,7 +5,7 @@ import {
   confirmBy, offerBy, pauseOf, responseStats, msText, AWAITING, staffOf, chargedOf, realOrder, hidePhones,
   applyOverrides, isListed, visibleReviews, ACTIVE, BLOCKING, HOUR, price, isFrozen, settleAll, ratingFor,
   powerOf, worksInBlackout, TICKET_TOPICS, CLIENT_TOPICS, TICKET_STATUS, ticketsAll, openTicket, ticketReply, setTicket, isBlocked, mobileOn, spanOf, laneCap, sameLane, MOBILE_ROAD, promosAll, promoCheck,
-  enterView, fitChatScreen, keepChatOnKeyboard, bizApps, saveBizApps, APP_STATUS, numberBookings, bookingNo, findByNo, ticketPhotos,
+  enterView, fitChatScreen, keepChatOnKeyboard, themePicker, setTheme, bizApps, saveBizApps, APP_STATUS, numberBookings, bookingNo, findByNo, ticketPhotos,
 } from './core.js';
 import {
   inboxFor, markRead, sendMessages, dealsOf, dealsOn, weeklyDealsOf, daysText, dealAt, dealPrice, dealCovers, hotDeals,
@@ -173,7 +173,9 @@ const bookable = (p) => [...personalFor(p), ...p.services];
 const leftText = (due) => { const sec = Math.max(0, Math.ceil((due - Date.now()) / 1000)); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; };
 // Дзвінок мийці — лише через CARCAR: номер мийки клієнту не потрібен, а мийка не бачить номер клієнта.
 const callBtn = (b, cls = '') => `<button class="btn${cls}" data-action="call" data-id="${b.id}">${icon('phone', 18)}Подзвонити</button>`;
-const canAskNotify = () => 'Notification' in window && Notification.permission === 'default';
+// Сповіщення клієнта вмикаються й вимикаються в «Гаражі» → «Налаштування».
+const notifyOn = () => store.get('notify', true) !== false;
+const canAskNotify = () => notifyOn() && 'Notification' in window && Notification.permission === 'default';
 
 // Мийка відповіла на запис, поки клієнт чекав (або поки застосунок був закритий) — показуємо це одразу:
 // банер зверху, вібрація й системне сповіщення, якщо клієнт дозволив.
@@ -205,6 +207,7 @@ function answerNotice(b) {
   document.querySelector('.answer-banner')?.remove();
   document.body.append(el);
   setTimeout(() => el.remove(), 9000);
+  if (!notifyOn()) return;
   if (navigator.userActivation?.hasBeenActive) navigator.vibrate?.([120, 60, 120]);
   if ('Notification' in window && Notification.permission === 'granted') {
     const opts = { body: text, tag: `answer-${b.id}`, icon: 'icon.svg', data: { url: `index.html#/bookings/${b.id}` } };
@@ -2219,6 +2222,17 @@ function updateInboxBadge() {
 // ---------- гараж: абонементи ----------
 
 // Вхід для власників точок — у профілі, а не в нижньому меню: клієнтам він не потрібен.
+// Налаштування: сповіщення й тема.
+function settingsBlock() {
+  const denied = 'Notification' in window && Notification.permission === 'denied';
+  return `<section class="card stack settings" aria-labelledby="h-settings" style="gap:12px;margin-top:16px">
+    <h2 id="h-settings" style="margin:0">Налаштування</h2>
+    <label class="check-row"><input class="check" type="checkbox" id="set-notify" ${notifyOn() ? 'checked' : ''}><span><b>Сповіщення</b>
+      <small class="muted">Мийка підтвердила запис, запропонувала інший час, відповіла в чаті${denied && notifyOn() ? '. Зараз вони заборонені в налаштуваннях браузера — дозвольте їх там' : ''}</small></span></label>
+    <div><span class="lbl">Тема</span>${themePicker(store.get('theme', 'system'))}</div>
+  </section>`;
+}
+
 const businessEntry = () => `<a class="card link-card biz-entry" href="#/business" style="margin-top:16px">${icon('chart', 22)}<span>Для бізнесу
     <small class="small muted" style="display:block;font-weight:400">Для власників мийок: умови й реєстрація</small></span>${icon('chevR', 18)}</a>`;
 
@@ -2446,6 +2460,7 @@ function viewGarage() {
       <label class="field"><span>Рік випуску (необовʼязково)</span><input name="year" type="number" inputmode="numeric" min="1950" max="${new Date().getFullYear() + 1}" autocomplete="off"></label>
       <label class="field"><span>Клас</span><select name="cls">${CAR_CLASSES.map((c, i) => `<option value="${i}">${c}</option>`).join('')}</select></label>`, 'Зберегти')}
     </details>
+    ${settingsBlock()}
     ${businessEntry()}
     ${logoutBlock()}`;
 }
@@ -2957,6 +2972,14 @@ document.addEventListener('toggle', (e) => {
 document.addEventListener('change', (e) => {
   const t = e.target;
   if (t.matches('.chat-attach')) { sendPhoto(t); return; }
+  if (t.name === 'theme' && t.closest('.settings')) { setTheme('theme', t.value); return; }
+  if (t.id === 'set-notify') {
+    store.set('notify', t.checked);
+    if (t.checked && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission().then(() => route());
+    else route();
+    toast(t.checked ? 'Сповіщення ввімкнено' : 'Сповіщення вимкнено — відповіді мийок побачите в застосунку');
+    return;
+  }
   if (t.matches('[data-action="svc"]')) {
     // Основна мийка — лише одна: обираючи іншу, знімаємо попередню.
     if (t.checked && t.dataset.main) {

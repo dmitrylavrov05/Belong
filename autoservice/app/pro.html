@@ -12,6 +12,10 @@
   <link rel="preload" href="fonts/onest-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="pro.css">
+  <script>
+    // Тема з налаштувань — до малювання сторінки, щоб не блимала.
+    try { const t = JSON.parse(localStorage.getItem('carcar.biz.theme')); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch { /* немає доступу до сховища */ }
+  </script>
 </head>
 <body class="pro">
   <header class="pro-top" id="top"></header>

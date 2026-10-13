@@ -913,3 +913,20 @@ test('клієнти CARCAR у списку клієнтів мийки — бе
   await expect(list.locator('li', { hasText: 'Ірина' }).locator('a[href^="tel:"]')).toHaveCount(0);
   await expect(list.locator('li', { hasText: 'Олег' }).locator('a[href^="tel:"]')).toHaveCount(1);
 });
+
+test('налаштування мийки: сповіщення, тиша поза робочим часом і тема', async ({ page }) => {
+  await page.goto(`${PRO}#/more`);
+  const set = page.getByRole('region', { name: 'Налаштування' });
+  await expect(set).toContainText('Сьогодні сповіщення лише з 08:00 до 22:00');
+  await set.getByLabel(/Вимикати поза робочим часом/).check();
+  await expect(page.locator('.toast')).toContainText('Поза робочим часом сповіщення не приходитимуть');
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('carcar.biz.notify')))).toEqual({ on: true, quiet: true });
+  await page.getByRole('region', { name: 'Налаштування' }).getByLabel(/Сповіщення про нові записи/).uncheck();
+  await expect(page.getByRole('region', { name: 'Налаштування' }).getByLabel(/Вимикати поза робочим часом/)).toBeDisabled();
+  await page.getByRole('region', { name: 'Налаштування' }).getByRole('radio', { name: 'Темна', exact: true }).check();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  // Тема мийки окрема від теми клієнта.
+  await page.goto('/#/garage');
+  await expect(page.locator('html')).not.toHaveAttribute('data-theme', /.+/);
+});

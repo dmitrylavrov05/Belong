@@ -325,3 +325,28 @@ test('умови для мийок відкриваються без входу 
   await expect(page.getByRole('heading', { name: 'Реєстрація мийки' })).toBeVisible();
   await expect(page.locator('#biz-apply')).toContainText('12% із замовлень');
 });
+
+test('налаштування клієнта: тема темна/світла зберігається, сповіщення вимикаються', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.goto('/#/garage');
+  const set = page.getByRole('region', { name: 'Налаштування' });
+  const bg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  const light = await bg();
+  await set.getByRole('radio', { name: 'Темна', exact: true }).check();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  expect(await bg()).not.toBe(light);
+  expect((await new AxeBuilder({ page }).include('.settings').analyze()).violations).toEqual([]);
+  // Після перезапуску тема та сама — і до того, як застосунок намалював сторінку.
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  // Світла тема перемагає темну системну.
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.getByRole('region', { name: 'Налаштування' }).getByRole('radio', { name: 'Світла', exact: true }).check();
+  expect(await bg()).toBe(light);
+  await page.getByRole('region', { name: 'Налаштування' }).getByRole('radio', { name: 'Системна', exact: true }).check();
+  await expect(page.locator('html')).not.toHaveAttribute('data-theme', /.+/);
+
+  await page.getByLabel(/^Сповіщення/).uncheck();
+  await expect(page.locator('#toast')).toContainText('Сповіщення вимкнено');
+  expect(await page.evaluate(() => localStorage.getItem('carcar.notify'))).toBe('false');
+});

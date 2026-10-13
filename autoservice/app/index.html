@@ -51,6 +51,10 @@
     @keyframes sp-swell { from { transform: translateY(100%); } }
     @media (prefers-reduced-motion: reduce) { #splash { display: none; } }
   </style>
+  <script>
+    // Тема з налаштувань — до малювання сторінки, щоб не блимала.
+    try { const t = JSON.parse(localStorage.getItem('carcar.theme')); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch { /* немає доступу до сховища */ }
+  </script>
 </head>
 <body>
   <div id="splash" aria-hidden="true">
