@@ -8,7 +8,8 @@
 1. **Сервер з Ubuntu 24.04** і публічною IP-адресою (VPS від ~3–5 $/міс: Hetzner, DigitalOcean, Contabo, українські хостинги).
    Домашній компʼютер теж підійде, якщо роутер пробрасує порти 80 і 443 і в провайдера «білий» IP.
 2. **Домен**, що вказує на IP сервера (запис A). Без домену немає HTTPS, а без HTTPS не працюють мікрофон для дзвінків,
-   сповіщення й офлайн-режим. Безкоштовно — піддомен на duckdns.org.
+   сповіщення й офлайн-режим. **Немає домену — не страшно:** скрипт сам візьме безкоштовне імʼя
+   `<IP>.sslip.io` (наприклад, `185.166.155.225.sslip.io`), воно вказує на IP сервера, і на нього видається сертифікат.
 3. Якщо репозиторій приватний — токен GitHub з правом читання (Settings → Developer settings → Fine-grained tokens).
 
 ## Встановлення
@@ -16,7 +17,8 @@
 ```bash
 git clone --depth 1 --branch claude/car-wash-tire-service-app-npsdxv https://github.com/dmitrylavrov05/Belong.git
 cd Belong/deploy/ubuntu
-sudo bash setup.sh --domain carcar.example.com --email you@example.com
+sudo bash setup.sh                                  # без домену → https://<IP>.sslip.io
+sudo bash setup.sh --domain carcar.example.com      # зі своїм доменом (--email — за бажанням)
 ```
 
 Приватний репозиторій: у обох командах замість `https://github.com/...` — `https://<токен>@github.com/...`,

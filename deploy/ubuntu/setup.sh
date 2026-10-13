@@ -5,6 +5,7 @@
 #
 # Запуск на сервері (від root або через sudo):
 #   sudo bash setup.sh --domain carcar.example.com --email you@example.com
+#   sudo bash setup.sh                      # без домену: <IP сервера>.sslip.io
 # Необовʼязково:
 #   --branch <гілка>   (типово claude/car-wash-tire-service-app-npsdxv)
 #   --repo <url>       (типово https://github.com/dmitrylavrov05/Belong.git;
@@ -31,12 +32,17 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ $EUID -ne 0 ]]; then echo "Запустіть через sudo" >&2; exit 1; fi
-if [[ -z "$DOMAIN" ]]; then echo "Вкажіть --domain (наприклад, carcar.duckdns.org)" >&2; exit 1; fi
-if [[ $HTTPS -eq 1 && -z "$EMAIL" ]]; then echo "Вкажіть --email для сертифіката Let's Encrypt" >&2; exit 1; fi
+# Без домену: безкоштовне імʼя <IP>.sslip.io саме вказує на IP сервера, на нього видається сертифікат.
+if [[ -z "$DOMAIN" ]]; then
+  IP=$(curl -4 -s --max-time 5 https://api.ipify.org || true)
+  [[ -z "$IP" ]] && { echo "Вкажіть --domain (наприклад, 185.166.155.225.sslip.io)" >&2; exit 1; }
+  DOMAIN="$IP.sslip.io"
+  echo "Домен не вказано — використовуємо $DOMAIN"
+fi
 
 echo "==> Пакети"
 apt-get update -y
-apt-get install -y nginx git ufw
+apt-get install -y nginx git ufw curl
 [[ $HTTPS -eq 1 ]] && apt-get install -y certbot python3-certbot-nginx
 
 echo "==> Код застосунку в $DIR"
@@ -64,7 +70,8 @@ ufw --force enable
 
 if [[ $HTTPS -eq 1 ]]; then
   echo "==> HTTPS (Let's Encrypt, продовжується автоматично)"
-  certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m "$EMAIL" --redirect
+  if [[ -n "$EMAIL" ]]; then MAIL=(-m "$EMAIL"); else MAIL=(--register-unsafely-without-email); fi
+  certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos "${MAIL[@]}" --redirect
 fi
 
 echo "==> Автооновлення з GitHub кожні 5 хвилин"
