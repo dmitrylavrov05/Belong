@@ -644,18 +644,18 @@ function bookingSheet(id) {
           <input class="sr-only" name="photos" type="file" accept="image/*" multiple></label>
         <div class="grid2">
           <label class="field"><span>Коментар для клієнта</span><input name="note" maxlength="200" autocomplete="off"></label>
-          <label class="field"><span>Пробіг, км</span><input name="km" type="number" min="0" inputmode="numeric" autocomplete="off"></label>
         </div>
         <button class="btn primary" type="submit">${icon('check', 18)}Машина готова</button>
         <p class="fine">Так ви підтверджуєте виконання. Клієнт отримає сповіщення, а фото й пробіг потраплять у сервісну книжку авто. Гроші ${PAYMENT.freezeHours} год чекають на випадок спору.</p>
       </form>
-      ${late ? `<button class="btn" type="button" data-action="late-forfeit" data-id="${b.id}">Запізнення понад ${PAYMENT.lateMinutes} хв — оплата нам</button>
+      ${late ? `<button class="btn" type="button" data-action="late-claim" data-id="${b.id}">Клієнт запізнився понад ${PAYMENT.lateMinutes} хв — у підтримку</button>
         <button class="btn text-danger" type="button" data-action="carcar-noshow" data-id="${b.id}">Клієнт не приїхав</button>
         <p class="fine">Оплата неявки ${PAYMENT.freezeHours} год заморожена: клієнт може оскаржити.</p>` : started(b) ? `<p class="fine">Якщо клієнт не приїде, позначити неявку можна через ${PAYMENT.lateMinutes} хв після початку.</p>` : ''}`;
   } else if (b.state === 'dispute') {
-    const t = ticketsAll().find((x) => x.bookingId === b.id && x.from === 'place' && x.topic === 'dispute');
-    actions = `<p class="notice warn"><b>Клієнт відкрив спір</b>«${esc(b.disputeReason ?? '')}». Гроші заморожені, доки модератор CARCAR не вирішить.</p>
-      ${t ? `<a class="btn" href="#/support/${t.id}" data-action="sheet-close">Ваше пояснення: звернення №${t.no}</a>` : `<form class="stack" id="dispute-note" data-id="${b.id}" style="gap:8px">
+    const t = ticketsAll().find((x) => x.bookingId === b.id && x.from === 'place' && ['dispute', 'late'].includes(x.topic));
+    actions = `<p class="notice warn">${b.lateClaim ? `<b>Запізнення на перевірці</b>Ви повідомили підтримку про запізнення клієнта. Оплата заморожена, доки CARCAR не вирішить.`
+      : `<b>Клієнт відкрив спір</b>«${esc(b.disputeReason ?? '')}». Гроші заморожені, доки модератор CARCAR не вирішить.`}</p>
+      ${t ? `<a class="btn" href="#/support/${t.id}" data-action="sheet-close">${b.lateClaim ? 'Ваше звернення' : 'Ваше пояснення: звернення'} №${t.no}</a>` : `<form class="stack" id="dispute-note" data-id="${b.id}" style="gap:8px">
         <label class="field"><span>Пояснення для модератора</span><textarea name="text" rows="3" required maxlength="1000" placeholder="Що було зроблено, фото, домовленості з клієнтом"></textarea></label>
         <button class="btn" type="submit">Надіслати модератору</button></form>`}`;
   } else if (b.state === 'completed' && isCarcar(b)) {
@@ -737,6 +737,30 @@ function washerSheet(id, mode) {
       <button class="washer-opt" type="button" data-action="washer-pick" data-mode="${mode}" data-id="${b.id}" data-m=""><span class="avatar none" aria-hidden="true">?</span><span><b>Без мийника</b><small>${mode === 'accept' ? 'оберете пізніше в картці запису' : 'зняти з запису'}</small></span></button>
     </div>
     ${mode === 'accept' ? '<p class="fine">Клієнт отримає підтвердження запису й імʼя мийника.</p>' : ''}`, b.id);
+}
+
+// Запізнення клієнта: звернення в підтримку з уже підставленими даними — мийці лишається натиснути «Надіслати».
+function lateText(b) {
+  const lateMin = Math.max(0, Math.round((Date.now() - bookingStart(b).getTime()) / 60000));
+  const chat = (b.chat ?? []).filter((m) => m.from === 'client');
+  return [
+    `Клієнт запізнився понад ${PAYMENT.lateMinutes} хв і досі не приїхав.`,
+    `Запис ${bookingNo(b)}: ${dayWord(b.date, true).toLowerCase()}, ${b.time}–${hhmm(toMin(b.time) + b.minutes)}.`,
+    `Клієнт: ${who(b)}${b.car ? `, ${b.car}` : ''}. Послуги: ${b.services.join(', ')}. Сума: ${uah(price(b))}.`,
+    `Зараз ${clock(Date.now())} — запізнення ${lateMin} хв.`,
+    b.late ? `Клієнт попереджав про запізнення на ${b.late} хв${b.etaAt ? ` (о ${clock(b.etaAt)})` : ''}.` : 'Клієнт не попереджав про запізнення.',
+    chat.length ? `Останнє повідомлення клієнта в чаті — о ${clock(chat.at(-1).at)}.` : 'У чаті запису клієнт не писав.',
+  ].join('\n');
+}
+
+function lateSheet(id) {
+  const b = own().find((x) => x.id === id);
+  openSheet('Запізнення клієнта', `<form class="stack" id="late-form" data-id="${b.id}" style="gap:12px">
+    <p class="small muted" style="margin:0">Дані запису вже підставлено — перевірте й надішліть. Підтримка CARCAR перевірить запізнення: підтвердить — оплата ваша, ні — гроші повернуться клієнту. До рішення оплата заморожена.</p>
+    <pre class="late-preview">${esc(lateText(b))}</pre>
+    <label class="field"><span>Коментар (необовʼязково)</span><input name="note" maxlength="300" autocomplete="off" placeholder="Наприклад, дзвонили — не відповідає"></label>
+    <button class="btn primary" type="submit">Надіслати в підтримку</button>
+  </form>`, b.id);
 }
 
 // Уточнити тривалість запису: машина більша чи брудніша, ніж у прайсі, — займаємо бокс на потрібний час.
@@ -1790,13 +1814,10 @@ document.addEventListener('click', async (e) => {
     after('Позначено неявку');
     return;
   }
-  if (action === 'late-forfeit') {
-    if (Date.now() < noShowFrom(b)) { toast(`Позначити запізнення можна з ${clock(noShowFrom(b))}`); return; }
-    if (!confirm(`Клієнт запізнюється понад ${PAYMENT.lateMinutes} хв: зарахувати оплату ${uah(price(b))} вам і закрити запис?`)) return;
-    if (!markNoShow(b, true)) { gone(); return; }
-    sendMessages([{ placeId: b.placeId, clientKey: 'device', channel: 'app', kind: 'late', bookingId: b.id, link: `#/bookings/${b.id}`,
-      text: `${place().name}: ви запізнилися більше ніж на ${PAYMENT.lateMinutes} хв, тому візит вважається неявкою — оплату зараховано мийці. Якщо це помилка, напишіть у підтримку.` }]);
-    after(`Оплату ${uah(price(b))} зараховано вам`);
+  if (action === 'late-claim') {
+    if (b?.state !== 'paid') { gone(); return; }
+    if (Date.now() < noShowFrom(b)) { toast(`Повідомити про запізнення можна з ${clock(noShowFrom(b))}`); return; }
+    lateSheet(b.id);
     return;
   }
   if (action === 'move') { moveSheet(id); return; }
@@ -2010,6 +2031,19 @@ document.addEventListener('submit', async (e) => {
     return;
   }
   if (f.id === 'nb-form') { nbSubmit(); return; }
+  if (f.id === 'late-form') {
+    const b = own().find((x) => x.id === f.dataset.id);
+    if (b?.state !== 'paid') { closeSheet(); rerender(); toast('Запис уже змінився'); return; }
+    const note = String(d.get('note')).trim();
+    const t = openTicket({ from: 'place', placeId: b.placeId, bookingId: b.id, topic: 'late', text: `${lateText(b)}${note ? `\nКоментар мийки: ${note}` : ''}`, clientName: who(b) });
+    Object.assign(b, { state: 'dispute', disputeReason: `Мийка повідомила про запізнення понад ${PAYMENT.lateMinutes} хв`, lateClaim: { ticketId: t.id, at: Date.now() } });
+    chatPost(b, 'sys', `Мийка повідомила, що ви запізнилися понад ${PAYMENT.lateMinutes} хв. Підтримка CARCAR перевірить і вирішить щодо оплати`, 'client');
+    save();
+    closeSheet();
+    rerender();
+    toast(`Звернення №${t.no} надіслано — підтримка перевірить запізнення`);
+    return;
+  }
   if (f.id === 'deal-form') {
     const days = d.getAll('day').map(Number);
     const from = Number(d.get('from'));
@@ -2047,7 +2081,7 @@ document.addEventListener('submit', async (e) => {
   if (f.id === 'ready-form') {
     const b = own().find((x) => x.id === f.dataset.id);
     const photos = (await Promise.all(d.getAll('photos').filter((x) => x?.size).slice(0, 3).map(shrinkPhoto))).filter(Boolean);
-    Object.assign(b, { photos, note: String(d.get('note')).trim() || null, km: Number(d.get('km')) || null, doneAt: Date.now() });
+    Object.assign(b, { photos, note: String(d.get('note')).trim() || null, doneAt: Date.now() });
     complete(b);
     // Фото не вмістилися в памʼять пристрою — зберігаємо запис без них.
     if (!store.set('bookings', bookings) && photos.length) { b.photos = []; save(); } else save();

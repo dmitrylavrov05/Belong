@@ -357,6 +357,17 @@ export function resolveDispute(b, placePart, note = '') {
   if (b.installments) b.installments = { ...b.installments, cancelled: Date.now() };
 }
 
+// Заява мийки про запізнення клієнта: підтримка перевіряє. Підтвердила — оплата мийці (як неявка, без заморозки:
+// уже перевірено); не підтвердила — гроші повертаються клієнту.
+export function resolveLate(b, confirmed, note = '') {
+  if (b?.state !== 'dispute' || !b.lateClaim) return false;
+  b.lateClaim = { ...b.lateClaim, decided: confirmed ? 'confirmed' : 'rejected', at: Date.now() };
+  if (!confirmed) { resolveDispute(b, 0, note); return true; }
+  Object.assign(b, { state: 'noshow', lateForfeit: true, placeAmount: price(b), refund: 0, closedAt: Date.now(), unfreezeAt: Date.now(),
+    resolution: { placePart: price(b), note, at: Date.now() } });
+  return true;
+}
+
 // Скільки клієнт справді заплатив: за оплати частинами — лише перший платіж (решту банк скасовує) і частину з балансу.
 export const chargedOf = (b) => (b.installments ? Math.max(0, b.paid - (b.installments.card ?? b.paid) + b.installments.first) : b.paid);
 
@@ -607,12 +618,13 @@ export function ratingFor(placeId, reviews) {
 export const TICKET_TOPICS = {
   booking: 'Запис і перенесення', payment: 'Оплата й повернення', quality: 'Якість послуги', dispute: 'Спір щодо замовлення',
   payout: 'Виплати й комісія', review: 'Відгуки', account: 'Акаунт і дані', fraud: 'Підозра на шахрайство', other: 'Інше',
+  late: 'Запізнення клієнта',
 };
 export const CLIENT_TOPICS = ['booking', 'payment', 'quality', 'dispute', 'account', 'fraud', 'other'];
 export const PLACE_TOPICS = ['payout', 'booking', 'dispute', 'review', 'account', 'fraud', 'other'];
 export const TICKET_STATUS = { new: ['Нове', 'warn'], open: ['У роботі', 'carcar'], waiting: ['Чекаємо відповіді', 'muted'], closed: ['Закрито', 'ok'] };
 // Термінові теми — гроші й шахрайство: відповідь за 2 години, решта — за добу.
-const URGENT = ['payment', 'dispute', 'fraud', 'payout'];
+const URGENT = ['payment', 'dispute', 'fraud', 'payout', 'late'];
 export const slaHours = (t) => (t.priority === 'high' ? 2 : 24);
 
 export const ticketsAll = () => store.get('support', []);

@@ -2376,6 +2376,17 @@ function resolveDispute(b, placePart, note = '') {
   if (b.installments) b.installments = { ...b.installments, cancelled: Date.now() };
 }
 
+// Заява мийки про запізнення клієнта: підтримка перевіряє. Підтвердила — оплата мийці (як неявка, без заморозки:
+// уже перевірено); не підтвердила — гроші повертаються клієнту.
+function resolveLate(b, confirmed, note = '') {
+  if (b?.state !== 'dispute' || !b.lateClaim) return false;
+  b.lateClaim = { ...b.lateClaim, decided: confirmed ? 'confirmed' : 'rejected', at: Date.now() };
+  if (!confirmed) { resolveDispute(b, 0, note); return true; }
+  Object.assign(b, { state: 'noshow', lateForfeit: true, placeAmount: price(b), refund: 0, closedAt: Date.now(), unfreezeAt: Date.now(),
+    resolution: { placePart: price(b), note, at: Date.now() } });
+  return true;
+}
+
 // Скільки клієнт справді заплатив: за оплати частинами — лише перший платіж (решту банк скасовує) і частину з балансу.
 const chargedOf = (b) => (b.installments ? Math.max(0, b.paid - (b.installments.card ?? b.paid) + b.installments.first) : b.paid);
 
@@ -2626,12 +2637,13 @@ function ratingFor(placeId, reviews) {
 const TICKET_TOPICS = {
   booking: 'Запис і перенесення', payment: 'Оплата й повернення', quality: 'Якість послуги', dispute: 'Спір щодо замовлення',
   payout: 'Виплати й комісія', review: 'Відгуки', account: 'Акаунт і дані', fraud: 'Підозра на шахрайство', other: 'Інше',
+  late: 'Запізнення клієнта',
 };
 const CLIENT_TOPICS = ['booking', 'payment', 'quality', 'dispute', 'account', 'fraud', 'other'];
 const PLACE_TOPICS = ['payout', 'booking', 'dispute', 'review', 'account', 'fraud', 'other'];
 const TICKET_STATUS = { new: ['Нове', 'warn'], open: ['У роботі', 'carcar'], waiting: ['Чекаємо відповіді', 'muted'], closed: ['Закрито', 'ok'] };
 // Термінові теми — гроші й шахрайство: відповідь за 2 години, решта — за добу.
-const URGENT = ['payment', 'dispute', 'fraud', 'payout'];
+const URGENT = ['payment', 'dispute', 'fraud', 'payout', 'late'];
 const slaHours = (t) => (t.priority === 'high' ? 2 : 24);
 
 const ticketsAll = () => store.get('support', []);
@@ -4069,7 +4081,8 @@ function viewTicket(id) {
             <dt>Стан</dt><dd>${b.state === 'dispute' ? '<span class="pill warn">Спір — гроші заморожено</span>' : esc(BOOKING_STATE[b.state] ?? b.state)}${b.declined ? ` (${{ place: 'відмова мийки', timeout: 'мийка не відповіла', proposal: 'інший час не підійшов' }[b.declined]})` : ''}${b.resolution ? ` · рішення ${fmtTime(b.resolution.at)}: точці ${uah(b.resolution.placePart)}` : ''}</dd>
           </dl>
           ${relatedTickets(b, t.id)}
-          ${b.state === 'dispute' ? `<p class="notice warn" style="margin:0"><b>Скарга клієнта</b>«${esc(b.disputeReason ?? '')}»</p>
+          ${b.state === 'dispute' && b.lateClaim ? lateDecision(b)
+            : b.state === 'dispute' ? `<p class="notice warn" style="margin:0"><b>Скарга клієнта</b>«${esc(b.disputeReason ?? '')}»</p>
             ${b.photos?.length ? `<div class="photos">${b.photos.map((src, i) => `<img src="${esc(src)}" alt="Фото результату ${i + 1}">`).join('')}</div>` : '<p class="small muted" style="margin:0">Точка не додала фото результату.</p>'}
             ${disputeForm(b)}`
             : canDispute ? `<button class="btn primary" data-action="escalate" data-id="${t.id}" style="align-self:flex-start">${icon('scale', 18)}Перевести в спір і заморозити гроші</button>
@@ -4078,6 +4091,20 @@ function viewTicket(id) {
           : '<p class="muted" style="margin:0">Звернення не повʼязане із записом.</p>'}
       </section>
     </div>`;
+}
+
+// Мийка повідомила про запізнення клієнта: модератор перевіряє (чат запису, «Запізнююсь», дзвінки) і вирішує.
+function lateDecision(b) {
+  const msgs = (b.chat ?? []).slice(-6);
+  return `<p class="notice warn" style="margin:0"><b>Заява мийки про запізнення</b>Перевірте листування й дзвінки за записом. Оплата заморожена до рішення.</p>
+    ${msgs.length ? `<ol class="thread">${msgs.map((m) => `<li class="msg ${m.from === 'client' ? 'client' : 'biz'}"><span class="who">${m.from === 'client' ? 'Клієнт' : m.from === 'biz' ? 'Мийка' : 'Подія'} · ${fmtTime(m.at)}</span>${esc(m.text ?? '')}</li>`).join('')}</ol>` : '<p class="small muted" style="margin:0">У чаті запису повідомлень немає.</p>'}
+    <form class="stack late-form" data-id="${b.id}" style="gap:10px">
+      <label class="field"><span>Коментар до рішення (необовʼязково)</span><input name="note" maxlength="300" autocomplete="off"></label>
+      <div class="row">
+        <button class="btn primary" type="submit" value="confirm">Запізнення підтверджено — оплата мийці</button>
+        <button class="btn" type="submit" value="reject">Не підтверджено — повернути клієнту</button>
+      </div>
+    </form>`;
 }
 
 // Рішення за спором — і відповідь у всіх повʼязаних зверненнях.
@@ -4945,6 +4972,15 @@ document.addEventListener('submit', async (e) => {
     }
     save();
     rerender();
+  } else if (f.matches('.late-form')) {
+    const b = bookings.find((x) => x.id === f.dataset.id);
+    const ok = e.submitter?.value === 'confirm';
+    const note = String(d.get('note') ?? '').trim();
+    if (!resolveLate(b, ok, note)) { toast('Запис уже змінився'); rerender(); return; }
+    save();
+    notifyResolution(b, `${ok ? `Запізнення понад ${PAYMENT.lateMinutes} хв підтверджено — оплату зараховано мийці` : 'Запізнення не підтверджено — оплату повернено клієнту на баланс CARCAR'}.${note ? ` ${note}` : ''}`);
+    rerender();
+    toast(ok ? 'Оплату зараховано мийці' : 'Гроші повернено клієнту');
   } else if (f.matches('.dispute-form')) {
     const b = bookings.find((x) => x.id === f.dataset.id);
     const to = d.get('to');

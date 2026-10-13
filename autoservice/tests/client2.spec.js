@@ -56,7 +56,7 @@ test('нагадування напередодні й за 2 години, «З
   await page.goto('/#/bookings');
   const bar = page.getByRole('group', { name: 'Візит завтра о 10:00' });
   await expect(bar.getByRole('button', { name: 'Їду' })).toHaveCount(0);
-  await expect(bar).toContainText('більше ніж на 15 хв, візит вважається неявкою');
+  await expect(bar).toContainText('більше ніж на 15 хв і CARCAR це підтвердить, оплата');
   await bar.getByRole('button', { name: 'Запізнююсь на 15 хв' }).click();
   await expect(page.locator('#toast')).toHaveText('Мийка знає: запізнюєтесь на 15 хв');
   await expect(bar.getByRole('button', { name: /Запізнююсь/ })).toHaveCount(0);
@@ -69,18 +69,53 @@ test('нагадування напередодні й за 2 години, «З
   await expect(sheet).toContainText('Клієнт повідомив: запізниться на 15 хв');
 });
 
-test('запізнення понад 15 хв: мийка зараховує оплату собі, клієнт бачить причину', async ({ page }) => {
+test('запізнення понад 15 хв: мийка надсилає готове звернення, підтримка перевіряє й вирішує', async ({ page }) => {
   await book(page);
-  // Візит о 10:00, зараз 10:20 — клієнта немає.
+  // Візит о 10:00, о 10:10 ще рано, о 10:20 клієнта немає.
+  await page.clock.setFixedTime(new Date(2026, 9, 5, 10, 10));
+  let sheet = await proBooking(page);
+  await expect(sheet.getByRole('button', { name: /запізнився понад 15 хв/ })).toHaveCount(0);
   await page.clock.setFixedTime(new Date(2026, 9, 5, 10, 20));
-  const sheet = await proBooking(page);
-  page.once('dialog', (d) => d.accept());
-  await sheet.getByRole('button', { name: 'Запізнення понад 15 хв — оплата нам' }).click();
-  await expect(page.locator('#toast')).toHaveText('Оплату 900 ₴ зараховано вам');
+  sheet = await proBooking(page);
+  await sheet.getByRole('button', { name: 'Клієнт запізнився понад 15 хв — у підтримку' }).click();
+  // Дані запису вже підставлено — мийка лише надсилає.
+  const form = page.getByRole('dialog', { name: 'Запізнення клієнта' });
+  await expect(form.locator('.late-preview')).toContainText('Клієнт запізнився понад 15 хв');
+  await expect(form.locator('.late-preview')).toContainText('запізнення 20 хв');
+  await expect(form.locator('.late-preview')).toContainText('Сума: 900 ₴');
+  await form.getByRole('button', { name: 'Надіслати в підтримку' }).click();
+  await expect(page.locator('#toast')).toContainText('підтримка перевірить запізнення');
+
+  // Клієнт бачить, що запізнення на перевірці, гроші заморожені.
+  await page.goto('/#/bookings');
+  const card = page.locator('article').first();
+  await expect(card).toContainText('Запізнення на перевірці');
+  await expect(card).toContainText('Мийка повідомила про запізнення');
+
+  // Підтримка бачить звернення з даними й підтверджує запізнення.
+  await page.goto('/admin.html#/support');
+  await page.locator('tr', { hasText: 'Запізнення клієнта' }).first().getByRole('link').click();
+  await expect(page.locator('.thread').first()).toContainText('Клієнт запізнився понад 15 хв');
+  await page.getByRole('button', { name: 'Запізнення підтверджено — оплата мийці' }).click();
+  await expect(page.locator('#toast')).toHaveText('Оплату зараховано мийці');
 
   await page.goto('/#/bookings');
   await expect(page.getByRole('button', { name: /Завершені/ })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('article').first()).toContainText('Запізнення понад 15 хв — оплату 900 ₴ зараховано точці за послугу');
+});
+
+test('запізнення не підтверджено — підтримка повертає гроші клієнту', async ({ page }) => {
+  await book(page);
+  await page.clock.setFixedTime(new Date(2026, 9, 5, 10, 20));
+  const sheet = await proBooking(page);
+  await sheet.getByRole('button', { name: 'Клієнт запізнився понад 15 хв — у підтримку' }).click();
+  await page.getByRole('dialog', { name: 'Запізнення клієнта' }).getByRole('button', { name: 'Надіслати в підтримку' }).click();
+  await page.goto('/admin.html#/support');
+  await page.locator('tr', { hasText: 'Запізнення клієнта' }).first().getByRole('link').click();
+  await page.getByRole('button', { name: 'Не підтверджено — повернути клієнту' }).click();
+  await expect(page.locator('#toast')).toHaveText('Гроші повернено клієнту');
+  const b = await page.evaluate(() => JSON.parse(localStorage.getItem('carcar.bookings')).at(-1));
+  expect([b.state, b.refund, b.placeAmount]).toEqual(['refunded', 900, 0]);
 });
 
 test('мої записи: вкладки «Активні» й «Завершені» з лічильниками', async ({ page }) => {

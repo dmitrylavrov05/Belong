@@ -6,7 +6,7 @@ import {
   store, icon, esc, uah, pad, isoDate, parseDate, plural, dayLabel, rating, fmtTime, fmtDate, catById, WEEKDAYS, bookingStart, HOUR,
   PARTNER_STATUS, partnerOf, savePartner, commissionFor, isCarcar, price, placeShare, isFrozen,
   responseStats, pauseOf, liftPause, ratePct, msText, realOrder,
-  ratingFor, visibleReviews, ACTIVE, resolveDispute, settleAll, applyOverrides, promosAll, savePromos, promoUses, promoText,
+  ratingFor, visibleReviews, ACTIVE, resolveDispute, resolveLate, settleAll, applyOverrides, promosAll, savePromos, promoUses, promoText,
   TICKET_TOPICS, TICKET_STATUS, ticketsAll, ticketReply, setTicket, ticketOverdue, slaHours, fraudState, saveFraud, staffOf, phoneKey,
   addCustomPlace, uid, hash,
   enterView, bizApps, APP_STATUS, approveBizApp, rejectBizApp, bookingNo, findByNo, ticketPhotos, shrinkPhoto,
@@ -527,7 +527,8 @@ function viewTicket(id) {
             <dt>Стан</dt><dd>${b.state === 'dispute' ? '<span class="pill warn">Спір — гроші заморожено</span>' : esc(BOOKING_STATE[b.state] ?? b.state)}${b.declined ? ` (${{ place: 'відмова мийки', timeout: 'мийка не відповіла', proposal: 'інший час не підійшов' }[b.declined]})` : ''}${b.resolution ? ` · рішення ${fmtTime(b.resolution.at)}: точці ${uah(b.resolution.placePart)}` : ''}</dd>
           </dl>
           ${relatedTickets(b, t.id)}
-          ${b.state === 'dispute' ? `<p class="notice warn" style="margin:0"><b>Скарга клієнта</b>«${esc(b.disputeReason ?? '')}»</p>
+          ${b.state === 'dispute' && b.lateClaim ? lateDecision(b)
+            : b.state === 'dispute' ? `<p class="notice warn" style="margin:0"><b>Скарга клієнта</b>«${esc(b.disputeReason ?? '')}»</p>
             ${b.photos?.length ? `<div class="photos">${b.photos.map((src, i) => `<img src="${esc(src)}" alt="Фото результату ${i + 1}">`).join('')}</div>` : '<p class="small muted" style="margin:0">Точка не додала фото результату.</p>'}
             ${disputeForm(b)}`
             : canDispute ? `<button class="btn primary" data-action="escalate" data-id="${t.id}" style="align-self:flex-start">${icon('scale', 18)}Перевести в спір і заморозити гроші</button>
@@ -536,6 +537,20 @@ function viewTicket(id) {
           : '<p class="muted" style="margin:0">Звернення не повʼязане із записом.</p>'}
       </section>
     </div>`;
+}
+
+// Мийка повідомила про запізнення клієнта: модератор перевіряє (чат запису, «Запізнююсь», дзвінки) і вирішує.
+function lateDecision(b) {
+  const msgs = (b.chat ?? []).slice(-6);
+  return `<p class="notice warn" style="margin:0"><b>Заява мийки про запізнення</b>Перевірте листування й дзвінки за записом. Оплата заморожена до рішення.</p>
+    ${msgs.length ? `<ol class="thread">${msgs.map((m) => `<li class="msg ${m.from === 'client' ? 'client' : 'biz'}"><span class="who">${m.from === 'client' ? 'Клієнт' : m.from === 'biz' ? 'Мийка' : 'Подія'} · ${fmtTime(m.at)}</span>${esc(m.text ?? '')}</li>`).join('')}</ol>` : '<p class="small muted" style="margin:0">У чаті запису повідомлень немає.</p>'}
+    <form class="stack late-form" data-id="${b.id}" style="gap:10px">
+      <label class="field"><span>Коментар до рішення (необовʼязково)</span><input name="note" maxlength="300" autocomplete="off"></label>
+      <div class="row">
+        <button class="btn primary" type="submit" value="confirm">Запізнення підтверджено — оплата мийці</button>
+        <button class="btn" type="submit" value="reject">Не підтверджено — повернути клієнту</button>
+      </div>
+    </form>`;
 }
 
 // Рішення за спором — і відповідь у всіх повʼязаних зверненнях.
@@ -1403,6 +1418,15 @@ document.addEventListener('submit', async (e) => {
     }
     save();
     rerender();
+  } else if (f.matches('.late-form')) {
+    const b = bookings.find((x) => x.id === f.dataset.id);
+    const ok = e.submitter?.value === 'confirm';
+    const note = String(d.get('note') ?? '').trim();
+    if (!resolveLate(b, ok, note)) { toast('Запис уже змінився'); rerender(); return; }
+    save();
+    notifyResolution(b, `${ok ? `Запізнення понад ${PAYMENT.lateMinutes} хв підтверджено — оплату зараховано мийці` : 'Запізнення не підтверджено — оплату повернено клієнту на баланс CARCAR'}.${note ? ` ${note}` : ''}`);
+    rerender();
+    toast(ok ? 'Оплату зараховано мийці' : 'Гроші повернено клієнту');
   } else if (f.matches('.dispute-form')) {
     const b = bookings.find((x) => x.id === f.dataset.id);
     const to = d.get('to');

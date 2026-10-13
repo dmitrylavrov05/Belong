@@ -551,7 +551,8 @@ test('«Машина готова» з фото потрапляє клієнт�
   const sheet = await proBooking(page);
   await sheet.getByLabel(/Фото результату/).setInputFiles({ name: 'wheel.png', mimeType: 'image/png', buffer: PIXEL });
   await expect(sheet.getByText('обрано: 1')).toBeVisible();
-  await sheet.getByLabel('Пробіг, км').fill('84200');
+  // Пробіг мийка більше не вносить.
+  await expect(sheet.getByLabel('Пробіг, км')).toHaveCount(0);
   await sheet.getByLabel('Коментар для клієнта').fill('Літні шини здали на зберігання');
   await sheet.getByRole('button', { name: 'Машина готова' }).click();
   await expect(page.locator('#toast')).toHaveText('Клієнт отримав сповіщення «Машина готова»');
@@ -569,7 +570,7 @@ test('«Машина готова» з фото потрапляє клієнт�
   await expect(page.getByText('Остання мийка 5 жовтня 2026 р.')).toBeVisible();
   const log = page.locator('.log-item').first();
   await expect(log).toContainText('Комплекс преміум: кузов, салон, віск');
-  await expect(log).toContainText('Автомийка «Хвиля» · 84 200 км');
+  await expect(log).toContainText('Автомийка «Хвиля»');
   await expect(log.getByRole('img', { name: 'Фото 1' })).toBeVisible();
 });
 

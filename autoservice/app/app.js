@@ -1255,7 +1255,7 @@ function renderBook() {
       <ul class="perks">
         <li><span class="perk-ic ok">${icon('shield', 20)}</span>Гроші утримуються, доки роботу не виконано</li>
         <li><span class="perk-ic">${icon('undo', 20)}</span>Скасування до ${cancelWindow()} до візиту — уся сума повертається на баланс CARCAR</li>
-        <li><span class="perk-ic">${icon('clock', 20)}</span>Запізнення понад ${PAYMENT.lateMinutes} хв — як неявка, оплата зараховується мийці</li>
+        <li><span class="perk-ic">${icon('clock', 20)}</span>Запізнення понад ${PAYMENT.lateMinutes} хв — мийка може звернутися в підтримку; якщо CARCAR підтвердить, оплата зараховується мийці</li>
       </ul>
       <div class="grid2 pf">
         <label class="field"><span>Ваше імʼя</span><input id="pf-name" autocomplete="name" value="${esc(draft.pfName ?? profile.name)}"></label>
@@ -1433,7 +1433,7 @@ const STATE_ICON = { pending: 'clock', offer: 'clock', completed: 'checkCircle',
 const washerOf = (b) => (b.masterId ? staffOf(b.placeId).find((x) => x.id === b.masterId)?.name ?? null : null);
 
 const cardHead = (b, title, sm, amount = b.paid) => {
-  const [cls, label] = b.declined && b.declined !== 'proposal' ? ['', 'Мийка не підтвердила'] : STATE_LABEL[b.state];
+  const [cls, label] = b.declined && b.declined !== 'proposal' ? ['', 'Мийка не підтвердила'] : b.lateClaim && b.state === 'dispute' ? ['warn', 'Запізнення на перевірці'] : STATE_LABEL[b.state];
   return `<div class="head">
       <div><div class="bk-status ${cls}">${STATE_ICON[b.state] ? icon(STATE_ICON[b.state], 14) : ''}${label}</div><h3 class="bk-title${sm ? ' sm' : ''}">${title}</h3>
         ${b.no ? `<span class="bk-no">Запис ${bookingNo(b)}</span>` : ''}</div>
@@ -1539,7 +1539,10 @@ function bookingCard(b, highlight) {
         ${t.inWindow && !canMove ? ' Запис уже переносили. Щоб змінити час ще раз, напишіть мийці в чат — вона перенесе запис.' : ''}</p>
       ${t.inWindow && !canMove ? `<a class="btn block" href="#/chat/${b.id}">${icon('chat', 18)}Домовитися про інший час у чаті</a>` : ''}`}`;
   } else if (b.state === 'dispute') {
-    body += `<div class="notice warn"><div class="label">Ваша скарга</div>«${esc(b.disputeReason)}». Модератор перевірить і вирішить, кому передати гроші.</div>${result(b)}`;
+    body += b.lateClaim
+      ? `<div class="notice warn"><div class="label">Мийка повідомила про запізнення</div>Мийка каже, що ви запізнилися понад ${PAYMENT.lateMinutes} хв. Підтримка CARCAR перевіряє: якщо запізнення не було, гроші повернемо. Оплата поки заморожена.</div>
+        <a class="btn" href="#/support">${icon('chat', 18)}Написати в підтримку</a>`
+      : `<div class="notice warn"><div class="label">Ваша скарга</div>«${esc(b.disputeReason)}». Модератор перевірить і вирішить, кому передати гроші.</div>${result(b)}`;
   } else if (b.state === 'completed') {
     body += result(b);
     if (isFrozen(b)) {
@@ -2030,14 +2033,14 @@ function visitReminders() {
 }
 
 // Блок біля запису, що скоро: «Запізнююсь на 15 хв» — мийка бачить це в журналі.
-// Запізнення понад PAYMENT.lateMinutes — як неявка: оплата зараховується мийці.
+// Запізнення понад PAYMENT.lateMinutes: мийка звертається в підтримку, CARCAR перевіряє й вирішує щодо оплати.
 function visitBar(b) {
   const left = bookingStart(b).getTime() - Date.now();
   if (left <= -30 * 60000 || left > 24 * HOUR) return '';
   return `<div class="visit-bar" role="group" aria-label="Візит ${b.date === isoDate(new Date()) ? 'сьогодні' : 'завтра'} о ${b.time}">
     <p class="small" style="margin:0">${icon('bell', 16)}${b.late ? `Мийка знає, що ви запізнюєтесь на ${b.late} хв.` : 'Не встигаєте вчасно? Попередьте мийку.'}</p>
     ${b.late ? '' : `<button class="btn" data-action="eta-late" data-id="${b.id}">Запізнююсь на ${PAYMENT.lateMinutes} хв</button>`}
-    <p class="fine">Якщо запізнитеся більше ніж на ${PAYMENT.lateMinutes} хв, візит вважається неявкою — оплата ${uah(b.paid)} зараховується мийці.</p>
+    <p class="fine">Якщо запізнитеся більше ніж на ${PAYMENT.lateMinutes} хв і CARCAR це підтвердить, оплата ${uah(b.paid)} зараховується мийці.</p>
   </div>`;
 }
 
