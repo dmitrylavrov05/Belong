@@ -542,6 +542,14 @@ export function placeShare(b) {
 
 // Баланс точки в CARCAR: available — можна вивести; frozen — замовлення в роботі
 // плюс підтверджені, що ще не розморозились. Оплати на місці сюди не входять.
+// Номери телефонів у листуванні приховуємо: клієнт CARCAR лишається клієнтом CARCAR, дзвінки — через застосунок.
+// Число з 9+ цифр (з пробілами, дужками, дефісами) — схоже на телефон; ціни й дати лишаються.
+export const hidePhones = (text) => String(text ?? '').replace(/\+?\d[\d\s\-().]{7,}\d/g, (m) => (m.replace(/\D/g, '').length >= 9 ? '[номер приховано — дзвінки через CARCAR]' : m));
+
+// Клієнт прийшов через CARCAR, але мийка записала його сама (по телефону чи «приїхав сам»):
+// комісія з такого запису утримується з виплат.
+export const leadFee = (b) => (b.lead === 'carcar' && b.state === 'completed' ? Math.round((b.paid || 0) * commissionFor(b.placeId)) : 0);
+
 export function balanceFor(placeId, bookings, payouts) {
   const own = bookings.filter((b) => b.placeId === placeId && isCarcar(b));
   const earned = own.filter((b) => !isFrozen(b)).reduce((a, b) => a + placeShare(b), 0);
@@ -555,7 +563,8 @@ export function balanceFor(placeId, bookings, payouts) {
   const ripe = (x) => Date.now() >= x.soldAt + PAYMENT.freezeHours * HOUR;
   const passEarned = sales.filter(ripe).reduce((a, x) => a + x.price, 0);
   const passFrozen = sales.filter((x) => !ripe(x)).reduce((a, x) => a + x.price, 0);
-  return { available: earned + passEarned - withdrawn, frozen: frozen + passFrozen, next, withdrawn };
+  const leadFees = bookings.filter((b) => b.placeId === placeId).reduce((a, b) => a + leadFee(b), 0);
+  return { available: earned + passEarned - withdrawn - leadFees, frozen: frozen + passFrozen, next, withdrawn, leadFees };
 }
 
 // Номер запису: шість цифр по порядку, однаковий у клієнта, мийки й підтримки — його називають,

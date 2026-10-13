@@ -186,9 +186,63 @@ test('питання клієнта: додати послугу й відпов
   await page.getByLabel('Позашляховик / мінівен').fill('1100');
   await page.getByRole('button', { name: 'Додати й повідомити клієнта' }).click();
   await expect(page.locator('.bubble.me')).toContainText('Додали послугу «Хімчистка стелі» — від 900 ₴');
-  await page.getByRole('button', { name: 'Записати' }).click();
-  await expect(page.getByLabel('Імʼя')).toHaveValue('Максим');
-  await expect(page.getByRole('button', { name: /Хімчистка стелі/ })).toBeVisible();
+  // Записати «вручну» з чату не можна — лише запропонувати запис, який клієнт оплатить у CARCAR.
+  await page.getByRole('button', { name: 'Запропонувати запис' }).click();
+  const d = page.getByRole('dialog', { name: 'Запропонувати запис' });
+  await expect(d.getByLabel('Телефон', { exact: true })).toHaveCount(0);
+  await expect(d.getByRole('button', { name: /Хімчистка стелі/ })).toBeVisible();
+});
+
+test('клієнт з чату: мийка пропонує запис, клієнт оплачує в CARCAR — це запис CARCAR з комісією', async ({ page }) => {
+  await page.goto('/#/ask/blysk');
+  await page.getByLabel('Ваше імʼя').fill('Оксана');
+  await page.getByLabel('Ваш телефон').fill('+380 67 123 45 67');
+  await page.getByLabel('Повідомлення мийці').fill('Помиєте сьогодні о 14? Мій номер 067 123 45 67');
+  await page.getByRole('button', { name: 'Надіслати', exact: true }).click();
+  // Номер у листуванні прихований.
+  await expect(page.locator('.bubble').last()).toContainText('[номер приховано — дзвінки через CARCAR]');
+
+  await page.goto(`${PRO}#/`);
+  await page.getByRole('button', { name: /^Питання/ }).click();
+  await page.locator('.convo').first().click();
+  await expect(page.locator('.chat-msgs')).not.toContainText('067 123 45 67');
+  await page.getByRole('button', { name: 'Запропонувати запис' }).click();
+  const d = page.getByRole('dialog', { name: 'Запропонувати запис' });
+  await d.getByRole('button', { name: /Експрес-мийка кузова/ }).click();
+  await d.getByRole('group', { name: 'Вільний час' }).getByRole('button', { name: '14:00' }).click();
+  await d.getByRole('button', { name: 'Надіслати клієнту' }).click();
+  await expect(page.locator('.toast')).toContainText('клієнт оплатить у застосунку');
+
+  await page.goto('/#/ask/blysk');
+  await expect(page.locator('.invite-card')).toContainText('14:00 · 250 ₴');
+  await page.locator('.invite-card').getByRole('button', { name: 'Записатися й оплатити' }).click();
+  await page.locator('[data-action="confirm"]').click();
+  await page.getByRole('button', { name: /^Оплатити/ }).click();
+  await expect(page.locator('#toast')).toHaveText('Оплачено, ви записані');
+  const b = await page.evaluate(() => JSON.parse(localStorage.getItem('carcar.bookings')).at(-1));
+  expect([b.placeId, b.time, b.state, b.source ?? null, b.channel ?? null]).toEqual(['blysk', '14:00', 'paid', null, null]);
+  await page.goto('/#/ask/blysk');
+  await expect(page.locator('.invite-card')).toContainText('Ви записані');
+});
+
+test('клієнта CARCAR записали напряму по телефону — запис позначено, комісія утримується з виплат', async ({ page }) => {
+  await seed(page, { bookings: [{ ...paid, state: 'completed', date: '2026-10-01', chat: undefined, chatUnreadBiz: false, completedAt: at(12, 0, 1), unfreezeAt: at(12, 0, 3) }] });
+  await page.goto(`${PRO}#/bookings`);
+  await page.getByRole('button', { name: 'Новий запис' }).click();
+  const d = page.getByRole('dialog', { name: 'Новий запис' });
+  await d.getByLabel('Телефон', { exact: true }).fill('050 123 45 67');
+  await expect(d.locator('#nb-hint')).toContainText('Це клієнт CARCAR — з такого запису утримається комісія 10%');
+  await d.getByRole('button', { name: /Експрес-мийка кузова/ }).click();
+  await d.getByRole('group', { name: 'Вільний час' }).getByRole('button').first().click();
+  await d.getByRole('button', { name: /^Записати на/ }).click();
+  await expect(page.locator('.toast')).toContainText('утримається комісія 10%');
+  const b = await page.evaluate(() => JSON.parse(localStorage.getItem('carcar.bookings')).at(-1));
+  expect(b.lead).toBe('carcar');
+  // Виконано й оплачено на місці — 250 ₴, комісія 25 ₴ віднімається з доступних до виведення.
+  await page.evaluate((id) => { const all = JSON.parse(localStorage.getItem('carcar.bookings')); Object.assign(all.find((x) => x.id === id), { state: 'completed', payment: 'cash' }); localStorage.setItem('carcar.bookings', JSON.stringify(all)); }, b.id);
+  await page.goto('about:blank');
+  await page.goto(`${PRO}#/wash`);
+  await expect(page.locator('main')).toContainText('Комісія за клієнтів CARCAR, записаних напряму−25 ₴');
 });
 
 test('мийка: виручка й гроші; відгуки — в «Ще» з публічною відповіддю', async ({ page }) => {

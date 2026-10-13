@@ -337,3 +337,5 @@ body.pro.locked .pro-tabs { display: none; }
 .wd-row input:focus-visible + span, .pct-row input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
 .nb-dur small { display: block; margin-top: 4px; font-size: 12px; }
 .late-preview { margin: 0; padding: 12px 14px; border-radius: 12px; background: var(--soft); font: inherit; font-size: 14px; line-height: 1.45; white-space: pre-wrap; }
+.warn-text { color: var(--warn); font-weight: 600; }
+.pill.lead { background: var(--warn-soft); color: var(--text); }

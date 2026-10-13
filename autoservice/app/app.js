@@ -2,7 +2,7 @@ import { CITY, CITIES, CATEGORIES, CAR_CLASSES, PLACES, PAYMENT, MAINTENANCE, RE
 import {
   store, icon, esc, uah, pad, hhmm, toMin, isoDate, parseDate, uid, placeById, plural, duration, dayLabel, rating,
   hoursFor, scheduleOf, inBreak, rangeText, WEEKDAY_NAMES, weekdayOf, phoneKey, offersOf, offerAsService, isOpenNow, hoursText, bookingStart, fmtTime, fmtDate, km, serviceCat, catById, shrinkPhoto,
-  confirmBy, offerBy, pauseOf, responseStats, msText, AWAITING, staffOf, chargedOf, realOrder,
+  confirmBy, offerBy, pauseOf, responseStats, msText, AWAITING, staffOf, chargedOf, realOrder, hidePhones,
   applyOverrides, isListed, visibleReviews, ACTIVE, BLOCKING, HOUR, price, isFrozen, settleAll, ratingFor,
   powerOf, worksInBlackout, TICKET_TOPICS, CLIENT_TOPICS, TICKET_STATUS, ticketsAll, openTicket, ticketReply, setTicket, isBlocked, mobileOn, spanOf, laneCap, sameLane, MOBILE_ROAD, promosAll, promoCheck,
   enterView, fitChatScreen, keepChatOnKeyboard, bizApps, saveBizApps, APP_STATUS, numberBookings, bookingNo, findByNo, ticketPhotos,
@@ -835,6 +835,17 @@ function viewAsk(id) {
     const sep = day !== lastDay ? `<li class="day-sep"><span>${dayName(day)}</span></li>` : '';
     lastDay = day;
     if (m.from === 'mark') return `${sep}<li class="chat-mark closed">${icon('x', 14)}<b>${esc(m.text)}</b></li>`;
+    // Мийка пропонує запис: клієнт підтверджує й оплачує тут — це запис CARCAR.
+    if (m.invite) {
+      const r = list.find((x) => x.invite?.id === m.invite);
+      const inv = r?.invite;
+      const used = inv?.bookingId && bookings.find((b) => b.id === inv.bookingId);
+      return `${sep}${bubble(m, p.name)}${inv && r.invite.id === m.invite ? `<li class="svc-offer invite-card">${icon('calendar', 22)}<div><b>${dayLabel(inv.date, { weekday: 'short', day: 'numeric', month: 'long' })}, ${inv.time} · ${uah(inv.total)}</b>
+        <span>${esc(inv.names.join(', '))}</span>
+        ${used ? `<a class="btn" href="#/bookings/${used.id}">Ви записані — відкрити запис</a>`
+          : inv.date < isoDate(new Date()) ? '<span class="muted">Пропозиція застаріла — напишіть мийці</span>'
+            : `<button class="btn primary" data-action="invite-book" data-req="${r.id}">Записатися й оплатити</button>`}</div></li>` : ''}`;
+    }
     if (m.from === 'svc') {
       return `${sep}<li class="svc-offer">${icon('checkCircle', 22)}<div><b>${esc(m.service.name)} — ${uah(m.service.price)}</b>
         <span>${m.service.personal ? 'Персональна послуга для вас' : 'Послугу додано до прайсу мийки'}</span>
@@ -915,9 +926,9 @@ function openPhoto(src) {
 }
 
 // Повідомлення мийці: дописуємо у відкритий запит або починаємо новий.
-function askSend(placeId, text, photo = null) {
-  if (!text && !photo) return;
-  const msg = { from: 'client', text, at: Date.now(), ...(photo ? { photo } : {}) };
+function askSend(placeId, raw, photo = null) {
+  if (!raw && !photo) return;
+  const msg = { from: 'client', text: hidePhones(raw), at: Date.now(), ...(photo ? { photo } : {}) };
   const open = requestsOf(placeId).find((r) => !r.closed && !r.service);
   if (open) {
     open.messages.push(msg);
@@ -1326,7 +1337,7 @@ function confirmBooking() {
     : isBlocked(myKeys()) ? 'Онлайн-запис для цього профілю обмежено' : null;
   if (stop) { draft = null; toast(stop); route(); return; }
   const fresh = bookingDays(p).includes(draft.date)
-    && slotsFor(p, draft.date, chosen.reduce((a, s) => a + s.min, 0), { mobile: mobileMode() }).some((sl) => sl.time === draft.time && !sl.busy);
+    && slotsFor(p, draft.date, draft.invite?.minutes ?? chosen.reduce((a, s) => a + s.min, 0), { mobile: mobileMode() }).some((sl) => sl.time === draft.time && !sl.busy);
   if (!fresh) { Object.assign(draft, { time: null, paying: false, step: 'time' }); renderBook(); toast('Цей час щойно зайняли — оберіть інший'); return; }
   const id = uid();
   const passUse = q.use ? { ...redeemPass(p.id, q.use.soldId, q.covered, id), kind: q.use.kind } : null;
@@ -1343,7 +1354,7 @@ function confirmBooking() {
     paid: q.rest - bonus,
     fromBalance: fromBal,
     bonus,
-    minutes: chosen.reduce((a, s) => a + s.min, 0),
+    minutes: draft.invite?.minutes ?? chosen.reduce((a, s) => a + s.min, 0),
     date: draft.date,
     time: draft.time,
     car: car ? carLabel(car) : CAR_CLASSES[cls],
@@ -1358,12 +1369,22 @@ function confirmBooking() {
     campaign: campaignNow()?.id ?? null,
     firstOrder: !mine().some(realOrder),
     installments: q.installments ? { ...q.installments, card: q.card } : null,
-    // Мийка підтверджує запис сама, якщо не ввімкнула автопідтвердження.
-    state: autoConfirmOf(p.id) ? 'paid' : 'pending',
-    needsConfirm: !autoConfirmOf(p.id),
+    // Мийка підтверджує запис сама, якщо не ввімкнула автопідтвердження. Запис за пропозицією мийки — вже погоджений.
+    state: autoConfirmOf(p.id) || draft.invite ? 'paid' : 'pending',
+    needsConfirm: !autoConfirmOf(p.id) && !draft.invite,
+    ...(draft.invite ? { fromReq: draft.invite.reqId, confirmedAt: Date.now() } : {}),
     createdAt: Date.now(),
   };
   bookings.push(b);
+  if (draft.invite) {
+    const r = requests.find((x) => x.id === draft.invite.reqId);
+    if (r?.invite) {
+      r.invite.bookingId = b.id;
+      r.messages.push({ from: 'client', text: `Записався й оплатив: ${dayLabel(b.date, { day: 'numeric', month: 'long' })}, ${b.time}`, at: Date.now() });
+      r.unreadBiz = true;
+      saveRequests();
+    }
+  }
   save();
   if (bonus) addBonus(-bonus, `Списано на замовлення: ${p.name}`);
   if (fromBal) addMoney(-fromBal, `Оплата замовлення: ${p.name}`);
@@ -1709,7 +1730,7 @@ function viewChat(id) {
 }
 
 function sendChat(b, text, photo = null) {
-  chatPost(b, 'client', text, 'biz', photo);
+  chatPost(b, 'client', hidePhones(text), 'biz', photo);
   save();
   route();
   $('.chat-form input[name="text"]')?.focus();
@@ -2782,6 +2803,16 @@ document.addEventListener('click', (e) => {
     const b = id ? bookings.find((x) => x.id === id) : null;
     const p = placeById(b?.placeId ?? el.dataset.place);
     if (p) startCall({ bookingId: b?.id ?? null, placeId: p.id, placeName: p.name, clientName: profile.name || 'Клієнт CARCAR' });
+  } else if (action === 'invite-book') {
+    // Пропозиція мийки з чату: ті самі послуги, день і час — одразу до оплати.
+    const r = requests.find((x) => x.id === el.dataset.req);
+    const inv = r?.invite;
+    const p = inv && placeById(r.placeId);
+    if (!p) return;
+    const ids = new Set(bookable(p).filter((s) => inv.services.includes(s.id)).map((s) => s.id));
+    draft = { placeId: p.id, services: ids, date: inv.date, time: null, wantTime: inv.time, carId: mainCar()?.id ?? null, step: 'time', paying: false,
+      invite: { reqId: r.id, id: inv.id, minutes: inv.minutes } };
+    location.hash = `#/book/${p.id}`;
   } else if (action === 'notify-on') {
     Notification.requestPermission().then((res) => {
       route();

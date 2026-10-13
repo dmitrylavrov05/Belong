@@ -9,7 +9,7 @@ import {
   ACTIVE, BLOCKING, isCarcar, price, complete, isFrozen, balanceFor, settleAll, ratingFor, partnerOf, PARTNER_STATUS,
   confirmBy, offerBy, responseStats, pauseOf, ratePct, msText, accountPlaces, addAccountPlace,
   ticketsAll, openTicket, ticketReply, setTicket, TICKET_TOPICS, TICKET_STATUS, PLACE_TOPICS, ticketPhotos,
-  payoutReady, maskIban, fitChatScreen, keepChatOnKeyboard, commissionFor, savePartner, staffOf, checkBizLogin, numberBookings, bookingNo, POWER, powerOf, setPower,
+  payoutReady, maskIban, hidePhones, fitChatScreen, keepChatOnKeyboard, commissionFor, savePartner, staffOf, checkBizLogin, numberBookings, bookingNo, POWER, powerOf, setPower,
 } from './core.js';
 import {
   openStarts, chatPost, chatTimeline, readMessages, msgPreview, touchPresence, BIZ_QUICK, sendMessages, checkWaitlist,
@@ -467,7 +467,7 @@ function viewThread(arg = '') {
   return `<section class="chat-screen" aria-label="Чат з ${esc(r.clientName || 'клієнтом')}">
     ${chatHead(r.clientName || 'Клієнт', `${label}${r.car ? ` · ${esc(r.car)}` : ''}`, `data-req="${r.id}"`)}
     ${open ? `<div class="chat-actions">
-      <button class="btn navy" type="button" data-action="nb-open" data-req="${r.id}">${icon('calendar', 16)}Записати</button>
+      <button class="btn navy" type="button" data-action="nb-open" data-req="${r.id}">${icon('calendar', 16)}Запропонувати запис</button>
       ${r.service ? '' : `<button class="btn" type="button" data-action="svc-new" data-req="${r.id}">${icon('plus', 16)}Додати послугу</button>`}
       <button class="btn" type="button" data-action="req-close" data-id="${r.id}">Закрити</button></div>` : ''}
     <ol class="chat-msgs" aria-label="Повідомлення">${threadList(r.messages)}</ol>
@@ -475,7 +475,8 @@ function viewThread(arg = '') {
   </section>`;
 }
 
-function sendTo(thread, text, photo = null) {
+function sendTo(thread, raw, photo = null) {
+  const text = hidePhones(raw);
   const id = thread.slice(2);
   if (thread.startsWith('b-')) {
     const b = own().find((x) => x.id === id);
@@ -662,7 +663,7 @@ function bookingSheet(id) {
     actions = `<p class="notice">${isFrozen(b) ? `Гроші стануть доступні ${fmtTime(b.unfreezeAt)}.` : 'Гроші доступні до виведення в розділі «Мийка».'}</p>`;
   }
   openSheet(`${b.time} · ${esc(who(b))}`, `
-    <div class="row"><span class="pill ${cls}">${label}</span><span class="pill">${CHANNEL[channelOf(b)]}</span>${b.no ? `<span class="small muted">${bookingNo(b)}</span>` : ''}</div>
+    <div class="row"><span class="pill ${cls}">${label}</span><span class="pill">${CHANNEL[channelOf(b)]}</span>${b.lead ? '<span class="pill lead">Клієнт CARCAR · з комісією</span>' : ''}${b.no ? `<span class="small muted">${bookingNo(b)}</span>` : ''}</div>
     <dl class="pro-kv">
       <dt>Коли</dt><dd>${dayWord(b.date, true)}, ${b.time}–${hhmm(toMin(b.time) + b.minutes)}</dd>
       <dt>Послуги</dt><dd>${esc(b.services.join(', '))}</dd>
@@ -804,7 +805,11 @@ let nb = null; // чернетка нового запису
 function nbOpen(prefill = {}) {
   nb = { cls: 0, services: new Set(), date: todayIso(), time: '', channel: 'phone', name: '', phone: '', car: '', ...prefill };
   if (nb.want) nb.time = nb.want;
-  openSheet('Новий запис', `<form class="stack nb-form" id="nb-form" style="gap:14px" novalidate>
+  openSheet(nb.invite ? 'Запропонувати запис' : 'Новий запис', `<form class="stack nb-form" id="nb-form" style="gap:14px" novalidate>
+    ${nb.invite ? `<p class="small muted" style="margin:0">Клієнт прийшов через CARCAR: оберіть послуги, день і час — він підтвердить і оплатить у застосунку. Запис зʼявиться у вас як запис CARCAR.</p>
+      <label class="field"><span>Авто</span><input name="car" autocomplete="off" value="${esc(nb.car)}"></label>
+      <div id="nb-dyn" class="stack" style="gap:14px"></div>
+    </form>` : `
     <div class="seg-row" role="radiogroup" aria-label="Звідки клієнт">
       <label><input type="radio" name="channel" value="phone" ${nb.channel === 'phone' ? 'checked' : ''}><span>${icon('phone', 16)}По телефону</span></label>
       <label><input type="radio" name="channel" value="walkin" ${nb.channel === 'walkin' ? 'checked' : ''}><span>${icon('car', 16)}Приїхав сам</span></label></div>
@@ -815,7 +820,7 @@ function nbOpen(prefill = {}) {
       <label class="field"><span>Авто й номер</span><input name="car" autocomplete="off" placeholder="Golf, AA1234BB" value="${esc(nb.car)}"></label>
     </div>
     <div id="nb-dyn" class="stack" style="gap:14px"></div>
-  </form>`);
+  </form>`}`);
   nbRender();
   nbHint();
 }
@@ -863,7 +868,33 @@ function nbRender() {
     <div><span class="lbl">Час</span>${times.length ? `<div class="slots" role="group" aria-label="Вільний час">${times.map((x) => `<button class="slot" type="button" data-action="nb-time" data-time="${x}" aria-pressed="${x === nb.time}">${x === nowTime && nb.channel === 'walkin' ? 'Зараз' : x}</button>`).join('')}</div>`
       : `<p class="muted small" style="margin:6px 0 0">${hoursFor(p, nb.date) ? 'Вільних боксів на цей день немає.' : 'Цього дня мийка не працює.'}</p>`}</div>
     <div class="nb-foot"><span><b>${chosen.length ? uah(total) : 'Оберіть послуги'}</b><small>${chosen.length ? duration(nbMinutes()) : ''}</small></span>
-      <button class="btn primary" type="submit" ${chosen.length && nb.time ? '' : 'disabled'}>Записати${nb.time ? ` на ${nb.time}` : ''}</button></div>`;
+      <button class="btn primary" type="submit" ${chosen.length && nb.time ? '' : 'disabled'}>${nb.invite ? 'Надіслати клієнту' : `Записати${nb.time ? ` на ${nb.time}` : ''}`}</button></div>`;
+}
+
+// Клієнт, який уже звертався до мийки через CARCAR (запис чи питання в застосунку).
+function carcarLead(phone) {
+  const key = phoneKey(phone);
+  if (!key) return false;
+  return own().some((b) => isCarcar(b) && b.clientPhone && phoneKey(b.clientPhone) === key)
+    || ownRequests().some((r) => r.clientPhone && phoneKey(r.clientPhone) === key);
+}
+
+// Пропозиція запису в чаті: клієнт підтверджує й оплачує в застосунку — це звичайний запис CARCAR.
+function sendInvite() {
+  const r = ownRequests().find((x) => x.id === nb.invite);
+  const chosen = nbChosen();
+  if (!r) { closeSheet(); return; }
+  if (!boxFree(nb.date, toMin(nb.time), nbMinutes())) { toast('Цей час щойно зайняли — оберіть інший'); nbRender(); return; }
+  const total = chosen.reduce((a, s) => a + s.price[nb.cls], 0);
+  const inv = { id: uid(), services: chosen.map((s) => s.id), names: chosen.map((s) => s.name), total, minutes: nbMinutes(), date: nb.date, time: nb.time, cls: nb.cls, at: Date.now() };
+  r.invite = inv;
+  r.messages.push({ from: 'biz', invite: inv.id, at: Date.now(),
+    text: `Пропоную запис: ${dayWord(inv.date).toLowerCase()}, ${inv.time} · ${inv.names.join(', ')} · ${uah(total)}. Підтвердіть і оплатіть у CARCAR — час за вами.` });
+  r.unreadClient = true;
+  save();
+  closeSheet();
+  rerender();
+  toast('Пропозицію надіслано — клієнт оплатить у застосунку');
 }
 
 // Постійний клієнт: за телефоном підтягуємо імʼя й авто з минулих записів.
@@ -872,6 +903,12 @@ function nbHint() {
   if (!hint) return;
   const key = phoneKey(nb.phone);
   const past = key ? own().filter((b) => b.clientPhone && phoneKey(b.clientPhone) === key).sort((a, b) => bookingStart(b) - bookingStart(a)) : [];
+  if (carcarLead(nb.phone)) {
+    hint.className = 'nb-hint small warn-text';
+    hint.textContent = `Це клієнт CARCAR — з такого запису утримається комісія ${Math.round(commissionFor(ui.place) * 100)}%. Краще надішліть йому пропозицію запису в чаті.`;
+    return;
+  }
+  hint.className = 'nb-hint small';
   if (!past.length) { hint.textContent = ''; return; }
   const f = $('#nb-form');
   if (!nb.name && past[0].clientName) { nb.name = past[0].clientName; f.elements.name.value = nb.name; }
@@ -883,6 +920,7 @@ function nbSubmit() {
   const p = place();
   const chosen = nbChosen();
   if (!chosen.length || !nb.time) return;
+  if (nb.invite) { sendInvite(); return; }
   if (nb.channel === 'phone' && !phoneKey(nb.phone)) { toast('Вкажіть телефон клієнта'); $('#nb-form [name="phone"]').focus(); return; }
   // Форму могли тримати відкритою довго: минулий час уже не записуємо.
   if (nb.date < todayIso() || (nb.date === todayIso() && toMin(nb.time) < minuteNow() - 5)) { toast('Цей час уже минув — оберіть інший'); nbRender(); return; }
@@ -896,13 +934,15 @@ function nbSubmit() {
     car: nb.car.trim() || CAR_CLASSES[nb.cls], plate: '', cls: nb.cls,
     clientName: nb.name.trim() || (nb.channel === 'walkin' ? 'Клієнт з вулиці' : 'Клієнт'), clientPhone: nb.phone.trim(), note: '',
     state: 'booked', createdAt: Date.now(),
+    // Клієнт уже приходив через CARCAR — запис зараховується CARCAR, комісія утримується з виплат.
+    ...(carcarLead(nb.phone) ? { lead: 'carcar' } : {}),
   };
   bookings.push(b);
   save();
   closeSheet();
   location.hash = `#/bookings/${b.date}`;
   route();
-  toast(`Записано: ${b.clientName}, ${dayWord(b.date).toLowerCase()} о ${b.time}`);
+  toast(`Записано: ${b.clientName}, ${dayWord(b.date).toLowerCase()} о ${b.time}${b.lead ? `. Клієнт CARCAR — утримається комісія ${Math.round(commissionFor(p.id) * 100)}%` : ''}`);
 }
 
 // ---------- мийка: гроші й показники ----------
@@ -957,6 +997,7 @@ function viewWash() {
       <h2 id="h-money">Гроші через CARCAR</h2>
       <div class="money-row"><span>Можна вивести</span><b>${uah(bal.available)}</b></div>
       <div class="money-row"><span>Заморожено до підтвердження</span><b>${uah(bal.frozen)}</b></div>
+      ${bal.leadFees ? `<div class="money-row"><span>Комісія за клієнтів CARCAR, записаних напряму</span><b>−${uah(bal.leadFees)}</b></div>` : ''}
       ${payoutReady(p.id)
         ? `<button class="btn primary block" type="button" data-action="payout" ${bal.available > 0 ? '' : 'disabled'}>${bal.available > 0 ? `Вивести ${uah(bal.available - fee)} на ${maskIban(partnerOf(p.id).payout.iban)}` : 'Немає коштів для виведення'}</button>`
         : `<a class="btn block" href="#/payout">${partnerOf(p.id).payout?.iban ? 'Рахунок на перевірці CARCAR' : 'Вказати рахунок для виплат'}</a>`}
@@ -1706,7 +1747,7 @@ document.addEventListener('click', async (e) => {
     const r = el.dataset.req ? ownRequests().find((x) => x.id === el.dataset.req) : null;
     nbOpen({
       ...(el.dataset.date ? { date: el.dataset.date } : {}), ...(el.dataset.time ? { want: el.dataset.time } : {}),
-      ...(r ? { name: r.clientName ?? '', car: r.car ?? '', cls: r.cls ?? 0 } : {}),
+      ...(r ? { name: r.clientName ?? '', car: r.car ?? '', cls: r.cls ?? 0, invite: r.id, channel: 'carcar' } : {}),
     });
     return;
   }
