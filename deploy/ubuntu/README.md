@@ -1,0 +1,41 @@
+# CARCAR на власному сервері Ubuntu 24.04
+
+Замість Netlify: nginx віддає статичні файли з `autoservice/app`, HTTPS від Let's Encrypt (безкоштовно),
+оновлення з GitHub кожні 5 хвилин. Кредитів і лімітів на деплой немає — платите лише за сервер.
+
+## Що потрібно
+
+1. **Сервер з Ubuntu 24.04** і публічною IP-адресою (VPS від ~3–5 $/міс: Hetzner, DigitalOcean, Contabo, українські хостинги).
+   Домашній компʼютер теж підійде, якщо роутер пробрасує порти 80 і 443 і в провайдера «білий» IP.
+2. **Домен**, що вказує на IP сервера (запис A). Без домену немає HTTPS, а без HTTPS не працюють мікрофон для дзвінків,
+   сповіщення й офлайн-режим. Безкоштовно — піддомен на duckdns.org.
+3. Якщо репозиторій приватний — токен GitHub з правом читання (Settings → Developer settings → Fine-grained tokens).
+
+## Встановлення
+
+```bash
+git clone --depth 1 --branch claude/car-wash-tire-service-app-npsdxv https://github.com/dmitrylavrov05/Belong.git
+cd Belong/deploy/ubuntu
+sudo bash setup.sh --domain carcar.example.com --email you@example.com
+```
+
+Приватний репозиторій: у обох командах замість `https://github.com/...` — `https://<токен>@github.com/...`,
+а в `setup.sh` додайте `--repo https://<токен>@github.com/dmitrylavrov05/Belong.git`.
+
+Після завершення:
+- клієнт — `https://ваш-домен/`
+- CarCar Business — `https://ваш-домен/pro.html`
+- адмінка — `https://ваш-домен/admin.html`
+
+## Оновлення
+
+Сервер сам підтягує гілку кожні 5 хвилин. Оновити одразу: `sudo systemctl start carcar-update`.
+Перевірити: `systemctl list-timers carcar-update.timer`, журнал — `journalctl -u carcar-update -n 20`.
+
+## Що робить скрипт
+
+- ставить nginx, git, certbot і вмикає брандмауер (SSH, 80, 443);
+- клонує гілку в `/opt/carcar` і налаштовує nginx (`nginx.conf` поруч): сторінки й скрипти без кешу,
+  щоб оновлення приходили одразу, шрифти й звук — з кешем, `.git` закрито;
+- отримує сертифікат Let's Encrypt і вмикає перенаправлення на HTTPS (сертифікат продовжується сам);
+- створює таймер systemd `carcar-update` для автооновлення.
