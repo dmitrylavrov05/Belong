@@ -495,3 +495,12 @@ test('номер запису: видно клієнту, мийці й підт
   await page.locator('.thread .chat-photo').last().click();
   await expect(page.getByRole('dialog', { name: 'Фото' })).toBeVisible();
 });
+
+test('демо-мийки вимкнено на сервері ("demo_places": false): у каталозі лише справжні мийки', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('carcar.srv.demoPlaces', 'false'));
+  await page.goto('/');
+  await expect(page.locator('#list article')).toHaveCount(0);
+  await expect(page.locator('.city-empty')).toContainText('У місті Київ ми ще не працюємо');
+  await page.goto('/#/book/blysk');
+  await expect(page.locator('h1')).toHaveText('Запис недоступний');
+});

@@ -225,6 +225,11 @@ class Server(unittest.TestCase):
         self.assertEqual(self.call('POST', '/api/notify/prefs', {'on': True, 'quiet': {}}, j['token'])[0], 200)
         self.assertEqual(self.call('POST', '/api/notify/prefs', {'on': True}, None)[0], 401)
 
+    def test_10_config_demo_switches(self):
+        cfg = self.call('GET', '/api/config')[1]
+        self.assertTrue(cfg['demoPlaces'])
+        self.assertEqual(cfg['payments'], 'liqpay')
+
     def test_99_login_rate_limit(self):
         codes = [self.call('POST', '/api/auth/admin', {'password': 'x'})[0] for _ in range(12)]
         self.assertIn(429, codes)

@@ -405,6 +405,7 @@ def make_handler(app):
                 return self.send_json(200, {
                     'telegramBot': cfg.get('telegram_bot') if cfg.get('telegram_token') else None,
                     'demoLogin': bool(cfg.get('demo_login')), 'demoWash': bool(cfg.get('demo_wash', True)),
+                    'demoPlaces': bool(cfg.get('demo_places', True)),
                     'payments': 'liqpay' if app['liqpay'].on else 'demo', 'sandbox': app['liqpay'].sandbox,
                     'vapid': app['webpush'].public if app['webpush'].ok else None, 'turn': bool(cfg.get('turn'))})
             if p == '/api/me':

@@ -1,6 +1,8 @@
 // Спільна логіка застосунку клієнта (app.js), CarCar Business (pro.js) і адмінки (admin.js):
 // сховище, форматування, іконки, гроші, рейтинг і налаштування точок із CRM.
 import { CATEGORIES, PLACES, PAYMENT, RELIABILITY, SERVICE_TEMPLATES, CITIES, DECLINE_RULES } from './data.js';
+// Вигадані мийки з data.js — запамʼятовуємо до того, як додадуться справжні (зареєстровані через CARCAR).
+const DEMO_PLACE_IDS = new Set(PLACES.map((p) => p.id));
 
 // peek — для частого читання без змін: розбираємо JSON лише тоді, коли значення змінилося.
 // Повернений обʼєкт спільний — не змінюйте його, для змін є get/set.
@@ -47,7 +49,7 @@ export const store = {
 // клієнту — свої записи, мийці — записи своїх мийок, адмінці — усе (див. deploy/server/acl.py).
 // Без сервера (файл з диска, тести) — лише цей пристрій. Особисте лишається на пристрої.
 const LOCAL_KEYS = new Set(['auth', 'profile', 'cars', 'carId', 'theme', 'biz.theme', 'notify', 'biz.notify', 'biz.session', 'partner',
-  'seenStates', 'cls', 'city', 'favs', 'view', 'mapLayer', 'campaign', 'referral', 'subscriptions', 'auth.token', 'biz.token', 'admin.token', 'pushSub']);
+  'seenStates', 'cls', 'city', 'favs', 'view', 'mapLayer', 'campaign', 'referral', 'subscriptions', 'auth.token', 'biz.token', 'admin.token', 'pushSub', 'srv.demoPlaces']);
 const shared = (key) => !LOCAL_KEYS.has(key);
 // Журнал подій великий і пишеться часто — відправляємо рідше.
 const PUSH_DELAY = { analytics: 5000, presence: 2000 };
@@ -82,7 +84,14 @@ export async function api(path, { method = 'GET', body } = {}) {
 
 let configPromise = null;
 // Що ввімкнено на сервері: вхід через Telegram, демо-вхід, оплата, push. Без сервера — null.
-export const serverConfig = () => (hasServer() ? (configPromise ??= api('config').then((r) => (r.ok ? r.data : null))) : Promise.resolve(null));
+export const serverConfig = () => (hasServer() ? (configPromise ??= api('config').then((r) => {
+  if (!r.ok) return null;
+  // Вигадані мийки показуємо, лише якщо сервер не вимкнув їх ("demo_places": false). Памʼятаємо, щоб наступне
+  // відкриття одразу було без них.
+  const demo = r.data.demoPlaces !== false;
+  if (store.get('srv.demoPlaces', true) !== demo) { store.set('srv.demoPlaces', demo); syncNotify('srv.demoPlaces'); }
+  return r.data;
+})) : Promise.resolve(null));
 
 // ---------- сповіщення з сервера: Web Push і Telegram ----------
 // Сервер надсилає push, навіть коли застосунок закрито. Налаштування (увімкнено, тиша поза робочим часом мийки)
@@ -205,7 +214,7 @@ export function syncRestart() {
   sync.base.clear();
   syncStart();
 }
-if (hasServer()) syncStart();
+if (hasServer()) { syncStart(); serverConfig(); }
 
 // ---------- іконки (лінійні, з дизайну CARCAR) ----------
 
@@ -498,7 +507,11 @@ export function savePartner(placeId, patch) {
 }
 
 // Клієнти бачать і можуть записатися лише до підключених точок.
-export const isListed = (p) => partnerOf(p.id).status === 'approved';
+// Демо-мийки з data.js (вигадані, для показу). На сервері їх можна сховати від клієнтів: "demo_places": false —
+// тоді в каталозі лише справжні мийки, що пройшли реєстрацію й перевірку.
+export const isDemoPlace = (id) => DEMO_PLACE_IDS.has(id);
+export const demoPlacesOn = () => store.get('srv.demoPlaces', true) !== false;
+export const isListed = (p) => !(isDemoPlace(p.id) && !demoPlacesOn()) && partnerOf(p.id).status === 'approved';
 
 // Виводити гроші можна лише на перевірені реквізити.
 // Виводити можна лише на перевірений CARCAR рахунок із правильним IBAN; призупиненій чи відхиленій точці — ні.

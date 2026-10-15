@@ -57,7 +57,8 @@ sudo bash setup.sh --domain carcar.example.com      # зі своїм домен
   "telegram_bot": "carcar_login_bot",
   "liqpay": { "public_key": "sandbox_i…", "private_key": "sandbox_…", "sandbox": true },
   "demo_login": false,
-  "demo_wash": false
+  "demo_wash": false,
+  "demo_places": false
 }
 ```
 
@@ -81,6 +82,8 @@ sudo systemctl restart carcar-sync
 Поки бота немає, працює **демо-вхід** за номером без перевірки (`demo_login`, типово ввімкнений, коли немає токена).
 Коли бот запрацює, поставте `"demo_login": false`. `"demo_wash": false` вимикає демо-кабінет мийки
 (кнопку «Демо» в CarCar Business) — увімкніть це, щойно підключите справжні мийки.
+`"demo_places": false` ховає від клієнтів вигадані мийки («Блиск», «Хвиля» та інші) — у каталозі лишаються тільки
+справжні, що пройшли реєстрацію й перевірку в адмінці. В адмінці вони позначені «Демо, приховано від клієнтів».
 
 ### Оплата карткою (LiqPay)
 

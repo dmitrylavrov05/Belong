@@ -10,7 +10,7 @@ import {
   TICKET_TOPICS, TICKET_STATUS, ticketsAll, ticketReply, setTicket, ticketOverdue, slaHours, fraudState, saveFraud, staffOf, phoneKey,
   addCustomPlace, uid, hash,
   enterView, bizApps, APP_STATUS, approveBizApp, rejectBizApp, bookingNo, findByNo, ticketPhotos, shrinkPhoto,
-  hasServer, api, authToken, setAuthToken,
+  hasServer, api, authToken, setAuthToken, isDemoPlace, demoPlacesOn,
 } from './core.js';
 import { ENTITY, TAX, codeValid, ibanValid, ibanBank, formatIban } from './partners.js';
 import { drawColumns, legend, tableView, hbars, hideTip } from './charts.js';
@@ -208,7 +208,7 @@ function viewPlaces() {
       <tbody>${list.length ? list.map(({ p, pt }) => {
         const todo = [pt.status === 'pending' && 'Нова заявка', pt.update === 'pending' && 'Зміни даних', pt.payout?.iban && !pt.payout.verified && 'Реквізити'].filter(Boolean);
         const last = pt.history.at(-1);
-        return `<tr class="link-row" data-href="#/places/${p.id}"><td><a class="row-link" href="#/places/${p.id}">${esc(p.name)}</a><small>${esc(p.district)}, ${esc(p.address)}</small></td>
+        return `<tr class="link-row" data-href="#/places/${p.id}"><td><a class="row-link" href="#/places/${p.id}">${esc(p.name)}</a><small>${isDemoPlace(p.id) ? `${demoPlacesOn() ? 'Демо' : 'Демо, приховано від клієнтів'} · ` : ''}${esc(p.district)}, ${esc(p.address)}</small></td>
           <td>${pt.company ? `${ENTITY[pt.company.type]} ${esc(pt.company.name)}<small>${pt.company.type === 'fop' ? 'РНОКПП' : 'ЄДРПОУ'} ${esc(pt.company.code)}</small>` : '<span class="muted">не вказано</span>'}</td>
           <td>${statusPill(pt.status)}${pt.demo ? ' <span class="pill">демо</span>' : ''}${pauseOf(p.id, bookings) ? ' <span class="pill bad">Запис на паузі</span>' : responseStats(p.id, bookings).lowered ? ' <span class="pill warn">Нижче в пошуку</span>' : ''}</td>
           ${relCells(p.id)}
