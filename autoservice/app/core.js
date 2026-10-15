@@ -31,6 +31,7 @@ export const store = {
   set(key, value) {
     try {
       localStorage.setItem(`carcar.${key}`, JSON.stringify(value));
+      if (sync.on && shared(key)) syncPush(key);
       return true;
     } catch {
       // Приватний режим або переповнення: працюємо без збереження.
@@ -38,6 +39,99 @@ export const store = {
     }
   },
 };
+
+// ---------- спільні дані між пристроями ----------
+// Якщо поруч із застосунком працює сервер CARCAR (/api, див. deploy/server), усі пристрої бачать ті самі записи,
+// мийки, відгуки й повідомлення: зміни відправляються на сервер, а чужі приходять за секунду-дві й
+// перемальовують екран (так само, як зміни з іншої вкладки). Без сервера (файл з диска, тести) — лише цей пристрій.
+// Особисте лишається на пристрої: вхід, профіль, авто, тема, сповіщення, вибрана мийка.
+const LOCAL_KEYS = new Set(['auth', 'profile', 'cars', 'carId', 'theme', 'biz.theme', 'notify', 'biz.notify', 'biz.session', 'partner',
+  'seenStates', 'cls', 'city', 'favs', 'view', 'mapLayer', 'campaign', 'referral', 'subscriptions']);
+const shared = (key) => !LOCAL_KEYS.has(key);
+// Журнал подій великий і пишеться часто — відправляємо рідше.
+const PUSH_DELAY = { analytics: 5000, presence: 2000 };
+const sync = { on: false, ver: 0, base: new Map(), timers: new Map(), busy: new Set() };
+const syncNotify = (key) => window.dispatchEvent(new StorageEvent('storage', { key: `carcar.${key}` }));
+export const syncOn = () => sync.on;
+
+function syncPush(key) {
+  clearTimeout(sync.timers.get(key));
+  sync.timers.set(key, setTimeout(() => { sync.timers.delete(key); syncSend(key); }, PUSH_DELAY[key] ?? 150));
+}
+
+async function syncSend(key) {
+  if (sync.busy.has(key)) { syncPush(key); return; }
+  sync.busy.add(key);
+  const raw = localStorage.getItem(`carcar.${key}`);
+  const base = sync.base.get(key);
+  const body = { value: raw === null ? null : JSON.parse(raw), ...(base !== undefined ? { base: JSON.parse(base) } : {}) };
+  try {
+    const res = await fetch(`api/state/${encodeURIComponent(key)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!res.ok) throw new Error(String(res.status));
+    const { value } = await res.json();
+    const merged = JSON.stringify(value);
+    sync.base.set(key, merged);
+    // Поки відправляли, хтось інший змінив той самий ключ — показуємо злите значення (якщо ми не змінили його знову).
+    if (!sync.timers.has(key) && merged !== localStorage.getItem(`carcar.${key}`)) {
+      localStorage.setItem(`carcar.${key}`, merged);
+      syncNotify(key);
+    }
+  } catch {
+    setTimeout(() => syncPush(key), 3000); // немає мережі — повторимо
+  } finally {
+    sync.busy.delete(key);
+  }
+}
+
+function syncApply(data) {
+  for (const [key, value] of Object.entries(data)) {
+    if (!shared(key)) continue;
+    // Наша зміна ще не пішла — вона зіллється з цією на сервері (base лишається тим, від чого ми рахували зміни).
+    if (sync.timers.has(key) || sync.busy.has(key)) continue;
+    const raw = JSON.stringify(value);
+    sync.base.set(key, raw);
+    if (localStorage.getItem(`carcar.${key}`) === raw) continue;
+    try { localStorage.setItem(`carcar.${key}`, raw); } catch { continue; }
+    syncNotify(key);
+  }
+}
+
+async function syncPoll() {
+  for (;;) {
+    try {
+      const res = await fetch(`api/state?since=${sync.ver}&wait=1`, { cache: 'no-store' });
+      if (!res.ok) throw new Error(String(res.status));
+      const j = await res.json();
+      syncApply(j.data);
+      sync.ver = j.ver;
+    } catch {
+      await new Promise((ok) => setTimeout(ok, 3000));
+    }
+  }
+}
+
+async function startSync() {
+  // Сервер CARCAR додає в сторінку <meta name="carcar-sync"> — без неї (Netlify, тести, файл з диска) нічого не питаємо.
+  if (typeof document === 'undefined' || !document.querySelector('meta[name="carcar-sync"]')) return;
+  let j;
+  try {
+    const res = await fetch('api/state?since=0', { cache: 'no-store' });
+    if (!res.ok || !(res.headers.get('content-type') ?? '').includes('json')) return;
+    j = await res.json();
+  } catch { return; }
+  // Сервер — джерело правди: спільних ключів, яких на ньому немає, на пристрої теж не лишаємо.
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const k = localStorage.key(i);
+    if (!k?.startsWith('carcar.')) continue;
+    const key = k.slice(7);
+    if (shared(key) && !(key in j.data)) { localStorage.removeItem(k); syncNotify(key); }
+  }
+  syncApply(j.data);
+  sync.ver = j.ver;
+  sync.on = true;
+  syncPoll();
+}
+startSync();
 
 // ---------- іконки (лінійні, з дизайну CARCAR) ----------
 
@@ -204,6 +298,11 @@ export const hoursText = (place, iso = isoDate(new Date())) => rangeText(hoursFo
 // ---------- клієнти й телефони ----------
 
 // Ключ клієнта за номером телефону: 0671234567, +38 067 123 45 67 і 380671234567 — один і той самий.
+// Клієнт CARCAR — його номер телефону (tel:380…). 'device' — без номера (демо й тести на одному пристрої).
+export const clientIdOf = (phone) => phoneKey(phone) ?? 'device';
+// Гаманець (баланс CARCAR і бонуси) — свій у кожного клієнта.
+export const walletKey = (id = 'device') => (id === 'device' ? 'wallet' : `wallet.${id}`);
+
 export function phoneKey(phone) {
   let d = String(phone ?? '').replace(/\D/g, '');
   if (!d) return null;
@@ -327,11 +426,11 @@ export const maskIban = (iban) => `UA…${String(iban).slice(-4)}`;
 export const commissionFor = (placeId) => partnerOf(placeId).commission ?? store.get('admin.settings', {}).commission ?? PAYMENT.commission;
 
 // Гроші клієнту на баланс CARCAR (повернення за спором чи скасуванням з будь-якого екрана).
-export function creditClient(amount, text) {
-  const w = { bonus: 0, money: 0, history: [], ...store.get('wallet', {}) };
+export function creditClient(amount, text, id = 'device') {
+  const w = { bonus: 0, money: 0, history: [], ...store.get(walletKey(id), {}) };
   w.money += amount;
   w.history.unshift({ amount, text, at: Date.now(), kind: 'money' });
-  store.set('wallet', w);
+  store.set(walletKey(id), w);
 }
 
 // Рішення за спором: placePart — скільки отримує точка (0 — усе клієнту, повна ціна — усе точці).
@@ -347,10 +446,10 @@ export function resolveDispute(b, placePart, note = '') {
   }
   const refund = Math.min(chargedOf(b), full - toPlace);
   Object.assign(b, { state: 'refunded', refund, placeAmount: toPlace, refundTo: 'balance', closedAt: Date.now() });
-  if (refund) creditClient(refund, `Повернення за спором: ${name}`);
+  if (refund) creditClient(refund, `Повернення за спором: ${name}`, b.clientId);
   // Усе клієнту — повертаємо й бонус, візит абонемента та промокод.
   if (toPlace === 0) {
-    if (b.bonus && !b.bonusReturned) { creditBonus(b.bonus, `Повернення бонусу за спором: ${name}`); b.bonusReturned = true; }
+    if (b.bonus && !b.bonusReturned) { creditBonus(b.bonus, `Повернення бонусу за спором: ${name}`, b.clientId); b.bonusReturned = true; }
     if (b.passUse) { returnPassUse(b.placeId, b.passUse); b.passUse = null; }
     if (b.promo) b.promo.returned = true;
   }
@@ -371,11 +470,11 @@ export function resolveLate(b, confirmed, note = '') {
 // Скільки клієнт справді заплатив: за оплати частинами — лише перший платіж (решту банк скасовує) і частину з балансу.
 export const chargedOf = (b) => (b.installments ? Math.max(0, b.paid - (b.installments.card ?? b.paid) + b.installments.first) : b.paid);
 
-export function creditBonus(amount, text) {
-  const w = { bonus: 0, money: 0, history: [], ...store.get('wallet', {}) };
+export function creditBonus(amount, text, id = 'device') {
+  const w = { bonus: 0, money: 0, history: [], ...store.get(walletKey(id), {}) };
   w.bonus += amount;
   w.history.unshift({ amount, text, at: Date.now() });
-  store.set('wallet', w);
+  store.set(walletKey(id), w);
 }
 
 // Повернути візит абонемента чи суму сертифіката (без залежності від ops.js).

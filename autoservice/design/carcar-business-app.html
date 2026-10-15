@@ -1859,6 +1859,7 @@ const store = {
   set(key, value) {
     try {
       localStorage.setItem(`carcar.${key}`, JSON.stringify(value));
+      if (sync.on && shared(key)) syncPush(key);
       return true;
     } catch {
       // Приватний режим або переповнення: працюємо без збереження.
@@ -1866,6 +1867,99 @@ const store = {
     }
   },
 };
+
+// ---------- спільні дані між пристроями ----------
+// Якщо поруч із застосунком працює сервер CARCAR (/api, див. deploy/server), усі пристрої бачать ті самі записи,
+// мийки, відгуки й повідомлення: зміни відправляються на сервер, а чужі приходять за секунду-дві й
+// перемальовують екран (так само, як зміни з іншої вкладки). Без сервера (файл з диска, тести) — лише цей пристрій.
+// Особисте лишається на пристрої: вхід, профіль, авто, тема, сповіщення, вибрана мийка.
+const LOCAL_KEYS = new Set(['auth', 'profile', 'cars', 'carId', 'theme', 'biz.theme', 'notify', 'biz.notify', 'biz.session', 'partner',
+  'seenStates', 'cls', 'city', 'favs', 'view', 'mapLayer', 'campaign', 'referral', 'subscriptions']);
+const shared = (key) => !LOCAL_KEYS.has(key);
+// Журнал подій великий і пишеться часто — відправляємо рідше.
+const PUSH_DELAY = { analytics: 5000, presence: 2000 };
+const sync = { on: false, ver: 0, base: new Map(), timers: new Map(), busy: new Set() };
+const syncNotify = (key) => window.dispatchEvent(new StorageEvent('storage', { key: `carcar.${key}` }));
+const syncOn = () => sync.on;
+
+function syncPush(key) {
+  clearTimeout(sync.timers.get(key));
+  sync.timers.set(key, setTimeout(() => { sync.timers.delete(key); syncSend(key); }, PUSH_DELAY[key] ?? 150));
+}
+
+async function syncSend(key) {
+  if (sync.busy.has(key)) { syncPush(key); return; }
+  sync.busy.add(key);
+  const raw = localStorage.getItem(`carcar.${key}`);
+  const base = sync.base.get(key);
+  const body = { value: raw === null ? null : JSON.parse(raw), ...(base !== undefined ? { base: JSON.parse(base) } : {}) };
+  try {
+    const res = await fetch(`api/state/${encodeURIComponent(key)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!res.ok) throw new Error(String(res.status));
+    const { value } = await res.json();
+    const merged = JSON.stringify(value);
+    sync.base.set(key, merged);
+    // Поки відправляли, хтось інший змінив той самий ключ — показуємо злите значення (якщо ми не змінили його знову).
+    if (!sync.timers.has(key) && merged !== localStorage.getItem(`carcar.${key}`)) {
+      localStorage.setItem(`carcar.${key}`, merged);
+      syncNotify(key);
+    }
+  } catch {
+    setTimeout(() => syncPush(key), 3000); // немає мережі — повторимо
+  } finally {
+    sync.busy.delete(key);
+  }
+}
+
+function syncApply(data) {
+  for (const [key, value] of Object.entries(data)) {
+    if (!shared(key)) continue;
+    // Наша зміна ще не пішла — вона зіллється з цією на сервері (base лишається тим, від чого ми рахували зміни).
+    if (sync.timers.has(key) || sync.busy.has(key)) continue;
+    const raw = JSON.stringify(value);
+    sync.base.set(key, raw);
+    if (localStorage.getItem(`carcar.${key}`) === raw) continue;
+    try { localStorage.setItem(`carcar.${key}`, raw); } catch { continue; }
+    syncNotify(key);
+  }
+}
+
+async function syncPoll() {
+  for (;;) {
+    try {
+      const res = await fetch(`api/state?since=${sync.ver}&wait=1`, { cache: 'no-store' });
+      if (!res.ok) throw new Error(String(res.status));
+      const j = await res.json();
+      syncApply(j.data);
+      sync.ver = j.ver;
+    } catch {
+      await new Promise((ok) => setTimeout(ok, 3000));
+    }
+  }
+}
+
+async function startSync() {
+  // Сервер CARCAR додає в сторінку <meta name="carcar-sync"> — без неї (Netlify, тести, файл з диска) нічого не питаємо.
+  if (typeof document === 'undefined' || !document.querySelector('meta[name="carcar-sync"]')) return;
+  let j;
+  try {
+    const res = await fetch('api/state?since=0', { cache: 'no-store' });
+    if (!res.ok || !(res.headers.get('content-type') ?? '').includes('json')) return;
+    j = await res.json();
+  } catch { return; }
+  // Сервер — джерело правди: спільних ключів, яких на ньому немає, на пристрої теж не лишаємо.
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const k = localStorage.key(i);
+    if (!k?.startsWith('carcar.')) continue;
+    const key = k.slice(7);
+    if (shared(key) && !(key in j.data)) { localStorage.removeItem(k); syncNotify(key); }
+  }
+  syncApply(j.data);
+  sync.ver = j.ver;
+  sync.on = true;
+  syncPoll();
+}
+startSync();
 
 // ---------- іконки (лінійні, з дизайну CARCAR) ----------
 
@@ -2032,6 +2126,11 @@ const hoursText = (place, iso = isoDate(new Date())) => rangeText(hoursFor(place
 // ---------- клієнти й телефони ----------
 
 // Ключ клієнта за номером телефону: 0671234567, +38 067 123 45 67 і 380671234567 — один і той самий.
+// Клієнт CARCAR — його номер телефону (tel:380…). 'device' — без номера (демо й тести на одному пристрої).
+const clientIdOf = (phone) => phoneKey(phone) ?? 'device';
+// Гаманець (баланс CARCAR і бонуси) — свій у кожного клієнта.
+const walletKey = (id = 'device') => (id === 'device' ? 'wallet' : `wallet.${id}`);
+
 function phoneKey(phone) {
   let d = String(phone ?? '').replace(/\D/g, '');
   if (!d) return null;
@@ -2155,11 +2254,11 @@ const maskIban = (iban) => `UA…${String(iban).slice(-4)}`;
 const commissionFor = (placeId) => partnerOf(placeId).commission ?? store.get('admin.settings', {}).commission ?? PAYMENT.commission;
 
 // Гроші клієнту на баланс CARCAR (повернення за спором чи скасуванням з будь-якого екрана).
-function creditClient(amount, text) {
-  const w = { bonus: 0, money: 0, history: [], ...store.get('wallet', {}) };
+function creditClient(amount, text, id = 'device') {
+  const w = { bonus: 0, money: 0, history: [], ...store.get(walletKey(id), {}) };
   w.money += amount;
   w.history.unshift({ amount, text, at: Date.now(), kind: 'money' });
-  store.set('wallet', w);
+  store.set(walletKey(id), w);
 }
 
 // Рішення за спором: placePart — скільки отримує точка (0 — усе клієнту, повна ціна — усе точці).
@@ -2175,10 +2274,10 @@ function resolveDispute(b, placePart, note = '') {
   }
   const refund = Math.min(chargedOf(b), full - toPlace);
   Object.assign(b, { state: 'refunded', refund, placeAmount: toPlace, refundTo: 'balance', closedAt: Date.now() });
-  if (refund) creditClient(refund, `Повернення за спором: ${name}`);
+  if (refund) creditClient(refund, `Повернення за спором: ${name}`, b.clientId);
   // Усе клієнту — повертаємо й бонус, візит абонемента та промокод.
   if (toPlace === 0) {
-    if (b.bonus && !b.bonusReturned) { creditBonus(b.bonus, `Повернення бонусу за спором: ${name}`); b.bonusReturned = true; }
+    if (b.bonus && !b.bonusReturned) { creditBonus(b.bonus, `Повернення бонусу за спором: ${name}`, b.clientId); b.bonusReturned = true; }
     if (b.passUse) { returnPassUse(b.placeId, b.passUse); b.passUse = null; }
     if (b.promo) b.promo.returned = true;
   }
@@ -2199,11 +2298,11 @@ function resolveLate(b, confirmed, note = '') {
 // Скільки клієнт справді заплатив: за оплати частинами — лише перший платіж (решту банк скасовує) і частину з балансу.
 const chargedOf = (b) => (b.installments ? Math.max(0, b.paid - (b.installments.card ?? b.paid) + b.installments.first) : b.paid);
 
-function creditBonus(amount, text) {
-  const w = { bonus: 0, money: 0, history: [], ...store.get('wallet', {}) };
+function creditBonus(amount, text, id = 'device') {
+  const w = { bonus: 0, money: 0, history: [], ...store.get(walletKey(id), {}) };
   w.bonus += amount;
   w.history.unshift({ amount, text, at: Date.now() });
-  store.set('wallet', w);
+  store.set(walletKey(id), w);
 }
 
 // Повернути візит абонемента чи суму сертифіката (без залежності від ops.js).
@@ -3071,7 +3170,7 @@ function setAutoConfirm(placeId, on) {
 // Відповідь мийки клієнт бачить у чаті запису й отримує сповіщення.
 function clientNote(b, kind, text) {
   chatPost(b, 'sys', text.replace(/^[^:]+: /, ''), 'client');
-  sendMessages([{ placeId: b.placeId, clientKey: 'device', channel: 'app', kind, bookingId: b.id, text, link: `#/bookings/${b.id}` }]);
+  sendMessages([{ placeId: b.placeId, clientKey: b.clientId ?? 'device', channel: 'app', kind, bookingId: b.id, text, link: `#/bookings/${b.id}` }]);
 }
 const opsPlaceName = (b) => opsPlace(b.placeId)?.name ?? 'Мийка';
 const whenText = (b) => `${parseDate(b.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })} о ${b.time}`;
@@ -3101,9 +3200,9 @@ function declineBooking(b, reason, by = 'place') {
     ...(b.installments ? { installments: { ...b.installments, cancelled: Date.now() } } : {}),
   });
   const why = by === 'proposal' ? 'інший час не підійшов' : `${opsPlaceName(b)} не підтвердила запис`;
-  if (fromBalance) creditClient(Math.min(fromBalance, refund), `Повернення: ${why}`);
+  if (fromBalance) creditClient(Math.min(fromBalance, refund), `Повернення: ${why}`, b.clientId);
   if (b.bonus && !b.bonusReturned) {
-    creditBonus(b.bonus, `Повернення бонусу: ${why}`);
+    creditBonus(b.bonus, `Повернення бонусу: ${why}`, b.clientId);
     b.bonusReturned = true;
   }
   if (b.passUse) { restorePass(b.placeId, b.passUse); b.passUse = null; }
@@ -3269,14 +3368,16 @@ const offerHtml = (esc) => `<article class="offer">
 
 // Дзвінки всередині CARCAR: клієнт і мийка говорять через застосунок, не бачачи номерів одне одного,
 // тож мийка не може записати клієнта CARCAR «собі» в обхід платформи.
-// Демо: виклик і обмін даними зʼєднання — через localStorage (працює між вкладками на одному пристрої),
-// голос — WebRTC без сервера. У робочій версії — сервер сигналізації (або VoIP-сервіс) і push про вхідний дзвінок.
+// Виклик і дані зʼєднання — у спільному сховищі: з сервером CARCAR (deploy/server) — між будь-якими пристроями,
+// без нього — між вкладками одного пристрою. Голос — WebRTC (STUN допомагає пройти крізь роутери; за дуже
+// суворим NAT потрібен ще TURN-сервер). Push про вхідний дзвінок у закритий застосунок — у робочій версії.
 
 const RING_MS = 30000;
-const CALL_KEY = 'call';
+const CALL_KEY = 'calls'; // { id: дзвінок } — у кожної пари клієнт—мийка свій
+const ICE = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }];
 
 let callSide = null; // 'client' або 'place'
-let callMine = () => false; // чи стосується вхідний дзвінок цього застосунку
+let callMine = () => false; // чи цей застосунок — учасник дзвінка (клієнт за номером, мийка за своїми мийками)
 let callPeer = null;
 let callStream = null;
 let callTick = null;
@@ -3284,13 +3385,18 @@ let callRingTimer = null;
 let callHooks = { onLog: () => {} };
 let callWarn = ''; // мікрофон недоступний тощо
 
-const callGet = () => store.peek(CALL_KEY, null);
-const callSet = (c) => store.set(CALL_KEY, c);
+// Поточний дзвінок цього застосунку: найсвіжіший, де ми учасник.
+const callGet = () => Object.values(store.peek(CALL_KEY, {})).filter((c) => callMine(c)).sort((a, b) => b.at - a.at)[0] ?? null;
+const callSet = (c) => {
+  const old = Date.now() - 6 * 3600e3;
+  const all = Object.fromEntries(Object.entries(store.get(CALL_KEY, {})).filter(([, x]) => x.at > old));
+  store.set(CALL_KEY, { ...all, [c.id]: c });
+};
 const callOther = (c) => (c.from === callSide ? 'out' : 'in');
 const callName = (c) => (callSide === 'client' ? c.placeName : c.clientName || 'Клієнт CARCAR');
 const callClock = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 
-// side — хто цей застосунок; mine(call) — чи показувати вхідний дзвінок; onLog(call) — дзвінок завершився.
+// side — хто цей застосунок; mine(call) — чи ми учасник дзвінка; onLog(call) — дзвінок завершився.
 function initCalls(side, mine, hooks = {}) {
   callSide = side;
   callMine = mine;
@@ -3367,7 +3473,7 @@ async function callPrepare(c, remoteOffer) {
     callStatus('Мікрофон недоступний — дозвольте його в налаштуваннях браузера');
     return null;
   }
-  callPeer = new RTCPeerConnection();
+  callPeer = new RTCPeerConnection({ iceServers: ICE });
   callStream.getTracks().forEach((t) => callPeer.addTrack(t, callStream));
   callPeer.ontrack = (ev) => { const a = document.getElementById('call-audio'); if (a) a.srcObject = ev.streams[0]; };
   if (remoteOffer) {
@@ -3398,7 +3504,6 @@ function callSync() {
   const c = callGet();
   if (!c) { callClose(); return; }
   const dir = callOther(c);
-  if (dir === 'in' && !callMine(c)) return;
   if (dir === 'out' && c.answer && callPeer && !callPeer.currentRemoteDescription) callPeer.setRemoteDescription({ type: 'answer', sdp: c.answer }).catch(() => {});
   if (['ended', 'declined', 'cancelled', 'missed'].includes(c.state)) callStop();
   // Вхідний дзвінок, що вже закінчився до відкриття застосунку, не показуємо.
@@ -3474,7 +3579,7 @@ function logCall(bookings, c, save) {
   const log = store.peek('callLog', []);
   if (!log.some((x) => x.id === c.id)) {
     store.set('callLog', [...log, {
-      id: c.id, placeId: c.placeId, bookingId: c.bookingId ?? null, from: c.from, state: answered ? 'ended' : c.state, at: c.endedAt ?? Date.now(),
+      id: c.id, placeId: c.placeId, bookingId: c.bookingId ?? null, clientId: c.clientId ?? 'device', from: c.from, state: answered ? 'ended' : c.state, at: c.endedAt ?? Date.now(),
       dur: answered ? c.endedAt - c.answeredAt : null, clientName: c.clientName ?? '', placeName: c.placeName ?? '',
       // Пропущений дзвінок — непрочитаний для того, кому дзвонили.
       unreadClient: !answered && c.from === 'place', unreadBiz: !answered && c.from === 'client',
@@ -3872,7 +3977,7 @@ function threads() {
 const MSG_FILTERS = [['all', 'Усі'], ['new', 'Нові'], ['booking', 'За записами'], ['request', 'Питання'], ['call', 'Дзвінки']];
 
 // Дзвінок у списку повідомлень: кнопка «передзвонити» (за записом — тому самому клієнту запису).
-const callRow = (t) => `<li><button class="convo call-row${t.unread ? ' unread missed' : ''}" type="button" data-action="call" data-place="${t.call.placeId}" data-name="${esc(t.name)}" ${t.call.bookingId && bookings.some((b) => b.id === t.call.bookingId) ? `data-id="${t.call.bookingId}"` : ''} aria-label="${esc(t.name)}: ${esc(t.text)}. Передзвонити">
+const callRow = (t) => `<li><button class="convo call-row${t.unread ? ' unread missed' : ''}" type="button" data-action="call" data-place="${t.call.placeId}" data-call-id="${t.call.id}" data-name="${esc(t.name)}" ${t.call.bookingId && bookings.some((b) => b.id === t.call.bookingId) ? `data-id="${t.call.bookingId}"` : ''} aria-label="${esc(t.name)}: ${esc(t.text)}. Передзвонити">
     <span class="avatar" aria-hidden="true">${firstLetter(t.name)}</span>
     <span class="convo-body"><span class="convo-top"><b>${esc(t.name)}</b><time>${whenShort(t.at)}</time></span>
       <span class="convo-text call-text">${icon('phone', 15)}${esc(t.text)}</span>
@@ -3980,7 +4085,7 @@ function sendTo(thread, raw, photo = null) {
   if (thread.startsWith('b-')) {
     const b = own().find((x) => x.id === id);
     chatPost(b, 'biz', text, 'client', photo);
-    sendMessages([{ placeId: b.placeId, clientKey: 'device', channel: 'app', kind: 'chat', bookingId: b.id, text: `${place().name}: ${text || 'Фото'}`, link: `#/chat/${b.id}` }]);
+    sendMessages([{ placeId: b.placeId, clientKey: b.clientId ?? 'device', channel: 'app', kind: 'chat', bookingId: b.id, text: `${place().name}: ${text || 'Фото'}`, link: `#/chat/${b.id}` }]);
   } else {
     const r = ownRequests().find((x) => x.id === id);
     r.messages.push({ from: 'biz', text, at: Date.now(), ...(photo ? { photo } : {}) });
@@ -5293,7 +5398,8 @@ document.addEventListener('click', async (e) => {
     if (el.matches('.call-row')) markCallsRead('place', (x) => x.placeId === (el.dataset.place ?? ui.place));
     const r = el.dataset.req ? requests.find((x) => x.id === el.dataset.req) : null;
     const pid = b?.placeId ?? r?.placeId ?? el.dataset.place ?? ui.place;
-    startCall({ bookingId: b?.id ?? null, reqId: r?.id ?? null, placeId: pid, placeName: placeById(pid)?.name ?? '', clientName: b ? who(b) : r?.clientName || el.dataset.name || 'Клієнт' });
+    const clientId = b?.clientId ?? r?.clientId ?? callHistory().find((x) => x.id === el.dataset.callId)?.clientId ?? 'device';
+    startCall({ bookingId: b?.id ?? null, reqId: r?.id ?? null, placeId: pid, placeName: placeById(pid)?.name ?? '', clientId, clientName: b ? who(b) : r?.clientName || el.dataset.name || 'Клієнт' });
     return;
   }
   if (action === 'dur') { durSheet(id); return; }
@@ -5830,7 +5936,7 @@ navigator.serviceWorker?.addEventListener('message', (e) => {
 });
 keepChatOnKeyboard();
 // Вхідні дзвінки клієнтів CARCAR — у будь-яку мийку акаунта.
-initCalls('place', (c) => c.from === 'client' && !!session() && accountPlaces(session()).includes(c.placeId), { onLog: (c) => logCall(bookings, c, save) });
+initCalls('place', (c) => !!session() && accountPlaces(session()).includes(c.placeId), { onLog: (c) => logCall(bookings, c, save) });
 route();
 
 </script>

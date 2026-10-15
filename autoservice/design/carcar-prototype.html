@@ -1605,6 +1605,7 @@ const store = {
   set(key, value) {
     try {
       localStorage.setItem(`carcar.${key}`, JSON.stringify(value));
+      if (sync.on && shared(key)) syncPush(key);
       return true;
     } catch {
       // Приватний режим або переповнення: працюємо без збереження.
@@ -1612,6 +1613,99 @@ const store = {
     }
   },
 };
+
+// ---------- спільні дані між пристроями ----------
+// Якщо поруч із застосунком працює сервер CARCAR (/api, див. deploy/server), усі пристрої бачать ті самі записи,
+// мийки, відгуки й повідомлення: зміни відправляються на сервер, а чужі приходять за секунду-дві й
+// перемальовують екран (так само, як зміни з іншої вкладки). Без сервера (файл з диска, тести) — лише цей пристрій.
+// Особисте лишається на пристрої: вхід, профіль, авто, тема, сповіщення, вибрана мийка.
+const LOCAL_KEYS = new Set(['auth', 'profile', 'cars', 'carId', 'theme', 'biz.theme', 'notify', 'biz.notify', 'biz.session', 'partner',
+  'seenStates', 'cls', 'city', 'favs', 'view', 'mapLayer', 'campaign', 'referral', 'subscriptions']);
+const shared = (key) => !LOCAL_KEYS.has(key);
+// Журнал подій великий і пишеться часто — відправляємо рідше.
+const PUSH_DELAY = { analytics: 5000, presence: 2000 };
+const sync = { on: false, ver: 0, base: new Map(), timers: new Map(), busy: new Set() };
+const syncNotify = (key) => window.dispatchEvent(new StorageEvent('storage', { key: `carcar.${key}` }));
+const syncOn = () => sync.on;
+
+function syncPush(key) {
+  clearTimeout(sync.timers.get(key));
+  sync.timers.set(key, setTimeout(() => { sync.timers.delete(key); syncSend(key); }, PUSH_DELAY[key] ?? 150));
+}
+
+async function syncSend(key) {
+  if (sync.busy.has(key)) { syncPush(key); return; }
+  sync.busy.add(key);
+  const raw = localStorage.getItem(`carcar.${key}`);
+  const base = sync.base.get(key);
+  const body = { value: raw === null ? null : JSON.parse(raw), ...(base !== undefined ? { base: JSON.parse(base) } : {}) };
+  try {
+    const res = await fetch(`api/state/${encodeURIComponent(key)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!res.ok) throw new Error(String(res.status));
+    const { value } = await res.json();
+    const merged = JSON.stringify(value);
+    sync.base.set(key, merged);
+    // Поки відправляли, хтось інший змінив той самий ключ — показуємо злите значення (якщо ми не змінили його знову).
+    if (!sync.timers.has(key) && merged !== localStorage.getItem(`carcar.${key}`)) {
+      localStorage.setItem(`carcar.${key}`, merged);
+      syncNotify(key);
+    }
+  } catch {
+    setTimeout(() => syncPush(key), 3000); // немає мережі — повторимо
+  } finally {
+    sync.busy.delete(key);
+  }
+}
+
+function syncApply(data) {
+  for (const [key, value] of Object.entries(data)) {
+    if (!shared(key)) continue;
+    // Наша зміна ще не пішла — вона зіллється з цією на сервері (base лишається тим, від чого ми рахували зміни).
+    if (sync.timers.has(key) || sync.busy.has(key)) continue;
+    const raw = JSON.stringify(value);
+    sync.base.set(key, raw);
+    if (localStorage.getItem(`carcar.${key}`) === raw) continue;
+    try { localStorage.setItem(`carcar.${key}`, raw); } catch { continue; }
+    syncNotify(key);
+  }
+}
+
+async function syncPoll() {
+  for (;;) {
+    try {
+      const res = await fetch(`api/state?since=${sync.ver}&wait=1`, { cache: 'no-store' });
+      if (!res.ok) throw new Error(String(res.status));
+      const j = await res.json();
+      syncApply(j.data);
+      sync.ver = j.ver;
+    } catch {
+      await new Promise((ok) => setTimeout(ok, 3000));
+    }
+  }
+}
+
+async function startSync() {
+  // Сервер CARCAR додає в сторінку <meta name="carcar-sync"> — без неї (Netlify, тести, файл з диска) нічого не питаємо.
+  if (typeof document === 'undefined' || !document.querySelector('meta[name="carcar-sync"]')) return;
+  let j;
+  try {
+    const res = await fetch('api/state?since=0', { cache: 'no-store' });
+    if (!res.ok || !(res.headers.get('content-type') ?? '').includes('json')) return;
+    j = await res.json();
+  } catch { return; }
+  // Сервер — джерело правди: спільних ключів, яких на ньому немає, на пристрої теж не лишаємо.
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const k = localStorage.key(i);
+    if (!k?.startsWith('carcar.')) continue;
+    const key = k.slice(7);
+    if (shared(key) && !(key in j.data)) { localStorage.removeItem(k); syncNotify(key); }
+  }
+  syncApply(j.data);
+  sync.ver = j.ver;
+  sync.on = true;
+  syncPoll();
+}
+startSync();
 
 // ---------- іконки (лінійні, з дизайну CARCAR) ----------
 
@@ -1778,6 +1872,11 @@ const hoursText = (place, iso = isoDate(new Date())) => rangeText(hoursFor(place
 // ---------- клієнти й телефони ----------
 
 // Ключ клієнта за номером телефону: 0671234567, +38 067 123 45 67 і 380671234567 — один і той самий.
+// Клієнт CARCAR — його номер телефону (tel:380…). 'device' — без номера (демо й тести на одному пристрої).
+const clientIdOf = (phone) => phoneKey(phone) ?? 'device';
+// Гаманець (баланс CARCAR і бонуси) — свій у кожного клієнта.
+const walletKey = (id = 'device') => (id === 'device' ? 'wallet' : `wallet.${id}`);
+
 function phoneKey(phone) {
   let d = String(phone ?? '').replace(/\D/g, '');
   if (!d) return null;
@@ -1901,11 +2000,11 @@ const maskIban = (iban) => `UA…${String(iban).slice(-4)}`;
 const commissionFor = (placeId) => partnerOf(placeId).commission ?? store.get('admin.settings', {}).commission ?? PAYMENT.commission;
 
 // Гроші клієнту на баланс CARCAR (повернення за спором чи скасуванням з будь-якого екрана).
-function creditClient(amount, text) {
-  const w = { bonus: 0, money: 0, history: [], ...store.get('wallet', {}) };
+function creditClient(amount, text, id = 'device') {
+  const w = { bonus: 0, money: 0, history: [], ...store.get(walletKey(id), {}) };
   w.money += amount;
   w.history.unshift({ amount, text, at: Date.now(), kind: 'money' });
-  store.set('wallet', w);
+  store.set(walletKey(id), w);
 }
 
 // Рішення за спором: placePart — скільки отримує точка (0 — усе клієнту, повна ціна — усе точці).
@@ -1921,10 +2020,10 @@ function resolveDispute(b, placePart, note = '') {
   }
   const refund = Math.min(chargedOf(b), full - toPlace);
   Object.assign(b, { state: 'refunded', refund, placeAmount: toPlace, refundTo: 'balance', closedAt: Date.now() });
-  if (refund) creditClient(refund, `Повернення за спором: ${name}`);
+  if (refund) creditClient(refund, `Повернення за спором: ${name}`, b.clientId);
   // Усе клієнту — повертаємо й бонус, візит абонемента та промокод.
   if (toPlace === 0) {
-    if (b.bonus && !b.bonusReturned) { creditBonus(b.bonus, `Повернення бонусу за спором: ${name}`); b.bonusReturned = true; }
+    if (b.bonus && !b.bonusReturned) { creditBonus(b.bonus, `Повернення бонусу за спором: ${name}`, b.clientId); b.bonusReturned = true; }
     if (b.passUse) { returnPassUse(b.placeId, b.passUse); b.passUse = null; }
     if (b.promo) b.promo.returned = true;
   }
@@ -1945,11 +2044,11 @@ function resolveLate(b, confirmed, note = '') {
 // Скільки клієнт справді заплатив: за оплати частинами — лише перший платіж (решту банк скасовує) і частину з балансу.
 const chargedOf = (b) => (b.installments ? Math.max(0, b.paid - (b.installments.card ?? b.paid) + b.installments.first) : b.paid);
 
-function creditBonus(amount, text) {
-  const w = { bonus: 0, money: 0, history: [], ...store.get('wallet', {}) };
+function creditBonus(amount, text, id = 'device') {
+  const w = { bonus: 0, money: 0, history: [], ...store.get(walletKey(id), {}) };
   w.bonus += amount;
   w.history.unshift({ amount, text, at: Date.now() });
-  store.set('wallet', w);
+  store.set(walletKey(id), w);
 }
 
 // Повернути візит абонемента чи суму сертифіката (без залежності від ops.js).
@@ -2817,7 +2916,7 @@ function setAutoConfirm(placeId, on) {
 // Відповідь мийки клієнт бачить у чаті запису й отримує сповіщення.
 function clientNote(b, kind, text) {
   chatPost(b, 'sys', text.replace(/^[^:]+: /, ''), 'client');
-  sendMessages([{ placeId: b.placeId, clientKey: 'device', channel: 'app', kind, bookingId: b.id, text, link: `#/bookings/${b.id}` }]);
+  sendMessages([{ placeId: b.placeId, clientKey: b.clientId ?? 'device', channel: 'app', kind, bookingId: b.id, text, link: `#/bookings/${b.id}` }]);
 }
 const opsPlaceName = (b) => opsPlace(b.placeId)?.name ?? 'Мийка';
 const whenText = (b) => `${parseDate(b.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })} о ${b.time}`;
@@ -2847,9 +2946,9 @@ function declineBooking(b, reason, by = 'place') {
     ...(b.installments ? { installments: { ...b.installments, cancelled: Date.now() } } : {}),
   });
   const why = by === 'proposal' ? 'інший час не підійшов' : `${opsPlaceName(b)} не підтвердила запис`;
-  if (fromBalance) creditClient(Math.min(fromBalance, refund), `Повернення: ${why}`);
+  if (fromBalance) creditClient(Math.min(fromBalance, refund), `Повернення: ${why}`, b.clientId);
   if (b.bonus && !b.bonusReturned) {
-    creditBonus(b.bonus, `Повернення бонусу: ${why}`);
+    creditBonus(b.bonus, `Повернення бонусу: ${why}`, b.clientId);
     b.bonusReturned = true;
   }
   if (b.passUse) { restorePass(b.placeId, b.passUse); b.passUse = null; }
@@ -3206,14 +3305,16 @@ function lookupPlate(raw) {
 
 // Дзвінки всередині CARCAR: клієнт і мийка говорять через застосунок, не бачачи номерів одне одного,
 // тож мийка не може записати клієнта CARCAR «собі» в обхід платформи.
-// Демо: виклик і обмін даними зʼєднання — через localStorage (працює між вкладками на одному пристрої),
-// голос — WebRTC без сервера. У робочій версії — сервер сигналізації (або VoIP-сервіс) і push про вхідний дзвінок.
+// Виклик і дані зʼєднання — у спільному сховищі: з сервером CARCAR (deploy/server) — між будь-якими пристроями,
+// без нього — між вкладками одного пристрою. Голос — WebRTC (STUN допомагає пройти крізь роутери; за дуже
+// суворим NAT потрібен ще TURN-сервер). Push про вхідний дзвінок у закритий застосунок — у робочій версії.
 
 const RING_MS = 30000;
-const CALL_KEY = 'call';
+const CALL_KEY = 'calls'; // { id: дзвінок } — у кожної пари клієнт—мийка свій
+const ICE = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }];
 
 let callSide = null; // 'client' або 'place'
-let callMine = () => false; // чи стосується вхідний дзвінок цього застосунку
+let callMine = () => false; // чи цей застосунок — учасник дзвінка (клієнт за номером, мийка за своїми мийками)
 let callPeer = null;
 let callStream = null;
 let callTick = null;
@@ -3221,13 +3322,18 @@ let callRingTimer = null;
 let callHooks = { onLog: () => {} };
 let callWarn = ''; // мікрофон недоступний тощо
 
-const callGet = () => store.peek(CALL_KEY, null);
-const callSet = (c) => store.set(CALL_KEY, c);
+// Поточний дзвінок цього застосунку: найсвіжіший, де ми учасник.
+const callGet = () => Object.values(store.peek(CALL_KEY, {})).filter((c) => callMine(c)).sort((a, b) => b.at - a.at)[0] ?? null;
+const callSet = (c) => {
+  const old = Date.now() - 6 * 3600e3;
+  const all = Object.fromEntries(Object.entries(store.get(CALL_KEY, {})).filter(([, x]) => x.at > old));
+  store.set(CALL_KEY, { ...all, [c.id]: c });
+};
 const callOther = (c) => (c.from === callSide ? 'out' : 'in');
 const callName = (c) => (callSide === 'client' ? c.placeName : c.clientName || 'Клієнт CARCAR');
 const callClock = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 
-// side — хто цей застосунок; mine(call) — чи показувати вхідний дзвінок; onLog(call) — дзвінок завершився.
+// side — хто цей застосунок; mine(call) — чи ми учасник дзвінка; onLog(call) — дзвінок завершився.
 function initCalls(side, mine, hooks = {}) {
   callSide = side;
   callMine = mine;
@@ -3304,7 +3410,7 @@ async function callPrepare(c, remoteOffer) {
     callStatus('Мікрофон недоступний — дозвольте його в налаштуваннях браузера');
     return null;
   }
-  callPeer = new RTCPeerConnection();
+  callPeer = new RTCPeerConnection({ iceServers: ICE });
   callStream.getTracks().forEach((t) => callPeer.addTrack(t, callStream));
   callPeer.ontrack = (ev) => { const a = document.getElementById('call-audio'); if (a) a.srcObject = ev.streams[0]; };
   if (remoteOffer) {
@@ -3335,7 +3441,6 @@ function callSync() {
   const c = callGet();
   if (!c) { callClose(); return; }
   const dir = callOther(c);
-  if (dir === 'in' && !callMine(c)) return;
   if (dir === 'out' && c.answer && callPeer && !callPeer.currentRemoteDescription) callPeer.setRemoteDescription({ type: 'answer', sdp: c.answer }).catch(() => {});
   if (['ended', 'declined', 'cancelled', 'missed'].includes(c.state)) callStop();
   // Вхідний дзвінок, що вже закінчився до відкриття застосунку, не показуємо.
@@ -3411,7 +3516,7 @@ function logCall(bookings, c, save) {
   const log = store.peek('callLog', []);
   if (!log.some((x) => x.id === c.id)) {
     store.set('callLog', [...log, {
-      id: c.id, placeId: c.placeId, bookingId: c.bookingId ?? null, from: c.from, state: answered ? 'ended' : c.state, at: c.endedAt ?? Date.now(),
+      id: c.id, placeId: c.placeId, bookingId: c.bookingId ?? null, clientId: c.clientId ?? 'device', from: c.from, state: answered ? 'ended' : c.state, at: c.endedAt ?? Date.now(),
       dur: answered ? c.endedAt - c.answeredAt : null, clientName: c.clientName ?? '', placeName: c.placeName ?? '',
       // Пропущений дзвінок — непрочитаний для того, кому дзвонили.
       unreadClient: !answered && c.from === 'place', unreadBiz: !answered && c.from === 'client',
@@ -3452,7 +3557,9 @@ let payouts = store.get('payouts', []);
 let reviews = store.get('reviews', []);
 // «Приведи друга»: бонусний рахунок, власний код і хто запросив цього користувача.
 // money — баланс CARCAR: повернення за скасовані записи, ним можна оплатити наступне замовлення.
-let wallet = { bonus: 0, money: 0, history: [], ...store.get('wallet', {}) };
+// Хто користується застосунком: номер телефону зі входу. Свої записи, гаманець, питання й повідомлення — лише його.
+const meId = () => clientIdOf(store.get('auth', null)?.phone);
+let wallet = { bonus: 0, money: 0, history: [], ...store.get(walletKey(meId()), {}) };
 // Запити до точок: «не знайшов послугу» — листування з точкою.
 let requests = store.get('requests', []);
 let referral = store.get('referral', null) ?? { code: newRefCode(), friends: [] };
@@ -3467,7 +3574,7 @@ let favs = new Set(store.get('favs', []));
 let profile = { name: '', phone: '', optIn: false, ...store.get('profile', {}) };
 
 // Записи цього клієнта — те, що він бачить у «Мої записи».
-const mine = () => bookings.filter((b) => !b.source);
+const mine = () => bookings.filter((b) => !b.source && (b.clientId ?? 'device') === meId());
 
 const ui = { view: store.get('view', 'list'), cat: 'all', q: '', sort: 'rating', openNow: false, favOnly: false, cls: store.get('cls', 0), city: store.get('city', 'Київ'), carId: store.get('carId', null) };
 let draft = null; // чернетка запису: { placeId, services: Set, date, time, carId, paying }
@@ -3586,7 +3693,7 @@ const firstOpenDay = (p) => bookingDays(p).find((d) => hoursFor(p, d)) ?? bookin
 
 // Ключі, за якими точка знає цього клієнта: телефон із профілю й авто з гаража.
 // 'device' — сповіщення самого застосунку (нагадування, відповіді на відгуки) навіть без телефону в профілі.
-const myKeys = () => [phoneKey(profile.phone), ...cars.map((c) => `car:${carLabel(c)}`), 'device'].filter(Boolean);
+const myKeys = () => [...new Set([meId(), phoneKey(profile.phone), ...cars.map((c) => `car:${carLabel(c)}`)].filter(Boolean))];
 const personalFor = (p) => offersOf(p.id).filter((o) => myKeys().includes(o.clientKey)).map(offerAsService);
 // Усе, що клієнт може замовити в точці: спершу персональні послуги, далі прайс.
 const bookable = (p) => [...personalFor(p), ...p.services];
@@ -3659,7 +3766,7 @@ const empty = (ic, text, action = '') => `<div class="empty"><div class="empty-i
 // ---------- приведи друга ----------
 
 function saveReferral() {
-  store.set('wallet', wallet);
+  store.set(walletKey(meId()), wallet);
   store.set('referral', referral);
 }
 
@@ -3943,7 +4050,7 @@ function promoBanner() {
 // Зберігаємо останні 5000 подій на пристрої; у робочій версії їх приймає сервер.
 function track(type, data = {}) {
   const all = store.get('analytics', []);
-  all.push({ t: type, at: Date.now(), ...data });
+  all.push({ id: uid(), t: type, at: Date.now(), ...data });
   store.set('analytics', all.slice(-5000));
 }
 
@@ -4229,7 +4336,7 @@ function passesBlock(p) {
 // Клієнт не знайшов послугу — пише точці. Точка відповідає в панелі й може додати послугу
 // до прайсу або зробити її персональною для цього клієнта (за телефоном).
 const saveRequests = () => store.set('requests', requests);
-const requestsOf = (placeId) => requests.filter((r) => r.placeId === placeId).sort((a, b) => b.at - a.at);
+const requestsOf = (placeId) => requests.filter((r) => r.placeId === placeId && (r.clientId ?? 'device') === meId()).sort((a, b) => b.at - a.at);
 const reqStatus = (r) => (r.closed ? ['', 'Запит закрито'] : r.service ? ['go', 'Послугу додано']
   : r.messages.at(-1).from === 'biz' ? ['go', 'Точка відповіла'] : ['', 'Чекає відповіді точки']);
 
@@ -4362,7 +4469,7 @@ function askSend(placeId, raw, photo = null) {
     open.unreadBiz = true;
   } else {
     requests.push({
-      id: uid(), placeId, clientName: profile.name, clientPhone: profile.phone,
+      id: uid(), placeId, clientId: meId(), clientName: profile.name, clientPhone: profile.phone,
       car: cars[0] ? carLabel(cars[0]) : '', cls: cars[0]?.cls ?? ui.cls, messages: [msg], at: msg.at, unreadBiz: true,
     });
   }
@@ -4420,7 +4527,7 @@ function viewBook(id, date, time) {
 
 // Лист очікування: якщо зручний час зайнятий — повідомимо, щойно він звільниться.
 function waitlistBlock(p, minutes, chosen) {
-  const mineW = store.get('waitlist', []).find((w) => w.placeId === p.id && w.date === draft.date && w.status === 'active' && w.mine);
+  const mineW = store.get('waitlist', []).find((w) => w.placeId === p.id && w.date === draft.date && w.status === 'active' && w.mine && (w.clientId ?? 'device') === meId());
   if (mineW) {
     return `<p class="notice ok" style="margin-top:12px">${icon('checkCircle', 20)}<span><b>Ви в листі очікування</b>${dayLabel(draft.date, { day: 'numeric', month: 'long' })}, ${hhmm(mineW.from)}–${hhmm(mineW.to)}. Повідомимо, щойно звільниться час.</span></p>`;
   }
@@ -4788,6 +4895,7 @@ function confirmBooking() {
     carId: car?.id ?? null,
     plate: car?.plate ?? '',
     cls,
+    clientId: meId(),
     clientName: profile.name,
     clientPhone: profile.phone,
     personal: chosen.filter((x) => x.personal).map((x) => x.id),
@@ -4834,7 +4942,7 @@ function settle() {
   const done = settleAll(bookings);
   // Мийка не відповіла на запис вчасно — скасовуємо й повертаємо гроші (і на баланс, якщо платили з нього).
   const expired = expirePending(bookings);
-  if (expired) wallet = { bonus: 0, money: 0, history: [], ...store.get('wallet', {}) };
+  if (expired) wallet = { bonus: 0, money: 0, history: [], ...store.get(walletKey(meId()), {}) };
   if (done || expired) save();
 }
 
@@ -5245,6 +5353,7 @@ function loginSubmit(form) {
     // Без localStorage (приватний режим) сесія живе до закриття вкладки.
     login.session = { phone: fmtPhone(login.phone), at: Date.now() };
     store.set('auth', login.session);
+    wallet = { bonus: 0, money: 0, history: [], ...store.get(walletKey(meId()), {}) };
     profile = { ...profile, name: login.name, phone: fmtPhone(login.phone) };
     store.set('profile', profile);
     Object.assign(login, { step: 'phone', error: '' });
@@ -5285,7 +5394,7 @@ function conversations() {
         text: `${last.from === 'client' ? 'Ви: ' : ''}${msgPreview(last)}`, unread: !!r.unreadClient, placeId: r.placeId, over: !!r.closed && !r.unreadClient };
     }),
     // Дзвінки через CARCAR: торкнутися — передзвонити.
-    ...callHistory().filter((x) => placeById(x.placeId)).map((x) => ({ at: x.at, call: x, name: placeById(x.placeId).name, placeId: x.placeId,
+    ...callHistory().filter((x) => placeById(x.placeId) && (x.clientId ?? 'device') === meId()).map((x) => ({ at: x.at, call: x, name: placeById(x.placeId).name, placeId: x.placeId,
       sub: 'Натисніть, щоб передзвонити', text: callRowText(x, 'client'), unread: !!x.unreadClient })),
     ...myTickets().map((t) => {
       const last = t.messages.at(-1);
@@ -5317,7 +5426,7 @@ function conversations() {
 
 // ---------- підтримка CARCAR ----------
 
-const myTickets = () => ticketsAll().filter((t) => t.from === 'client' && (myKeys().includes(t.clientKey) || t.clientKey === 'device' || !t.clientKey))
+const myTickets = () => ticketsAll().filter((t) => t.from === 'client' && (myKeys().includes(t.clientKey ?? 'device')))
   .sort((a, b) => b.updatedAt - a.updatedAt);
 const ticketWho = (m) => (m.from === 'admin' ? 'Підтримка CARCAR' : m.from === 'place' ? 'Точка' : 'Ви');
 
@@ -5477,7 +5586,7 @@ function visitReminders() {
   }
   if (!sent.length) return;
   save();
-  sendMessages(sent.map(({ b, text }) => ({ placeId: b.placeId, clientKey: 'device', channel: 'app', kind: 'remind', bookingId: b.id, text, link: `#/bookings/${b.id}` })));
+  sendMessages(sent.map(({ b, text }) => ({ placeId: b.placeId, clientKey: b.clientId ?? 'device', channel: 'app', kind: 'remind', bookingId: b.id, text, link: `#/bookings/${b.id}` })));
 }
 
 // Блок біля запису, що скоро: «Запізнююсь на 15 хв» — мийка бачить це в журналі.
@@ -5570,7 +5679,7 @@ function runSubscriptions() {
       const free = slotsFor(p, date, minutes).filter((sl) => !sl.busy).map((sl) => sl.time)
         .filter((t) => Math.abs(toMin(t) - toMin(x.time)) <= 120).sort((a, c) => Math.abs(toMin(a) - toMin(x.time)) - Math.abs(toMin(c) - toMin(x.time)));
       if (!free.length) {
-        sent.push({ placeId: p.id, clientKey: 'device', channel: 'app', kind: 'sub', text: `${p.name}: на ${dayLabel(date, { weekday: 'short', day: 'numeric', month: 'long' })} біля ${x.time} немає вільного часу, регулярний запис пропущено. Оберіть інший час.`, link: `#/book/${p.id}/${date}` });
+        sent.push({ placeId: p.id, clientKey: meId(), channel: 'app', kind: 'sub', text: `${p.name}: на ${dayLabel(date, { weekday: 'short', day: 'numeric', month: 'long' })} біля ${x.time} немає вільного часу, регулярний запис пропущено. Оберіть інший час.`, link: `#/book/${p.id}/${date}` });
         continue;
       }
       const time = free[0];
@@ -5580,12 +5689,12 @@ function runSubscriptions() {
         id: uid(), placeId: p.id, services: chosen.map((sv) => sv.name), total, listTotal: chosen.reduce((a, sv) => a + sv.price[x.cls], 0),
         deal: total < chosen.reduce((a, sv) => a + sv.price[x.cls], 0) ? { id: deal.id, pct: deal.pct } : null, covered: 0, passUse: null,
         paid: total, fromBalance: 0, bonus: 0, minutes, date, time, car: x.car || CAR_CLASSES[x.cls], carId: x.carId, plate: x.plate ?? '', cls: x.cls,
-        clientName: profile.name, clientPhone: profile.phone, optIn: !!profile.optIn, personal: [], createdAt: Date.now(), subId: x.id,
+        clientId: meId(), clientName: profile.name, clientPhone: profile.phone, optIn: !!profile.optIn, personal: [], createdAt: Date.now(), subId: x.id,
         // Як і звичайний запис: мийка підтверджує, якщо не ввімкнула автопідтвердження.
         state: autoConfirmOf(p.id) ? 'paid' : 'pending', needsConfirm: !autoConfirmOf(p.id),
       };
       bookings.push(b);
-      sent.push({ placeId: p.id, clientKey: 'device', channel: 'app', kind: 'sub', bookingId: b.id, link: `#/bookings/${b.id}`,
+      sent.push({ placeId: p.id, clientKey: meId(), channel: 'app', kind: 'sub', bookingId: b.id, link: `#/bookings/${b.id}`,
         text: `Регулярний запис: ${p.name}, ${dayLabel(date, { weekday: 'short', day: 'numeric', month: 'long' })} о ${time}${time !== x.time ? ` (о ${x.time} було зайнято)` : ''}. Оплачено ${uah(total)} з картки.${b.state === 'pending' ? ' Чекаємо, коли мийка підтвердить.' : ''}` });
       track('sub_booking', { placeId: p.id });
     }
@@ -5612,7 +5721,7 @@ function intakeBlock(b) {
 
 function viewInbox() {
   const keys = myKeys();
-  const waits = store.get('waitlist', []).filter((w) => w.mine && w.status === 'active');
+  const waits = store.get('waitlist', []).filter((w) => w.mine && (w.clientId ?? 'device') === meId() && w.status === 'active');
   // Сповіщень окремим блоком немає: нагадування видно на картці запису, відповіді — у чатах.
   // Лишаємо тільки «звільнився час» з листа очікування — по ньому треба встигнути записатися.
   const offers = inboxFor(keys).filter((m) => m.kind === 'waitlist' && !staleNote(m)).slice(0, 3);
@@ -5636,7 +5745,7 @@ function viewInbox() {
 
 // Лічильник на вкладці «Повідомлення»: непрочитані сповіщення й нові відповіді точок у чатах.
 function updateInboxBadge() {
-  const unread = inboxFor(myKeys()).filter((m) => !m.read && ((m.kind === 'waitlist' && !staleNote(m)) || m.kind === 'sub')).length + requests.filter((r) => r.unreadClient).length + mine().filter((b) => b.chatUnreadClient).length + myTickets().filter((t) => t.unreadUser).length + callHistory().filter((x) => callMissed(x, 'client')).length;
+  const unread = inboxFor(myKeys()).filter((m) => !m.read && ((m.kind === 'waitlist' && !staleNote(m)) || m.kind === 'sub')).length + requests.filter((r) => r.unreadClient).length + mine().filter((b) => b.chatUnreadClient).length + myTickets().filter((t) => t.unreadUser).length + callHistory().filter((x) => (x.clientId ?? 'device') === meId() && callMissed(x, 'client')).length;
   const count = $('#inbox-tab .tab-count');
   count.textContent = unread > 9 ? '9+' : unread;
   count.hidden = !unread;
@@ -5987,7 +6096,7 @@ const bookingActions = {
   'offer-no'(b) {
     if (!confirm('Скасувати запис? Гроші повернемо повністю.')) return false;
     rejectOffer(b);
-    wallet = { bonus: 0, money: 0, history: [], ...store.get('wallet', {}) };
+    wallet = { bonus: 0, money: 0, history: [], ...store.get(walletKey(meId()), {}) };
     toast(`Запис скасовано, ${uah(chargedOf(b))} повернено`);
   },
   'extra-ok'(b) {
@@ -6045,7 +6154,7 @@ function route() {
   settle();
   watchAnswers();
   // Пішли з «Повідомлень» — пропущені дзвінки переглянуто.
-  if (ui.lastView?.startsWith('inbox/') && page !== 'inbox') markCallsRead('client', () => true);
+  if (ui.lastView?.startsWith('inbox/') && page !== 'inbox') markCallsRead('client', (x) => (x.clientId ?? 'device') === meId());
   // Хтось скасував запис — можливо, звільнився час для листа очікування.
   checkWaitlist(bookings);
   runSubscriptions();
@@ -6238,10 +6347,10 @@ document.addEventListener('click', (e) => {
     const b = bookings.find((x) => x.id === id);
     if (b && bookingActions[action](b) !== false) { ui.bookFocus = b.id; save(); route(); }
   } else if (action === 'call') {
-    if (el.matches('.call-row')) markCallsRead('client', (x) => x.placeId === el.dataset.place);
+    if (el.matches('.call-row')) markCallsRead('client', (x) => x.placeId === el.dataset.place && (x.clientId ?? 'device') === meId());
     const b = id ? bookings.find((x) => x.id === id) : null;
     const p = placeById(b?.placeId ?? el.dataset.place);
-    if (p) startCall({ bookingId: b?.id ?? null, placeId: p.id, placeName: p.name, clientName: profile.name || 'Клієнт CARCAR' });
+    if (p) startCall({ bookingId: b?.id ?? null, placeId: p.id, placeName: p.name, clientId: meId(), clientName: profile.name || 'Клієнт CARCAR' });
   } else if (action === 'invite-book') {
     // Пропозиція мийки з чату: ті самі послуги, день і час — одразу до оплати.
     const r = requests.find((x) => x.id === el.dataset.req);
@@ -6597,7 +6706,7 @@ document.addEventListener('submit', async (e) => {
     reviews.push({
       id: uid(), placeId: b.placeId, bookingId: b.id, stars: Number(f.get('stars')),
       text: f.get('text').trim(), services: b.services.join(', '), date: isoDate(new Date()), at: Date.now(),
-      clientKey: 'device', photos: [],
+      clientKey: meId(), photos: [],
     });
     const r = reviews.at(-1);
     // Фото зменшуємо; якщо сховище переповнене — зберігаємо відгук без них.
@@ -6623,7 +6732,7 @@ document.addEventListener('submit', async (e) => {
     const chosen = quote(p).chosen;
     store.set('waitlist', [...store.get('waitlist', []), {
       id: uid(), placeId: p.id, date: draft.date, from, to, minutes, services: chosen.map((x) => x.name), clientName: profile.name, phone: profile.phone,
-      clientKey: myKeys()[0], status: 'active', mine: true, createdAt: Date.now(),
+      clientKey: myKeys()[0], clientId: meId(), status: 'active', mine: true, createdAt: Date.now(),
     }]);
     draft.waitOpen = false;
     renderBook();
@@ -6710,7 +6819,7 @@ window.addEventListener('storage', (e) => {
   reviews = store.get('reviews', []);
   requests = store.get('requests', []);
   profile = { name: '', phone: '', optIn: false, ...store.get('profile', {}) };
-  wallet = { bonus: 0, money: 0, history: [], ...store.get('wallet', {}) };
+  wallet = { bonus: 0, money: 0, history: [], ...store.get(walletKey(meId()), {}) };
   applyOverrides();
   if (!draft?.paying) route();
 });
@@ -6727,7 +6836,7 @@ acceptCampaign();
 track('session', { view: ui.view });
 keepChatOnKeyboard();
 // Вхідні дзвінки від мийок — за записами клієнта.
-initCalls('client', (c) => c.from === 'place' && (!c.bookingId || mine().some((b) => b.id === c.bookingId)), { onLog: (c) => logCall(bookings, c, save) });
+initCalls('client', (c) => (c.clientId ?? 'device') === meId(), { onLog: (c) => logCall(bookings, c, save) });
 route();
 acceptInvite();
 

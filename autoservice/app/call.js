@@ -1,15 +1,17 @@
 // Дзвінки всередині CARCAR: клієнт і мийка говорять через застосунок, не бачачи номерів одне одного,
 // тож мийка не може записати клієнта CARCAR «собі» в обхід платформи.
-// Демо: виклик і обмін даними зʼєднання — через localStorage (працює між вкладками на одному пристрої),
-// голос — WebRTC без сервера. У робочій версії — сервер сигналізації (або VoIP-сервіс) і push про вхідний дзвінок.
+// Виклик і дані зʼєднання — у спільному сховищі: з сервером CARCAR (deploy/server) — між будь-якими пристроями,
+// без нього — між вкладками одного пристрою. Голос — WebRTC (STUN допомагає пройти крізь роутери; за дуже
+// суворим NAT потрібен ще TURN-сервер). Push про вхідний дзвінок у закритий застосунок — у робочій версії.
 import { store, icon, esc } from './core.js';
 import { chatPost } from './ops.js';
 
 const RING_MS = 30000;
-const CALL_KEY = 'call';
+const CALL_KEY = 'calls'; // { id: дзвінок } — у кожної пари клієнт—мийка свій
+const ICE = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }];
 
 let callSide = null; // 'client' або 'place'
-let callMine = () => false; // чи стосується вхідний дзвінок цього застосунку
+let callMine = () => false; // чи цей застосунок — учасник дзвінка (клієнт за номером, мийка за своїми мийками)
 let callPeer = null;
 let callStream = null;
 let callTick = null;
@@ -17,13 +19,18 @@ let callRingTimer = null;
 let callHooks = { onLog: () => {} };
 let callWarn = ''; // мікрофон недоступний тощо
 
-const callGet = () => store.peek(CALL_KEY, null);
-const callSet = (c) => store.set(CALL_KEY, c);
+// Поточний дзвінок цього застосунку: найсвіжіший, де ми учасник.
+const callGet = () => Object.values(store.peek(CALL_KEY, {})).filter((c) => callMine(c)).sort((a, b) => b.at - a.at)[0] ?? null;
+const callSet = (c) => {
+  const old = Date.now() - 6 * 3600e3;
+  const all = Object.fromEntries(Object.entries(store.get(CALL_KEY, {})).filter(([, x]) => x.at > old));
+  store.set(CALL_KEY, { ...all, [c.id]: c });
+};
 const callOther = (c) => (c.from === callSide ? 'out' : 'in');
 const callName = (c) => (callSide === 'client' ? c.placeName : c.clientName || 'Клієнт CARCAR');
 const callClock = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 
-// side — хто цей застосунок; mine(call) — чи показувати вхідний дзвінок; onLog(call) — дзвінок завершився.
+// side — хто цей застосунок; mine(call) — чи ми учасник дзвінка; onLog(call) — дзвінок завершився.
 export function initCalls(side, mine, hooks = {}) {
   callSide = side;
   callMine = mine;
@@ -100,7 +107,7 @@ async function callPrepare(c, remoteOffer) {
     callStatus('Мікрофон недоступний — дозвольте його в налаштуваннях браузера');
     return null;
   }
-  callPeer = new RTCPeerConnection();
+  callPeer = new RTCPeerConnection({ iceServers: ICE });
   callStream.getTracks().forEach((t) => callPeer.addTrack(t, callStream));
   callPeer.ontrack = (ev) => { const a = document.getElementById('call-audio'); if (a) a.srcObject = ev.streams[0]; };
   if (remoteOffer) {
@@ -131,7 +138,6 @@ function callSync() {
   const c = callGet();
   if (!c) { callClose(); return; }
   const dir = callOther(c);
-  if (dir === 'in' && !callMine(c)) return;
   if (dir === 'out' && c.answer && callPeer && !callPeer.currentRemoteDescription) callPeer.setRemoteDescription({ type: 'answer', sdp: c.answer }).catch(() => {});
   if (['ended', 'declined', 'cancelled', 'missed'].includes(c.state)) callStop();
   // Вхідний дзвінок, що вже закінчився до відкриття застосунку, не показуємо.
@@ -207,7 +213,7 @@ export function logCall(bookings, c, save) {
   const log = store.peek('callLog', []);
   if (!log.some((x) => x.id === c.id)) {
     store.set('callLog', [...log, {
-      id: c.id, placeId: c.placeId, bookingId: c.bookingId ?? null, from: c.from, state: answered ? 'ended' : c.state, at: c.endedAt ?? Date.now(),
+      id: c.id, placeId: c.placeId, bookingId: c.bookingId ?? null, clientId: c.clientId ?? 'device', from: c.from, state: answered ? 'ended' : c.state, at: c.endedAt ?? Date.now(),
       dur: answered ? c.endedAt - c.answeredAt : null, clientName: c.clientName ?? '', placeName: c.placeName ?? '',
       // Пропущений дзвінок — непрочитаний для того, кому дзвонили.
       unreadClient: !answered && c.from === 'place', unreadBiz: !answered && c.from === 'client',

@@ -74,6 +74,26 @@ if [[ $HTTPS -eq 1 ]]; then
   certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos "${MAIL[@]}" --redirect
 fi
 
+echo "==> Сервер спільних даних (усі пристрої бачать ті самі записи)"
+cat > /etc/systemd/system/carcar-sync.service <<UNIT
+[Unit]
+Description=CARCAR: спільні дані для всіх пристроїв
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 $DIR/deploy/server/carcar_sync.py --host 127.0.0.1 --port 8090 --db /var/lib/carcar/data.db
+DynamicUser=yes
+StateDirectory=carcar
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable --now carcar-sync
+systemctl restart carcar-sync
+
 echo "==> Автооновлення з GitHub кожні 5 хвилин"
 cat > /etc/systemd/system/carcar-update.service <<UNIT
 [Unit]
@@ -82,7 +102,7 @@ After=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/bin/sh -c 'git -C $DIR fetch --depth 1 origin $BRANCH && git -C $DIR reset --hard FETCH_HEAD && chmod -R a+rX $DIR'
+ExecStart=/bin/sh -c 'old=\$\$(git -C $DIR rev-parse HEAD:deploy/server/carcar_sync.py 2>/dev/null); git -C $DIR fetch --depth 1 origin $BRANCH && git -C $DIR reset --hard FETCH_HEAD && chmod -R a+rX $DIR; [ "\$\$old" = "\$\$(git -C $DIR rev-parse HEAD:deploy/server/carcar_sync.py)" ] || systemctl restart carcar-sync'
 UNIT
 cat > /etc/systemd/system/carcar-update.timer <<UNIT
 [Unit]
@@ -105,3 +125,4 @@ echo "  Клієнт:          $SCHEME://$DOMAIN/"
 echo "  CarCar Business: $SCHEME://$DOMAIN/pro.html"
 echo "  Адмінка:         $SCHEME://$DOMAIN/admin.html"
 echo "Оновлення з гілки $BRANCH — кожні 5 хв (оновити зараз: sudo systemctl start carcar-update)."
+echo "Спільні дані: /var/lib/carcar/data.db (резервна копія — просто скопіюйте файл). Стан: systemctl status carcar-sync"

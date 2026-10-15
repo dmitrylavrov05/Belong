@@ -383,7 +383,7 @@ function threads() {
 const MSG_FILTERS = [['all', 'Усі'], ['new', 'Нові'], ['booking', 'За записами'], ['request', 'Питання'], ['call', 'Дзвінки']];
 
 // Дзвінок у списку повідомлень: кнопка «передзвонити» (за записом — тому самому клієнту запису).
-const callRow = (t) => `<li><button class="convo call-row${t.unread ? ' unread missed' : ''}" type="button" data-action="call" data-place="${t.call.placeId}" data-name="${esc(t.name)}" ${t.call.bookingId && bookings.some((b) => b.id === t.call.bookingId) ? `data-id="${t.call.bookingId}"` : ''} aria-label="${esc(t.name)}: ${esc(t.text)}. Передзвонити">
+const callRow = (t) => `<li><button class="convo call-row${t.unread ? ' unread missed' : ''}" type="button" data-action="call" data-place="${t.call.placeId}" data-call-id="${t.call.id}" data-name="${esc(t.name)}" ${t.call.bookingId && bookings.some((b) => b.id === t.call.bookingId) ? `data-id="${t.call.bookingId}"` : ''} aria-label="${esc(t.name)}: ${esc(t.text)}. Передзвонити">
     <span class="avatar" aria-hidden="true">${firstLetter(t.name)}</span>
     <span class="convo-body"><span class="convo-top"><b>${esc(t.name)}</b><time>${whenShort(t.at)}</time></span>
       <span class="convo-text call-text">${icon('phone', 15)}${esc(t.text)}</span>
@@ -491,7 +491,7 @@ function sendTo(thread, raw, photo = null) {
   if (thread.startsWith('b-')) {
     const b = own().find((x) => x.id === id);
     chatPost(b, 'biz', text, 'client', photo);
-    sendMessages([{ placeId: b.placeId, clientKey: 'device', channel: 'app', kind: 'chat', bookingId: b.id, text: `${place().name}: ${text || 'Фото'}`, link: `#/chat/${b.id}` }]);
+    sendMessages([{ placeId: b.placeId, clientKey: b.clientId ?? 'device', channel: 'app', kind: 'chat', bookingId: b.id, text: `${place().name}: ${text || 'Фото'}`, link: `#/chat/${b.id}` }]);
   } else {
     const r = ownRequests().find((x) => x.id === id);
     r.messages.push({ from: 'biz', text, at: Date.now(), ...(photo ? { photo } : {}) });
@@ -1804,7 +1804,8 @@ document.addEventListener('click', async (e) => {
     if (el.matches('.call-row')) markCallsRead('place', (x) => x.placeId === (el.dataset.place ?? ui.place));
     const r = el.dataset.req ? requests.find((x) => x.id === el.dataset.req) : null;
     const pid = b?.placeId ?? r?.placeId ?? el.dataset.place ?? ui.place;
-    startCall({ bookingId: b?.id ?? null, reqId: r?.id ?? null, placeId: pid, placeName: placeById(pid)?.name ?? '', clientName: b ? who(b) : r?.clientName || el.dataset.name || 'Клієнт' });
+    const clientId = b?.clientId ?? r?.clientId ?? callHistory().find((x) => x.id === el.dataset.callId)?.clientId ?? 'device';
+    startCall({ bookingId: b?.id ?? null, reqId: r?.id ?? null, placeId: pid, placeName: placeById(pid)?.name ?? '', clientId, clientName: b ? who(b) : r?.clientName || el.dataset.name || 'Клієнт' });
     return;
   }
   if (action === 'dur') { durSheet(id); return; }
@@ -2341,7 +2342,7 @@ navigator.serviceWorker?.addEventListener('message', (e) => {
 });
 keepChatOnKeyboard();
 // Вхідні дзвінки клієнтів CARCAR — у будь-яку мийку акаунта.
-initCalls('place', (c) => c.from === 'client' && !!session() && accountPlaces(session()).includes(c.placeId), { onLog: (c) => logCall(bookings, c, save) });
+initCalls('place', (c) => !!session() && accountPlaces(session()).includes(c.placeId), { onLog: (c) => logCall(bookings, c, save) });
 route();
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
