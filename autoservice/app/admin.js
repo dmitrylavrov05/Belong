@@ -10,6 +10,7 @@ import {
   TICKET_TOPICS, TICKET_STATUS, ticketsAll, ticketReply, setTicket, ticketOverdue, slaHours, fraudState, saveFraud, staffOf, phoneKey,
   addCustomPlace, uid, hash,
   enterView, bizApps, APP_STATUS, approveBizApp, rejectBizApp, bookingNo, findByNo, ticketPhotos, shrinkPhoto,
+  hasServer, api, authToken, setAuthToken,
 } from './core.js';
 import { ENTITY, TAX, codeValid, ibanValid, ibanBank, formatIban } from './partners.js';
 import { drawColumns, legend, tableView, hbars, hideTip } from './charts.js';
@@ -1224,9 +1225,22 @@ function viewApplications() {
     }).join('')}</div>` : `<div class="empty-state">${icon('users', 32)}<h2>Заявок поки немає</h2><p>Мийки подають заявку в застосунку: «Гараж» → «Для бізнесу» → «Зареєструвати бізнес».</p></div>`}`;
 }
 
+// На сервері адмінка відкривається лише за паролем (його задає setup.sh, див. deploy/ubuntu/README.md).
+const adminLocked = () => hasServer() && !authToken();
+function viewAdminLogin(error = '') {
+  return `<form class="card stack admin-login" id="admin-login" style="max-width:380px;margin:12vh auto;gap:12px">
+    <h1 style="margin:0">Вхід в адмінку</h1>
+    <label class="field"><span>Пароль</span><input name="password" type="password" autocomplete="current-password" required autofocus></label>
+    ${error ? `<p class="auth-error" role="alert" style="margin:0">${esc(error)}</p>` : ''}
+    <button class="btn primary" type="submit">Увійти</button>
+  </form>`;
+}
+
 function route() {
   hideTip();
   charts = {};
+  document.body.classList.toggle('locked', adminLocked());
+  if (adminLocked()) { $('#nav').innerHTML = ''; $('#view').innerHTML = viewAdminLogin(); return; }
   const [, page = '', arg] = location.hash.replace(/^#/, '').split('/');
   const q = queues();
   const count = { applications: bizApps().filter((a) => a.status === 'new').length, places: q.places, reviews: q.reviews, disputes: q.disputes, support: q.support, fraud: q.fraud };
@@ -1262,6 +1276,10 @@ document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-action]');
   if (!el) return;
   const { action, id } = el.dataset;
+  if (action === 'admin-logout') {
+    api('auth/logout', { method: 'POST', body: {} }).finally(() => { setAuthToken(null); route(); });
+    return;
+  }
   if (action === 'app-approve') {
     approveBizApp(id).then((r) => { if (r) { applyOverrides(); rerender(); toast(`Доступ видано: логін ${r.login}`); } });
     return;
@@ -1357,6 +1375,13 @@ document.addEventListener('submit', async (e) => {
   const f = e.target;
   e.preventDefault();
   const d = new FormData(f);
+  if (f.id === 'admin-login') {
+    const r = await api('auth/admin', { method: 'POST', body: { password: String(d.get('password') ?? '') } });
+    if (!r.ok) { $('#view').innerHTML = viewAdminLogin(r.data.error ?? 'Немає звʼязку з сервером'); return; }
+    setAuthToken(r.data.token);
+    route();
+    return;
+  }
   if (f.id === 'support-search') { ui.supportQ = String(d.get('q') ?? '').trim(); rerender(); return; }
   if (f.id === 'moderate-form') moderate(f.dataset.id, e.submitter?.value, d.get('note').trim());
   else if (f.id === 'campaign-form') {
@@ -1448,7 +1473,8 @@ window.addEventListener('storage', (e) => {
 });
 
 $('#to-biz').innerHTML = `${icon('chevL', 18)}CarCar Business`;
-$('#admin-badge').innerHTML = `${icon('shield', 18)}Демо-доступ модератора: у робочій версії — лише для співробітників CARCAR із двофакторним входом`;
+$('#admin-badge').innerHTML = hasServer() ? `${icon('shield', 18)}Адмінка CARCAR — доступ лише за паролем` : `${icon('shield', 18)}Демо-доступ модератора: на сервері адмінка відкривається лише за паролем`;
+$('#admin-logout').hidden = !hasServer();
 window.addEventListener('hashchange', () => { route(); window.scrollTo(0, 0); });
 route();
 

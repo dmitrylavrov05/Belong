@@ -1,6 +1,6 @@
 // Кеш для роботи без мережі: застосунок відкривається, навіть якщо зник інтернет
 // (зокрема під час відключень світла).
-const CACHE = 'carcar-v66';
+const CACHE = 'carcar-v67';
 const FILES = [
   './', 'index.html', 'styles.css', 'app.js', 'core.js', 'data.js', 'icon.svg', 'manifest.webmanifest',
   'business.html', 'admin.css', 'charts.js', 'partners.js', 'ops.js', 'map.js', 'vehicles.js', 'admin.html', 'admin.js',
@@ -34,6 +34,25 @@ self.addEventListener('fetch', (e) => {
   );
 });
 
+// Застосунок мийки (pro.html) і клієнта (index.html) живуть на одному сайті — вікно шукаємо за адресою.
+const isPro = (url) => /\/pro\.html/.test(new URL(url, self.registration.scope).pathname);
+const isAdmin = (url) => /\/admin\.html/.test(new URL(url, self.registration.scope).pathname);
+const sameApp = (client, url) => !isAdmin(client.url) && isPro(client.url) === isPro(url);
+
+// Push із сервера CARCAR: приходить, навіть коли застосунок закрито.
+// Якщо потрібний застосунок відкритий на екрані — він уже показав шторку чи банер, другий раз не дзвонимо.
+self.addEventListener('push', (e) => {
+  let msg = {};
+  try { msg = e.data?.json() ?? {}; } catch { msg = { title: 'CARCAR', body: e.data?.text() ?? '' }; }
+  const url = msg.url || 'index.html';
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+    if (list.some((c) => sameApp(c, url) && c.visibilityState === 'visible')) return undefined;
+    return self.registration.showNotification(msg.title || 'CARCAR', {
+      body: msg.body || '', tag: msg.tag, icon: isPro(url) ? 'pro-icon.svg' : 'icon.svg', data: { url }, renotify: !!msg.tag,
+    });
+  }));
+});
+
 // Кнопки сповіщення про новий запис у CarCar Business: «Прийняти» / «Відмовити» або дотик до сповіщення.
 // Відкритому застосунку передаємо дію повідомленням, інакше відкриваємо його з дією в адресі.
 self.addEventListener('notificationclick', (e) => {
@@ -42,7 +61,7 @@ self.addEventListener('notificationclick', (e) => {
   const url = e.notification.data?.url;
   if (url) {
     e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
-      const win = list.find((c) => !new URL(c.url).pathname.endsWith('/pro.html') && !new URL(c.url).pathname.endsWith('/admin.html'));
+      const win = list.find((c) => sameApp(c, url));
       if (win) return win.navigate(url).then((w) => (w ?? win).focus()).catch(() => win.focus());
       return self.clients.openWindow(url);
     }));

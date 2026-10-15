@@ -41,18 +41,82 @@ export const store = {
 };
 
 // ---------- спільні дані між пристроями ----------
-// Якщо поруч із застосунком працює сервер CARCAR (/api, див. deploy/server), усі пристрої бачать ті самі записи,
+// Якщо поруч із застосунком працює сервер CARCAR (deploy/server), усі пристрої бачать ті самі записи,
 // мийки, відгуки й повідомлення: зміни відправляються на сервер, а чужі приходять за секунду-дві й
-// перемальовують екран (так само, як зміни з іншої вкладки). Без сервера (файл з диска, тести) — лише цей пристрій.
-// Особисте лишається на пристрої: вхід, профіль, авто, тема, сповіщення, вибрана мийка.
+// перемальовують екран (так само, як зміни з іншої вкладки). Сервер віддає кожному лише дозволене:
+// клієнту — свої записи, мийці — записи своїх мийок, адмінці — усе (див. deploy/server/acl.py).
+// Без сервера (файл з диска, тести) — лише цей пристрій. Особисте лишається на пристрої.
 const LOCAL_KEYS = new Set(['auth', 'profile', 'cars', 'carId', 'theme', 'biz.theme', 'notify', 'biz.notify', 'biz.session', 'partner',
-  'seenStates', 'cls', 'city', 'favs', 'view', 'mapLayer', 'campaign', 'referral', 'subscriptions']);
+  'seenStates', 'cls', 'city', 'favs', 'view', 'mapLayer', 'campaign', 'referral', 'subscriptions', 'auth.token', 'biz.token', 'admin.token', 'pushSub']);
 const shared = (key) => !LOCAL_KEYS.has(key);
 // Журнал подій великий і пишеться часто — відправляємо рідше.
 const PUSH_DELAY = { analytics: 5000, presence: 2000 };
-const sync = { on: false, ver: 0, base: new Map(), timers: new Map(), busy: new Set() };
+const sync = { on: false, ver: 0, base: new Map(), timers: new Map(), busy: new Set(), poll: null, gen: 0 };
 const syncNotify = (key) => window.dispatchEvent(new StorageEvent('storage', { key: `carcar.${key}` }));
 export const syncOn = () => sync.on;
+// Сервер CARCAR додає в сторінку <meta name="carcar-sync"> — без неї (Netlify, тести, файл з диска) нічого не питаємо.
+export const hasServer = () => typeof document !== 'undefined' && !!document.querySelector('meta[name="carcar-sync"]');
+// Вхід у кожному застосунку свій: клієнт, кабінет мийки, адмінка.
+const TOKEN_KEY = typeof location === 'undefined' ? 'auth.token' : /pro\.html$/.test(location.pathname) ? 'biz.token' : /admin\.html$/.test(location.pathname) ? 'admin.token' : 'auth.token';
+export const authToken = () => store.get(TOKEN_KEY, null);
+export function setAuthToken(token) {
+  store.set(TOKEN_KEY, token);
+  syncRestart();
+}
+
+// Запит до сервера CARCAR з ключем входу. Повертає { ok, status, data }.
+export async function api(path, { method = 'GET', body } = {}) {
+  const token = authToken();
+  try {
+    const res = await fetch(`api/${path}`, {
+      method, cache: 'no-store',
+      headers: { ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, data };
+  } catch {
+    return { ok: false, status: 0, data: { error: 'Немає звʼязку з сервером' } };
+  }
+}
+
+let configPromise = null;
+// Що ввімкнено на сервері: вхід через Telegram, демо-вхід, оплата, push. Без сервера — null.
+export const serverConfig = () => (hasServer() ? (configPromise ??= api('config').then((r) => (r.ok ? r.data : null))) : Promise.resolve(null));
+
+// ---------- сповіщення з сервера: Web Push і Telegram ----------
+// Сервер надсилає push, навіть коли застосунок закрито. Налаштування (увімкнено, тиша поза робочим часом мийки)
+// зберігаються на сервері — інакше він не знатиме, коли мовчати. quiet: { placeId: { 'YYYY-MM-DD': [від, до] | null } }.
+const b64uBytes = (s) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (s.length % 4)) % 4)), (c) => c.charCodeAt(0));
+export async function notifySync(prefs) {
+  if (!hasServer() || !authToken()) return;
+  api('notify/prefs', { method: 'POST', body: prefs });
+  if (!prefs.on || !('PushManager' in window) || !('Notification' in window) || Notification.permission !== 'granted') return;
+  const cfg = await serverConfig();
+  if (!cfg?.vapid) return;
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    if (!reg) return;
+    const sub = (await reg.pushManager.getSubscription()) ?? await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uBytes(cfg.vapid) });
+    await api('push/subscribe', { method: 'POST', body: { subscription: sub.toJSON() } });
+  } catch { /* браузер не підтримує push чи немає дозволу — лишаються сповіщення у відкритому застосунку */ }
+}
+// Перед виходом: цей телефон більше не отримує сповіщень для цього акаунта.
+export async function pushForget() {
+  try {
+    const sub = await (await navigator.serviceWorker?.getRegistration())?.pushManager.getSubscription();
+    if (sub) await api('push/unsubscribe', { method: 'POST', body: { endpoint: sub.endpoint } });
+  } catch { /* немає підписки */ }
+}
+// Сповіщення в Telegram: бот запамʼятовує чат і пише туди про записи й повідомлення.
+export function telegramNotify() {
+  const win = window.open('', '_blank');
+  return api('notify/telegram', { method: 'POST', body: {} }).then((r) => {
+    if (!r.ok) { win?.close(); return false; }
+    if (win) win.location.href = r.data.url; else location.href = r.data.url;
+    return true;
+  });
+}
 
 function syncPush(key) {
   clearTimeout(sync.timers.get(key));
@@ -62,18 +126,21 @@ function syncPush(key) {
 async function syncSend(key) {
   if (sync.busy.has(key)) { syncPush(key); return; }
   sync.busy.add(key);
+  const gen = sync.gen;
   const raw = localStorage.getItem(`carcar.${key}`);
   const base = sync.base.get(key);
   const body = { value: raw === null ? null : JSON.parse(raw), ...(base !== undefined ? { base: JSON.parse(base) } : {}) };
   try {
-    const res = await fetch(`api/state/${encodeURIComponent(key)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    if (!res.ok) throw new Error(String(res.status));
-    const { value } = await res.json();
-    const merged = JSON.stringify(value);
+    const r = await api(`state/${encodeURIComponent(key)}`, { method: 'PUT', body });
+    if (gen !== sync.gen) return; // тим часом вийшли чи увійшли — це вже інший користувач
+    if (!r.ok && r.status !== 403) throw new Error(String(r.status));
+    // 403 — змінювати це не можна: показуємо те, що є на сервері.
+    const merged = JSON.stringify(r.data.value ?? null);
     sync.base.set(key, merged);
     // Поки відправляли, хтось інший змінив той самий ключ — показуємо злите значення (якщо ми не змінили його знову).
     if (!sync.timers.has(key) && merged !== localStorage.getItem(`carcar.${key}`)) {
-      localStorage.setItem(`carcar.${key}`, merged);
+      if (r.data.value === null || r.data.value === undefined) localStorage.removeItem(`carcar.${key}`);
+      else localStorage.setItem(`carcar.${key}`, merged);
       syncNotify(key);
     }
   } catch {
@@ -96,42 +163,49 @@ function syncApply(data) {
   }
 }
 
-async function syncPoll() {
-  for (;;) {
+async function syncPoll(gen) {
+  while (gen === sync.gen) {
+    const ctrl = new AbortController();
+    sync.poll = ctrl;
     try {
-      const res = await fetch(`api/state?since=${sync.ver}&wait=1`, { cache: 'no-store' });
+      const token = authToken();
+      const res = await fetch(`api/state?since=${sync.ver}&wait=1`, { cache: 'no-store', signal: ctrl.signal, headers: token ? { Authorization: `Bearer ${token}` } : {} });
       if (!res.ok) throw new Error(String(res.status));
       const j = await res.json();
+      if (gen !== sync.gen) return;
       syncApply(j.data);
       sync.ver = j.ver;
     } catch {
+      if (gen !== sync.gen) return;
       await new Promise((ok) => setTimeout(ok, 3000));
     }
   }
 }
 
-async function startSync() {
-  // Сервер CARCAR додає в сторінку <meta name="carcar-sync"> — без неї (Netlify, тести, файл з диска) нічого не питаємо.
-  if (typeof document === 'undefined' || !document.querySelector('meta[name="carcar-sync"]')) return;
-  let j;
-  try {
-    const res = await fetch('api/state?since=0', { cache: 'no-store' });
-    if (!res.ok || !(res.headers.get('content-type') ?? '').includes('json')) return;
-    j = await res.json();
-  } catch { return; }
-  // Сервер — джерело правди: спільних ключів, яких на ньому немає, на пристрої теж не лишаємо.
+// Повне завантаження з сервера: при відкритті, після входу й виходу (бачимо вже інше).
+async function syncStart() {
+  const gen = ++sync.gen;
+  sync.poll?.abort();
+  const r = await api('state?since=0');
+  if (!r.ok || gen !== sync.gen) return;
+  // Сервер — джерело правди: спільних ключів, яких цьому користувачу не видно, на пристрої теж не лишаємо.
   for (let i = localStorage.length - 1; i >= 0; i--) {
     const k = localStorage.key(i);
     if (!k?.startsWith('carcar.')) continue;
     const key = k.slice(7);
-    if (shared(key) && !(key in j.data)) { localStorage.removeItem(k); syncNotify(key); }
+    if (shared(key) && !(key in r.data.data) && !sync.timers.has(key)) { localStorage.removeItem(k); sync.base.delete(key); syncNotify(key); }
   }
-  syncApply(j.data);
-  sync.ver = j.ver;
+  syncApply(r.data.data);
+  sync.ver = r.data.ver;
   sync.on = true;
-  syncPoll();
+  syncPoll(gen);
 }
-startSync();
+export function syncRestart() {
+  if (!hasServer()) return;
+  sync.base.clear();
+  syncStart();
+}
+if (hasServer()) syncStart();
 
 // ---------- іконки (лінійні, з дизайну CARCAR) ----------
 
@@ -302,6 +376,18 @@ export const hoursText = (place, iso = isoDate(new Date())) => rangeText(hoursFo
 export const clientIdOf = (phone) => phoneKey(phone) ?? 'device';
 // Гаманець (баланс CARCAR і бонуси) — свій у кожного клієнта.
 export const walletKey = (id = 'device') => (id === 'device' ? 'wallet' : `wallet.${id}`);
+
+// Відбиток номера (FNV-1a, як phone_hash на сервері): сервер віддає мийці його замість номера клієнта CARCAR,
+// а мийка може впізнати постійного клієнта, коли вводить номер сама.
+export function phoneHash(phone) {
+  const key = phoneKey(phone);
+  if (!key) return '';
+  let h = 0x811c9dc5;
+  for (const b of new TextEncoder().encode(`carcar:${key}`)) h = Math.imul(h ^ b, 0x01000193) >>> 0;
+  return `h:${h.toString(16).padStart(8, '0')}`;
+}
+// Той самий клієнт: збігається номер або (якщо номер прихований сервером) його відбиток.
+export const samePhone = (stored, typed) => !!stored && !!typed && (String(stored).startsWith('h:') ? stored === phoneHash(typed) : phoneKey(stored) === phoneKey(typed));
 
 export function phoneKey(phone) {
   let d = String(phone ?? '').replace(/\D/g, '');
@@ -571,7 +657,8 @@ export function reliability(list, now = Date.now()) {
   return { cancels: cancels.length, noshows, moves, level: noshows || cancels.length >= 3 || moves >= 4 ? 'warn' : 'ok' };
 }
 // Стани, у яких запис займає бокс: оплачені через CARCAR і внесені в журнал точки.
-export const BLOCKING = [...ACTIVE, 'booked'];
+// unpaid — запис чекає оплати карткою (до 15 хв): час уже тримаємо.
+export const BLOCKING = [...ACTIVE, 'booked', 'unpaid'];
 
 // Запис через CARCAR (оплата в застосунку) чи внесений точкою вручну (оплата на місці).
 export const isCarcar = (b) => (b.channel ?? 'carcar') === 'carcar';

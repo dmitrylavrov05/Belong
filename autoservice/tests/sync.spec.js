@@ -13,7 +13,7 @@ let server;
 let base;
 
 test.beforeAll(async ({}, info) => {
-  const port = 4190 + info.workerIndex + (info.project.name === 'mobile' ? 20 : 0);
+  const port = 5310 + info.workerIndex + (info.project.name === 'mobile' ? 20 : 0);
   const db = join(mkdtempSync(join(tmpdir(), 'carcar-sync-')), 'data.db');
   server = spawn('python3', ['../deploy/server/carcar_sync.py', '--port', String(port), '--db', db, '--static', 'app'], { stdio: 'pipe' });
   await new Promise((ok, no) => {
@@ -36,15 +36,22 @@ async function device(browser, init, arg) {
   page.errors = errors;
   return page;
 }
-const client = (browser, phone, name) => device(browser, ([p, n]) => {
+// Вхід через сервер: клієнт — демо-вхід за номером (без Telegram-бота), мийка — демо-кабінет.
+async function token(path, body) {
+  const r = await fetch(`${base}/api/auth/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  return (await r.json()).token;
+}
+const client = async (browser, phone, name) => device(browser, ([p, n, t]) => {
   sessionStorage.setItem('carcar.splash', '1');
   localStorage.getItem('carcar.auth') ?? localStorage.setItem('carcar.auth', JSON.stringify({ phone: p, at: 1 }));
   localStorage.getItem('carcar.profile') ?? localStorage.setItem('carcar.profile', JSON.stringify({ name: n, phone: p }));
-}, [phone, name]);
-const wash = (browser) => device(browser, () => {
+  localStorage.getItem('carcar.auth.token') ?? localStorage.setItem('carcar.auth.token', JSON.stringify(t));
+}, [phone, name, await token('demo', { phone })]);
+const wash = async (browser) => device(browser, (t) => {
   localStorage.getItem('carcar.biz.session') ?? localStorage.setItem('carcar.biz.session', '{"demo":true}');
   localStorage.getItem('carcar.partner') ?? localStorage.setItem('carcar.partner', '"blysk"');
-});
+  localStorage.getItem('carcar.biz.token') ?? localStorage.setItem('carcar.biz.token', JSON.stringify(t));
+}, await token('biz', { demo: true }));
 
 test('різні пристрої бачать ті самі дані: запис клієнта → мийка приймає → клієнт бачить підтвердження', async ({ browser }) => {
   const ira = await client(browser, '+380 67 111 11 11', 'Ірина');
@@ -115,4 +122,36 @@ test('дзвінок між різними пристроями: клієнт д
   await expect(ira.locator('#call-screen #call-time')).toBeVisible({ timeout: 15000 });
   await ira.locator('#call-screen').getByRole('button', { name: 'Завершити' }).click();
   await expect(inc).toContainText('Дзвінок завершено', { timeout: 15000 });
+});
+
+test('на сервері вхід обовʼязковий: без ключа — екран входу, після коду — застосунок із ключем сервера', async ({ browser }) => {
+  const page = await device(browser, () => {
+    sessionStorage.setItem('carcar.splash', '1');
+    // Старий вхід «лише на телефоні» без ключа сервера не пускає далі.
+    localStorage.setItem('carcar.auth', JSON.stringify({ phone: '+380 63 333 33 33', at: 1 }));
+  });
+  await page.goto('/#/bookings');
+  await expect(page.getByRole('heading', { name: 'Вхід у CARCAR' })).toBeVisible();
+  await page.getByLabel('Ваше імʼя').fill('Марія');
+  await page.getByLabel('Номер телефону').fill('63 333 33 33');
+  await page.getByRole('button', { name: 'Отримати код' }).click();
+  const code = await page.locator('.auth-card .code').textContent();
+  // Четверта цифра підтверджує код сама.
+  for (const [i, d] of [...code].entries()) await page.locator('.code-cell').nth(i).fill(d);
+  await expect(page.locator('#view h1')).toHaveText('Мої записи', { timeout: 10000 });
+  const t = await page.evaluate(() => JSON.parse(localStorage.getItem('carcar.auth.token')));
+  const me = await (await fetch(`${base}/api/me`, { headers: { Authorization: `Bearer ${t}` } })).json();
+  expect(me).toMatchObject({ role: 'client', cid: 'tel:380633333333' });
+  expect(page.errors).toEqual([]);
+});
+
+test('адмінка на сервері відкривається лише за паролем', async ({ browser }) => {
+  const page = await device(browser, () => {});
+  await page.goto('/admin.html');
+  await expect(page.getByRole('heading', { name: 'Вхід в адмінку' })).toBeVisible();
+  await expect(page.locator('#nav a')).toHaveCount(0);
+  await page.getByLabel('Пароль').fill('не той');
+  await page.getByRole('button', { name: 'Увійти' }).click();
+  await expect(page.getByRole('alert')).toContainText('Невірний пароль');
+  expect(page.errors).toEqual([]);
 });

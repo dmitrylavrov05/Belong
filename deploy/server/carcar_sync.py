@@ -1,33 +1,51 @@
 #!/usr/bin/env python3
-"""Спільні дані CARCAR для всіх пристроїв: клієнтів, мийок і адмінки.
+"""Сервер CARCAR: спільні дані для всіх пристроїв, вхід, права доступу, сповіщення, оплата й дзвінки.
 
-Застосунок зберігає дані у вигляді ключів (bookings, reviews, partners…). Цей сервер тримає спільну копію
-кожного ключа в SQLite, приймає зміни й розсилає їх іншим пристроям через «довге опитування».
+Застосунок зберігає дані ключами (bookings, reviews, partners…). Сервер тримає спільну копію кожного ключа
+в SQLite, кожному віддає лише те, що йому можна бачити (acl.py), приймає зміни з перевіркою прав і розсилає
+їх іншим пристроям («довге опитування»). Події записів (новий запис, підтвердження, «Машина готова»,
+повідомлення в чаті) надсилає push-сповіщенням і в Telegram.
 
-  GET  /api/ping                     — сервер працює
-  GET  /api/state?since=N&wait=1     — ключі, змінені після версії N (чекає до 25 с, якщо змін немає)
-  PUT  /api/state/<key>  {value, base}
-                                     — записати ключ. base — значення, яке пристрій бачив востаннє:
-                                       якщо тим часом ключ змінив хтось інший, зміни зливаються (див. merge).
+  GET  /api/config                       — що ввімкнено: Telegram-вхід, демо-вхід, оплата, push, TURN
+  POST /api/auth/demo   {phone, name}    — вхід клієнта без перевірки номера (якщо demo_login)
+  POST /api/auth/tg/start  → {nonce,url} / GET /api/auth/tg/check?nonce=…  — вхід через Telegram-бота
+  POST /api/auth/biz    {login,password} або {demo:true}  — кабінет мийки
+  POST /api/auth/admin  {password}       — адмінка
+  GET  /api/me, POST /api/auth/logout
+  GET  /api/state?since=N&wait=1         — змінені ключі (лише дозволене цій ролі)
+  PUT  /api/state/<key>  {value, base}   — зміни з тристороннім злиттям і перевіркою прав
+  POST /api/push/subscribe {subscription} — push на цей телефон
+  POST /api/notify/telegram              — посилання, щоб отримувати сповіщення в Telegram
+  POST /api/pay/create {booking}         — оплата LiqPay; POST /api/pay/liqpay/callback — відповідь банку
+  GET  /api/ice                          — STUN/TURN для дзвінків
 
-Лише стандартна бібліотека Python 3. Запуск: python3 carcar_sync.py --port 8090 --db /var/lib/carcar/data.db
-Для локальної перевірки можна віддавати й сам застосунок: --static ../../autoservice/app
-
-Увага: це демо без входу на сервері — хто знає адресу, може прочитати й змінити дані.
-У робочій версії потрібні авторизація й перевірка прав для кожного запису.
+Запуск: python3 carcar_sync.py --port 8090 --db /var/lib/carcar/data.db --config /etc/carcar/config.json
+Пароль адмінки: python3 carcar_sync.py --config /etc/carcar/config.json --set-admin-password 'пароль'
+Лише стандартна бібліотека Python 3 (+ python3-cryptography для push).
 """
 import argparse
+import base64
+import hashlib
+import hmac
 import json
 import mimetypes
 import os
 import re
+import secrets
 import sqlite3
+import sys
 import threading
 import time
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, unquote
 
-KEY_RE = re.compile(r'^[A-Za-z0-9_.\-]{1,120}$')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import acl  # noqa: E402
+from auth import Sessions, TelegramBot, biz_hash, check_admin, make_admin_hash, tg_link_url  # noqa: E402
+from pay import LiqPay  # noqa: E402
+from push import WebPush  # noqa: E402
+
+KEY_RE = re.compile(r'^[A-Za-z0-9_.:\-]{1,120}$')  # wallet.tel:380… — двокрапка теж
 MAX_BODY = 20 * 1024 * 1024  # фото в записах займають місце
 WAIT_SECONDS = 25
 
@@ -88,6 +106,7 @@ def merge(base, cur, new):
     return new
 
 
+
 # ---------- сховище ----------
 
 class Store:
@@ -95,11 +114,14 @@ class Store:
         os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.db.execute('CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL, ver INTEGER NOT NULL)')
+        self.db.execute('CREATE TABLE IF NOT EXISTS push_subs (endpoint TEXT PRIMARY KEY, role TEXT, subject TEXT, data TEXT, created INTEGER)')
+        self.db.execute('CREATE TABLE IF NOT EXISTS notify_prefs (subject TEXT PRIMARY KEY, data TEXT)')
         self.db.commit()
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
         self.changed = threading.Condition(self.lock)
         row = self.db.execute('SELECT MAX(ver) FROM kv').fetchone()
         self.ver = row[0] or 0
+        self.on_change = None  # (key, old, new) — для сповіщень
 
     def since(self, ver):
         rows = self.db.execute('SELECT key, value FROM kv WHERE ver > ?', (ver,)).fetchall()
@@ -109,17 +131,39 @@ class Store:
         row = self.db.execute('SELECT value FROM kv WHERE key = ?', (key,)).fetchone()
         return json.loads(row[0]) if row else None
 
-    def put(self, key, value, base, has_base):
+    def _save(self, key, value):
+        self.ver += 1
+        self.db.execute('INSERT INTO kv (key, value, ver) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, ver = excluded.ver',
+                        (key, json.dumps(value, ensure_ascii=False), self.ver))
+        self.db.commit()
+        self.changed.notify_all()
+
+    def put(self, who, key, value, base, has_base):
+        """Зміни від пристрою: лише те, що роль може змінити, зливаємо з поточним значенням."""
         with self.lock:
             cur = self.get(key)
-            merged = merge(base if has_base else cur, cur, value) if cur is not None else value
+            view = acl.read(who, key, cur, self.get)
+            b, n, ok = acl.allowed_change(who, key, base if has_base else view, cur, value, self.get)
+            if not ok:
+                return self.ver, view, False
+            merged = merge(b, cur, n) if cur is not None else n
+            merged = acl.sanitize(who, key, cur, merged)
             if merged != cur:
-                self.ver += 1
-                self.db.execute('INSERT INTO kv (key, value, ver) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, ver = excluded.ver',
-                                (key, json.dumps(merged, ensure_ascii=False), self.ver))
-                self.db.commit()
-                self.changed.notify_all()
-            return self.ver, merged
+                self._save(key, merged)
+                if self.on_change:
+                    threading.Thread(target=self.on_change, args=(key, cur, merged), daemon=True).start()
+            return self.ver, acl.read(who, key, merged, self.get), True
+
+    def update(self, key, fn):
+        """Зміна від самого сервера (оплата, повернення): fn(старе) -> нове."""
+        with self.lock:
+            cur = self.get(key)
+            new = fn(acl.deep(cur))
+            if new != cur:
+                self._save(key, new)
+                if self.on_change:
+                    threading.Thread(target=self.on_change, args=(key, cur, new), daemon=True).start()
+            return new
 
     def wait(self, ver, seconds):
         with self.lock:
@@ -128,15 +172,190 @@ class Store:
             return self.ver, self.since(ver)
 
 
+# ---------- сповіщення про події записів ----------
+
+def booking_events(old, new):
+    """Що змінилося в записах — кому й що сказати. Повертає [(кому, заголовок, текст, посилання)]."""
+    om = {x.get('id'): x for x in old or [] if isinstance(x, dict)}
+    out = []
+    for b in new or []:
+        if not isinstance(b, dict) or b.get('source'):
+            continue
+        o = om.get(b.get('id'))
+        when = f"{b.get('date', '')[8:10]}.{b.get('date', '')[5:7]} о {b.get('time', '')}"
+        svc = ', '.join(b.get('services') or [])
+        place = ('place', b.get('placeId'))
+        client = ('client', b.get('clientId'))
+        pro_url = f"pro.html#/booking/{b.get('id')}"
+        cli_url = f"index.html#/bookings/{b.get('id')}"
+        st, ost = b.get('state'), (o or {}).get('state')
+        if (o is None or ost == 'unpaid') and st == 'pending':
+            out.append((place, 'Новий запис — підтвердіть', f"{when} · {svc}. Відповісти протягом 5 хв", pro_url))
+        elif (o is None or ost == 'unpaid') and st == 'paid':
+            out.append((place, 'Новий запис', f"{when} · {svc} (прийнято автоматично)", pro_url))
+        elif o is not None and st != ost:
+            if ost == 'pending' and st == 'paid':
+                out.append((client, 'Запис підтверджено', f"Мийка чекає вас {when}", cli_url))
+            elif ost == 'pending' and st == 'offer':
+                out.append((client, 'Мийка пропонує інший час', f"{when}. Підтвердіть або скасуйте без втрат", cli_url))
+            elif st == 'cancelled' and b.get('declined') in ('place', 'timeout'):
+                out.append((client, 'Мийка не підтвердила запис', 'Гроші повернуто. Оберіть інший час чи мийку', cli_url))
+            elif st == 'cancelled' and b.get('cancelBy') == 'client':
+                out.append((place, 'Клієнт скасував запис', f"{when} · {svc}", pro_url))
+            elif st == 'completed' and ost in ('paid', 'dispute'):
+                out.append((client, 'Машина готова', 'Мийка завершила роботу. Можна забирати авто й залишити відгук', cli_url))
+            elif st == 'dispute':
+                out.append((place, 'Клієнт відкрив спір', f"{when} · гроші заморожено до рішення CARCAR", pro_url))
+        # Нове повідомлення в чаті запису
+        oc, nc = len((o or {}).get('chat') or []), len(b.get('chat') or [])
+        if nc > oc and o is not None:
+            m = (b.get('chat') or [])[-1]
+            if m.get('from') == 'client':
+                out.append((place, 'Повідомлення від клієнта', (m.get('text') or 'Фото')[:120], f"pro.html#/chat/b-{b.get('id')}"))
+            elif m.get('from') == 'biz':
+                out.append((client, 'Повідомлення від мийки', (m.get('text') or 'Фото')[:120], f"index.html#/chat/{b.get('id')}"))
+    return out
+
+
+def request_events(old, new):
+    om = {x.get('id'): x for x in old or [] if isinstance(x, dict)}
+    out = []
+    for r in new or []:
+        o = om.get(r.get('id'))
+        msgs, olds = r.get('messages') or [], (o or {}).get('messages') or []
+        if len(msgs) > len(olds):
+            m = msgs[-1]
+            if m.get('from') == 'client':
+                out.append((('place', r.get('placeId')), 'Питання від клієнта', (m.get('text') or 'Фото')[:120], f"pro.html#/chat/r-{r.get('id')}"))
+            elif m.get('from') == 'biz':
+                out.append((('client', r.get('clientId')), 'Мийка відповіла', (m.get('text') or 'Фото')[:120], f"index.html#/ask/{r.get('placeId')}"))
+    return out
+
+
+def call_events(old, new):
+    out = []
+    for cid, c in (new or {}).items():
+        o = (old or {}).get(cid)
+        if o is None and c.get('state') == 'ringing':
+            if c.get('from') == 'client':
+                out.append((('place', c.get('placeId')), 'Вхідний дзвінок CARCAR', f"{c.get('clientName') or 'Клієнт'} дзвонить", 'pro.html#/'))
+            else:
+                out.append((('client', c.get('clientId')), 'Вхідний дзвінок CARCAR', f"{c.get('placeName') or 'Мийка'} дзвонить", 'index.html#/inbox'))
+    return out
+
+
+def kyiv_now():
+    try:
+        from zoneinfo import ZoneInfo
+        from datetime import datetime
+        return datetime.now(ZoneInfo('Europe/Kyiv'))
+    except Exception:  # немає бази часових поясів — час сервера
+        from datetime import datetime
+        return datetime.now()
+
+
+def muted(prefs, kind, who):
+    """Чи мовчати: сповіщення вимкнено або (для мийки) зараз неробочий час і ввімкнено «тишу»."""
+    if not prefs:
+        return False
+    if prefs.get('on') is False:
+        return True
+    if kind == 'place':
+        days = (prefs.get('quiet') or {}).get(who)
+        if isinstance(days, dict):
+            now = kyiv_now()
+            iso = now.strftime('%Y-%m-%d')
+            if iso in days:
+                h = days[iso]
+                m = now.hour * 60 + now.minute
+                return not h or not (h[0] <= m < h[1])
+    return False
+
+
+class Notifier:
+    def __init__(self, store, webpush, bot):
+        self.store, self.webpush, self.bot = store, webpush, bot
+
+    def prefs(self, subject):
+        row = self.store.db.execute('SELECT data FROM notify_prefs WHERE subject = ?', (subject,)).fetchone()
+        return json.loads(row[0]) if row else None
+
+    def on_change(self, key, old, new):
+        try:
+            events = {'bookings': booking_events, 'requests': request_events, 'calls': call_events}.get(key, lambda a, b: [])(old, new)
+            for (kind, who), title, text, url in events:
+                if who:
+                    self.send(kind, who, title, text, url)
+        except Exception as e:  # сповіщення не мають ламати збереження
+            print('notify error', e, flush=True)
+
+    def place_subjects(self, pid):
+        """Хто керує мийкою: акаунти з biz.accounts; якщо нікому не належить — демо-кабінет."""
+        accounts = self.store.get('biz.accounts') or []
+        logins = [a.get('login') for a in accounts if pid == a.get('placeId') or pid in (a.get('places') or [])]
+        return [f'acct:{x}' for x in logins] or ['acct:*demo*']
+
+    def send(self, kind, who, title, text, url):
+        subjects = [who] if kind == 'client' else self.place_subjects(who)
+        msg = {'title': title, 'body': text, 'url': url, 'tag': f'{kind}-{who}-{title}'}
+        for subject in subjects:
+            if muted(self.prefs(subject), kind, who):
+                continue
+            rows = self.store.db.execute('SELECT endpoint, data FROM push_subs WHERE subject = ?', (subject,)).fetchall()
+            for endpoint, data in rows:
+                if self.webpush.send(json.loads(data), msg) is False:
+                    with self.store.lock:
+                        self.store.db.execute('DELETE FROM push_subs WHERE endpoint = ?', (endpoint,))
+                        self.store.db.commit()
+            if self.bot:
+                chat = self.store_sessions.tg_chat(subject)
+                if chat:
+                    self.bot.send(chat, f'🔔 {title}\n{text}')
+
+
+# ---------- конфігурація ----------
+
+def load_config(path):
+    cfg = {}
+    if path and os.path.exists(path):
+        with open(path) as f:
+            cfg = json.load(f)
+    cfg.setdefault('demo_login', not cfg.get('telegram_token'))  # без бота — вхід за номером без перевірки
+    cfg.setdefault('demo_wash', True)  # демо-кабінет мийки з вигаданими мийками
+    return cfg
+
+
 # ---------- HTTP ----------
 
-def make_handler(store, static_dir):
+class Limiter:
+    """Не більше N спроб входу за хвилину з однієї адреси — щоб не підбирали паролі."""
+
+    def __init__(self, per_minute=10):
+        self.per, self.hits, self.lock = per_minute, {}, threading.Lock()
+
+    def ok(self, ip):
+        now = time.time()
+        with self.lock:
+            self.hits[ip] = [t for t in self.hits.get(ip, []) if now - t < 60]
+            return len(self.hits[ip]) < self.per
+
+    def fail(self, ip):
+        with self.lock:
+            self.hits.setdefault(ip, []).append(time.time())
+
+
+def make_handler(app):
+    store, cfg, sessions = app['store'], app['cfg'], app['sessions']
+    static_dir = app['static']
+    limiter = Limiter()
+
     class Handler(BaseHTTPRequestHandler):
         protocol_version = 'HTTP/1.1'
 
-        def log_message(self, fmt, *args):  # тихо, без журналу кожного запиту
+        def log_message(self, fmt, *args):
             pass
 
+        # --- відповіді ---
         def send_json(self, code, obj):
             body = json.dumps(obj, ensure_ascii=False).encode()
             self.send_response(code)
@@ -146,44 +365,221 @@ def make_handler(store, static_dir):
             self.end_headers()
             self.wfile.write(body)
 
+        def body_json(self):
+            size = int(self.headers.get('Content-Length') or 0)
+            if size > MAX_BODY:
+                raise ValueError('too large')
+            raw = self.rfile.read(size) if size else b''
+            if self.headers.get('Content-Type', '').startswith('application/x-www-form-urlencoded'):
+                return {k: v[0] for k, v in parse_qs(raw.decode()).items()}
+            return json.loads(raw or b'{}')
+
+        def ip(self):
+            return self.headers.get('X-Real-IP') or self.client_address[0]
+
+        # --- хто питає ---
+        def who(self):
+            token = (self.headers.get('Authorization') or '').removeprefix('Bearer ').strip()
+            s = sessions.get(token)
+            if not s:
+                return acl.Who()
+            role, sub = s
+            w = acl.Who(role, cid=sub.get('cid'), login=sub.get('login'), demo=bool(sub.get('demo')))
+            if role == 'place':
+                if w.demo and not cfg.get('demo_wash', True):
+                    return acl.Who()
+                w.places = acl.account_places(store.get, w)
+            return w
+
+        def subject(self, w):
+            return w.cid if w.role == 'client' else f"acct:{'*demo*' if w.demo else w.login}" if w.role == 'place' else 'admin'
+
+        # --- GET ---
         def do_GET(self):
             url = urlparse(self.path)
-            if url.path == '/api/ping':
+            q = parse_qs(url.query)
+            p = url.path
+            if p == '/api/ping':
                 return self.send_json(200, {'ok': True, 'ver': store.ver})
-            if url.path == '/api/state':
-                q = parse_qs(url.query)
+            if p == '/api/config':
+                return self.send_json(200, {
+                    'telegramBot': cfg.get('telegram_bot') if cfg.get('telegram_token') else None,
+                    'demoLogin': bool(cfg.get('demo_login')), 'demoWash': bool(cfg.get('demo_wash', True)),
+                    'payments': 'liqpay' if app['liqpay'].on else 'demo', 'sandbox': app['liqpay'].sandbox,
+                    'vapid': app['webpush'].public if app['webpush'].ok else None, 'turn': bool(cfg.get('turn'))})
+            if p == '/api/me':
+                w = self.who()
+                return self.send_json(200, {'role': w.role, 'cid': w.cid, 'login': w.login, 'demo': w.demo, 'places': sorted(w.places)})
+            if p == '/api/state':
+                w = self.who()
                 since = int((q.get('since') or ['0'])[0] or 0)
                 if (q.get('wait') or ['0'])[0] == '1':
                     ver, data = store.wait(since, WAIT_SECONDS)
                 else:
                     ver, data = store.ver, store.since(since)
-                return self.send_json(200, {'ver': ver, 'data': data})
+                out = {}
+                for k, v in data.items():
+                    r = acl.read(w, k, v, store.get)
+                    if r is not None:
+                        out[k] = r
+                return self.send_json(200, {'ver': ver, 'data': out})
+            if p == '/api/auth/tg/check':
+                row = sessions.tg_check((q.get('nonce') or [''])[0])
+                if not row:
+                    return self.send_json(200, {'pending': True})
+                phone, name, _ = row
+                token = sessions.create('client', {'cid': phone})
+                return self.send_json(200, {'token': token, 'phone': phone, 'name': name})
+            if p == '/api/ice':
+                return self.send_json(200, {'iceServers': ice_servers(cfg, self.subject(self.who()))})
             if static_dir:
                 return self.serve_static(url.path)
-            self.send_json(404, {'error': 'not found'})
+            return self.send_json(404, {'error': 'not found'})
 
         def do_HEAD(self):
             url = urlparse(self.path)
             if static_dir and not url.path.startswith('/api/'):
                 return self.serve_static(url.path)
-            self.send_json(404, {'error': 'not found'})
+            return self.send_json(404, {'error': 'not found'})
 
+        # --- POST ---
+        def do_POST(self):
+            p = urlparse(self.path).path
+            try:
+                body = self.body_json()
+            except ValueError:
+                return self.send_json(400, {'error': 'bad body'})
+            if p in ('/api/auth/biz', '/api/auth/admin') and not limiter.ok(self.ip()):
+                return self.send_json(429, {'error': 'Забагато спроб. Зачекайте хвилину.'})
+            if p == '/api/auth/demo':
+                if not cfg.get('demo_login'):
+                    return self.send_json(403, {'error': 'Вхід лише через Telegram'})
+                cid = acl.phone_key(body.get('phone'))
+                if not cid or len(cid) != 16:
+                    return self.send_json(400, {'error': 'Невірний номер'})
+                return self.send_json(200, {'token': sessions.create('client', {'cid': cid}), 'phone': cid})
+            if p == '/api/auth/tg/start':
+                if not cfg.get('telegram_token'):
+                    return self.send_json(404, {'error': 'Telegram не налаштовано'})
+                nonce = sessions.tg_start()
+                return self.send_json(200, {'nonce': nonce, 'url': tg_link_url(cfg.get('telegram_bot'), nonce)})
+            if p == '/api/auth/biz':
+                if body.get('demo'):
+                    if not cfg.get('demo_wash', True):
+                        return self.send_json(403, {'error': 'Демо-кабінет вимкнено'})
+                    return self.send_json(200, {'token': sessions.create('place', {'demo': True})})
+                login = str(body.get('login') or '').strip().lower()
+                acc = next((a for a in store.get('biz.accounts') or [] if a.get('login') == login), None)
+                if not acc or not hmac.compare_digest(acc.get('hash', ''), biz_hash(login, str(body.get('password') or ''))):
+                    limiter.fail(self.ip())
+                    return self.send_json(401, {'error': 'Невірний логін або пароль.'})
+                return self.send_json(200, {'token': sessions.create('place', {'login': login}), 'login': login, 'placeId': acc.get('placeId')})
+            if p == '/api/auth/admin':
+                if not cfg.get('admin_password_hash') or not check_admin(str(body.get('password') or ''), cfg['admin_password_hash']):
+                    limiter.fail(self.ip())
+                    return self.send_json(401, {'error': 'Невірний пароль'})
+                return self.send_json(200, {'token': sessions.create('admin', {})})
+            if p == '/api/auth/logout':
+                sessions.drop((self.headers.get('Authorization') or '').removeprefix('Bearer ').strip())
+                return self.send_json(200, {'ok': True})
+            if p == '/api/push/subscribe':
+                w = self.who()
+                sub = body.get('subscription') or {}
+                if w.role == 'anon' or not str(sub.get('endpoint', '')).startswith('https://'):
+                    return self.send_json(400, {'error': 'bad subscription'})
+                with store.lock:
+                    store.db.execute('INSERT INTO push_subs VALUES (?, ?, ?, ?, ?) ON CONFLICT(endpoint) DO UPDATE SET role = excluded.role, subject = excluded.subject, data = excluded.data',
+                                     (sub['endpoint'], w.role, self.subject(w), json.dumps(sub), int(time.time())))
+                    store.db.commit()
+                return self.send_json(200, {'ok': True})
+            if p == '/api/push/unsubscribe':
+                with store.lock:
+                    store.db.execute('DELETE FROM push_subs WHERE endpoint = ?', (str(body.get('endpoint') or ''),))
+                    store.db.commit()
+                return self.send_json(200, {'ok': True})
+            if p == '/api/notify/prefs':
+                w = self.who()
+                if w.role == 'anon':
+                    return self.send_json(401, {'error': 'Потрібен вхід'})
+                quiet = body.get('quiet') if isinstance(body.get('quiet'), dict) else {}
+                prefs = {'on': body.get('on') is not False,
+                         'quiet': {pid: days for pid, days in quiet.items() if w.role != 'place' or pid in w.places}}
+                data = json.dumps(prefs)
+                if len(data) > 100_000:
+                    return self.send_json(400, {'error': 'too big'})
+                with store.lock:
+                    store.db.execute('INSERT INTO notify_prefs VALUES (?, ?) ON CONFLICT(subject) DO UPDATE SET data = excluded.data', (self.subject(w), data))
+                    store.db.commit()
+                return self.send_json(200, {'ok': True})
+            if p == '/api/notify/telegram':
+                w = self.who()
+                if w.role == 'anon' or not cfg.get('telegram_token'):
+                    return self.send_json(400, {'error': 'Telegram не налаштовано'})
+                code = secrets.token_urlsafe(12).replace('-', 'x').replace('_', 'y')
+                app['links'][code] = (self.subject(w), time.time())
+                return self.send_json(200, {'url': tg_link_url(cfg.get('telegram_bot'), 'link_' + code)})
+            if p == '/api/pay/create':
+                return self.pay_create(body)
+            if p == '/api/pay/liqpay/callback':
+                return self.pay_callback(body)
+            return self.send_json(404, {'error': 'not found'})
+
+        # --- PUT ---
         def do_PUT(self):
             url = urlparse(self.path)
             m = re.match(r'^/api/state/(.+)$', url.path)
             key = unquote(m.group(1)) if m else ''
             if not KEY_RE.match(key):
                 return self.send_json(400, {'error': 'bad key'})
-            size = int(self.headers.get('Content-Length') or 0)
-            if size > MAX_BODY:
-                return self.send_json(413, {'error': 'too large'})
             try:
-                body = json.loads(self.rfile.read(size) or b'{}')
+                body = self.body_json()
             except ValueError:
-                return self.send_json(400, {'error': 'bad json'})
-            ver, merged = store.put(key, body.get('value'), body.get('base'), 'base' in body)
-            self.send_json(200, {'ver': ver, 'value': merged})
+                return self.send_json(400, {'error': 'bad body'})
+            w = self.who()
+            ver, value, ok = store.put(w, key, body.get('value'), body.get('base'), 'base' in body)
+            self.send_json(200 if ok else 403, {'ver': ver, 'value': value})
 
+        # --- оплата ---
+        def pay_create(self, body):
+            w = self.who()
+            lp = app['liqpay']
+            b = body.get('booking') or {}
+            if w.role != 'client' or not lp.on:
+                return self.send_json(400, {'error': 'Оплата недоступна'})
+            if b.get('clientId') != w.cid or b.get('state') != 'unpaid' or not b.get('id'):
+                return self.send_json(400, {'error': 'Невірний запис'})
+            # Запис з'являється на сервері зі статусом «очікує оплати» — час тримаємо 15 хв.
+            view = [x for x in acl.read(w, 'bookings', store.get('bookings'), store.get) or [] if x.get('id') != b['id']]
+            store.put(w, 'bookings', view + [b], None, False)
+            base = app['public_url'] or f"https://{self.headers.get('Host')}"
+            amount = max(0, float(b.get('paid') or 0))
+            form = lp.checkout(b['id'], amount, f"CARCAR: {', '.join(b.get('services') or [])}", f"{base}/#/bookings/{b['id']}", f"{base}/api/pay/liqpay/callback")
+            return self.send_json(200, form)
+
+        def pay_callback(self, body):
+            info = app['liqpay'].parse_callback(body.get('data'), body.get('signature'))
+            if not info:
+                return self.send_json(400, {'error': 'bad signature'})
+            bid, status = info.get('order_id'), info.get('status')
+            auto = store.get('biz.autoConfirm') or {}
+
+            def apply(lst):
+                for b in lst or []:
+                    if b.get('id') != bid:
+                        continue
+                    if status in ('success', 'sandbox') and b.get('state') == 'unpaid':
+                        now = int(time.time() * 1000)
+                        # Автопідтвердження мийки чи запис за її ж пропозицією в чаті — одразу підтверджено.
+                        ok = bool(auto.get(b.get('placeId')) or b.get('fromReq'))
+                        b.update({'state': 'paid' if ok else 'pending', 'needsConfirm': not ok,
+                                  'createdAt': now, 'payment': {'provider': 'liqpay', 'id': info.get('payment_id'), 'amount': info.get('amount'), 'at': now}})
+                    elif status in ('failure', 'error', 'reversed') and b.get('state') == 'unpaid':
+                        b.update({'state': 'cancelled', 'cancelBy': 'system', 'closedAt': int(time.time() * 1000), 'payFailed': info.get('err_description') or status})
+                return lst
+            store.update('bookings', apply)
+            return self.send_json(200, {'ok': True})
+
+        # --- статика (для перевірки без nginx) ---
         def serve_static(self, path):
             rel = os.path.normpath(unquote(path).lstrip('/')) or 'index.html'
             if rel == '.':
@@ -206,19 +602,101 @@ def make_handler(store, static_dir):
     return Handler
 
 
+def ice_servers(cfg, subject):
+    """STUN завжди; TURN (coturn з use-auth-secret) — тимчасові облікові дані на 12 годин."""
+    out = [{'urls': ['stun:stun.l.google.com:19302']}]
+    turn = cfg.get('turn') or {}
+    if turn.get('secret') and turn.get('host'):
+        user = f"{int(time.time()) + 12 * 3600}:{subject}"
+        cred = base64.b64encode(hmac.new(turn['secret'].encode(), user.encode(), hashlib.sha1).digest()).decode()
+        host = turn['host']
+        out.append({'urls': [f'turn:{host}:3478?transport=udp', f'turn:{host}:3478?transport=tcp'], 'username': user, 'credential': cred})
+    return out
+
+
+def refunds_loop(app):
+    """Повернення на картку через LiqPay: запис скасовано з поверненням — просимо банк повернути гроші."""
+    store, lp = app['store'], app['liqpay']
+    while True:
+        time.sleep(30)
+        if not lp.on:
+            continue
+        todo = [b for b in store.get('bookings') or [] if (b.get('payment') or {}).get('provider') == 'liqpay'
+                and b.get('refundTo') == 'card' and (b.get('refund') or 0) > 0 and not b.get('refundDone') and b.get('state') in ('cancelled', 'refunded')]
+        for b in todo:
+            res = lp.refund(b['id'], b['refund'])
+            ok = res.get('status') in ('reversed', 'success', 'sandbox')
+
+            def mark(lst, bid=b['id'], ok=ok, res=res):
+                for x in lst or []:
+                    if x.get('id') == bid:
+                        if ok:
+                            x['refundDone'] = int(time.time() * 1000)
+                        else:
+                            x['refundError'] = res.get('err_description') or res.get('status')
+                return lst
+            store.update('bookings', mark)
+
+
+def unpaid_loop(app):
+    """Запис, який так і не оплатили за 15 хв, звільняє час."""
+    store = app['store']
+    while True:
+        time.sleep(60)
+        limit = (time.time() - 15 * 60) * 1000
+
+        def expire(lst):
+            for b in lst or []:
+                if b.get('state') == 'unpaid' and (b.get('createdAt') or 0) < limit:
+                    b.update({'state': 'cancelled', 'cancelBy': 'system', 'closedAt': int(time.time() * 1000), 'payFailed': 'Час на оплату минув'})
+            return lst
+        store.update('bookings', expire)
+
+
 def main():
-    ap = argparse.ArgumentParser(description='Спільні дані CARCAR')
+    ap = argparse.ArgumentParser(description='Сервер CARCAR')
     ap.add_argument('--port', type=int, default=8090)
     ap.add_argument('--host', default='127.0.0.1')
     ap.add_argument('--db', default='/var/lib/carcar/data.db')
+    ap.add_argument('--config', default='')
     ap.add_argument('--static', default='', help='тека застосунку, щоб віддавати його без nginx (для перевірки)')
+    ap.add_argument('--public-url', default='', help='адреса сайту для повернення з оплати, напр. https://185.166.155.225.sslip.io')
+    ap.add_argument('--set-admin-password', default=None, help='записати пароль адмінки в конфігурацію й вийти')
     a = ap.parse_args()
+    if a.set_admin_password is not None:
+        cfg = json.load(open(a.config)) if a.config and os.path.exists(a.config) else {}
+        cfg['admin_password_hash'] = make_admin_hash(a.set_admin_password)
+        os.makedirs(os.path.dirname(os.path.abspath(a.config)), exist_ok=True)
+        with open(a.config, 'w') as f:
+            json.dump(cfg, f, ensure_ascii=False, indent=2)
+        os.chmod(a.config, 0o600)
+        print('Пароль адмінки збережено')
+        return
     mimetypes.add_type('application/javascript', '.js')
     mimetypes.add_type('application/manifest+json', '.webmanifest')
+    cfg = load_config(a.config)
     store = Store(a.db)
-    srv = ThreadingHTTPServer((a.host, a.port), make_handler(store, a.static and os.path.abspath(a.static)))
+    sessions = Sessions(store.db, store.lock)
+    webpush = WebPush(os.path.dirname(os.path.abspath(a.db)))
+    app = {'store': store, 'cfg': cfg, 'sessions': sessions, 'static': a.static and os.path.abspath(a.static),
+           'liqpay': LiqPay(cfg.get('liqpay')), 'webpush': webpush, 'links': {}, 'public_url': a.public_url or cfg.get('public_url', '')}
+
+    def on_link(code):
+        subject, at = app['links'].pop(code, (None, 0))
+        return subject if subject and time.time() - at < 3600 else None
+    bot = TelegramBot(cfg['telegram_token'], sessions, on_link) if cfg.get('telegram_token') else None
+    acl.REQUIRE_PAYMENT = app['liqpay'].on
+    notifier = Notifier(store, webpush, bot)
+    notifier.store_sessions = sessions
+    store.on_change = notifier.on_change
+    if bot:
+        bot.start()
+    threading.Thread(target=refunds_loop, args=(app,), daemon=True).start()
+    threading.Thread(target=unpaid_loop, args=(app,), daemon=True).start()
+    srv = ThreadingHTTPServer((a.host, a.port), make_handler(app))
     srv.daemon_threads = True
-    print(f'CARCAR sync: http://{a.host}:{a.port}  db={a.db}  ver={store.ver}', flush=True)
+    print(f"CARCAR sync: http://{a.host}:{a.port}  db={a.db}  ver={store.ver}  telegram={'так' if bot else 'ні'}  "
+          f"оплата={'LiqPay' if app['liqpay'].on else 'демо'}  push={'так' if webpush.ok else 'ні'}  адмінка={'так' if cfg.get('admin_password_hash') else 'не налаштовано'}", flush=True)
     srv.serve_forever()
 
 

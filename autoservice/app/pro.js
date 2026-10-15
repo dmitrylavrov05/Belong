@@ -9,7 +9,7 @@ import {
   ACTIVE, BLOCKING, isCarcar, price, complete, isFrozen, balanceFor, settleAll, ratingFor, partnerOf, PARTNER_STATUS,
   confirmBy, offerBy, responseStats, pauseOf, ratePct, msText, accountPlaces, addAccountPlace,
   ticketsAll, openTicket, ticketReply, setTicket, TICKET_TOPICS, TICKET_STATUS, PLACE_TOPICS, ticketPhotos,
-  payoutReady, maskIban, hidePhones, themePicker, setTheme, fitChatScreen, keepChatOnKeyboard, commissionFor, savePartner, staffOf, checkBizLogin, numberBookings, bookingNo, POWER, powerOf, setPower,
+  payoutReady, maskIban, hidePhones, themePicker, setTheme, samePhone, hasServer, api, authToken, setAuthToken, serverConfig, notifySync, pushForget, telegramNotify, fitChatScreen, keepChatOnKeyboard, commissionFor, savePartner, staffOf, checkBizLogin, numberBookings, bookingNo, POWER, powerOf, setPower,
 } from './core.js';
 import {
   openStarts, chatPost, chatTimeline, readMessages, msgPreview, touchPresence, BIZ_QUICK, sendMessages, checkWaitlist,
@@ -43,7 +43,8 @@ function save() {
 load();
 
 // Вхід — той самий акаунт, що й у повній панелі: логін і пароль видає CARCAR після схвалення заявки.
-const session = () => store.get('biz.session', null);
+// Кабінет відкритий: є сесія, а з сервером CARCAR — ще й ключ входу, виданий сервером.
+const session = () => { const s = store.get('biz.session', null); return s && (!hasServer() || authToken()) ? s : null; };
 const ui = { place: session()?.placeId ?? store.get('partner', null), filter: 'all', lastView: '' };
 if (!placeById(ui.place)) ui.place = PLACES[0].id;
 
@@ -52,7 +53,8 @@ const todayIso = () => isoDate(new Date());
 const shiftDay = (iso, n) => { const d = parseDate(iso); d.setDate(d.getDate() + n); return isoDate(d); };
 const minuteNow = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
 const place = () => placeById(ui.place);
-const own = () => bookings.filter((b) => b.placeId === ui.place);
+// Запис, який клієнт ще оплачує, мийці не показуємо: він зʼявиться після оплати (а час уже зайнятий).
+const own = () => bookings.filter((b) => b.placeId === ui.place && b.state !== 'unpaid');
 const isPast = (b) => bookingStart(b).getTime() + b.minutes * 60000 <= Date.now();
 const who = (b) => b.clientName || 'Клієнт CARCAR';
 const telHref = (phone) => `tel:${String(phone).replace(/[^+\d]/g, '')}`;
@@ -86,6 +88,7 @@ const STATE = {
   offer: ['Чекає відповіді клієнта', 'carcar'],
   paid: ['Оплачено', 'carcar'], booked: ['Записано', 'cash'], done: ['Чекає клієнта', 'warn'], dispute: ['Спір', 'warn'],
   completed: ['Виконано', 'ok'], cancelled: ['Скасовано', 'muted'], noshow: ['Неявка', 'muted'], refunded: ['Повернено клієнту', 'muted'],
+  unpaid: ['Клієнт оплачує', 'muted'],
 };
 function stateOf(b) {
   const open = b.state === 'paid' || b.state === 'booked';
@@ -225,6 +228,23 @@ const offHours = (placeId) => {
 };
 // Чи можна зараз турбувати мийку сповіщенням (системним і вібрацією).
 const mayNotify = (placeId) => { const s = notifySet(); return s.on && !(s.quiet && offHours(placeId)); };
+// Те саме — серверу, щоб push і Telegram мовчали, коли треба: робочі години мийок на 30 днів уперед.
+function bizNotifySync() {
+  const s = session();
+  if (!s || !hasServer()) return;
+  const ns = notifySet();
+  const quiet = {};
+  if (ns.quiet) {
+    for (const pid of accountPlaces(s)) {
+      const p = placeById(pid);
+      if (!p) continue;
+      quiet[pid] = Object.fromEntries(Array.from({ length: 30 }, (_, i) => { const iso = shiftDay(todayIso(), i); return [iso, hoursFor(p, iso) ?? null]; }));
+    }
+  }
+  notifySync({ on: ns.on, quiet });
+}
+let srv = null;
+serverConfig().then((c) => { srv = c; if (c) { bizNotifySync(); if (c.telegramBot && $('.settings')) rerender(); } });
 const canNotify = () => notifySet().on && 'Notification' in window && Notification.permission === 'default';
 const notifyAsk = () => (canNotify() ? `<button class="btn soft notify-ask" type="button" data-action="notify-on">${icon('bell', 18)}Сповіщення про нові записи на телефон</button>` : '');
 
@@ -883,10 +903,10 @@ function nbRender() {
 
 // Клієнт, який уже звертався до мийки через CARCAR (запис чи питання в застосунку).
 function carcarLead(phone) {
-  const key = phoneKey(phone);
-  if (!key) return false;
-  return own().some((b) => isCarcar(b) && b.clientPhone && phoneKey(b.clientPhone) === key)
-    || ownRequests().some((r) => r.clientPhone && phoneKey(r.clientPhone) === key);
+  if (!phoneKey(phone)) return false;
+  // Номери клієнтів CARCAR сервер мийці не віддає — порівнюємо з відбитком номера.
+  return own().some((b) => isCarcar(b) && samePhone(b.clientPhone, phone))
+    || ownRequests().some((r) => samePhone(r.clientPhone, phone));
 }
 
 // Пропозиція запису в чаті: клієнт підтверджує й оплачує в застосунку — це звичайний запис CARCAR.
@@ -1223,7 +1243,9 @@ function viewMore() {
         <small>На телефон, навіть коли застосунок згорнуто${denied && ns.on ? '. Зараз вони заборонені в налаштуваннях браузера — дозвольте їх там' : ''}</small></span></label>
       <label class="check-row"><input class="check" type="checkbox" id="set-quiet" ${ns.quiet ? 'checked' : ''} ${ns.on ? '' : 'disabled'}><span><b>Вимикати поза робочим часом</b>
         <small>${h ? `Сьогодні сповіщення лише з ${hhmm(h[0])} до ${hhmm(h[1])}` : 'Сьогодні вихідний — сповіщень не буде'}. Нові записи чекатимуть у застосунку, а час на відповідь почнеться з відкриття мийки</small></span></label>
+      ${srv?.telegramBot ? `<button class="btn soft" type="button" data-action="tg-notify">${icon('send', 18)}Нові записи — ще й у Telegram</button>` : ''}
       <div><span class="lbl">Тема</span>${themePicker(store.get('biz.theme', 'system'))}</div>
+      <p class="small muted" style="margin:0"><a href="legal/partner-offer.html" target="_blank">Договір для мийок</a> · <a href="legal/privacy.html" target="_blank">Конфіденційність</a></p>
     </section>
     <div class="stack" style="gap:8px;margin-top:12px">${links.map(([href, ic, title, sub, n]) => `<a class="pro-link" href="${href}">${icon(ic, 22)}<span><b>${title}</b><small>${sub}</small></span>${n ? `<span class="count-dot" aria-hidden="true">${n}</span>` : ''}${icon('chevR', 18)}</a>`).join('')}</div>
     ${s?.demo ? `<button class="btn block" type="button" data-action="demo-seed" style="margin-top:16px">Заповнити прикладом: історія, записи й повідомлення</button>` : ''}
@@ -1752,9 +1774,27 @@ document.addEventListener('click', async (e) => {
   };
 
   if (action === 'sheet-close') { closeSheet(); return; }
-  if (action === 'demo-login') { store.set('biz.session', { demo: true, at: Date.now() }); location.hash = '#/'; route(); runPendingAct(); return; }
+  if (action === 'demo-login') {
+    if (hasServer()) {
+      const r = await api('auth/biz', { method: 'POST', body: { demo: true } });
+      if (!r.ok) { toast(r.data.error || 'Демо-кабінет недоступний'); return; }
+      setAuthToken(r.data.token);
+    }
+    store.set('biz.session', { demo: true, at: Date.now() });
+    location.hash = '#/';
+    route();
+    runPendingAct();
+    bizNotifySync();
+    return;
+  }
+  if (action === 'tg-notify') {
+    const ok = await telegramNotify();
+    toast(ok ? 'У Telegram натисніть «Старт» — і нові записи приходитимуть туди' : 'Telegram зараз недоступний');
+    return;
+  }
   if (action === 'logout') {
     if (!confirm('Вийти з CarCar Business?')) return;
+    if (hasServer()) { await pushForget(); api('auth/logout', { method: 'POST', body: {} }); setAuthToken(null); }
     store.set('biz.session', null);
     location.hash = '#/';
     route();
@@ -1854,6 +1894,7 @@ document.addEventListener('click', async (e) => {
   if (action === 'notify-on') {
     const res = await Notification.requestPermission();
     rerender();
+    bizNotifySync();
     toast(res === 'granted' ? 'Сповіщення ввімкнено' : 'Сповіщення заборонені в налаштуваннях браузера');
     return;
   }
@@ -2051,6 +2092,7 @@ document.addEventListener('change', async (e) => {
     store.set('biz.notify', { ...notifySet(), [on ? 'on' : 'quiet']: e.target.checked });
     if (on && e.target.checked && 'Notification' in window && Notification.permission === 'default') await Notification.requestPermission();
     rerender();
+    bizNotifySync();
     toast(on ? (e.target.checked ? 'Сповіщення ввімкнено' : 'Сповіщення вимкнено — нові записи побачите в застосунку')
       : e.target.checked ? 'Поза робочим часом сповіщення не приходитимуть' : 'Сповіщення приходитимуть цілодобово');
     return;
@@ -2088,14 +2130,24 @@ document.addEventListener('submit', async (e) => {
   e.preventDefault();
   const d = new FormData(f);
   if (f.id === 'pro-login') {
-    const acc = await checkBizLogin(String(d.get('login')), String(d.get('password')));
-    if (!acc || !placeById(acc.placeId)) { $('#view').innerHTML = viewLogin('Невірний логін або пароль.'); $('#pro-login [name="login"]').value = String(d.get('login')); return; }
+    let acc;
+    if (hasServer()) {
+      // Пароль перевіряє сервер — у браузері хешів паролів немає.
+      const r = await api('auth/biz', { method: 'POST', body: { login: String(d.get('login')), password: String(d.get('password')) } });
+      if (!r.ok) { $('#view').innerHTML = viewLogin(r.data.error || 'Невірний логін або пароль.'); $('#pro-login [name="login"]').value = String(d.get('login')); return; }
+      acc = { login: r.data.login, placeId: r.data.placeId };
+      setAuthToken(r.data.token);
+    } else {
+      acc = await checkBizLogin(String(d.get('login')), String(d.get('password')));
+    }
+    if (!acc || (!hasServer() && !placeById(acc.placeId))) { $('#view').innerHTML = viewLogin('Невірний логін або пароль.'); $('#pro-login [name="login"]').value = String(d.get('login')); return; }
     store.set('biz.session', { login: acc.login, placeId: acc.placeId, at: Date.now() });
     ui.place = acc.placeId;
     store.set('partner', ui.place);
     location.hash = '#/';
     route();
     runPendingAct();
+    bizNotifySync();
     return;
   }
   if (f.id === 'pro-chat') {

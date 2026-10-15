@@ -1,9 +1,10 @@
 // Дзвінки всередині CARCAR: клієнт і мийка говорять через застосунок, не бачачи номерів одне одного,
 // тож мийка не може записати клієнта CARCAR «собі» в обхід платформи.
 // Виклик і дані зʼєднання — у спільному сховищі: з сервером CARCAR (deploy/server) — між будь-якими пристроями,
-// без нього — між вкладками одного пристрою. Голос — WebRTC (STUN допомагає пройти крізь роутери; за дуже
-// суворим NAT потрібен ще TURN-сервер). Push про вхідний дзвінок у закритий застосунок — у робочій версії.
-import { store, icon, esc } from './core.js';
+// без нього — між вкладками одного пристрою. Голос — WebRTC: STUN допомагає пройти крізь роутери, а за суворим
+// NAT (мобільний інтернет) голос іде через TURN-сервер CARCAR (coturn, тимчасові паролі видає /api/ice).
+// Про вхідний дзвінок у закритий застосунок сервер надсилає push.
+import { store, icon, esc, hasServer, api } from './core.js';
 import { chatPost } from './ops.js';
 
 const RING_MS = 30000;
@@ -107,7 +108,12 @@ async function callPrepare(c, remoteOffer) {
     callStatus('Мікрофон недоступний — дозвольте його в налаштуваннях браузера');
     return null;
   }
-  callPeer = new RTCPeerConnection({ iceServers: ICE });
+  let iceServers = ICE;
+  if (hasServer()) {
+    const r = await api('ice');
+    if (r.ok && r.data.iceServers?.length) iceServers = r.data.iceServers;
+  }
+  callPeer = new RTCPeerConnection({ iceServers });
   callStream.getTracks().forEach((t) => callPeer.addTrack(t, callStream));
   callPeer.ontrack = (ev) => { const a = document.getElementById('call-audio'); if (a) a.srcObject = ev.streams[0]; };
   if (remoteOffer) {

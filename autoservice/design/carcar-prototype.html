@@ -1615,18 +1615,82 @@ const store = {
 };
 
 // ---------- спільні дані між пристроями ----------
-// Якщо поруч із застосунком працює сервер CARCAR (/api, див. deploy/server), усі пристрої бачать ті самі записи,
+// Якщо поруч із застосунком працює сервер CARCAR (deploy/server), усі пристрої бачать ті самі записи,
 // мийки, відгуки й повідомлення: зміни відправляються на сервер, а чужі приходять за секунду-дві й
-// перемальовують екран (так само, як зміни з іншої вкладки). Без сервера (файл з диска, тести) — лише цей пристрій.
-// Особисте лишається на пристрої: вхід, профіль, авто, тема, сповіщення, вибрана мийка.
+// перемальовують екран (так само, як зміни з іншої вкладки). Сервер віддає кожному лише дозволене:
+// клієнту — свої записи, мийці — записи своїх мийок, адмінці — усе (див. deploy/server/acl.py).
+// Без сервера (файл з диска, тести) — лише цей пристрій. Особисте лишається на пристрої.
 const LOCAL_KEYS = new Set(['auth', 'profile', 'cars', 'carId', 'theme', 'biz.theme', 'notify', 'biz.notify', 'biz.session', 'partner',
-  'seenStates', 'cls', 'city', 'favs', 'view', 'mapLayer', 'campaign', 'referral', 'subscriptions']);
+  'seenStates', 'cls', 'city', 'favs', 'view', 'mapLayer', 'campaign', 'referral', 'subscriptions', 'auth.token', 'biz.token', 'admin.token', 'pushSub']);
 const shared = (key) => !LOCAL_KEYS.has(key);
 // Журнал подій великий і пишеться часто — відправляємо рідше.
 const PUSH_DELAY = { analytics: 5000, presence: 2000 };
-const sync = { on: false, ver: 0, base: new Map(), timers: new Map(), busy: new Set() };
+const sync = { on: false, ver: 0, base: new Map(), timers: new Map(), busy: new Set(), poll: null, gen: 0 };
 const syncNotify = (key) => window.dispatchEvent(new StorageEvent('storage', { key: `carcar.${key}` }));
 const syncOn = () => sync.on;
+// Сервер CARCAR додає в сторінку <meta name="carcar-sync"> — без неї (Netlify, тести, файл з диска) нічого не питаємо.
+const hasServer = () => typeof document !== 'undefined' && !!document.querySelector('meta[name="carcar-sync"]');
+// Вхід у кожному застосунку свій: клієнт, кабінет мийки, адмінка.
+const TOKEN_KEY = typeof location === 'undefined' ? 'auth.token' : /pro\.html$/.test(location.pathname) ? 'biz.token' : /admin\.html$/.test(location.pathname) ? 'admin.token' : 'auth.token';
+const authToken = () => store.get(TOKEN_KEY, null);
+function setAuthToken(token) {
+  store.set(TOKEN_KEY, token);
+  syncRestart();
+}
+
+// Запит до сервера CARCAR з ключем входу. Повертає { ok, status, data }.
+async function api(path, { method = 'GET', body } = {}) {
+  const token = authToken();
+  try {
+    const res = await fetch(`api/${path}`, {
+      method, cache: 'no-store',
+      headers: { ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, data };
+  } catch {
+    return { ok: false, status: 0, data: { error: 'Немає звʼязку з сервером' } };
+  }
+}
+
+let configPromise = null;
+// Що ввімкнено на сервері: вхід через Telegram, демо-вхід, оплата, push. Без сервера — null.
+const serverConfig = () => (hasServer() ? (configPromise ??= api('config').then((r) => (r.ok ? r.data : null))) : Promise.resolve(null));
+
+// ---------- сповіщення з сервера: Web Push і Telegram ----------
+// Сервер надсилає push, навіть коли застосунок закрито. Налаштування (увімкнено, тиша поза робочим часом мийки)
+// зберігаються на сервері — інакше він не знатиме, коли мовчати. quiet: { placeId: { 'YYYY-MM-DD': [від, до] | null } }.
+const b64uBytes = (s) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (s.length % 4)) % 4)), (c) => c.charCodeAt(0));
+async function notifySync(prefs) {
+  if (!hasServer() || !authToken()) return;
+  api('notify/prefs', { method: 'POST', body: prefs });
+  if (!prefs.on || !('PushManager' in window) || !('Notification' in window) || Notification.permission !== 'granted') return;
+  const cfg = await serverConfig();
+  if (!cfg?.vapid) return;
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    if (!reg) return;
+    const sub = (await reg.pushManager.getSubscription()) ?? await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uBytes(cfg.vapid) });
+    await api('push/subscribe', { method: 'POST', body: { subscription: sub.toJSON() } });
+  } catch { /* браузер не підтримує push чи немає дозволу — лишаються сповіщення у відкритому застосунку */ }
+}
+// Перед виходом: цей телефон більше не отримує сповіщень для цього акаунта.
+async function pushForget() {
+  try {
+    const sub = await (await navigator.serviceWorker?.getRegistration())?.pushManager.getSubscription();
+    if (sub) await api('push/unsubscribe', { method: 'POST', body: { endpoint: sub.endpoint } });
+  } catch { /* немає підписки */ }
+}
+// Сповіщення в Telegram: бот запамʼятовує чат і пише туди про записи й повідомлення.
+function telegramNotify() {
+  const win = window.open('', '_blank');
+  return api('notify/telegram', { method: 'POST', body: {} }).then((r) => {
+    if (!r.ok) { win?.close(); return false; }
+    if (win) win.location.href = r.data.url; else location.href = r.data.url;
+    return true;
+  });
+}
 
 function syncPush(key) {
   clearTimeout(sync.timers.get(key));
@@ -1636,18 +1700,21 @@ function syncPush(key) {
 async function syncSend(key) {
   if (sync.busy.has(key)) { syncPush(key); return; }
   sync.busy.add(key);
+  const gen = sync.gen;
   const raw = localStorage.getItem(`carcar.${key}`);
   const base = sync.base.get(key);
   const body = { value: raw === null ? null : JSON.parse(raw), ...(base !== undefined ? { base: JSON.parse(base) } : {}) };
   try {
-    const res = await fetch(`api/state/${encodeURIComponent(key)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    if (!res.ok) throw new Error(String(res.status));
-    const { value } = await res.json();
-    const merged = JSON.stringify(value);
+    const r = await api(`state/${encodeURIComponent(key)}`, { method: 'PUT', body });
+    if (gen !== sync.gen) return; // тим часом вийшли чи увійшли — це вже інший користувач
+    if (!r.ok && r.status !== 403) throw new Error(String(r.status));
+    // 403 — змінювати це не можна: показуємо те, що є на сервері.
+    const merged = JSON.stringify(r.data.value ?? null);
     sync.base.set(key, merged);
     // Поки відправляли, хтось інший змінив той самий ключ — показуємо злите значення (якщо ми не змінили його знову).
     if (!sync.timers.has(key) && merged !== localStorage.getItem(`carcar.${key}`)) {
-      localStorage.setItem(`carcar.${key}`, merged);
+      if (r.data.value === null || r.data.value === undefined) localStorage.removeItem(`carcar.${key}`);
+      else localStorage.setItem(`carcar.${key}`, merged);
       syncNotify(key);
     }
   } catch {
@@ -1670,42 +1737,49 @@ function syncApply(data) {
   }
 }
 
-async function syncPoll() {
-  for (;;) {
+async function syncPoll(gen) {
+  while (gen === sync.gen) {
+    const ctrl = new AbortController();
+    sync.poll = ctrl;
     try {
-      const res = await fetch(`api/state?since=${sync.ver}&wait=1`, { cache: 'no-store' });
+      const token = authToken();
+      const res = await fetch(`api/state?since=${sync.ver}&wait=1`, { cache: 'no-store', signal: ctrl.signal, headers: token ? { Authorization: `Bearer ${token}` } : {} });
       if (!res.ok) throw new Error(String(res.status));
       const j = await res.json();
+      if (gen !== sync.gen) return;
       syncApply(j.data);
       sync.ver = j.ver;
     } catch {
+      if (gen !== sync.gen) return;
       await new Promise((ok) => setTimeout(ok, 3000));
     }
   }
 }
 
-async function startSync() {
-  // Сервер CARCAR додає в сторінку <meta name="carcar-sync"> — без неї (Netlify, тести, файл з диска) нічого не питаємо.
-  if (typeof document === 'undefined' || !document.querySelector('meta[name="carcar-sync"]')) return;
-  let j;
-  try {
-    const res = await fetch('api/state?since=0', { cache: 'no-store' });
-    if (!res.ok || !(res.headers.get('content-type') ?? '').includes('json')) return;
-    j = await res.json();
-  } catch { return; }
-  // Сервер — джерело правди: спільних ключів, яких на ньому немає, на пристрої теж не лишаємо.
+// Повне завантаження з сервера: при відкритті, після входу й виходу (бачимо вже інше).
+async function syncStart() {
+  const gen = ++sync.gen;
+  sync.poll?.abort();
+  const r = await api('state?since=0');
+  if (!r.ok || gen !== sync.gen) return;
+  // Сервер — джерело правди: спільних ключів, яких цьому користувачу не видно, на пристрої теж не лишаємо.
   for (let i = localStorage.length - 1; i >= 0; i--) {
     const k = localStorage.key(i);
     if (!k?.startsWith('carcar.')) continue;
     const key = k.slice(7);
-    if (shared(key) && !(key in j.data)) { localStorage.removeItem(k); syncNotify(key); }
+    if (shared(key) && !(key in r.data.data) && !sync.timers.has(key)) { localStorage.removeItem(k); sync.base.delete(key); syncNotify(key); }
   }
-  syncApply(j.data);
-  sync.ver = j.ver;
+  syncApply(r.data.data);
+  sync.ver = r.data.ver;
   sync.on = true;
-  syncPoll();
+  syncPoll(gen);
 }
-startSync();
+function syncRestart() {
+  if (!hasServer()) return;
+  sync.base.clear();
+  syncStart();
+}
+if (hasServer()) syncStart();
 
 // ---------- іконки (лінійні, з дизайну CARCAR) ----------
 
@@ -1876,6 +1950,18 @@ const hoursText = (place, iso = isoDate(new Date())) => rangeText(hoursFor(place
 const clientIdOf = (phone) => phoneKey(phone) ?? 'device';
 // Гаманець (баланс CARCAR і бонуси) — свій у кожного клієнта.
 const walletKey = (id = 'device') => (id === 'device' ? 'wallet' : `wallet.${id}`);
+
+// Відбиток номера (FNV-1a, як phone_hash на сервері): сервер віддає мийці його замість номера клієнта CARCAR,
+// а мийка може впізнати постійного клієнта, коли вводить номер сама.
+function phoneHash(phone) {
+  const key = phoneKey(phone);
+  if (!key) return '';
+  let h = 0x811c9dc5;
+  for (const b of new TextEncoder().encode(`carcar:${key}`)) h = Math.imul(h ^ b, 0x01000193) >>> 0;
+  return `h:${h.toString(16).padStart(8, '0')}`;
+}
+// Той самий клієнт: збігається номер або (якщо номер прихований сервером) його відбиток.
+const samePhone = (stored, typed) => !!stored && !!typed && (String(stored).startsWith('h:') ? stored === phoneHash(typed) : phoneKey(stored) === phoneKey(typed));
 
 function phoneKey(phone) {
   let d = String(phone ?? '').replace(/\D/g, '');
@@ -2145,7 +2231,8 @@ function reliability(list, now = Date.now()) {
   return { cancels: cancels.length, noshows, moves, level: noshows || cancels.length >= 3 || moves >= 4 ? 'warn' : 'ok' };
 }
 // Стани, у яких запис займає бокс: оплачені через CARCAR і внесені в журнал точки.
-const BLOCKING = [...ACTIVE, 'booked'];
+// unpaid — запис чекає оплати карткою (до 15 хв): час уже тримаємо.
+const BLOCKING = [...ACTIVE, 'booked', 'unpaid'];
 
 // Запис через CARCAR (оплата в застосунку) чи внесений точкою вручну (оплата на місці).
 const isCarcar = (b) => (b.channel ?? 'carcar') === 'carcar';
@@ -3306,8 +3393,9 @@ function lookupPlate(raw) {
 // Дзвінки всередині CARCAR: клієнт і мийка говорять через застосунок, не бачачи номерів одне одного,
 // тож мийка не може записати клієнта CARCAR «собі» в обхід платформи.
 // Виклик і дані зʼєднання — у спільному сховищі: з сервером CARCAR (deploy/server) — між будь-якими пристроями,
-// без нього — між вкладками одного пристрою. Голос — WebRTC (STUN допомагає пройти крізь роутери; за дуже
-// суворим NAT потрібен ще TURN-сервер). Push про вхідний дзвінок у закритий застосунок — у робочій версії.
+// без нього — між вкладками одного пристрою. Голос — WebRTC: STUN допомагає пройти крізь роутери, а за суворим
+// NAT (мобільний інтернет) голос іде через TURN-сервер CARCAR (coturn, тимчасові паролі видає /api/ice).
+// Про вхідний дзвінок у закритий застосунок сервер надсилає push.
 
 const RING_MS = 30000;
 const CALL_KEY = 'calls'; // { id: дзвінок } — у кожної пари клієнт—мийка свій
@@ -3410,7 +3498,12 @@ async function callPrepare(c, remoteOffer) {
     callStatus('Мікрофон недоступний — дозвольте його в налаштуваннях браузера');
     return null;
   }
-  callPeer = new RTCPeerConnection({ iceServers: ICE });
+  let iceServers = ICE;
+  if (hasServer()) {
+    const r = await api('ice');
+    if (r.ok && r.data.iceServers?.length) iceServers = r.data.iceServers;
+  }
+  callPeer = new RTCPeerConnection({ iceServers });
   callStream.getTracks().forEach((t) => callPeer.addTrack(t, callStream));
   callPeer.ontrack = (ev) => { const a = document.getElementById('call-audio'); if (a) a.srcObject = ev.streams[0]; };
   if (remoteOffer) {
@@ -4874,6 +4967,8 @@ function confirmBooking() {
     && slotsFor(p, draft.date, draft.invite?.minutes ?? chosen.reduce((a, s) => a + s.min, 0), { mobile: mobileMode() }).some((sl) => sl.time === draft.time && !sl.busy);
   if (!fresh) { Object.assign(draft, { time: null, paying: false, step: 'time' }); renderBook(); toast('Цей час щойно зайняли — оберіть інший'); return; }
   const id = uid();
+  // Справжня оплата карткою (LiqPay на сервері): запис чекає оплати, час тримаємо 15 хв.
+  const card = srv?.payments === 'liqpay' && q.rest - bonus > 0;
   const passUse = q.use ? { ...redeemPass(p.id, q.use.soldId, q.covered, id), kind: q.use.kind } : null;
   const b = {
     id,
@@ -4905,7 +5000,7 @@ function confirmBooking() {
     firstOrder: !mine().some(realOrder),
     installments: q.installments ? { ...q.installments, card: q.card } : null,
     // Мийка підтверджує запис сама, якщо не ввімкнула автопідтвердження. Запис за пропозицією мийки — вже погоджений.
-    state: autoConfirmOf(p.id) || draft.invite ? 'paid' : 'pending',
+    state: card ? 'unpaid' : autoConfirmOf(p.id) || draft.invite ? 'paid' : 'pending',
     needsConfirm: !autoConfirmOf(p.id) && !draft.invite,
     ...(draft.invite ? { fromReq: draft.invite.reqId, confirmedAt: Date.now() } : {}),
     createdAt: Date.now(),
@@ -4927,6 +5022,7 @@ function confirmBooking() {
   location.hash = `#/bookings/${b.id}`;
   track('paid', { placeId: p.id, amount: total, deal: !!q.deal, pass: q.use?.kind ?? null, bonus: !!bonus, balance: !!fromBal, leadH: Math.round((bookingStart(b) - Date.now()) / HOUR),
     promo: q.promo?.code ?? null, mobile: !!b.mobile, parts: q.parts || 0 });
+  if (card) { payCard(b); return; }
   toast(b.state === 'pending' ? 'Оплачено. Чекаємо, коли мийка підтвердить запис'
     : q.installments ? `Оплачено першу частину, ви записані` : 'Оплачено, ви записані');
 }
@@ -4938,7 +5034,38 @@ function save() {
   return store.set('bookings', bookings) && store.set('payouts', payouts) && store.set('reviews', reviews);
 }
 
+// Оплата карткою через LiqPay: сервер підписує платіж, ми переходимо на сторінку банку.
+// Після оплати банк повертає на картку запису, а сервер (отримавши підтвердження банку) відкриває запис мийці.
+function payCard(b) {
+  toast('Переходимо до оплати…');
+  api('pay/create', { method: 'POST', body: { booking: b } }).then((r) => {
+    if (!r.ok) { toast(r.data.error ?? 'Оплата зараз недоступна. Спробуйте ще раз'); return; }
+    const f = document.createElement('form');
+    f.method = 'POST';
+    f.action = r.data.url;
+    f.acceptCharset = 'utf-8';
+    for (const k of ['data', 'signature']) {
+      const i = document.createElement('input');
+      Object.assign(i, { type: 'hidden', name: k, value: r.data[k] });
+      f.append(i);
+    }
+    document.body.append(f);
+    f.submit();
+  });
+}
+
 function settle() {
+  // Оплату не завершили (скасовано, банк відмовив, минуло 15 хв) — повертаємо списані бонуси й баланс.
+  let back = false;
+  for (const b of mine()) {
+    if (b.state !== 'cancelled' || !b.payFailed || b.walletBack) continue;
+    b.walletBack = true;
+    back = true;
+    const p = placeById(b.placeId);
+    if (b.bonus) addBonus(b.bonus, `Повернено: запис не оплачено (${p?.name ?? 'мийка'})`);
+    if (b.fromBalance) addMoney(b.fromBalance, `Повернено: запис не оплачено (${p?.name ?? 'мийка'})`);
+  }
+  if (back) save();
   const done = settleAll(bookings);
   // Мийка не відповіла на запис вчасно — скасовуємо й повертаємо гроші (і на баланс, якщо платили з нього).
   const expired = expirePending(bookings);
@@ -4972,6 +5099,7 @@ function steps(b) {
 
 // [клас кольору статусу, підпис]
 const STATE_LABEL = {
+  unpaid: ['warn', 'Очікує оплати'],
   pending: ['warn', 'Чекає підтвердження мийки'],
   offer: ['warn', 'Мийка пропонує інший час'],
   paid: ['go', 'Оплачено'],
@@ -4983,7 +5111,7 @@ const STATE_LABEL = {
 };
 
 // Іконки статусів, щоб завершені записи розрізнялися з першого погляду.
-const STATE_ICON = { pending: 'clock', offer: 'clock', completed: 'checkCircle', cancelled: 'x', refunded: 'x', noshow: 'clock', dispute: 'info' };
+const STATE_ICON = { unpaid: 'card', pending: 'clock', offer: 'clock', completed: 'checkCircle', cancelled: 'x', refunded: 'x', noshow: 'clock', dispute: 'info' };
 
 // Хто митиме машину — мийка обирає в CarCar Business.
 const washerOf = (b) => (b.masterId ? staffOf(b.placeId).find((x) => x.id === b.masterId)?.name ?? null : null);
@@ -5045,7 +5173,14 @@ function bookingCard(b, highlight) {
     </div>`;
   let body = lines;
   const started = bookingStart(b) <= new Date();
-  if (b.state === 'pending') {
+  if (b.state === 'unpaid') {
+    body += `<div class="wait-box" role="status"><span class="wait-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span><b>Оплата не завершена</b><small>Час тримаємо 15 хвилин від запису. Якщо ви вже оплатили — статус оновиться сам за хвилину.</small></span></div>
+      <div class="grid2">
+        <button class="btn primary" data-action="pay-card" data-id="${b.id}">${icon('card', 18)}Оплатити ${uah(b.paid)}</button>
+        <button class="btn text-danger" data-action="unpaid-cancel" data-id="${b.id}">Скасувати</button>
+      </div>`;
+  } else if (b.state === 'pending') {
     const due = confirmBy(b);
     const soon = due - Date.now() < 60 * 60000;
     body += `<div class="wait-box" role="status">
@@ -5129,7 +5264,7 @@ function bookingCard(b, highlight) {
     ${intakeBlock(b)}
     ${chatBlock(b)}
     <a class="help-link small" href="${b.ticketId ? `#/support/t/${b.ticketId}` : `#/support/new/${b.id}`}">${icon('info', 16)}${b.ticketId ? 'Звернення в підтримку за цим записом' : 'Проблема із записом? Напишіть у підтримку CARCAR'}</a>
-    ${!ACTIVE.includes(b.state) && p ? `<div class="grid2">
+    ${!ACTIVE.includes(b.state) && b.state !== 'unpaid' && p ? `<div class="grid2">
       <a class="btn" href="#/book/${p.id}" data-action="repeat" data-id="${b.id}">${icon('repeat', 18)}Повторити запис</a>
       ${p.cats.includes('wash') && !b.subId ? `<button class="btn" data-action="sub-open" data-id="${b.id}">${icon('calendar', 18)}Зробити регулярним</button>` : ''}
     </div>${ui.subFor === b.id ? subForm(b) : ''}` : ''}
@@ -5274,9 +5409,23 @@ function sendChat(b, text, photo = null) {
 
 // ---------- вхід за номером телефону ----------
 
-// Номер → код із SMS → готово. У прототипі SMS не надсилаються: код показуємо на екрані.
-// У робочій версії код надсилає сервер (SMS-шлюз), а сесію зберігає токен.
+// Номер → код із SMS → готово. SMS поки не надсилаються: код показуємо на екрані (демо-вхід).
+// На сервері CARCAR номер безкоштовно підтверджує Telegram-бот, а сесію тримає токен від сервера.
 const login = { step: 'phone', phone: '', code: '', sentAt: 0, error: '' };
+// Що ввімкнено на сервері (вхід через Telegram, оплата, push). Без сервера — null.
+let srv = null;
+serverConfig().then((c) => {
+  srv = c;
+  if (c?.telegramBot && (login.step === 'phone' || $('.settings'))) route();
+  // Нагадуємо серверу, куди слати сповіщення (підписка браузера могла оновитися).
+  if (c && isAuthed()) notifySync({ on: notifyOn() });
+});
+// Увійшов: є номер, а на сервері — ще й ключ від сервера (без нього сервер не віддасть записів).
+const isAuthed = () => !!(store.get('auth', null) ?? login.session) && (!hasServer() || !!authToken());
+const tgPending = {
+  get: () => { try { return JSON.parse(sessionStorage.getItem('carcar.tgNonce')); } catch { return null; } },
+  set: (v) => { try { if (v) sessionStorage.setItem('carcar.tgNonce', JSON.stringify(v)); else sessionStorage.removeItem('carcar.tgNonce'); } catch { /* приватний режим */ } },
+};
 const phoneDigits = (v) => v.replace(/\D/g, '').replace(/^(380|80|0)?/, '').slice(0, 9);
 const fmtPhone = (d) => `+380 ${d.slice(0, 2)} ${d.slice(2, 5)} ${d.slice(5, 7)} ${d.slice(7, 9)}`.trim();
 
@@ -5291,6 +5440,15 @@ function viewLogin() {
     return `<section class="auth" aria-label="Вхід">${hero}<div class="auth-card done">
       <span class="auth-check" aria-hidden="true">${icon('check', 40)}</span>
       <h1>Готово!</h1><p>Номер ${fmtPhone(login.phone)} підтверджено.</p></div></section>`;
+  }
+  if (login.step === 'tg') {
+    return `<section class="auth" aria-label="Вхід">${hero}<div class="auth-card">
+      <h1>Підтвердіть номер у Telegram</h1>
+      <p>Відкрили бота CARCAR. Натисніть у ньому <b>«Поділитися номером»</b> — і повертайтеся сюди, вхід станеться сам.</p>
+      ${login.error ? `<p class="auth-error" role="alert">${esc(login.error)}</p>` : '<p class="fine" role="status">Чекаємо підтвердження…</p>'}
+      <a class="btn primary block" href="${esc(login.tgUrl ?? '#')}" target="_blank" rel="noopener">Відкрити Telegram ще раз</a>
+      <button type="button" class="btn ghost block" data-action="login-back">Скасувати</button>
+    </div></section>`;
   }
   if (login.step === 'code') {
     const left = Math.max(0, 30 - Math.round((Date.now() - login.sentAt) / 1000));
@@ -5314,8 +5472,10 @@ function viewLogin() {
     <label class="auth-phone"><span class="sr-only">Номер телефону</span><span class="prefix" aria-hidden="true">+380</span>
       <input id="login-phone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="67 123 45 67" value="${esc(login.phone ? fmtPhone(login.phone).slice(5) : '')}" aria-label="Номер телефону"></label>
     ${login.error ? `<p class="auth-error" role="alert">${esc(login.error)}</p>` : ''}
-    <button class="btn primary block" type="submit">Отримати код</button>
-    <p class="fine">Номер бачить тільки мийка, до якої ви записалися.</p>
+    ${srv?.telegramBot ? `<button class="btn primary block" type="button" data-action="tg-login">${icon('send', 18)} Увійти через Telegram</button>
+      <p class="fine">Бот попросить поділитися номером — це безкоштовно і без SMS.</p>` : ''}
+    ${!srv || srv.demoLogin ? `<button class="btn ${srv?.telegramBot ? 'ghost' : 'primary'} block" type="submit">Отримати код</button>` : ''}
+    <p class="fine">Номер бачить тільки мийка, до якої ви записалися. <a href="legal/privacy.html" target="_blank">Конфіденційність</a> · <a href="legal/offer.html" target="_blank">Умови</a></p>
   </form></section>`;
 }
 
@@ -5346,6 +5506,16 @@ function loginSubmit(form) {
   }
   const typed = [...form.querySelectorAll('.code-cell')].map((i) => i.value).join('');
   if (typed !== login.code) { Object.assign(login, { error: 'Невірний код. Спробуйте ще раз.', typed: '' }); route(); return; }
+  if (!hasServer()) { loginDone(); return; }
+  // Демо-вхід на сервері: номер без перевірки (поки не налаштовано Telegram-бота чи SMS).
+  api('auth/demo', { method: 'POST', body: { phone: '+380' + login.phone } }).then((r) => {
+    if (!r.ok) { Object.assign(login, { step: 'phone', error: r.data.error ?? 'Не вдалося увійти. Спробуйте ще раз.' }); route(); return; }
+    setAuthToken(r.data.token);
+    loginDone();
+  });
+}
+
+function loginDone() {
   login.step = 'done';
   route();
   // Коротка анімація успіху — і в застосунок.
@@ -5354,11 +5524,57 @@ function loginSubmit(form) {
     login.session = { phone: fmtPhone(login.phone), at: Date.now() };
     store.set('auth', login.session);
     wallet = { bonus: 0, money: 0, history: [], ...store.get(walletKey(meId()), {}) };
-    profile = { ...profile, name: login.name, phone: fmtPhone(login.phone) };
+    profile = { ...profile, name: login.name || profile.name || '', phone: fmtPhone(login.phone) };
     store.set('profile', profile);
     Object.assign(login, { step: 'phone', error: '' });
     if (location.hash.startsWith('#/login')) location.hash = '#/'; else route();
+    notifySync({ on: notifyOn() });
   }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 200 : 1100);
+}
+
+// Вхід через Telegram: бот просить поділитися номером, сервер звіряє, що номер належить тому, хто натиснув.
+function tgLogin() {
+  const name = $('#login-name')?.value.trim().replace(/\s+/g, ' ');
+  if (name) login.name = name;
+  // Вікно відкриваємо одразу на натискання — інакше браузер заблокує його як спливаюче.
+  const win = window.open('', '_blank');
+  api('auth/tg/start', { method: 'POST', body: {} }).then((r) => {
+    if (!r.ok) { win?.close(); login.error = r.data.error ?? 'Telegram зараз недоступний.'; route(); return; }
+    if (win) win.location.href = r.data.url; else location.href = r.data.url;
+    tgPending.set({ nonce: r.data.nonce, url: r.data.url, name: login.name ?? '', at: Date.now() });
+    Object.assign(login, { step: 'tg', tgUrl: r.data.url, error: '' });
+    route();
+    tgWait(r.data.nonce);
+  });
+}
+
+async function tgWait(nonce) {
+  const until = Date.now() + 15 * 60000;
+  while (Date.now() < until) {
+    const p = tgPending.get();
+    if (p?.nonce !== nonce) return; // скасували
+    const r = await api(`auth/tg/check?nonce=${encodeURIComponent(nonce)}`);
+    if (r.ok && r.data.token) {
+      tgPending.set(null);
+      setAuthToken(r.data.token);
+      login.phone = phoneDigits(r.data.phone);
+      if (!login.name && r.data.name) login.name = r.data.name;
+      loginDone();
+      return;
+    }
+    await new Promise((ok) => setTimeout(ok, 2000));
+  }
+  tgPending.set(null);
+  Object.assign(login, { step: 'phone', error: 'Час на підтвердження минув. Спробуйте ще раз.' });
+  route();
+}
+// Повернулися з Telegram і сторінка перезавантажилась — чекаємо далі.
+{
+  const p = tgPending.get();
+  if (p && Date.now() - p.at < 15 * 60000 && hasServer()) {
+    Object.assign(login, { step: 'tg', tgUrl: p.url, name: p.name });
+    tgWait(p.nonce);
+  }
 }
 
 // Чи запис ще попереду: для позначок у списку переписок і в сповіщеннях.
@@ -5762,7 +5978,9 @@ function settingsBlock() {
     <h2 id="h-settings" style="margin:0">Налаштування</h2>
     <label class="check-row"><input class="check" type="checkbox" id="set-notify" ${notifyOn() ? 'checked' : ''}><span><b>Сповіщення</b>
       <small class="muted">Мийка підтвердила запис, запропонувала інший час, відповіла в чаті${denied && notifyOn() ? '. Зараз вони заборонені в налаштуваннях браузера — дозвольте їх там' : ''}</small></span></label>
+    ${srv?.telegramBot ? `<button class="btn soft" type="button" data-action="tg-notify">${icon('send', 18)}Отримувати сповіщення в Telegram</button>` : ''}
     <div><span class="lbl">Тема</span>${themePicker(store.get('theme', 'system'))}</div>
+    <p class="small muted" style="margin:0"><a href="legal/privacy.html" target="_blank">Політика конфіденційності</a> · <a href="legal/offer.html" target="_blank">Умови користування</a></p>
   </section>`;
 }
 
@@ -5783,7 +6001,7 @@ const myApp = () => bizApps().filter((a) => a.device).sort((a, b) => b.at - a.at
 const feePct = () => String(Math.round((store.get('admin.settings', {}).commission ?? PAYMENT.commission) * 1000) / 10).replace('.', ',');
 
 function viewBusiness(sub) {
-  const authed = !!(store.get('auth', null) ?? login.session);
+  const authed = isAuthed();
   const head = authed ? back('#/garage', 'Гараж') : back('#/', 'Вхід');
   const a = myApp();
   if (sub === 'apply' && !(a && a.status !== 'rejected')) return `${head}<h1>Реєстрація мийки</h1>${bizApplyForm()}`;
@@ -5838,6 +6056,7 @@ function bizApplyForm() {
     <label class="field"><span>ІПН (ФОП) або ЄДРПОУ (ТОВ)</span><input name="code" required inputmode="numeric" pattern="\\d{8}|\\d{10}" title="8 цифр ЄДРПОУ або 10 цифр ІПН"></label>
     <label class="check-row small"><input class="check" type="checkbox" name="agree" required><span>Погоджуюсь з умовами: ${feePct()}% із замовлень через CARCAR, правила скасувань і спорів</span></label>
     <button class="btn primary block" type="submit">Надіслати заявку</button>
+    <p class="small muted" style="margin:0">Надсилаючи заявку, ви погоджуєтесь з <a href="legal/partner-offer.html" target="_blank">договором для мийок</a> і <a href="legal/privacy.html" target="_blank">політикою конфіденційності</a>.</p>
     <p class="fine">Після перевірки надішлемо логін і пароль до CarCar Business.</p>
   </form>`;
 }
@@ -5899,8 +6118,8 @@ function doneByMonth(all, highlightId) {
 function viewBookings(highlightId) {
   const list = mine();
   const sorted = [...list].sort((a, b) => bookingStart(a) - bookingStart(b));
-  const active = sorted.filter((b) => ACTIVE.includes(b.state));
-  const rest = sorted.filter((b) => !ACTIVE.includes(b.state)).reverse();
+  const active = sorted.filter((b) => ACTIVE.includes(b.state) || b.state === 'unpaid');
+  const rest = sorted.filter((b) => !ACTIVE.includes(b.state) && b.state !== 'unpaid').reverse();
   if (!list.length) {
     return `<h1>Мої записи</h1>${empty('calendar', 'Записів поки немає.', '<a class="btn primary" href="#/">Знайти мийку</a>')}${inviteCard()}`;
   }
@@ -6133,7 +6352,7 @@ const bookingActions = {
 function route() {
   const [, page = '', arg, sub, extra] = location.hash.replace(/^#/, '').split('/');
   // Вхід за номером телефону — перед будь-яким екраном застосунку.
-  const authed = !!(store.get('auth', null) ?? login.session);
+  const authed = isAuthed();
   // Умови для мийок і заявку видно й без входу клієнта: власник мийки не мусить реєструватися як клієнт.
   const guest = !authed && page === 'business';
   document.body.classList.toggle('in-auth', !authed && !guest);
@@ -6364,6 +6583,7 @@ document.addEventListener('click', (e) => {
   } else if (action === 'notify-on') {
     Notification.requestPermission().then((res) => {
       route();
+      notifySync({ on: notifyOn() });
       toast(res === 'granted' ? 'Готово — повідомимо, щойно мийка відповість' : 'Сповіщення вимкнені в налаштуваннях браузера. Відповідь мийки побачите тут');
     });
   } else if (action === 'ics') {
@@ -6438,12 +6658,29 @@ document.addEventListener('click', (e) => {
     confirmMove();
   } else if (action === 'logout') {
     if (!confirm('Вийти з акаунта? Щоб повернутися, знадобиться номер телефону й код із SMS.')) return;
+    if (hasServer()) pushForget().then(() => api('auth/logout', { method: 'POST', body: {} })).finally(() => setAuthToken(null));
     store.set('auth', null);
     login.session = null;
     Object.assign(login, { step: 'phone', phone: '', error: '' });
     location.hash = '#/';
     route();
+  } else if (action === 'pay-card') {
+    const b = bookings.find((x) => x.id === id);
+    if (b?.state === 'unpaid') payCard(b);
+  } else if (action === 'unpaid-cancel') {
+    const b = bookings.find((x) => x.id === id);
+    if (b?.state !== 'unpaid') return;
+    Object.assign(b, { state: 'cancelled', cancelBy: 'client', closedAt: Date.now(), payFailed: 'Скасовано до оплати' });
+    settle();
+    save();
+    route();
+    toast('Запис скасовано');
+  } else if (action === 'tg-notify') {
+    telegramNotify().then((ok) => toast(ok ? 'У Telegram натисніть «Старт» — і сповіщення приходитимуть туди' : 'Telegram зараз недоступний'));
+  } else if (action === 'tg-login') {
+    tgLogin();
   } else if (action === 'login-back') {
+    tgPending.set(null);
     Object.assign(login, { step: 'phone', error: '' });
     route();
   } else if (action === 'login-resend') {
@@ -6508,8 +6745,8 @@ document.addEventListener('change', (e) => {
   if (t.name === 'theme' && t.closest('.settings')) { setTheme('theme', t.value); return; }
   if (t.id === 'set-notify') {
     store.set('notify', t.checked);
-    if (t.checked && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission().then(() => route());
-    else route();
+    if (t.checked && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission().then(() => { route(); notifySync({ on: true }); });
+    else { route(); notifySync({ on: t.checked }); }
     toast(t.checked ? 'Сповіщення ввімкнено' : 'Сповіщення вимкнено — відповіді мийок побачите в застосунку');
     return;
   }
@@ -6610,7 +6847,7 @@ document.addEventListener('submit', async (e) => {
   if (e.target.id === 'biz-apply') {
     e.preventDefault();
     const f = new FormData(e.target);
-    const a = { id: uid(), device: true, at: Date.now(), status: 'new', ...Object.fromEntries(['name', 'city', 'boxes', 'address', 'contact', 'phone', 'email', 'type', 'code'].map((k) => [k, String(f.get(k) ?? '').trim()])) };
+    const a = { id: uid(), device: true, at: Date.now(), status: 'new', ...(isAuthed() ? { clientId: meId() } : {}), ...Object.fromEntries(['name', 'city', 'boxes', 'address', 'contact', 'phone', 'email', 'type', 'code'].map((k) => [k, String(f.get(k) ?? '').trim()])) };
     saveBizApps([...bizApps(), a]);
     location.hash = '#/business';
     toast('Заявку надіслано. Відповімо протягом 2 робочих днів');
