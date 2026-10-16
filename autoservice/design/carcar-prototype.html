@@ -6171,10 +6171,10 @@ function bizAppStatus(a) {
   const [label, cls] = APP_STATUS[a.status];
   return `<section class="card app-status ${cls}" aria-label="Ваша заявка">
     <div class="head"><b>Заявка: ${esc(a.name)}</b><span class="pill ${cls}">${label}</span></div>
-    ${a.status === 'new' ? '<p class="small muted" style="margin:0">Перевіримо дані й надішлемо логін і пароль у SMS.</p>' : ''}
+    ${a.status === 'new' ? `<p class="small muted" style="margin:0">Перевіримо дані протягом 2 робочих днів. Логін і пароль до кабінету зʼявляться тут${hasServer() ? '' : ' (у робочій версії — ще й у SMS)'}.</p>` : ''}
     ${a.status === 'approved' ? `<p style="margin:0">Заявку схвалено. Увійдіть у CarCar Business, перевірте профіль, графік і ціни та опублікуйте мийку — тоді клієнти її побачать. Дані для входу:</p>
       <dl class="kv"><dt>Логін</dt><dd><b class="code">${esc(a.issued.login)}</b></dd><dt>Пароль</dt><dd><b class="code">${esc(a.issued.password)}</b></dd></dl>
-      <p class="fine" style="margin:0">Це демо. Насправді логін і пароль приходять у SMS.</p>
+      <p class="fine" style="margin:0">${hasServer() ? 'Ці дані бачите лише ви. Збережіть пароль — він знадобиться на кожному телефоні, де відкриваєте кабінет.' : 'Це демо. Насправді логін і пароль приходять у SMS.'}</p>
       <a class="btn primary" href="pro.html">Увійти в CarCar Business</a>` : ''}
     ${a.status === 'rejected' ? `<p class="small" style="margin:0">Причина: ${esc(a.reason || 'не вказано')}. Виправте й надішліть ще раз.</p>` : ''}
   </section>`;
@@ -6495,8 +6495,9 @@ function route() {
   const [, page = '', arg, sub, extra] = location.hash.replace(/^#/, '').split('/');
   // Вхід за номером телефону — перед будь-яким екраном застосунку.
   const authed = isAuthed();
-  // Умови для мийок і заявку видно й без входу клієнта: власник мийки не мусить реєструватися як клієнт.
-  const guest = !authed && page === 'business';
+  // Умови для мийок видно й без входу. Заявку на сервері — лише після входу за номером: так заявник
+  // бачить її статус і логін із паролем до кабінету (номер підтверджено).
+  const guest = !authed && page === 'business' && !(arg === 'apply' && hasServer());
   document.body.classList.toggle('in-auth', !authed && !guest);
   document.body.classList.toggle('guest', guest);
   if (guest) {
