@@ -46,6 +46,7 @@ def check_admin(password, stored):
 class Sessions:
     def __init__(self, db, lock):
         self.db, self.lock = db, lock
+        self.cache = {}  # token -> (роль, субʼєкт, створено): кожен запит без звернення до диска
         db.execute('CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, role TEXT, subject TEXT, created INTEGER)')
         db.execute('CREATE TABLE IF NOT EXISTS tg_login (nonce TEXT PRIMARY KEY, created INTEGER, phone TEXT, name TEXT, chat_id INTEGER)')
         db.execute('CREATE TABLE IF NOT EXISTS tg_links (subject TEXT PRIMARY KEY, chat_id INTEGER)')
@@ -61,12 +62,21 @@ class Sessions:
     def get(self, token):
         if not token:
             return None
-        row = self.db.execute('SELECT role, subject, created FROM sessions WHERE token = ?', (token,)).fetchone()
-        if not row or time.time() - row[2] > SESSION_DAYS * 86400:
+        row = self.cache.get(token)
+        if row is None:
+            row = self.db.execute('SELECT role, subject, created FROM sessions WHERE token = ?', (token,)).fetchone()
+            if not row:
+                return None
+            row = (row[0], json.loads(row[1]), row[2])
+            if len(self.cache) > 100_000:
+                self.cache.clear()
+            self.cache[token] = row
+        if time.time() - row[2] > SESSION_DAYS * 86400:
             return None
-        return row[0], json.loads(row[1])
+        return row[0], row[1]
 
     def drop(self, token):
+        self.cache.pop(token, None)
         with self.lock:
             self.db.execute('DELETE FROM sessions WHERE token = ?', (token,))
             self.db.commit()

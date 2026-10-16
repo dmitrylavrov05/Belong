@@ -511,7 +511,12 @@ export function savePartner(placeId, patch) {
 // Демо-мийки з data.js (вигадані, для показу). На сервері їх можна сховати від клієнтів: "demo_places": false —
 // тоді в каталозі лише справжні мийки, що пройшли реєстрацію й перевірку.
 export const isDemoPlace = (id) => DEMO_PLACE_IDS.has(id);
-export const demoPlacesOn = () => store.get('srv.demoPlaces', true) !== false;
+// Демо-режим вмикає й вимикає адмінка (ключ admin.server — одразу на всіх пристроях); інакше — як у конфігурації сервера.
+const adminDemo = (name) => { const v = store.get('admin.server', null)?.[name]; return typeof v === 'boolean' ? v : null; };
+export const demoPlacesOn = () => adminDemo('demoPlaces') ?? store.get('srv.demoPlaces', true) !== false;
+export const demoWashOn = (srv) => adminDemo('demoWash') ?? srv?.demoWash !== false;
+// Вхід за номером без перевірки. Без бота Telegram — завжди (інакше клієнт не увійде взагалі).
+export const demoLoginOn = (srv) => !srv?.telegramBot || (adminDemo('demoLogin') ?? srv.demoLogin !== false);
 export const isListed = (p) => !(isDemoPlace(p.id) && !demoPlacesOn()) && partnerOf(p.id).status === 'approved';
 
 // Виводити гроші можна лише на перевірені реквізити.

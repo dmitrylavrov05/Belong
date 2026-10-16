@@ -59,6 +59,9 @@ fi
 chmod -R a+rX "$DIR"
 
 echo "==> nginx"
+# Багато одночасних користувачів: кожен телефон тримає відкрите зʼєднання (довге опитування).
+sed -i 's/^\(\s*\)worker_connections .*/\1worker_connections 8192;/' /etc/nginx/nginx.conf
+grep -q '^worker_rlimit_nofile' /etc/nginx/nginx.conf || sed -i '/^worker_processes/a worker_rlimit_nofile 32768;' /etc/nginx/nginx.conf
 sed "s/__DOMAIN__/$DOMAIN/g" "$(dirname "$0")/nginx.conf" > /etc/nginx/sites-available/carcar
 ln -sf /etc/nginx/sites-available/carcar /etc/nginx/sites-enabled/carcar
 rm -f /etc/nginx/sites-enabled/default
@@ -153,6 +156,9 @@ ExecStart=/usr/bin/python3 $DIR/deploy/server/carcar_sync.py --host 127.0.0.1 --
 LoadCredential=config.json:$CFG
 DynamicUser=yes
 StateDirectory=carcar
+# Тисячі одночасних зʼєднань: кожне — файл і потік.
+LimitNOFILE=65535
+TasksMax=16384
 Restart=always
 RestartSec=2
 

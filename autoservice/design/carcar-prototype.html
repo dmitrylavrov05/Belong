@@ -2093,7 +2093,12 @@ function savePartner(placeId, patch) {
 // Демо-мийки з data.js (вигадані, для показу). На сервері їх можна сховати від клієнтів: "demo_places": false —
 // тоді в каталозі лише справжні мийки, що пройшли реєстрацію й перевірку.
 const isDemoPlace = (id) => DEMO_PLACE_IDS.has(id);
-const demoPlacesOn = () => store.get('srv.demoPlaces', true) !== false;
+// Демо-режим вмикає й вимикає адмінка (ключ admin.server — одразу на всіх пристроях); інакше — як у конфігурації сервера.
+const adminDemo = (name) => { const v = store.get('admin.server', null)?.[name]; return typeof v === 'boolean' ? v : null; };
+const demoPlacesOn = () => adminDemo('demoPlaces') ?? store.get('srv.demoPlaces', true) !== false;
+const demoWashOn = (srv) => adminDemo('demoWash') ?? srv?.demoWash !== false;
+// Вхід за номером без перевірки. Без бота Telegram — завжди (інакше клієнт не увійде взагалі).
+const demoLoginOn = (srv) => !srv?.telegramBot || (adminDemo('demoLogin') ?? srv.demoLogin !== false);
 const isListed = (p) => !(isDemoPlace(p.id) && !demoPlacesOn()) && partnerOf(p.id).status === 'approved';
 
 // Виводити гроші можна лише на перевірені реквізити.
@@ -5611,7 +5616,7 @@ function viewLogin() {
     ${login.error ? `<p class="auth-error" role="alert">${esc(login.error)}</p>` : ''}
     ${srv?.telegramBot ? `<button class="btn primary block" type="button" data-action="tg-login">${icon('send', 18)} Увійти через Telegram</button>
       <p class="fine">Бот попросить поділитися номером — це безкоштовно і без SMS.</p>` : ''}
-    ${!srv || srv.demoLogin ? `<button class="btn ${srv?.telegramBot ? 'ghost' : 'primary'} block" type="submit">Отримати код</button>` : ''}
+    ${demoLoginOn(srv) ? `<button class="btn ${srv?.telegramBot ? 'ghost' : 'primary'} block" type="submit">Отримати код</button>` : ''}
     <p class="fine">Номер бачить тільки мийка, до якої ви записалися. <a href="legal/privacy.html" target="_blank">Конфіденційність</a> · <a href="legal/offer.html" target="_blank">Умови</a></p>
   </form></section>`;
 }

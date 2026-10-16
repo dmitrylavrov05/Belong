@@ -9,7 +9,7 @@ import {
   ACTIVE, BLOCKING, isCarcar, price, complete, isFrozen, balanceFor, settleAll, ratingFor, partnerOf, PARTNER_STATUS,
   confirmBy, offerBy, responseStats, pauseOf, ratePct, msText, accountPlaces, addAccountPlace,
   ticketsAll, openTicket, ticketReply, setTicket, TICKET_TOPICS, TICKET_STATUS, PLACE_TOPICS, ticketPhotos,
-  payoutReady, maskIban, hidePhones, themePicker, setTheme, samePhone, hasServer, api, authToken, setAuthToken, serverConfig, notifySync, pushForget, telegramNotify, fitChatScreen, keepChatOnKeyboard, commissionFor, savePartner, staffOf, checkBizLogin, numberBookings, bookingNo, POWER, powerOf, setPower,
+  payoutReady, maskIban, hidePhones, themePicker, setTheme, samePhone, hasServer, api, authToken, setAuthToken, serverConfig, demoWashOn, notifySync, pushForget, telegramNotify, fitChatScreen, keepChatOnKeyboard, commissionFor, savePartner, staffOf, checkBizLogin, numberBookings, bookingNo, POWER, powerOf, setPower,
 } from './core.js';
 import {
   openStarts, chatPost, chatTimeline, readMessages, msgPreview, touchPresence, BIZ_QUICK, sendMessages, checkWaitlist,
@@ -46,7 +46,10 @@ load();
 
 // Вхід — той самий акаунт, що й у повній панелі: логін і пароль видає CARCAR після схвалення заявки.
 // Кабінет відкритий: є сесія, а з сервером CARCAR — ще й ключ входу, виданий сервером.
-const session = () => { const s = store.get('biz.session', null); return s && (!hasServer() || authToken()) ? s : null; };
+// Що ввімкнено на сервері (Telegram, оплата, демо). Без сервера — null.
+let srv = null;
+// Демо-кабінет, який адмінка вимкнула, більше не відкривається.
+const session = () => { const s = store.get('biz.session', null); return s && (!hasServer() || authToken()) && !(s.demo && !demoWashOn(srv)) ? s : null; };
 const ui = { place: session()?.placeId ?? store.get('partner', null), filter: 'all', lastView: '' };
 if (!placeById(ui.place)) ui.place = PLACES[0].id;
 
@@ -210,7 +213,7 @@ function viewLogin(error = '') {
       <button class="btn primary" type="submit">Увійти</button>
     </form>
     <p class="small muted">Логін і пароль надсилає CARCAR після схвалення заявки. Ще не з нами? <a href="index.html#/business">Умови й реєстрація мийки</a></p>
-    <button class="btn" type="button" data-action="demo-login">Подивитися демо (вигадані дані)</button>
+    ${demoWashOn(srv) ? '<button class="btn" type="button" data-action="demo-login">Подивитися демо (вигадані дані)</button>' : ''}
   </section>`;
 }
 
@@ -245,8 +248,7 @@ function bizNotifySync() {
   }
   notifySync({ on: ns.on, quiet });
 }
-let srv = null;
-serverConfig().then((c) => { srv = c; if (c) { bizNotifySync(); if (c.telegramBot && $('.settings')) rerender(); } });
+serverConfig().then((c) => { srv = c; if (c) { bizNotifySync(); if ((c.telegramBot && $('.settings')) || $('#pro-login')) rerender(); } });
 const canNotify = () => notifySet().on && 'Notification' in window && Notification.permission === 'default';
 const notifyAsk = () => (canNotify() ? `<button class="btn soft notify-ask" type="button" data-action="notify-on">${icon('bell', 18)}Сповіщення про нові записи на телефон</button>` : '');
 

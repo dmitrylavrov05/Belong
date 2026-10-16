@@ -84,7 +84,7 @@ class Server(unittest.TestCase):
     def test_01_clients_see_only_their_bookings(self):
         ira, ira_id = self.login_client('067 111 11 11')
         oleh, oleh_id = self.login_client('050 222 22 22')
-        b1 = {'id': 'b1', 'placeId': 'blysk', 'clientId': ira_id, 'clientName': 'Ірина', 'clientPhone': '+380671111111', 'date': '2026-10-05', 'time': '10:00', 'minutes': 30, 'state': 'pending', 'paid': 0, 'total': 250}
+        b1 = {'id': 'b1', 'placeId': 'blysk', 'clientId': ira_id, 'clientName': 'Ірина', 'clientPhone': '+380671111111', 'date': '2099-10-05', 'time': '10:00', 'minutes': 30, 'state': 'pending', 'paid': 0, 'total': 250}
         code, j = self.put('bookings', [b1], ira)
         self.assertEqual(code, 200)
         # Олег бачить лише зайнятість: без імені, телефону й грошей.
@@ -121,9 +121,9 @@ class Server(unittest.TestCase):
         oleh, oleh_id = self.login_client('050 222 22 22')
         base_ira = self.state(ira)['bookings']
         base_oleh = self.state(oleh)['bookings']
-        b2 = {'id': 'b2', 'placeId': 'blysk', 'clientId': oleh_id, 'date': '2026-10-05', 'time': '11:00', 'minutes': 30, 'state': 'pending'}
+        b2 = {'id': 'b2', 'placeId': 'blysk', 'clientId': oleh_id, 'date': '2099-10-05', 'time': '11:00', 'minutes': 30, 'state': 'pending'}
         self.put('bookings', base_oleh + [b2], oleh, base=base_oleh)
-        b3 = {'id': 'b3', 'placeId': 'hvylia', 'clientId': ira_id, 'date': '2026-10-06', 'time': '12:00', 'minutes': 30, 'state': 'pending'}
+        b3 = {'id': 'b3', 'placeId': 'hvylia', 'clientId': ira_id, 'date': '2099-10-06', 'time': '12:00', 'minutes': 30, 'state': 'pending'}
         self.put('bookings', base_ira + [b3], ira, base=base_ira)
         _, j = self.call('POST', '/api/auth/admin', {'password': 'secret-admin'})
         ids = sorted(x['id'] for x in self.state(j['token'])['bookings'])
@@ -175,7 +175,7 @@ class Server(unittest.TestCase):
 
     def test_07_payment_only_by_signed_bank_callback(self):
         ira, ira_id = self.login_client('067 111 11 11')
-        b = {'id': 'pay1', 'placeId': 'blysk', 'clientId': ira_id, 'date': '2026-10-07', 'time': '10:00', 'minutes': 30, 'state': 'unpaid', 'paid': 250, 'services': ['Мийка'], 'createdAt': int(time.time() * 1000)}
+        b = {'id': 'pay1', 'placeId': 'blysk', 'clientId': ira_id, 'date': '2099-10-07', 'time': '10:00', 'minutes': 30, 'state': 'unpaid', 'paid': 250, 'services': ['Мийка'], 'createdAt': int(time.time() * 1000)}
         code, form = self.call('POST', '/api/pay/create', {'booking': b}, ira)
         self.assertEqual(code, 200, form)
         params = json.loads(base64.b64decode(form['data']))
@@ -193,7 +193,7 @@ class Server(unittest.TestCase):
 
     def test_07b_booking_cannot_skip_payment(self):
         ira, ira_id = self.login_client('067 111 11 11')
-        b = {'id': 'skip1', 'placeId': 'blysk', 'clientId': ira_id, 'date': '2026-10-08', 'time': '10:00', 'minutes': 30, 'state': 'pending', 'paid': 300,
+        b = {'id': 'skip1', 'placeId': 'blysk', 'clientId': ira_id, 'date': '2099-10-08', 'time': '10:00', 'minutes': 30, 'state': 'pending', 'paid': 300,
              'payment': {'provider': 'liqpay'}}
         self.put('bookings', self.state(ira)['bookings'] + [b], ira)
         got = next(x for x in self.state(ira)['bookings'] if x['id'] == 'skip1')
@@ -277,6 +277,21 @@ class Server(unittest.TestCase):
         back = dict(spent, visitsLeft=5, history=spent['history'] + [{'at': 2, 'bookingId': 'b1', 'amount': -250, 'note': 'повернення'}])
         self.put('biz.passes', {'blysk': dict(mine, sold=[back])}, ira)
         self.assertEqual(self.state(wash)['biz.passes']['blysk']['sold'][0]['visitsLeft'], 4)
+
+    def test_13_admin_turns_demo_off(self):
+        _, j = self.call('POST', '/api/auth/admin', {'password': 'secret-admin'})
+        admin = j['token']
+        ira, _ = self.login_client('067 111 11 11')
+        # Клієнт не може ввімкнути чи вимкнути демо — лише адмінка.
+        self.assertEqual(self.put('admin.server', {'demoWash': True, 'demoPlaces': True}, ira)[0], 403)
+        self.put('admin.server', {'demoWash': False, 'demoPlaces': False, 'demoLogin': False}, admin)
+        cfg = self.call('GET', '/api/config')[1]
+        self.assertEqual((cfg['demoWash'], cfg['demoPlaces']), (False, False))
+        self.assertTrue(cfg['demoLogin'])  # без бота Telegram демо-вхід лишається, інакше ніхто не увійде
+        self.assertEqual(self.call('POST', '/api/auth/biz', {'demo': True})[0], 403)
+        self.assertEqual(self.state()['admin.server']['demoPlaces'], False)  # бачать усі — застосунок ховає демо одразу
+        self.put('admin.server', {'demoWash': True, 'demoPlaces': True}, admin)
+        self.assertEqual(self.call('POST', '/api/auth/biz', {'demo': True})[0], 200)
 
     def test_99_login_rate_limit(self):
         codes = [self.call('POST', '/api/auth/admin', {'password': 'x'})[0] for _ in range(12)]

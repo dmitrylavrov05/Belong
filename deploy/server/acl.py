@@ -167,22 +167,86 @@ def _client_of(item):
     return item.get('clientId') or None
 
 
-def read_bookings(who, value, get):
-    out = []
+def _public_booking(b):
+    x = pick(b, BOOKING_PUBLIC)
+    if b.get('mobile'):
+        x['mobile'] = {'hidden': True}
+    if isinstance(x.get('offer'), dict):
+        x['offer'] = {}
+    return x
+
+
+# Чужі записи потрібні клієнту лише для вільного часу (сьогодні й далі) і статистики відповідей мийок (30 днів).
+# Старі чужі записи не надсилаємо — інакше кожна зміна розсилала б усю історію всім телефонам.
+STATS_DAYS = 31
+_pub = {'src': None, 'day': None, 'items': None}
+
+
+def _public_view(value):
+    """Урізані чужі записи — один раз на версію даних (спільні для всіх клієнтів)."""
+    import time as _t
+    day = _t.strftime('%Y-%m-%d', _t.localtime(_t.time() - 86400))
+    if _pub['src'] is value and _pub['day'] == day:
+        return _pub['items']
+    since_ms = (_t.time() - STATS_DAYS * 86400) * 1000
+    items = []
     for b in value or []:
-        if who.admin:
-            out.append(b)
-        elif owns(who, b.get('placeId'), get):
+        if not isinstance(b, dict):
+            items.append(None)
+            continue
+        relevant = str(b.get('date') or '') >= day or (b.get('needsConfirm') and (b.get('createdAt') or 0) >= since_ms)
+        items.append(_public_booking(b) if relevant else None)
+    _pub.update(src=value, day=day, items=items)
+    return items
+
+
+class RawJSON(str):
+    """Готовий JSON (сервер віддає як є)."""
+
+
+_idx = {'src': None, 'day': None, 'own': None, 'pub': None, 'pub_json': None}
+
+
+def bookings_json(who, value, dumps):
+    """Записи для клієнта чи гостя одразу як JSON: спільна частина (чужі урізані записи) збирається
+    один раз на версію даних, до неї додаються лише власні записи клієнта."""
+    items = _public_view(value)
+    if _idx['src'] is not value or _idx['day'] != _pub['day']:
+        own = {}
+        for i, b in enumerate(value or []):
+            c = _client_of(b) if isinstance(b, dict) else None
+            if c:
+                own.setdefault(c, []).append(i)
+        pub = [(i, dumps(x)) for i, x in enumerate(items) if x is not None]
+        _idx.update(src=value, day=_pub['day'], own=own, pub=pub, pub_json=','.join(j for _, j in pub))
+    mine = _idx['own'].get(who.cid, []) if who.role == 'client' and who.cid else []
+    if not mine:
+        return RawJSON('[' + _idx['pub_json'] + ']')
+    ms = set(mine)
+    return RawJSON('[' + ','.join([dumps(value[i]) for i in mine] + [j for i, j in _idx['pub'] if i not in ms]) + ']')
+
+
+def read_fast(who, key, value, get, dumps):
+    """Те саме, що read, але для довгого опитування: найважче (записи для клієнтів) — з готових шматків JSON."""
+    if key == 'bookings' and who.role in ('client', 'anon') and isinstance(value, list):
+        return bookings_json(who, value, dumps)
+    return read(who, key, value, get)
+
+
+def read_bookings(who, value, get):
+    if who.admin:
+        return value
+    out = []
+    pub = _public_view(value) if who.role != 'place' or not who.places else None
+    for i, b in enumerate(value or []):
+        if who.role == 'place' and owns(who, b.get('placeId'), get):
             out.append(mask_ids(b))  # клієнт CARCAR — номер прихований
         elif who.is_client(_client_of(b)):
             out.append(b)
         else:
-            x = pick(b, BOOKING_PUBLIC)
-            if b.get('mobile'):
-                x['mobile'] = {'hidden': True}
-            if isinstance(x.get('offer'), dict):
-                x['offer'] = {}
-            out.append(x)
+            x = pub[i] if pub is not None else _public_view(value)[i]
+            if x is not None:
+                out.append(x)
     return out
 
 
@@ -470,6 +534,7 @@ POLICIES = {
     'presence':        ('dict', read_all, write_place_key),
     'calls':           ('dict', read_calls, write_call),
     'admin.settings':  ('raw', read_all, write_admin),
+    'admin.server':    ('raw', read_all, write_admin),
     'admin.pauseLift': ('raw', read_all, write_admin),
     'admin.fraud':     ('raw', read_admin, write_admin),
     'admin.campaignDemo': ('raw', read_admin, write_admin),

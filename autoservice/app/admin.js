@@ -10,7 +10,7 @@ import {
   TICKET_TOPICS, TICKET_STATUS, ticketsAll, ticketReply, setTicket, ticketOverdue, slaHours, fraudState, saveFraud, staffOf, phoneKey,
   addCustomPlace, uid, hash,
   enterView, bizApps, APP_STATUS, approveBizApp, rejectBizApp, bookingNo, findByNo, ticketPhotos, shrinkPhoto,
-  hasServer, api, authToken, setAuthToken, isDemoPlace, demoPlacesOn,
+  hasServer, api, authToken, setAuthToken, isDemoPlace, demoPlacesOn, demoWashOn, demoLoginOn, serverConfig,
 } from './core.js';
 import { ENTITY, TAX, codeValid, ibanValid, ibanBank, formatIban } from './partners.js';
 import { drawColumns, legend, tableView, hbars, hideTip } from './charts.js';
@@ -1200,6 +1200,7 @@ const NAV = [
   ['commission', 'Комісії й виплати', 'cash'],
   ['promos', 'Промокоди', 'gift'],
   ['marketing', 'Маркетинг і CAC', 'chart'],
+  ['demo', 'Демо-режим', 'settings'],
 ];
 
 // ---------- заявки бізнесу ----------
@@ -1236,6 +1237,37 @@ function viewAdminLogin(error = '') {
   </form>`;
 }
 
+// ---------- демо-режим ----------
+// Вигадані мийки, демо-кабінет мийки й вхід без перевірки номера. Діє одразу на всіх пристроях.
+let srv = null;
+serverConfig().then((c) => { srv = c; if (location.hash.startsWith('#/demo')) rerender(); });
+function viewDemo() {
+  const demoCount = PLACES.filter((p) => isDemoPlace(p.id)).length;
+  const realCount = PLACES.filter((p) => !isDemoPlace(p.id)).length;
+  const bot = !!srv?.telegramBot;
+  const row = (name, on, title, sub, disabled = false) => `<label class="check-row"><input class="check" type="checkbox" name="${name}" ${on ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
+    <span><b>${title}</b><small class="muted">${sub}</small></span></label>`;
+  return `<h1>Демо-режим</h1>
+    <p class="muted">Поки немає справжніх мийок і клієнтів, демо допомагає показати, як усе працює. Перед запуском — вимкніть.
+      Зміни діють одразу на всіх телефонах.</p>
+    <form class="card stack" id="demo-form" style="gap:14px;max-width:640px">
+      ${row('demoPlaces', demoPlacesOn(), 'Вигадані мийки в каталозі', `${demoCount} демо-мийок («Блиск», «Хвиля»…). Вимкнено — клієнти бачать лише справжні (зараз ${realCount}).`)}
+      ${row('demoWash', demoWashOn(srv), 'Демо-кабінет мийки', 'Кнопка «Подивитися демо» в CarCar Business. Вимкнено — у кабінет лише за логіном і паролем.')}
+      ${row('demoLogin', demoLoginOn(srv), 'Вхід клієнтів без перевірки номера', bot ? 'Код показується на екрані, номер ніхто не перевіряє. Вимкнено — вхід лише через Telegram (номер підтверджує Telegram).'
+        : 'Не можна вимкнути, поки не підключено Telegram-бота: інакше клієнти не зможуть увійти. Як підключити — deploy/ubuntu/README.md.', !bot)}
+      <div class="row" style="gap:8px;flex-wrap:wrap">
+        <button class="btn primary" type="submit">Зберегти</button>
+        <button class="btn" type="button" data-action="demo-all-off">Вимкнути все демо</button>
+      </div>
+    </form>`;
+}
+function saveDemo(patch) {
+  store.set('admin.server', { ...store.get('admin.server', {}), ...patch, at: Date.now() });
+  rerender();
+  const off = Object.entries(patch).filter(([, v]) => v === false).length;
+  toast(off === Object.keys(patch).length ? 'Демо вимкнено' : 'Збережено — діє на всіх пристроях');
+}
+
 function route() {
   hideTip();
   charts = {};
@@ -1258,6 +1290,7 @@ function route() {
   else if (page === 'support') view.innerHTML = viewSupport(arg);
   else if (page === 'fraud') view.innerHTML = viewFraud();
   else if (page === 'marketing') view.innerHTML = viewMarketing();
+  else if (page === 'demo') view.innerHTML = viewDemo();
   else view.innerHTML = '<p>Сторінку не знайдено.</p>';
   mountCharts();
   enterView(view, `${page}/${arg ?? ''}` !== ui.lastView);
@@ -1276,6 +1309,11 @@ document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-action]');
   if (!el) return;
   const { action, id } = el.dataset;
+  if (action === 'demo-all-off') {
+    if (!confirm('Вимкнути все демо? Клієнти бачитимуть лише справжні мийки.')) return;
+    saveDemo({ demoPlaces: false, demoWash: false, ...(srv?.telegramBot ? { demoLogin: false } : {}) });
+    return;
+  }
   if (action === 'admin-logout') {
     api('auth/logout', { method: 'POST', body: {} }).finally(() => { setAuthToken(null); route(); });
     return;
@@ -1375,6 +1413,10 @@ document.addEventListener('submit', async (e) => {
   const f = e.target;
   e.preventDefault();
   const d = new FormData(f);
+  if (f.id === 'demo-form') {
+    saveDemo({ demoPlaces: d.get('demoPlaces') === 'on', demoWash: d.get('demoWash') === 'on', ...(srv?.telegramBot ? { demoLogin: d.get('demoLogin') === 'on' } : {}) });
+    return;
+  }
   if (f.id === 'admin-login') {
     const r = await api('auth/admin', { method: 'POST', body: { password: String(d.get('password') ?? '') } });
     if (!r.ok) { $('#view').innerHTML = viewAdminLogin(r.data.error ?? 'Немає звʼязку з сервером'); return; }

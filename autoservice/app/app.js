@@ -6,7 +6,7 @@ import {
   applyOverrides, isListed, visibleReviews, ACTIVE, BLOCKING, HOUR, price, isFrozen, settleAll, ratingFor,
   powerOf, worksInBlackout, TICKET_TOPICS, CLIENT_TOPICS, TICKET_STATUS, ticketsAll, openTicket, ticketReply, setTicket, isBlocked, mobileOn, spanOf, laneCap, sameLane, MOBILE_ROAD, promosAll, promoCheck,
   enterView, fitChatScreen, keepChatOnKeyboard, themePicker, setTheme, bizApps, saveBizApps, APP_STATUS, numberBookings, bookingNo, findByNo, ticketPhotos,
-  hasServer, api, authToken, setAuthToken, serverConfig, notifySync, pushForget, telegramNotify,
+  hasServer, api, authToken, setAuthToken, serverConfig, notifySync, pushForget, telegramNotify, demoLoginOn,
 } from './core.js';
 import {
   inboxFor, markRead, sendMessages, dealsOf, dealsOn, weeklyDealsOf, daysText, dealAt, dealPrice, dealCovers, hotDeals,
@@ -1875,7 +1875,7 @@ function viewLogin() {
     ${login.error ? `<p class="auth-error" role="alert">${esc(login.error)}</p>` : ''}
     ${srv?.telegramBot ? `<button class="btn primary block" type="button" data-action="tg-login">${icon('send', 18)} Увійти через Telegram</button>
       <p class="fine">Бот попросить поділитися номером — це безкоштовно і без SMS.</p>` : ''}
-    ${!srv || srv.demoLogin ? `<button class="btn ${srv?.telegramBot ? 'ghost' : 'primary'} block" type="submit">Отримати код</button>` : ''}
+    ${demoLoginOn(srv) ? `<button class="btn ${srv?.telegramBot ? 'ghost' : 'primary'} block" type="submit">Отримати код</button>` : ''}
     <p class="fine">Номер бачить тільки мийка, до якої ви записалися. <a href="legal/privacy.html" target="_blank">Конфіденційність</a> · <a href="legal/offer.html" target="_blank">Умови</a></p>
   </form></section>`;
 }

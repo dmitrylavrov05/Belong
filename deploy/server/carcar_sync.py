@@ -109,34 +109,82 @@ def merge(base, cur, new):
 
 # ---------- сховище ----------
 
+# Готовий JSON кожного запису: однаковий для сотень телефонів, тож серіалізуємо один раз.
+# Тримаємо сам обʼєкт поруч, щоб його id не дістався іншому обʼєкту; збережені обʼєкти не змінюються на місці.
+_JSON = {}
+
+
+def item_json(x):
+    e = _JSON.get(id(x))
+    if e is not None and e[0] is x:
+        return e[1]
+    if len(_JSON) > 300_000:
+        _JSON.clear()
+    out = json.dumps(x, ensure_ascii=False)
+    _JSON[id(x)] = (x, out)
+    return out
+
+
+def value_json(v):
+    if isinstance(v, acl.RawJSON):
+        return v
+    if isinstance(v, list):
+        return '[' + ','.join(item_json(x) for x in v) + ']'
+    if isinstance(v, dict):
+        return '{' + ','.join(json.dumps(str(k), ensure_ascii=False) + ':' + item_json(x) for k, x in v.items()) + '}'
+    return json.dumps(v, ensure_ascii=False)
+
+
+ANALYTICS_MAX = 50_000  # журнал подій: останні N (старіші — у резервних копіях)
+
+
 class Store:
+    """Дані в памʼяті (розібрані один раз) + SQLite на диску. Читання не чіпає диск і не розбирає JSON —
+    так сотні телефонів з довгим опитуванням не навантажують сервер."""
+
     def __init__(self, path):
         os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
         self.db = sqlite3.connect(path, check_same_thread=False)
+        self.db.execute('PRAGMA journal_mode=WAL')
+        self.db.execute('PRAGMA synchronous=NORMAL')
         self.db.execute('CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL, ver INTEGER NOT NULL)')
         self.db.execute('CREATE TABLE IF NOT EXISTS push_subs (endpoint TEXT PRIMARY KEY, role TEXT, subject TEXT, data TEXT, created INTEGER)')
         self.db.execute('CREATE TABLE IF NOT EXISTS notify_prefs (subject TEXT PRIMARY KEY, data TEXT)')
         self.db.commit()
         self.lock = threading.RLock()
         self.changed = threading.Condition(self.lock)
-        row = self.db.execute('SELECT MAX(ver) FROM kv').fetchone()
-        self.ver = row[0] or 0
+        self.cache = {k: (v, json.loads(raw)) for k, raw, v in self.db.execute('SELECT key, value, ver FROM kv')}
+        self.ver = max([v for v, _ in self.cache.values()], default=0)
         self.on_change = None  # (key, old, new) — для сповіщень
+        self._seen = None  # id подій журналу
 
     def since(self, ver):
-        rows = self.db.execute('SELECT key, value FROM kv WHERE ver > ?', (ver,)).fetchall()
-        return {k: json.loads(v) for k, v in rows}
+        return {k: val for k, (v, val) in list(self.cache.items()) if v > ver}
 
     def get(self, key):
-        row = self.db.execute('SELECT value FROM kv WHERE key = ?', (key,)).fetchone()
-        return json.loads(row[0]) if row else None
+        e = self.cache.get(key)
+        return e[1] if e else None
 
     def _save(self, key, value):
         self.ver += 1
+        self.cache[key] = (self.ver, value)
         self.db.execute('INSERT INTO kv (key, value, ver) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, ver = excluded.ver',
-                        (key, json.dumps(value, ensure_ascii=False), self.ver))
+                        (key, value_json(value), self.ver))
         self.db.commit()
         self.changed.notify_all()
+
+    def add_events(self, value):
+        """Журнал подій: лише дописуємо нові (за id), без повного злиття; найстаріші понад ліміт — відкидаємо."""
+        with self.lock:
+            cur = self.get('analytics') or []
+            if self._seen is None:
+                self._seen = {json.dumps(x.get('id')) for x in cur if isinstance(x, dict)}
+            new = [x for x in value if isinstance(x, dict) and 'id' in x and json.dumps(x['id']) not in self._seen]
+            if new:
+                merged = (cur + new)[-ANALYTICS_MAX:]
+                self._seen = {json.dumps(x.get('id')) for x in merged} if len(cur) + len(new) > ANALYTICS_MAX else self._seen | {json.dumps(x['id']) for x in new}
+                self._save('analytics', merged)
+            return self.ver
 
     def put(self, who, key, value, base, has_base):
         """Зміни від пристрою: лише те, що роль може змінити, зливаємо з поточним значенням."""
@@ -165,11 +213,19 @@ class Store:
                     threading.Thread(target=self.on_change, args=(key, cur, new), daemon=True).start()
             return new
 
-    def wait(self, ver, seconds):
-        with self.lock:
-            if self.ver <= ver:
-                self.changed.wait(seconds)
-            return self.ver, self.since(ver)
+    def wait(self, ver, seconds, view):
+        """Довге опитування: чекаємо змін, які цей користувач бачить (чужі гаманці, журнал подій тощо його не будять)."""
+        deadline = time.time() + seconds
+        while True:
+            with self.lock:
+                if self.ver <= ver:
+                    self.changed.wait(max(0.0, deadline - time.time()))
+                cur = self.ver
+            out = view(self.since(ver))
+            # Порожнє ({} чи []) — це чуже, що змінилося (нотатки іншої мийки тощо): не будимо через нього.
+            if any(v not in ({}, []) for v in out.values()) or time.time() >= deadline:
+                return cur, out
+            ver = cur
 
 
 # ---------- сповіщення про події записів ----------
@@ -327,6 +383,11 @@ def load_config(path):
 
 # ---------- HTTP ----------
 
+class Server(ThreadingHTTPServer):
+    daemon_threads = True
+    request_queue_size = 1024  # черга нових зʼєднань (типово 5 — під навантаженням зʼєднання відкидались би)
+
+
 class Limiter:
     """Не більше N спроб входу за хвилину з однієї адреси — щоб не підбирали паролі."""
 
@@ -349,6 +410,16 @@ def make_handler(app):
     static_dir = app['static']
     limiter = Limiter()
 
+    def setting(name):
+        """Демо-режим: вирішує адмінка (ключ admin.server, діє одразу), інакше — конфігурація сервера.
+        Демо-вхід без бота Telegram не вимикається: інакше клієнти не змогли б увійти взагалі."""
+        v = (store.get('admin.server') or {}).get(name)
+        if name == 'demoLogin' and not cfg.get('telegram_token'):
+            return True
+        if isinstance(v, bool):
+            return v
+        return bool({'demoLogin': cfg.get('demo_login'), 'demoWash': cfg.get('demo_wash', True), 'demoPlaces': cfg.get('demo_places', True)}[name])
+
     class Handler(BaseHTTPRequestHandler):
         protocol_version = 'HTTP/1.1'
 
@@ -356,8 +427,8 @@ def make_handler(app):
             pass
 
         # --- відповіді ---
-        def send_json(self, code, obj):
-            body = json.dumps(obj, ensure_ascii=False).encode()
+        def send_json(self, code, obj, raw=None):
+            body = (raw if raw is not None else json.dumps(obj, ensure_ascii=False)).encode()
             self.send_response(code)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.send_header('Cache-Control', 'no-store')
@@ -386,7 +457,7 @@ def make_handler(app):
             role, sub = s
             w = acl.Who(role, cid=sub.get('cid'), login=sub.get('login'), demo=bool(sub.get('demo')))
             if role == 'place':
-                if w.demo and not cfg.get('demo_wash', True):
+                if w.demo and not setting('demoWash'):
                     return acl.Who()
                 w.places = acl.account_places(store.get, w)
             return w
@@ -404,8 +475,7 @@ def make_handler(app):
             if p == '/api/config':
                 return self.send_json(200, {
                     'telegramBot': cfg.get('telegram_bot') if cfg.get('telegram_token') else None,
-                    'demoLogin': bool(cfg.get('demo_login')), 'demoWash': bool(cfg.get('demo_wash', True)),
-                    'demoPlaces': bool(cfg.get('demo_places', True)),
+                    'demoLogin': setting('demoLogin'), 'demoWash': setting('demoWash'), 'demoPlaces': setting('demoPlaces'),
                     'payments': 'liqpay' if app['liqpay'].on else 'demo', 'sandbox': app['liqpay'].sandbox,
                     'vapid': app['webpush'].public if app['webpush'].ok else None, 'turn': bool(cfg.get('turn'))})
             if p == '/api/me':
@@ -414,16 +484,20 @@ def make_handler(app):
             if p == '/api/state':
                 w = self.who()
                 since = int((q.get('since') or ['0'])[0] or 0)
+
+                def view(data):
+                    out = {}
+                    for k, v in data.items():
+                        r = acl.read_fast(w, k, v, store.get, item_json)
+                        if r is not None:
+                            out[k] = r
+                    return out
                 if (q.get('wait') or ['0'])[0] == '1':
-                    ver, data = store.wait(since, WAIT_SECONDS)
+                    ver, out = store.wait(since, WAIT_SECONDS, view)
                 else:
-                    ver, data = store.ver, store.since(since)
-                out = {}
-                for k, v in data.items():
-                    r = acl.read(w, k, v, store.get)
-                    if r is not None:
-                        out[k] = r
-                return self.send_json(200, {'ver': ver, 'data': out})
+                    ver, out = store.ver, view(store.since(since))
+                data = ','.join(json.dumps(k, ensure_ascii=False) + ':' + value_json(v) for k, v in out.items())
+                return self.send_json(200, None, raw=f'{{"ver":{ver},"data":{{{data}}}}}')
             if p == '/api/auth/tg/check':
                 row = sessions.tg_check((q.get('nonce') or [''])[0])
                 if not row:
@@ -453,7 +527,7 @@ def make_handler(app):
             if p in ('/api/auth/biz', '/api/auth/admin') and not limiter.ok(self.ip()):
                 return self.send_json(429, {'error': 'Забагато спроб. Зачекайте хвилину.'})
             if p == '/api/auth/demo':
-                if not cfg.get('demo_login'):
+                if not setting('demoLogin'):
                     return self.send_json(403, {'error': 'Вхід лише через Telegram'})
                 cid = acl.phone_key(body.get('phone'))
                 if not cid or len(cid) != 16:
@@ -466,7 +540,7 @@ def make_handler(app):
                 return self.send_json(200, {'nonce': nonce, 'url': tg_link_url(cfg.get('telegram_bot'), nonce)})
             if p == '/api/auth/biz':
                 if body.get('demo'):
-                    if not cfg.get('demo_wash', True):
+                    if not setting('demoWash'):
                         return self.send_json(403, {'error': 'Демо-кабінет вимкнено'})
                     return self.send_json(200, {'token': sessions.create('place', {'demo': True})})
                 login = str(body.get('login') or '').strip().lower()
@@ -537,6 +611,8 @@ def make_handler(app):
             except ValueError:
                 return self.send_json(400, {'error': 'bad body'})
             w = self.who()
+            if key == 'analytics' and isinstance(body.get('value'), list):
+                return self.send_json(200, {'ver': store.add_events(body['value']), 'value': store.get('analytics') if w.admin else None})
             ver, value, ok = store.put(w, key, body.get('value'), body.get('base'), 'base' in body)
             self.send_json(200 if ok else 403, {'ver': ver, 'value': value})
 
@@ -694,8 +770,8 @@ def main():
         bot.start()
     threading.Thread(target=refunds_loop, args=(app,), daemon=True).start()
     threading.Thread(target=unpaid_loop, args=(app,), daemon=True).start()
-    srv = ThreadingHTTPServer((a.host, a.port), make_handler(app))
-    srv.daemon_threads = True
+    threading.stack_size(512 * 1024)  # потік на кожне зʼєднання — менше памʼяті на тисячу телефонів
+    srv = Server((a.host, a.port), make_handler(app))
     print(f"CARCAR sync: http://{a.host}:{a.port}  db={a.db}  ver={store.ver}  telegram={'так' if bot else 'ні'}  "
           f"оплата={'LiqPay' if app['liqpay'].on else 'демо'}  push={'так' if webpush.ok else 'ні'}  адмінка={'так' if cfg.get('admin_password_hash') else 'не налаштовано'}", flush=True)
     srv.serve_forever()

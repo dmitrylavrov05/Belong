@@ -504,3 +504,28 @@ test('демо-мийки вимкнено на сервері ("demo_places": f
   await page.goto('/#/book/blysk');
   await expect(page.locator('h1')).toHaveText('Запис недоступний');
 });
+
+test('адмінка вмикає й вимикає демо-режим: вигадані мийки й демо-кабінет зникають одразу', async ({ page }) => {
+  await page.goto('/admin.html#/demo');
+  await expect(page.getByRole('heading', { name: 'Демо-режим' })).toBeVisible();
+  const form = page.locator('#demo-form');
+  await expect(form.getByLabel(/Вигадані мийки в каталозі/)).toBeChecked();
+  // Без бота Telegram вхід без перевірки вимкнути не можна — інакше клієнти не увійдуть.
+  await expect(form.getByLabel(/Вхід клієнтів без перевірки номера/)).toBeDisabled();
+  page.once('dialog', (d) => d.accept());
+  await page.getByRole('button', { name: 'Вимкнути все демо' }).click();
+  await expect(page.locator('#toast')).toHaveText('Демо вимкнено');
+  await expect(form.getByLabel(/Вигадані мийки в каталозі/)).not.toBeChecked();
+  await page.goto('/');
+  await expect(page.locator('#list article')).toHaveCount(0);
+  await page.evaluate(() => localStorage.removeItem('carcar.biz.session'));
+  await page.goto('/pro.html');
+  await expect(page.getByLabel('Логін')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Подивитися демо/ })).toHaveCount(0);
+  // Увімкнули знову — каталог повернувся.
+  await page.goto('/admin.html#/demo');
+  await page.locator('#demo-form').getByLabel(/Вигадані мийки в каталозі/).check();
+  await page.locator('#demo-form').getByRole('button', { name: 'Зберегти' }).click();
+  await page.goto('/');
+  await expect(page.locator('#list article')).toHaveCount(9);
+});
