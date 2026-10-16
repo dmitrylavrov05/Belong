@@ -147,7 +147,7 @@ class Store:
             if not ok:
                 return self.ver, view, False
             merged = merge(b, cur, n) if cur is not None else n
-            merged = acl.sanitize(who, key, cur, merged)
+            merged = acl.sanitize(who, key, cur, merged, self.get)
             if merged != cur:
                 self._save(key, merged)
                 if self.on_change:

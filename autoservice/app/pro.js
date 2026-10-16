@@ -14,6 +14,8 @@ import {
 import {
   openStarts, chatPost, chatTimeline, readMessages, msgPreview, touchPresence, BIZ_QUICK, sendMessages, checkWaitlist,
   acceptBooking, declineBooking, expirePending, autoConfirmOf, setAutoConfirm, proposeTime, weeklyDealsOf, daysText, markNoShow, noShowFrom,
+  passesOf, savePasses, sellPass, passActive, passLeft, loyaltyOf, cashDay, shiftsOf, shiftOn, closeShift, salaryFor,
+  stockOf, saveStock, stockLow, useStock, NOTE_TAGS, clientNoteKey, clientNotesOf, saveClientNote,
 } from './ops.js';
 import { ibanValid, normIban, formatIban, codeValid } from './partners.js';
 import { initCalls, startCall, logCall, callHistory, callRowText, callMissed, markCallsRead } from './call.js';
@@ -708,6 +710,8 @@ function bookingSheet(id) {
       ${b.moves?.length ? `<dt>Перенесено</dt><dd>${b.moves.map((m) => `з ${dayLabel(m.date, { day: 'numeric', month: 'short' })}, ${m.time}`).join('; ')}</dd>` : ''}
       ${b.promo && !b.promo.returned ? `<dt>Промокод</dt><dd>${esc(b.promo.code)}: −${uah(b.promo.amount)} для клієнта, доплачує CARCAR — ви отримаєте повну суму</dd>` : ''}
       ${b.installments ? `<dt>Оплата</dt><dd>Частинами · ${b.installments.n} платежі. Ви отримуєте всю суму одразу</dd>` : ''}
+      ${b.loyalty ? `<dt>Лояльність</dt><dd>${b.loyalty.every}-та мийка: −${uah(b.loyalty.amount)} для клієнта (ваша знижка)</dd>` : ''}
+      ${clientNoteKey(b) ? `<dt>Нотатка</dt><dd class="washer-dd"><span>${noteLine(clientNoteKey(b)) || '<span class="muted">немає</span>'}</span><button class="btn soft" type="button" data-action="note-open" data-key="${esc(clientNoteKey(b))}" data-name="${esc(who(b))}">${clientNotesOf(ui.place)[clientNoteKey(b)] ? 'Змінити' : 'Додати'}</button></dd>` : ''}
     </dl>
     ${etaText(b) ? `<p class="notice ok" style="margin:0">${icon('bell', 18)}<span>Клієнт повідомив: ${etaText(b)} (${fmtTime(b.etaAt)}).</span></p>` : ''}
     <div class="grid2">
@@ -1224,7 +1228,14 @@ function viewMore() {
   const pt = partnerOf(ui.place);
   const noReply = reviewsOf().filter((x) => !x.reply).length;
   const answers = placeTickets().filter((t) => t.unreadUser).length;
+  const todayCash = cashDay(bookings, ui.place, todayIso());
+  const low = stockOf(ui.place).filter(stockLow);
+  const pp = passesOf(ui.place);
+  const onSale = pp.plans.filter((x) => x.active !== false).length;
   const links = [
+    ['#/cash', 'card', 'Каса', `Сьогодні: ${uah(todayCash.total)} · ${todayCash.cars} ${plural(todayCash.cars, 'машина', 'машини', 'машин')}${shiftOn(ui.place, todayIso()) ? ' · зміну закрито' : ''}`, 0],
+    ['#/stock', 'drop', 'Витратні матеріали', low.length ? `Закінчується: ${low.map((x) => x.name).join(', ')}` : 'Залишки й списання на кожне авто', low.length],
+    ['#/passes', 'gift', 'Абонементи й лояльність', [onSale ? `${onSale} в продажу` : '', loyaltyOf(ui.place)?.on ? `картка: кожна ${loyaltyOf(ui.place).every}-та` : ''].filter(Boolean).join(' · ') || 'Повертайте клієнтів знижками за візити', 0],
     ['#/reviews', 'star', 'Відгуки', noReply ? `Без відповіді: ${noReply}` : 'Відповіді видно на сторінці мийки', noReply],
     ['#/analytics', 'chart', 'Аналітика', 'Виручка, завантаження по годинах, послуги, клієнти', 0],
     ['#/staff', 'users', 'Мийники', washers().length ? washers().map((w) => w.name).join(', ') : 'Додайте мийників, щоб призначати їх на записи', 0],
@@ -1254,16 +1265,32 @@ function viewMore() {
 }
 
 // Мийники: хто працює на мийці, скільки машин помив за місяць і відсоток від роботи (якщо вказано).
+const SAL_PERIODS = [['day', 'Сьогодні'], ['week', '7 днів'], ['month', 'Цей місяць']];
+function salaryRange(k) {
+  const t = todayIso();
+  return k === 'day' ? [t, t] : k === 'week' ? [shiftDay(t, -6), t] : [`${t.slice(0, 8)}01`, t];
+}
+const rateText = (w) => [w.pct ? `${w.pct}% від роботи` : '', w.perCar ? `${uah(w.perCar)} за авто` : ''].filter(Boolean).join(' + ');
 function viewStaff() {
   const list = washers();
   const from = shiftDay(todayIso(), -29);
   const cars = (id) => own().filter((b) => b.masterId === id && b.state === 'completed' && b.date >= from).length;
+  const per = ui.salP ?? 'month';
+  const [sFrom, sTo] = salaryRange(per);
+  const sal = list.map((w) => ({ w, ...salaryFor(w, bookings, ui.place, sFrom, sTo) }));
+  const total = sal.reduce((a, x) => a + x.pay, 0);
   return `<a class="back" href="#/more">${icon('chevL', 22)}Ще</a><h1>Мийники</h1>
     <p class="lead">Обирайте мийника, коли приймаєте запис. Клієнт бачить, хто митиме машину.</p>
+    ${list.length ? `<section class="pro-card" aria-labelledby="h-sal"><h2 id="h-sal">Зарплата</h2>
+      <div class="chips" role="group" aria-label="Період">${SAL_PERIODS.map(([k, label]) => `<button class="chip" type="button" data-action="sal-period" data-p="${k}" aria-pressed="${k === per}">${label}</button>`).join('')}</div>
+      <ul class="plain-list">${sal.map((x) => `<li><span>${esc(x.w.name)}<br><small class="muted">${x.cars} авто · робіт на ${uah(x.revenue)}${rateText(x.w) ? ` · ${rateText(x.w)}` : ' · ставку не вказано'}</small></span><b>${uah(x.pay)}</b></li>`).join('')}</ul>
+      <div class="money-row"><span>Разом до виплати</span><b>${uah(total)}</b></div>
+      <p class="fine" style="margin:0">Рахується з виконаних записів, де призначено мийника.</p></section>` : ''}
     ${list.length ? `<ul class="client-list">${list.map((w) => `<li>
       <span class="avatar" aria-hidden="true">${firstLetter(w.name)}</span>
-      <span class="cl-main"><b>${esc(w.name)}</b><small>${w.phone ? esc(w.phone) : 'без телефону'}${w.pct ? ` · ${w.pct}% від роботи` : ''}</small><small>За 30 днів: ${cars(w.id)} ${plural(cars(w.id), 'машина', 'машини', 'машин')}</small></span>
-      <button class="btn text-danger" type="button" data-action="washer-del" data-id="${w.id}" aria-label="Прибрати ${esc(w.name)}">Прибрати</button>
+      <span class="cl-main"><b>${esc(w.name)}</b><small>${w.phone ? esc(w.phone) : 'без телефону'}${rateText(w) ? ` · ${rateText(w)}` : ''}</small><small>За 30 днів: ${cars(w.id)} ${plural(cars(w.id), 'машина', 'машини', 'машин')}</small></span>
+      <span class="row"><button class="btn soft" type="button" data-action="washer-rate" data-id="${w.id}" aria-label="Ставка: ${esc(w.name)}">Ставка</button>
+        <button class="btn text-danger" type="button" data-action="washer-del" data-id="${w.id}" aria-label="Прибрати ${esc(w.name)}">Прибрати</button></span>
     </li>`).join('')}</ul>` : `<div class="pro-empty">${icon('users', 32)}<b>Мийників ще немає</b><span>Додайте їх, щоб призначати на записи.</span></div>`}
     <form class="pro-card stack" id="washer-form" aria-labelledby="h-add-w" style="gap:12px;margin-top:12px">
       <h2 id="h-add-w">Додати мийника</h2>
@@ -1271,6 +1298,7 @@ function viewStaff() {
       <div class="grid2">
         <label class="field"><span>Телефон</span><input name="phone" type="tel" autocomplete="off" placeholder="+380"></label>
         <label class="field"><span>% від роботи</span><input name="pct" type="number" min="0" max="100" inputmode="numeric" placeholder="необовʼязково"></label>
+        <label class="field"><span>За авто, ₴</span><input name="perCar" type="number" min="0" inputmode="numeric" placeholder="необовʼязково"></label>
       </div>
       <button class="btn navy" type="submit">Додати</button>
     </form>`;
@@ -1300,7 +1328,7 @@ function viewReviews() {
 function clientsList() {
   const map = new Map();
   for (const b of own()) {
-    const key = b.clientPhone ? phoneKey(b.clientPhone) : `name:${(b.clientName || '').toLowerCase()}`;
+    const key = clientNoteKey(b);
     if (!key || key === 'name:') continue;
     const c = map.get(key) ?? { key, name: b.clientName || 'Клієнт', phone: '', cars: new Set(), visits: 0, spent: 0, last: '', cls: b.cls ?? 0, car: '' };
     // Номер клієнта CARCAR мийка не бачить — лише тих, кого записала сама.
@@ -1326,8 +1354,8 @@ function viewClients() {
     ${list.length ? `<ul class="client-list">${list.slice(0, 100).map((c) => `<li>
       <span class="avatar" aria-hidden="true">${firstLetter(c.name)}</span>
       <span class="cl-main"><b>${esc(c.name)}</b><small>${esc([...c.cars].join(', ') || '—')}</small>
-        <small>${c.visits} ${plural(c.visits, 'візит', 'візити', 'візитів')}${c.spent ? ` · ${uah(c.spent)}` : ''} · востаннє ${dayLabel(c.last, { day: 'numeric', month: 'short' })}</small></span>
-      <span class="row">${c.phone ? `<a class="icon-btn" href="${telHref(c.phone)}" aria-label="Подзвонити: ${esc(c.name)}">${icon('phone', 20)}</a>` : ''}
+        <small>${c.visits} ${plural(c.visits, 'візит', 'візити', 'візитів')}${c.spent ? ` · ${uah(c.spent)}` : ''} · востаннє ${dayLabel(c.last, { day: 'numeric', month: 'short' })}</small>${noteLine(c.key)}</span>
+      <span class="row"><button class="icon-btn" type="button" data-action="note-open" data-key="${esc(c.key)}" data-name="${esc(c.name)}" aria-label="Нотатка: ${esc(c.name)}">${icon('list', 20)}</button>${c.phone ? `<a class="icon-btn" href="${telHref(c.phone)}" aria-label="Подзвонити: ${esc(c.name)}">${icon('phone', 20)}</a>` : ''}
         <button class="btn soft" type="button" data-action="nb-client" data-key="${esc(c.key)}">Записати</button></span>
     </li>`).join('')}</ul>` : `<div class="pro-empty">${icon('users', 32)}<b>${all.length ? 'Нікого не знайдено' : 'Клієнтів ще немає'}</b><span>Тут зʼявляться всі, хто записувався через CARCAR, по телефону чи приїжджав сам.</span></div>`}`;
 }
@@ -1642,13 +1670,184 @@ function demoSeed() {
   toast('Додано приклад записів і повідомлень');
 }
 
+// ---------- каса й зміна ----------
+
+// Матеріали на виконаний запис: списуємо й кажемо, якщо щось закінчується.
+function stockNote(b) {
+  const low = useStock(b);
+  return low.length ? `. Закінчується: ${low.join(', ')}` : '';
+}
+
+const PAY_WORD = { cash: 'готівка', card: 'картка' };
+function viewCash(arg) {
+  const today = todayIso();
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(arg ?? '') && arg <= today ? arg : today;
+  const day = cashDay(bookings, ui.place, date);
+  const shift = shiftOn(ui.place, date);
+  const left = own().filter((b) => b.date === date && (b.state === 'paid' || b.state === 'booked') && isPast(b)).length;
+  const pay = washers().map((w) => ({ w, ...salaryFor(w, bookings, ui.place, date, date) })).filter((x) => x.cars);
+  const reopen = ui.reshift === date;
+  return `${backTo('#/more', 'Ще')}<h1>Каса</h1>
+    <nav class="day-nav" aria-label="День">
+      <a class="btn soft" href="#/cash/${shiftDay(date, -1)}" aria-label="Попередній день">${icon('chevL', 18)}</a>
+      <b>${dayWord(date, true)}</b>
+      ${date < today ? `<a class="btn soft" href="#/cash/${shiftDay(date, 1)}" aria-label="Наступний день">${icon('chevR', 18)}</a>` : '<span style="width:44px"></span>'}
+    </nav>
+    <section class="tiles pro-tiles" aria-label="Підсумки дня">
+      <div class="tile hero"><span>Разом за день</span><b>${uah(day.total)}</b><small>${day.cars} ${plural(day.cars, 'машина', 'машини', 'машин')}</small></div>
+      <div class="tile"><span>Готівка</span><b>${uah(day.cash + day.passCash)}</b></div>
+      <div class="tile"><span>Картка на місці</span><b>${uah(day.card + day.passCard)}</b></div>
+      <div class="tile"><span>Через CARCAR</span><b>${uah(day.carcar)}</b><small>надійде на рахунок</small></div>
+    </section>
+    ${left ? `<p class="notice warn">${left} ${plural(left, 'запис', 'записи', 'записів')} за цей день без позначки — позначте, чим закінчились, щоб каса зійшлася.
+      <button class="btn soft" type="button" data-action="mark-open">Позначити</button></p>` : ''}
+    <section class="pro-card" aria-labelledby="h-cash-list"><h2 id="h-cash-list">Виконані записи</h2>
+      ${day.list.length ? `<ul class="plain-list cash-list">${day.list.sort((a, b) => a.time.localeCompare(b.time)).map((b) => `<li>
+        <span>${b.time} · ${esc(who(b))}<br><small>${esc(b.services.join(', '))}${b.masterId && washerName(b.masterId) ? ` · ${esc(washerName(b.masterId))}` : ''}</small></span>
+        <span style="text-align:right"><b>${uah(sumOf(b))}</b><br><small>${isCarcar(b) ? 'CARCAR' : PAY_WORD[b.payment] ?? 'картка'}</small></span></li>`).join('')}</ul>`
+        : '<p class="small muted" style="margin:0">За цей день виконаних записів немає.</p>'}
+      ${day.passes ? `<div class="money-row"><span>Продано абонементів на місці</span><b>${uah(day.passes)}</b></div>` : ''}
+    </section>
+    ${pay.length ? `<section class="pro-card" aria-labelledby="h-cash-pay"><h2 id="h-cash-pay">Зарплата мийників за день</h2>
+      <ul class="plain-list">${pay.map((x) => `<li><span>${esc(x.w.name)} · ${x.cars} авто</span><b>${uah(x.pay)}</b></li>`).join('')}</ul></section>` : ''}
+    ${shift && !reopen ? `<section class="pro-card" aria-labelledby="h-shift"><h2 id="h-shift">Зміну закрито о ${clock(shift.closedAt)}</h2>
+        <div class="money-row"><span>Має бути готівки</span><b>${uah(shift.drawer)}</b></div>
+        ${shift.counted !== null ? `<div class="money-row"><span>Перелічили</span><b>${uah(shift.counted)}</b></div>
+        <div class="money-row"><span>Розбіжність</span><b>${shift.diff === 0 ? 'немає' : `${shift.diff > 0 ? '+' : '−'}${uah(Math.abs(shift.diff))}`}</b></div>` : ''}
+        ${shift.note ? `<p class="small" style="margin:0">${esc(shift.note)}</p>` : ''}
+        <button class="btn soft" type="button" data-action="shift-reopen" data-date="${date}">Закрити ще раз</button></section>`
+      : `<form class="pro-card stack" id="shift-form" data-date="${date}" aria-labelledby="h-shift" style="gap:10px">
+        <h2 id="h-shift">Закрити зміну</h2>
+        <div class="money-row"><span>Має бути готівки в касі</span><b>${uah(day.drawer)}</b></div>
+        <label class="field"><span>Перелічили готівки, ₴</span><input name="counted" type="number" min="0" inputmode="numeric" placeholder="${day.drawer}"></label>
+        <label class="field"><span>Коментар (необовʼязково)</span><input name="note" maxlength="200" autocomplete="off" placeholder="Наприклад, видали 200 ₴ на хімію"></label>
+        <button class="btn navy" type="submit">Закрити зміну</button>
+      </form>`}
+    ${shiftsOf(ui.place).length ? `<section class="pro-card" aria-labelledby="h-shifts"><h2 id="h-shifts">Останні зміни</h2>
+      <ul class="plain-list">${shiftsOf(ui.place).slice(0, 7).map((x) => `<li><a href="#/cash/${x.date}">${dayLabel(x.date, { weekday: 'short', day: 'numeric', month: 'short' })}</a>
+        <span>${uah(x.total)}${x.diff ? ` · <span class="${x.diff < 0 ? 'bad-text' : ''}">${x.diff > 0 ? '+' : '−'}${uah(Math.abs(x.diff))}</span>` : ''}</span></li>`).join('')}</ul></section>` : ''}`;
+}
+
+// ---------- витратні матеріали ----------
+
+const UNITS = ['л', 'мл', 'кг', 'шт'];
+const num2 = (n) => String(n).replace('.', ',');
+const svcNames = () => [...new Set((place().allServices ?? place().services).filter((x) => !x.off).map((x) => x.name))];
+function viewStock() {
+  const list = stockOf(ui.place);
+  const low = list.filter(stockLow);
+  return `${backTo('#/more', 'Ще')}<h1>Витратні матеріали</h1>
+    <p class="lead">Залишки хімії й матеріалів. Коли позначаєте запис виконаним, витрата на одне авто списується сама.</p>
+    ${low.length ? `<p class="notice warn">${icon('info', 18)}<span>Закінчується: <b>${low.map((x) => esc(x.name)).join(', ')}</b>. Час докупити.</span></p>` : ''}
+    ${list.length ? `<ul class="client-list">${list.map((x) => `<li class="stock-row${stockLow(x) ? ' low' : ''}">
+      <span class="cl-main"><b>${esc(x.name)}: ${num2(x.qty)} ${esc(x.unit)}</b>
+        <small>${Number(x.per) > 0 ? `${num2(x.per)} ${esc(x.unit)} на авто${x.services?.length ? ` · ${esc(x.services.join(', '))}` : ' · усі послуги'}` : 'не списується автоматично'}${Number(x.min) > 0 ? ` · мінімум ${num2(x.min)} ${esc(x.unit)}` : ''}</small>
+        ${Number(x.per) > 0 ? `<small>Вистачить приблизно на ${Math.floor(Number(x.qty) / Number(x.per))} авто</small>` : ''}</span>
+      <span class="row"><button class="btn soft" type="button" data-action="stock-add" data-id="${x.id}" aria-label="Поповнити: ${esc(x.name)}">Поповнити</button>
+        <button class="btn text-danger" type="button" data-action="stock-del" data-id="${x.id}" aria-label="Прибрати: ${esc(x.name)}">Прибрати</button></span>
+    </li>`).join('')}</ul>` : `<div class="pro-empty">${icon('drop', 32)}<b>Матеріалів ще немає</b><span>Додайте шампунь, віск, хімію для салону — і бачитимете, коли докупити.</span></div>`}
+    <form class="pro-card stack" id="stock-form" aria-labelledby="h-add-st" style="gap:12px;margin-top:12px">
+      <h2 id="h-add-st">Додати матеріал</h2>
+      <label class="field"><span>Назва</span><input name="name" required maxlength="60" autocomplete="off" placeholder="Наприклад, шампунь для безконтактної мийки"></label>
+      <div class="grid2">
+        <label class="field"><span>Залишок</span><input name="qty" type="number" min="0" step="0.01" inputmode="decimal" required></label>
+        <label class="field"><span>Одиниця</span><select name="unit">${UNITS.map((u) => `<option>${u}</option>`).join('')}</select></label>
+        <label class="field"><span>Витрата на авто</span><input name="per" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0,2"></label>
+        <label class="field"><span>Мінімум</span><input name="min" type="number" min="0" step="0.01" inputmode="decimal" placeholder="попередити, коли менше"></label>
+      </div>
+      <fieldset class="check-grid"><legend>Для яких послуг (не обрано — для всіх)</legend>
+        ${svcNames().map((n) => `<label class="check-row"><input class="check" type="checkbox" name="services" value="${esc(n)}"><span>${esc(n)}</span></label>`).join('')}
+      </fieldset>
+      <button class="btn navy" type="submit">Додати</button>
+    </form>`;
+}
+
+// ---------- абонементи й картка лояльності ----------
+
+function viewPasses() {
+  const data = passesOf(ui.place);
+  const l = { on: false, every: 6, pct: 100, ...loyaltyOf(ui.place) };
+  const active = data.sold.filter(passActive);
+  const svc = (place().allServices ?? place().services).filter((x) => !x.off);
+  const days = (n) => `${n} ${plural(n, 'день', 'дні', 'днів')}`;
+  return `${backTo('#/more', 'Ще')}<h1>Абонементи й лояльність</h1>
+    <p class="lead">Постійні клієнти повертаються частіше. Абонементи списуються самі під час запису через CARCAR.</p>
+    <form class="pro-card stack" id="loyalty-form" aria-labelledby="h-loy" style="gap:10px">
+      <h2 id="h-loy">Картка лояльності</h2>
+      <label class="check-row"><input class="check" type="checkbox" name="on" ${l.on ? 'checked' : ''}><span><b>Увімкнути</b>
+        <small>Клієнт бачить штампи на сторінці мийки. Рахуються візити через CARCAR; знижку даєте ви.</small></span></label>
+      <div class="grid2">
+        <label class="field"><span>Кожна … мийка</span><select name="every">${[3, 4, 5, 6, 7, 8, 10].map((n) => `<option value="${n}" ${n === l.every ? 'selected' : ''}>${n}-та</option>`).join('')}</select></label>
+        <label class="field"><span>Знижка</span><select name="pct">${[30, 50, 100].map((n) => `<option value="${n}" ${n === l.pct ? 'selected' : ''}>${n === 100 ? 'безкоштовно' : `−${n}%`}</option>`).join('')}</select></label>
+      </div>
+      <button class="btn navy" type="submit">Зберегти</button>
+    </form>
+    <section class="pro-card" aria-labelledby="h-plans"><h2 id="h-plans">Абонементи</h2>
+      ${data.plans.length ? `<ul class="client-list">${data.plans.map((x) => `<li>
+        <span class="cl-main"><b>${esc(x.name)}</b><small>${x.kind === 'sub' ? `${x.visits} ${plural(x.visits, 'візит', 'візити', 'візитів')}` : `сертифікат ${uah(x.amount ?? x.price)}`} · ${uah(x.price)} · діє ${days(x.validDays)}${x.active === false ? ' · знято з продажу' : ''}</small></span>
+        <span class="row">${x.active !== false ? `<button class="btn soft" type="button" data-action="pass-sell" data-id="${x.id}">Продати</button>` : ''}
+          <button class="btn text-danger" type="button" data-action="plan-toggle" data-id="${x.id}">${x.active === false ? 'Повернути' : 'Зняти'}</button></span></li>`).join('')}</ul>`
+        : '<p class="small muted" style="margin:0">Ще немає. Наприклад: «5 мийок за ціною 4».</p>'}
+    </section>
+    <form class="pro-card stack" id="plan-form" aria-labelledby="h-add-plan" style="gap:12px">
+      <h2 id="h-add-plan">Новий абонемент</h2>
+      <label class="field"><span>Назва</span><input name="name" required maxlength="60" autocomplete="off" placeholder="5 мийок кузова"></label>
+      <div class="grid2">
+        <label class="field"><span>Візитів</span><input name="visits" type="number" min="2" max="50" inputmode="numeric" required value="5"></label>
+        <label class="field"><span>Ціна, ₴</span><input name="price" type="number" min="1" inputmode="numeric" required></label>
+        <label class="field"><span>Діє, днів</span><input name="validDays" type="number" min="7" max="365" inputmode="numeric" value="60"></label>
+      </div>
+      <fieldset class="check-grid"><legend>На які послуги (не обрано — на будь-яку)</legend>
+        ${svc.map((x) => `<label class="check-row"><input class="check" type="checkbox" name="services" value="${esc(x.id)}"><span>${esc(x.name)}</span></label>`).join('')}
+      </fieldset>
+      <button class="btn navy" type="submit">Додати абонемент</button>
+    </form>
+    <section class="pro-card" aria-labelledby="h-sold"><h2 id="h-sold">Діючі абонементи клієнтів</h2>
+      ${active.length ? `<ul class="plain-list">${active.map((x) => `<li><span>${esc(x.clientName || 'Клієнт CARCAR')} · ${esc(x.name)}<br><small class="muted">до ${dayLabel(x.validUntil, { day: 'numeric', month: 'short' })}${x.buyer === 'app' ? ' · куплено в CARCAR' : ''}</small></span><b>${passLeft(x)}</b></li>`).join('')}</ul>`
+        : '<p class="small muted" style="margin:0">Поки ніхто не купив.</p>'}
+    </section>`;
+}
+
+function sellSheet(planId) {
+  const plan = passesOf(ui.place).plans.find((x) => x.id === planId);
+  if (!plan) return;
+  openSheet(`Продати: ${esc(plan.name)}`, `<form class="stack" id="sell-form" data-id="${plan.id}" style="gap:12px">
+    <p class="small muted" style="margin:0">${uah(plan.price)} · ${plan.visits} ${plural(plan.visits, 'візит', 'візити', 'візитів')}. Абонемент зʼявиться в застосунку CARCAR у клієнта з цим номером і спишеться під час запису.</p>
+    <label class="field"><span>Імʼя клієнта</span><input name="name" required maxlength="60" autocomplete="off"></label>
+    <label class="field"><span>Телефон клієнта</span><input name="phone" type="tel" required autocomplete="off" placeholder="+380"></label>
+    <div class="seg-row" role="radiogroup" aria-label="Оплата">
+      <label><input type="radio" name="payment" value="card" checked><span>Картка</span></label>
+      <label><input type="radio" name="payment" value="cash"><span>Готівка</span></label></div>
+    <button class="btn primary" type="submit">Продати за ${uah(plan.price)}</button>
+  </form>`);
+}
+
+// ---------- нотатки про клієнта ----------
+
+function noteSheet(key, name) {
+  const n = clientNotesOf(ui.place)[key] ?? { text: '', tags: [] };
+  openSheet(`Нотатка: ${esc(name || 'клієнт')}`, `<form class="stack" id="note-form" data-key="${esc(key)}" style="gap:12px">
+    <p class="small muted" style="margin:0">Бачите лише ви — клієнту нотатки не показуються.</p>
+    <fieldset class="check-grid"><legend>Мітки</legend>
+      ${NOTE_TAGS.map((t) => `<label class="check-row"><input class="check" type="checkbox" name="tags" value="${esc(t)}" ${n.tags.includes(t) ? 'checked' : ''}><span>${esc(t)}</span></label>`).join('')}
+    </fieldset>
+    <label class="field"><span>Нотатка</span><textarea name="text" rows="3" maxlength="500" placeholder="Наприклад: завжди просить віск, дитяче крісло — не знімати">${esc(n.text)}</textarea></label>
+    <button class="btn primary" type="submit">Зберегти</button>
+  </form>`);
+}
+const noteLine = (key) => {
+  const n = key ? clientNotesOf(ui.place)[key] : null;
+  if (!n) return '';
+  return `<span class="tag-row">${n.tags.map((t) => `<span class="tag">${esc(t)}</span>`).join('')}</span>${n.text ? `<small>${esc(n.text)}</small>` : ''}`;
+};
+
 // ---------- оболонка ----------
 
 const TABS = [['', 'Повідомлення', 'chat'], ['bookings', 'Записи', 'calendar'], ['wash', 'Мийка', 'chart'], ['profile', 'Профіль', 'car'], ['more', 'Ще', 'list']];
 
 function renderChrome(page) {
   const badge = { '': unreadCount(), bookings: unmarked().length };
-  const tabOf = page === 'chat' ? '' : ['reviews', 'clients', 'payout', 'support', 'staff'].includes(page) ? 'more' : page === 'analytics' ? 'wash' : page;
+  const tabOf = page === 'chat' ? '' : ['reviews', 'clients', 'payout', 'support', 'staff', 'cash', 'stock', 'passes'].includes(page) ? 'more' : page === 'analytics' ? 'wash' : page;
   $('#tabbar').innerHTML = TABS.map(([id, label, ic]) => `<a href="#/${id}" ${tabOf === id ? 'aria-current="page"' : ''}>
     <span class="tab-ic">${icon(ic, 24)}${badge[id] ? `<span class="tab-count" aria-label="${id ? 'Записи без позначки' : 'Непрочитані'}: ${badge[id]}">${badge[id]}</span>` : ''}</span>${label}</a>`).join('');
   const p = place();
@@ -1713,6 +1912,9 @@ function route() {
   else if (page === 'reviews') view.innerHTML = viewReviews();
   else if (page === 'clients') view.innerHTML = viewClients();
   else if (page === 'staff') view.innerHTML = viewStaff();
+  else if (page === 'cash') view.innerHTML = viewCash(arg);
+  else if (page === 'stock') view.innerHTML = viewStock();
+  else if (page === 'passes') view.innerHTML = viewPasses();
   else if (page === 'payout') view.innerHTML = viewPayout();
   else if (page === 'support') view.innerHTML = viewSupport(arg);
   else if (page === 'analytics') view.innerHTML = viewAnalytics();
@@ -1774,6 +1976,44 @@ document.addEventListener('click', async (e) => {
   };
 
   if (action === 'sheet-close') { closeSheet(); return; }
+  if (action === 'shift-reopen') { ui.reshift = el.dataset.date; rerender(); return; }
+  if (action === 'sal-period') { ui.salP = el.dataset.p; rerender(); return; }
+  if (action === 'note-open') { noteSheet(el.dataset.key, el.dataset.name); return; }
+  if (action === 'pass-sell') { sellSheet(id); return; }
+  if (action === 'plan-toggle') {
+    savePasses(ui.place, { plans: passesOf(ui.place).plans.map((x) => (x.id === id ? { ...x, active: x.active === false } : x)) });
+    rerender();
+    return;
+  }
+  if (action === 'stock-add' || action === 'stock-del') {
+    const list = stockOf(ui.place);
+    const x = list.find((y) => y.id === id);
+    if (!x) return;
+    if (action === 'stock-del') {
+      if (!confirm(`Прибрати «${x.name}» зі складу?`)) return;
+      saveStock(ui.place, list.filter((y) => y.id !== id));
+      rerender();
+      return;
+    }
+    const add = Number(String(prompt(`Скільки додати (${x.unit})?`) ?? '').replace(',', '.'));
+    if (!(add > 0)) return;
+    saveStock(ui.place, list.map((y) => (y.id === id ? { ...y, qty: Math.round((Number(y.qty) + add) * 100) / 100 } : y)));
+    rerender();
+    toast(`${x.name}: +${num2(add)} ${x.unit}`);
+    return;
+  }
+  if (action === 'washer-rate') {
+    const w = staffOf(ui.place).find((x) => x.id === id);
+    if (!w) return;
+    openSheet(`Ставка: ${esc(w.name)}`, `<form class="stack" id="rate-form" data-id="${w.id}" style="gap:12px">
+      <div class="grid2">
+        <label class="field"><span>% від роботи</span><input name="pct" type="number" min="0" max="100" inputmode="numeric" value="${w.pct ?? ''}"></label>
+        <label class="field"><span>За авто, ₴</span><input name="perCar" type="number" min="0" inputmode="numeric" value="${w.perCar ?? ''}"></label>
+      </div>
+      <p class="fine" style="margin:0">Можна вказати одне або обидва: наприклад, 30% від вартості послуг або 100 ₴ за кожне авто.</p>
+      <button class="btn primary" type="submit">Зберегти</button></form>`);
+    return;
+  }
   if (action === 'demo-login') {
     if (hasServer()) {
       const r = await api('auth/biz', { method: 'POST', body: { demo: true } });
@@ -1900,7 +2140,7 @@ document.addEventListener('click', async (e) => {
   }
   if (action === 'mark-done') {
     Object.assign(b, { state: 'completed', payment: 'card', completedAt: Date.now() });
-    after('Запис виконано');
+    after(`Запис виконано${stockNote(b)}`);
     return;
   }
   if (action === 'crm-noshow' || action === 'crm-cancel') {
@@ -2208,20 +2448,22 @@ document.addEventListener('submit', async (e) => {
     const photos = (await Promise.all(d.getAll('photos').filter((x) => x?.size).slice(0, 3).map(shrinkPhoto))).filter(Boolean);
     Object.assign(b, { photos, note: String(d.get('note')).trim() || null, doneAt: Date.now() });
     complete(b);
+    const sn = stockNote(b);
     // Фото не вмістилися в памʼять пристрою — зберігаємо запис без них.
     if (!store.set('bookings', bookings) && photos.length) { b.photos = []; save(); } else save();
     closeSheet();
     rerender();
-    toast('Клієнт отримав сповіщення «Машина готова»');
+    toast(`Клієнт отримав сповіщення «Машина готова»${sn}`);
     return;
   }
   if (f.id === 'done-form') {
     const b = own().find((x) => x.id === f.dataset.id);
     Object.assign(b, { state: 'completed', payment: d.get('payment'), paid: Number(d.get('paid')) || 0, completedAt: Date.now() });
+    const sn = stockNote(b);
     save();
     closeSheet();
     rerender();
-    toast('Запис виконано й оплачено');
+    toast(`Запис виконано й оплачено${sn}`);
     return;
   }
   if (f.matches('.rev-reply')) {
@@ -2234,11 +2476,71 @@ document.addEventListener('submit', async (e) => {
     toast('Відповідь опубліковано на сторінці мийки');
     return;
   }
+  if (f.id === 'shift-form') {
+    const day = cashDay(bookings, ui.place, f.dataset.date);
+    const raw = String(d.get('counted') ?? '').trim();
+    const shift = closeShift(ui.place, day, raw === '' ? null : Number(raw) || 0, String(d.get('note') ?? '').trim());
+    ui.reshift = null;
+    rerender();
+    toast(shift.diff ? `Зміну закрито. Розбіжність: ${shift.diff > 0 ? '+' : '−'}${uah(Math.abs(shift.diff))}` : 'Зміну закрито, каса зійшлася');
+    return;
+  }
+  if (f.id === 'stock-form') {
+    const n = (k) => Math.max(0, Number(String(d.get(k) ?? '').replace(',', '.')) || 0);
+    const item = { id: uid(), name: String(d.get('name')).trim(), unit: String(d.get('unit')), qty: n('qty'), per: n('per'), min: n('min'), services: d.getAll('services').map(String) };
+    if (!item.name) return;
+    saveStock(ui.place, [...stockOf(ui.place), item]);
+    rerender();
+    toast(`${item.name} додано`);
+    return;
+  }
+  if (f.id === 'loyalty-form') {
+    savePasses(ui.place, { loyalty: { on: d.get('on') === 'on', every: Number(d.get('every')) || 6, pct: Number(d.get('pct')) || 100 } });
+    rerender();
+    toast(d.get('on') === 'on' ? 'Картку лояльності ввімкнено — клієнти бачать її на сторінці мийки' : 'Картку лояльності вимкнено');
+    return;
+  }
+  if (f.id === 'plan-form') {
+    const plan = { id: uid(), kind: 'sub', name: String(d.get('name')).trim(), visits: Math.max(2, Number(d.get('visits')) || 5), price: Math.max(1, Number(d.get('price')) || 0),
+      validDays: Math.min(365, Math.max(7, Number(d.get('validDays')) || 60)), services: d.getAll('services').map(String), active: true };
+    if (!plan.name) return;
+    savePasses(ui.place, { plans: [...passesOf(ui.place).plans, plan] });
+    rerender();
+    toast('Абонемент додано — клієнти бачать його на сторінці мийки');
+    return;
+  }
+  if (f.id === 'sell-form') {
+    const plan = passesOf(ui.place).plans.find((x) => x.id === f.dataset.id);
+    const phone = String(d.get('phone')).trim();
+    if (!plan || String(phoneKey(phone) ?? '').length !== 16) { toast('Перевірте номер телефону'); return; }
+    sellPass(ui.place, plan, { clientName: String(d.get('name')).trim(), phone, clientKey: phoneKey(phone), buyer: 'place', source: 'place', payment: String(d.get('payment')) });
+    closeSheet();
+    rerender();
+    toast(`Продано: ${plan.name}. Гроші — у касі за сьогодні`);
+    return;
+  }
+  if (f.id === 'note-form') {
+    saveClientNote(ui.place, f.dataset.key, { text: String(d.get('text') ?? '').trim(), tags: d.getAll('tags').map(String) });
+    closeSheet();
+    rerender();
+    toast('Нотатку збережено');
+    return;
+  }
+  if (f.id === 'rate-form') {
+    const pct = Math.min(100, Math.max(0, Number(d.get('pct')) || 0));
+    const perCar = Math.max(0, Number(d.get('perCar')) || 0);
+    saveWashers(staffOf(ui.place).map((w) => (w.id === f.dataset.id ? { ...w, pct: pct || null, perCar: perCar || null } : w)));
+    closeSheet();
+    rerender();
+    toast('Ставку збережено');
+    return;
+  }
   if (f.id === 'washer-form') {
     const name = String(d.get('name')).trim();
     if (!name) return;
     const pct = Math.min(100, Math.max(0, Number(d.get('pct')) || 0));
-    saveWashers([...staffOf(ui.place), { id: uid(), name, phone: String(d.get('phone')).trim(), role: 'master', pct: pct || null, active: true, createdAt: Date.now() }]);
+    const perCar = Math.max(0, Number(d.get('perCar')) || 0);
+    saveWashers([...staffOf(ui.place), { id: uid(), name, phone: String(d.get('phone')).trim(), role: 'master', pct: pct || null, perCar: perCar || null, active: true, createdAt: Date.now() }]);
     rerender();
     toast(`${name} додано до мийників`);
     return;

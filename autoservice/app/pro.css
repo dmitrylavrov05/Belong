@@ -339,3 +339,13 @@ body.pro.locked .pro-tabs { display: none; }
 .late-preview { margin: 0; padding: 12px 14px; border-radius: 12px; background: var(--soft); font: inherit; font-size: 14px; line-height: 1.45; white-space: pre-wrap; }
 .warn-text { color: var(--warn); font-weight: 600; }
 .pill.lead { background: var(--warn-soft); color: var(--text); }
+
+/* CRM: каса, склад, мітки клієнтів */
+.day-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0 12px; }
+.day-nav b { font-size: 16px; }
+.tag-row { display: flex; flex-wrap: wrap; gap: 4px; }
+.tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--soft); color: var(--text); }
+.stock-row.low b { color: var(--danger); }
+.cash-list li small { color: var(--muted); }
+.check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; border: 0; padding: 0; margin: 0; }
+.check-grid legend { font-size: 14px; color: var(--muted); margin-bottom: 4px; padding: 0; }

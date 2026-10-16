@@ -1224,6 +1224,14 @@ button.convo.call-row { width: 100%; border: 0; background: none; font: inherit;
 .seg-row input:checked + span { background: var(--bg); color: var(--text); box-shadow: 0 1px 3px rgb(16 24 40 / 12%); }
 .seg-row input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
 .settings .check-row small { display: block; font-weight: 400; margin-top: 2px; }
+
+/* Картка лояльності мийки: штампи за візити */
+.loyalty-card { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 14px; margin-top: 14px; }
+.loyalty-card b { display: block; margin-bottom: 2px; }
+.stamps { display: flex; flex-wrap: wrap; gap: 6px; }
+.stamps i { width: 22px; height: 22px; border-radius: 50%; border: 2px dashed var(--line); display: grid; place-items: center; color: var(--muted); }
+.stamps i.on { border: 2px solid var(--accent); background: var(--accent); color: #fff; }
+.stamps i.prize { border-style: solid; }
 </style>
   <style>
     /* Заставка під час запуску: піна, бульбашки, логотип із відблиском і розкриття застосунку колом.
@@ -1626,7 +1634,8 @@ const LOCAL_KEYS = new Set(['auth', 'profile', 'cars', 'carId', 'theme', 'biz.th
   'seenStates', 'cls', 'city', 'favs', 'view', 'mapLayer', 'campaign', 'referral', 'subscriptions', 'auth.token', 'biz.token', 'admin.token', 'pushSub', 'srv.demoPlaces']);
 const shared = (key) => !LOCAL_KEYS.has(key);
 // Журнал подій великий і пишеться часто — відправляємо рідше.
-const PUSH_DELAY = { analytics: 5000, presence: 2000 };
+// Абонементи — трохи пізніше за записи: повернення візиту сервер перевіряє за вже скасованим записом.
+const PUSH_DELAY = { analytics: 5000, presence: 2000, 'biz.passes': 1500 };
 const sync = { on: false, ver: 0, base: new Map(), timers: new Map(), busy: new Set(), poll: null, gen: 0 };
 const syncNotify = (key) => window.dispatchEvent(new StorageEvent('storage', { key: `carcar.${key}` }));
 const syncOn = () => sync.on;
@@ -2989,7 +2998,7 @@ function redeemPass(placeId, soldId, amount, bookingId) {
     return s.kind === 'sub' ? { ...s, visitsLeft: s.visitsLeft - 1, history: h } : { ...s, balance: s.balance - amount, history: h };
   });
   savePasses(placeId, { sold });
-  return { soldId, amount };
+  return { soldId, amount, bookingId };
 }
 
 // Повернути візит чи суму, якщо запис скасовано вчасно.
@@ -2997,8 +3006,8 @@ function restorePass(placeId, use) {
   if (!use) return;
   const data = passesOf(placeId);
   const sold = data.sold.map((s) => (s.id !== use.soldId ? s : s.kind === 'sub'
-    ? { ...s, visitsLeft: s.visitsLeft + 1, history: [...s.history, { at: Date.now(), amount: -use.amount, note: 'повернення' }] }
-    : { ...s, balance: s.balance + use.amount, history: [...s.history, { at: Date.now(), amount: -use.amount, note: 'повернення' }] }));
+    ? { ...s, visitsLeft: s.visitsLeft + 1, history: [...s.history, { at: Date.now(), bookingId: use.bookingId, amount: -use.amount, note: 'повернення' }] }
+    : { ...s, balance: s.balance + use.amount, history: [...s.history, { at: Date.now(), bookingId: use.bookingId, amount: -use.amount, note: 'повернення' }] }));
   savePasses(placeId, { sold });
 }
 
@@ -3105,6 +3114,99 @@ function markNoShow(b, late = false) {
   const placeAmount = Math.round(price(b) * PAYMENT.noShowShare);
   Object.assign(b, { state: 'noshow', placeAmount, refund: 0, closedAt: Date.now(), unfreezeAt: Date.now() + PAYMENT.freezeHours * HOUR, ...(late ? { lateForfeit: true } : {}) });
   return true;
+}
+
+// ---------- картка лояльності ----------
+// Мийка вмикає «кожна N-та мийка — зі знижкою pct%» (100% — безкоштовно). Рахуються візити через CARCAR,
+// виконані в цій мийці; знижку дає сама мийка (з її виручки, комісія CARCAR — з того, що заплатив клієнт).
+const loyaltyOf = (placeId) => passesOf(placeId).loyalty ?? null;
+function loyaltyState(placeId, myBookings) {
+  const l = loyaltyOf(placeId);
+  if (!l?.on || !(l.every >= 2)) return null;
+  const done = myBookings.filter((b) => b.placeId === placeId && b.state === 'completed')
+    .sort((a, b) => (a.completedAt ?? a.createdAt ?? 0) - (b.completedAt ?? b.createdAt ?? 0));
+  let stamps = 0;
+  for (const b of done) stamps = b.loyalty ? 0 : stamps + 1;
+  const reserved = myBookings.some((b) => b.placeId === placeId && b.loyalty && [...ACTIVE, 'unpaid'].includes(b.state));
+  const need = l.every - 1;
+  return { every: l.every, pct: l.pct ?? 100, stamps: Math.min(stamps, need), need, due: !reserved && stamps >= need, reserved };
+}
+
+// ---------- каса й зміни ----------
+// День мийки: виконані записи — готівка й картка на місці (свої клієнти), через CARCAR, продані абонементи.
+function cashDay(bookings, placeId, date) {
+  const list = bookings.filter((b) => b.placeId === placeId && b.date === date && b.state === 'completed');
+  const out = { date, cars: list.length, cash: 0, card: 0, carcar: 0, passes: 0, passCash: 0, passCard: 0, list };
+  for (const b of list) {
+    if (isCarcar(b)) out.carcar += price(b);
+    else if (b.payment === 'cash') out.cash += Number(b.paid) || 0;
+    else out.card += Number(b.paid) || 0;
+  }
+  for (const x of passesOf(placeId).sold) {
+    if (x.buyer !== 'place' || isoDate(new Date(x.soldAt)) !== date) continue;
+    out.passes += x.price;
+    if (x.payment === 'cash') out.passCash += x.price; else out.passCard += x.price;
+  }
+  out.total = out.cash + out.card + out.carcar + out.passes;
+  out.drawer = out.cash + out.passCash; // має бути в касі готівкою
+  return out;
+}
+const shiftsOf = (placeId) => store.peek('biz.shifts', []).filter((x) => x.placeId === placeId).sort((a, b) => b.date.localeCompare(a.date));
+const shiftOn = (placeId, date) => shiftsOf(placeId).find((x) => x.date === date) ?? null;
+function closeShift(placeId, day, counted, note) {
+  const shift = {
+    id: `${placeId}:${day.date}`, placeId, date: day.date, cars: day.cars, cash: day.cash, card: day.card, carcar: day.carcar, passes: day.passes,
+    total: day.total, drawer: day.drawer, counted, diff: counted === null ? null : counted - day.drawer, note, closedAt: Date.now(),
+  };
+  store.set('biz.shifts', [...store.get('biz.shifts', []).filter((x) => x.id !== shift.id), shift]);
+  return shift;
+}
+
+// ---------- зарплата мийників ----------
+// Відсоток від вартості послуг і/або фіксована сума за авто — з виконаних записів, де призначено цього мийника.
+function salaryFor(w, bookings, placeId, from, to) {
+  const list = bookings.filter((b) => b.placeId === placeId && b.masterId === w.id && b.state === 'completed' && b.date >= from && b.date <= to);
+  const revenue = list.reduce((a, b) => a + (isCarcar(b) ? price(b) : Number(b.paid) || 0), 0);
+  const pay = Math.round((revenue * (Number(w.pct) || 0)) / 100 + list.length * (Number(w.perCar) || 0));
+  return { cars: list.length, revenue, pay };
+}
+
+// ---------- витратні матеріали ----------
+// Для кожного матеріалу: залишок, мінімум (нижче — попередження) і витрата на одне авто для обраних послуг.
+const stockOf = (placeId) => store.peek('biz.stock', {})[placeId] ?? [];
+function saveStock(placeId, list) {
+  store.set('biz.stock', { ...store.get('biz.stock', {}), [placeId]: list });
+}
+const stockLow = (x) => Number(x.min) > 0 && Number(x.qty) <= Number(x.min);
+const round2 = (n) => Math.round(n * 100) / 100;
+// Списати матеріали на виконаний запис (один раз). Повертає назви тих, що щойно стали на мінімумі.
+function useStock(b) {
+  if (b.stockUsed) return [];
+  b.stockUsed = true;
+  const list = stockOf(b.placeId);
+  const low = [];
+  const next = list.map((x) => {
+    const hit = Number(x.per) > 0 && (!x.services?.length || b.services.some((n) => x.services.includes(n)));
+    if (!hit) return x;
+    const y = { ...x, qty: Math.max(0, round2(Number(x.qty) - Number(x.per))) };
+    if (!stockLow(x) && stockLow(y)) low.push(x.name);
+    return y;
+  });
+  if (list.length) saveStock(b.placeId, next);
+  return low;
+}
+
+// ---------- нотатки й мітки про клієнтів ----------
+// Бачить лише мийка (на сервері — тільки її акаунт). Клієнт CARCAR — за хешем номера, свій — за номером.
+const NOTE_TAGS = ['VIP', 'Постійний', 'Любить віск', 'Без поспіху', 'Проблемний'];
+const clientNoteKey = (b) => (b.clientId && b.clientId !== 'device' ? b.clientId
+  : b.clientPhone ? phoneKey(b.clientPhone) ?? b.clientPhone : b.clientName ? `name:${b.clientName.toLowerCase()}` : null);
+const clientNotesOf = (placeId) => store.peek('biz.clientNotes', {})[placeId] ?? {};
+function saveClientNote(placeId, key, note) {
+  const all = store.get('biz.clientNotes', {});
+  const mine = { ...(all[placeId] ?? {}) };
+  if (!note.text && !note.tags.length) delete mine[key]; else mine[key] = { ...note, at: Date.now() };
+  store.set('biz.clientNotes', { ...all, [placeId]: mine });
 }
 
 // Інтерактивна карта з двома шарами:
@@ -4424,16 +4526,32 @@ function dayDealsBar(p, date) {
 
 // ---------- абонементи й сертифікати ----------
 
+// Картка лояльності: штампи за візити через CARCAR.
+function loyaltyCard(p) {
+  const ls = loyaltyState(p.id, mine());
+  if (!ls || !isListed(p)) return '';
+  const left = ls.need - ls.stamps;
+  const prize = ls.pct === 100 ? 'безкоштовна' : `зі знижкою ${ls.pct}%`;
+  return `<section class="card loyalty-card" aria-label="Картка лояльності">
+      <div><b>Кожна ${ls.every}-та мийка — ${prize}</b>
+        <span class="small">${ls.due ? 'Наступний запис уже зі знижкою — вона застосується під час оплати.' : ls.reserved ? 'Знижку застосовано до вашого запису.' : `Ще ${left} ${plural(left, 'візит', 'візити', 'візитів')} через CARCAR — і ${prize}.`}</span></div>
+      <div class="stamps" role="img" aria-label="${ls.stamps} з ${ls.need} візитів">${Array.from({ length: ls.need }, (_, i) => `<i class="${i < ls.stamps ? 'on' : ''}"></i>`).join('')}<i class="prize${ls.due ? ' on' : ''}">${icon('gift', 14)}</i></div>
+    </section>`;
+}
+
 function passesBlock(p) {
   const plans = passesOf(p.id).plans.filter((x) => x.active !== false);
-  if (!plans.length || !isListed(p)) return '';
-  const mineHere = passesOf(p.id).sold.filter((x) => x.buyer === 'app' && passActive(x));
-  return `<h2 class="big" id="passes">Абонементи й сертифікати</h2>
+  if (!plans.length || !isListed(p)) return loyaltyCard(p);
+  const mineHere = passesOf(p.id).sold.filter((x) => (x.buyer === 'app' || myKeys().includes(x.clientKey)) && passActive(x));
+  // З оплатою карткою (LiqPay) абонемент поки купують на мийці: він зʼявиться тут за номером телефону.
+  const onSite = srv?.payments === 'liqpay';
+  return `${loyaltyCard(p)}<h2 class="big" id="passes">Абонементи й сертифікати</h2>
     ${mineHere.length ? `<p class="small" style="margin:-6px 0 0">У вас: ${mineHere.map((x) => `${esc(x.name)} — ${passLeft(x)}`).join('; ')}</p>` : ''}
     <div class="list">${plans.map((x) => `<div class="item pass-item">
       <span class="name">${esc(x.name)}<small>${x.kind === 'sub' ? `${x.visits} ${plural(x.visits, 'візит', 'візити', 'візитів')} на ${x.validDays} ${plural(x.validDays, 'день', 'дні', 'днів')}` : `номінал ${uah(x.amount)} · діє ${x.validDays} ${plural(x.validDays, 'день', 'дні', 'днів')}`}</small></span>
-      <button class="btn" data-action="buy-pass" data-place="${p.id}" data-id="${x.id}" aria-label="Купити: ${esc(x.name)} за ${uah(x.price)}">${uah(x.price)}</button>
+      ${onSite ? `<span class="price">${uah(x.price)}</span>` : `<button class="btn" data-action="buy-pass" data-place="${p.id}" data-id="${x.id}" aria-label="Купити: ${esc(x.name)} за ${uah(x.price)}">${uah(x.price)}</button>`}
     </div>`).join('')}</div>
+    ${onSite ? '<p class="small">Купити абонемент можна на мийці — назвіть свій номер, і він зʼявиться тут.</p>' : ''}
     <p class="small muted">Абонемент списується автоматично під час запису на послуги, на які він діє. Сертифікат можна подарувати — кодом оплачують запис.</p>`;
 }
 
@@ -4687,6 +4805,9 @@ function quote(p) {
     covered = ok.length ? Math.max(...ok) : 0;
     use = { kind: 'sub', soldId: sub.id, name: sub.name, left: sub.visitsLeft };
   }
+  // Картка лояльності мийки: кожна N-та мийка зі знижкою (за рахунок мийки).
+  const ls = loyaltyState(p.id, mine());
+  const loyalty = ls?.due && chosen.length ? { pct: ls.pct, every: ls.every, amount: Math.round(((total - covered) * ls.pct) / 100) } : null;
   // Промокод CARCAR: введений клієнтом або акція, що діє автоматично; '' — клієнт відмовився.
   const items = chosen.map((s) => ({ cat: serviceCat(s), price: priceOf(s) }));
   let promo = null;
@@ -4696,10 +4817,10 @@ function quote(p) {
     const fromLink = draft.promo === undefined && campaignNow()?.code ? promosAll().find((x) => x.code === campaignNow().code && promoFor(x, p, items).ok) : null;
     const pr = draft.promo ? promosAll().find((x) => x.code === draft.promo) : fromLink ?? promosAll().find((x) => x.auto && promoFor(x, p, items).ok);
     const r = pr ? promoFor(pr, p, items) : draft.promo ? { ok: false, why: 'Такого промокоду немає' } : null;
-    if (r?.ok) promo = { code: pr.code, title: pr.title, amount: Math.min(r.amount, total - covered) };
+    if (r?.ok) promo = { code: pr.code, title: pr.title, amount: Math.min(r.amount, total - covered - (loyalty?.amount ?? 0)) };
     else if (draft.promo) promoErr = r.why;
   }
-  const rest = total - covered - (promo?.amount ?? 0);
+  const rest = total - covered - (loyalty?.amount ?? 0) - (promo?.amount ?? 0);
   const bonus = draft.useBonus !== false ? bonusFor(rest) : 0;
   const fromBal = draft.useMoney !== false ? Math.min(wallet.money, rest - bonus) : 0;
   const card = rest - bonus - fromBal;
@@ -4708,7 +4829,7 @@ function quote(p) {
   const parts = canParts && PAYMENT.installments.parts.includes(draft.parts) ? draft.parts : 0;
   const monthly = parts ? Math.ceil(card / parts) : 0;
   return {
-    cls, list, chosen, minutes, deal: total < listTotal ? deal : null, listTotal, total, fee, subs, covered, use, promo, promoErr, rest, bonus, fromBal, card,
+    cls, list, chosen, minutes, deal: total < listTotal ? deal : null, listTotal, total, fee, subs, covered, use, loyalty, promo, promoErr, rest, bonus, fromBal, card,
     canParts, parts, installments: parts ? { n: parts, monthly, first: card - monthly * (parts - 1) } : null,
   };
 }
@@ -4761,8 +4882,9 @@ function renderBook() {
   const step = draft.paying ? 'pay' : draft.step === 'time' && chosen.length && where.ok ? 'time' : 'svc';
   const when = draft.time ? `${dayLabel(draft.date, { day: 'numeric', month: 'long' })}, ${draft.time}` : '';
   const pills = `${q.deal ? `<p class="save-pill">${icon('bolt', 14)}${dealName(q.deal)} −${q.deal.pct}%: ви економите ${uah(q.listTotal - total)}</p>` : ''}
-      ${q.promo ? `<p class="save-pill">${icon('gift', 14)}${esc(q.promo.title)}: −${uah(q.promo.amount)} за промокодом ${esc(q.promo.code)}</p>` : ''}`;
-  const priceTag = `${q.deal || q.promo ? `<s class="muted">${uah(q.listTotal)}</s> ` : ''}${uah(q.rest)}`;
+      ${q.promo ? `<p class="save-pill">${icon('gift', 14)}${esc(q.promo.title)}: −${uah(q.promo.amount)} за промокодом ${esc(q.promo.code)}</p>` : ''}
+      ${q.loyalty ? `<p class="save-pill">${icon('gift', 14)}Картка лояльності: ця мийка ${q.loyalty.pct === 100 ? 'безкоштовна' : `зі знижкою ${q.loyalty.pct}%`}</p>` : ''}`;
+  const priceTag = `${q.deal || q.promo || q.loyalty ? `<s class="muted">${uah(q.listTotal)}</s> ` : ''}${uah(q.rest)}`;
   let html = '';
 
   if (step === 'svc') {
@@ -4869,6 +4991,7 @@ function renderBook() {
           ${q.fee ? line(`Виїзд до вас: ${draft.addr.text}`, q.fee) : ''}
           ${q.deal ? line(`${dealName(q.deal)} −${q.deal.pct}%`, q.listTotal - total, true) : ''}
           ${q.covered ? line(q.use.kind === 'sub' ? q.use.name : 'Сертифікат', q.covered, true) : ''}
+          ${q.loyalty ? line(`Картка лояльності: ${q.loyalty.every}-та мийка${q.loyalty.pct === 100 ? ' безкоштовно' : ` −${q.loyalty.pct}%`}`, q.loyalty.amount, true) : ''}
           ${q.promo ? line(`Промокод ${q.promo.code}`, q.promo.amount, true) : ''}
           ${bonus ? line('Бонус «Приведи друга»', bonus, true) : ''}
           ${fromBal ? line('Баланс CARCAR', fromBal, true) : ''}
@@ -5009,6 +5132,7 @@ function confirmBooking() {
     personal: chosen.filter((x) => x.personal).map((x) => x.id),
     mobile: mobileMode() ? { address: draft.addr.text.trim(), lat: draft.addr.lat, lng: draft.addr.lng, fee: q.fee, km: Math.round(addrCheck(p).km * 10) / 10 } : null,
     promo: q.promo ? { code: q.promo.code, amount: q.promo.amount } : null,
+    loyalty: q.loyalty,
     campaign: campaignNow()?.id ?? null,
     firstOrder: !mine().some(realOrder),
     installments: q.installments ? { ...q.installments, card: q.card } : null,

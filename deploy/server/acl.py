@@ -52,6 +52,66 @@ def pick(d, keys):
     return {k: d[k] for k in keys if k in d}
 
 
+# Поля, за якими можна дізнатися номер клієнта CARCAR. Мийці замість них — хеш (впізнати клієнта можна, номер — ні).
+ID_FIELDS = ('clientId', 'clientKey', 'clientPhone')
+
+
+def mask_ids(x):
+    """Запис чи повідомлення, як його бачить мийка: без номера клієнта CARCAR (свої записи мийки — як є)."""
+    if not isinstance(x, dict) or x.get('source'):
+        return x
+    y = dict(x)
+    for f in ID_FIELDS:
+        v = y.get(f)
+        if isinstance(v, str) and v and not hidden_phone(v) and (f == 'clientPhone' or v.startswith('tel:')):
+            y[f] = phone_hash(v)
+    return y
+
+
+def unmask_ids(who, merged, cur_items, get):
+    """Мийка повертає змінене з хешами — підставляємо справжні номери (лише клієнтів її мийок)."""
+    tel, raw = {}, {}
+
+    def add(items):
+        for x in items or []:
+            if not isinstance(x, dict) or not owns(who, x.get('placeId'), get):
+                continue
+            for f in ID_FIELDS:
+                v = x.get(f)
+                if not isinstance(v, str) or not v or hidden_phone(v):
+                    continue
+                h = phone_hash(v)
+                if not h:
+                    continue
+                if f == 'clientPhone':
+                    raw.setdefault(h, v)
+                elif v.startswith('tel:'):
+                    tel[h] = v
+    add(get('bookings'))
+    add(get('requests'))
+    add(cur_items)
+
+    def fix(x):
+        if not isinstance(x, dict) or not any(hidden_phone(x.get(f)) for f in ID_FIELDS):
+            return x
+        y = dict(x)
+        for f in ID_FIELDS:
+            if hidden_phone(y.get(f)):
+                real = raw.get(y[f]) if f == 'clientPhone' else tel.get(y[f])
+                if real:
+                    y[f] = real
+        return y
+    if isinstance(merged, list):
+        return [fix(x) for x in merged]
+    if isinstance(merged, dict):
+        return {k: fix(v) for k, v in merged.items()}
+    return merged
+
+
+# Ключі, у яких мийка бачить клієнтів CARCAR лише за хешем номера.
+MASKED_KEYS = ('bookings', 'requests', 'messages', 'calls', 'callLog', 'waitlist', 'support')
+
+
 class Who:
     """Хто робить запит. places — мийки, якими керує акаунт (рахуються наживо з biz.accounts)."""
 
@@ -113,10 +173,7 @@ def read_bookings(who, value, get):
         if who.admin:
             out.append(b)
         elif owns(who, b.get('placeId'), get):
-            x = dict(b)
-            if not b.get('source') and b.get('clientPhone'):
-                x['clientPhone'] = phone_hash(b['clientPhone'])  # клієнт CARCAR — номер прихований
-            out.append(x)
+            out.append(mask_ids(b))  # клієнт CARCAR — номер прихований
         elif who.is_client(_client_of(b)):
             out.append(b)
         else:
@@ -153,10 +210,7 @@ def read_requests(who, value, get):
         if who.admin or who.is_client(_client_of(r)):
             out.append(r)
         elif owns(who, r.get('placeId'), get):
-            x = dict(r)
-            if r.get('clientPhone'):
-                x['clientPhone'] = phone_hash(r['clientPhone'])
-            out.append(x)
+            out.append(mask_ids(r))
     return out
 
 
@@ -171,8 +225,13 @@ def write_by_place_or_client(who, item, cur, get):
 def read_client_items(field):
     """Списки, де власник — клієнт у полі field (clientKey / clientId), а мийка — за placeId."""
     def read(who, value, get):
-        return [x for x in value or [] if who.admin or who.is_client(x.get(field) or x.get('clientId'))
-                or owns(who, x.get('placeId'), get)]
+        out = []
+        for x in value or []:
+            if who.admin or who.is_client(x.get(field) or x.get('clientId')):
+                out.append(x)
+            elif owns(who, x.get('placeId'), get):
+                out.append(mask_ids(x))
+        return out
     return read
 
 
@@ -210,9 +269,13 @@ def write_review(who, item, cur, get):
 
 
 def read_tickets(who, value, get):
-    return [t for t in value or [] if who.admin or who.is_client(t.get('clientKey'))
-            or (t.get('from') == 'client' and who.role == 'client' and phone_key(t.get('clientPhone')) == who.cid)
-            or owns(who, t.get('placeId'), get)]
+    out = []
+    for t in value or []:
+        if who.admin or who.is_client(t.get('clientKey')) or (t.get('from') == 'client' and who.role == 'client' and phone_key(t.get('clientPhone')) == who.cid):
+            out.append(t)
+        elif owns(who, t.get('placeId'), get):
+            out.append(mask_ids(t))
+    return out
 
 
 def write_ticket(who, item, cur, get):
@@ -270,8 +333,22 @@ def write_partner(who, pid, cur, get):
 
 
 def read_staff(who, value, get):
-    return {pid: (lst if who.admin or owns(who, pid, get) else [{k: v for k, v in w.items() if k != 'phone'} for w in lst or []])
+    # Клієнти бачать імена мийників (хто митиме), але не телефони й не зарплату.
+    return {pid: (lst if who.admin or owns(who, pid, get) else [{k: v for k, v in w.items() if k not in ('phone', 'pct', 'perCar', 'paid')} for w in lst or []])
             for pid, lst in (value or {}).items()}
+
+
+def read_own_dict(who, value, get):
+    """Внутрішнє мийки (каса, склад, нотатки про клієнтів): лише її власні мийки."""
+    return {pid: v for pid, v in (value or {}).items() if who.admin or owns(who, pid, get)}
+
+
+def read_own_list(who, value, get):
+    return [x for x in value or [] if who.admin or owns(who, x.get('placeId'), get)]
+
+
+def write_own_list(who, item, cur, get):
+    return owns(who, item.get('placeId'), get) and (cur is None or owns(who, cur.get('placeId'), get))
 
 
 def read_accounts(who, value, get):
@@ -301,17 +378,31 @@ def write_wallet_key(who, key):
 
 
 def read_calls(who, value, get):
-    return {cid: c for cid, c in (value or {}).items() if who.admin or who.is_client(c.get('clientId')) or owns(who, c.get('placeId'), get)}
+    out = {}
+    for cid, c in (value or {}).items():
+        if who.admin or who.is_client(c.get('clientId')):
+            out[cid] = c
+        elif owns(who, c.get('placeId'), get):
+            out[cid] = mask_ids(c)
+    return out
 
 
 def write_call(who, key, cur, get, item=None):
     c = item or cur or {}
     ok = lambda x: who.admin or who.is_client(x.get('clientId')) or owns(who, x.get('placeId'), get)
+    if who.role == 'place' and cur is not None and not owns(who, cur.get('placeId'), get):
+        return False
     return ok(c) and (cur is None or ok(cur))
 
 
 def read_calllog(who, value, get):
-    return [x for x in value or [] if who.admin or who.is_client(x.get('clientId')) or owns(who, x.get('placeId'), get)]
+    out = []
+    for x in value or []:
+        if who.admin or who.is_client(x.get('clientId')):
+            out.append(x)
+        elif owns(who, x.get('placeId'), get):
+            out.append(mask_ids(x))
+    return out
 
 
 def write_calllog(who, item, cur, get):
@@ -372,7 +463,10 @@ POLICIES = {
     'biz.power':       ('dict', read_all, write_place_key),
     'biz.queue':       ('dict', read_all, write_place_key),
     'biz.queueOn':     ('dict', read_all, write_place_key),
-    'biz.passes':      ('dict', read_passes, write_place_key),
+    'biz.passes':      ('dict', read_passes, lambda w, k, c, g: owns(w, k, g) or (w.role == 'client' and c is not None)),
+    'biz.stock':       ('dict', read_own_dict, write_place_key),
+    'biz.clientNotes': ('dict', read_own_dict, write_place_key),
+    'biz.shifts':      ('list', read_own_list, write_own_list),
     'presence':        ('dict', read_all, write_place_key),
     'calls':           ('dict', read_calls, write_call),
     'admin.settings':  ('raw', read_all, write_admin),
@@ -463,10 +557,77 @@ def _paid_bookings(who, cur, merged):
     return out
 
 
-def sanitize(who, key, cur, merged):
+def _client_pass_change(who, old, s, get_bookings):
+    """Списати візит (суму) клієнт може сам. Повернути — лише за свій скасований запис, з якого списувалось, і один раз."""
+    hist_old = old.get('history') or []
+    hist_new = s.get('history') if isinstance(s.get('history'), list) else hist_old
+    if hist_new[:len(hist_old)] != hist_old:
+        return old  # історію не переписуємо
+    added = hist_new[len(hist_old):]
+    field = 'visitsLeft' if old.get('kind') == 'sub' else 'balance'
+    try:
+        want = float(s.get(field, old.get(field)) or 0)
+        was = float(old.get(field) or 0)
+    except (TypeError, ValueError):
+        return old
+    allowed_up = 0.0
+    mine = {b.get('id'): b for b in get_bookings() or [] if isinstance(b, dict) and who.is_client(b.get('clientId'))}
+    redeemed = {h.get('bookingId') for h in hist_old if isinstance(h, dict) and (h.get('amount') or 0) > 0}
+    refunded = {h.get('bookingId') for h in hist_old if isinstance(h, dict) and (h.get('amount') or 0) < 0}
+    for h in added:
+        if not isinstance(h, dict) or (h.get('amount') or 0) >= 0:
+            continue
+        bid = h.get('bookingId')
+        b = mine.get(bid)
+        if b and bid in redeemed and bid not in refunded and b.get('state') in ('cancelled', 'refunded'):
+            refunded.add(bid)
+            allowed_up += 1 if field == 'visitsLeft' else -float(h.get('amount') or 0)
+    want = max(0.0, min(want, was + allowed_up))
+    if old.get('visits') is not None and field == 'visitsLeft':
+        want = min(want, float(old['visits']))
+    return {**old, 'history': hist_new, field: int(want) if field == 'visitsLeft' else want}
+
+
+def _client_passes(who, cur, merged, get_bookings):
+    """Клієнт у biz.passes: лише купує собі абонемент чи списує власний візит. Плани, картку лояльності
+    й чужі абонементи не змінює (і не бачить)."""
+    out = {}
+    for pid, cur_p in (cur or {}).items():
+        cur_p = cur_p or {}
+        new_p = (merged or {}).get(pid) or {}
+        mine = lambda s: isinstance(s, dict) and who.is_client(s.get('clientKey'))
+        cur_sold = {s.get('id'): s for s in cur_p.get('sold') or [] if isinstance(s, dict)}
+        keep = [s for s in cur_p.get('sold') or [] if not mine(s)]
+        own = []
+        for s in new_p.get('sold') or []:
+            if not mine(s):
+                continue
+            old = cur_sold.get(s.get('id'))
+            if old is None:
+                if REQUIRE_PAYMENT:
+                    continue  # з оплатою карткою абонемент продає мийка (оплата на місці) — без банку не «купиш»
+                plan = next((x for x in cur_p.get('plans') or [] if x.get('id') == s.get('planId')), None)
+                if not plan or plan.get('active') is False:
+                    continue
+                s = {**s, 'price': plan.get('price'), 'visits': plan.get('visits'), 'services': plan.get('services') or []}
+                if s.get('kind') == 'sub':
+                    s['visitsLeft'] = plan.get('visits')
+                own.append(s)
+            else:
+                own.append(_client_pass_change(who, old, s, get_bookings))
+        out[pid] = {**cur_p, 'sold': keep + own}
+    return out
+
+
+def sanitize(who, key, cur, merged, get=None):
     """Поля, які роль не може змінити навіть у своєму: статус перевірки мийки, пароль, вміст відгуку тощо."""
     if who.admin or merged is None:
         return merged
+    if who.role == 'place' and key in MASKED_KEYS and get is not None:
+        cur_items = list(cur.values()) if isinstance(cur, dict) else cur
+        merged = unmask_ids(who, merged, cur_items, get)
+    if key == 'biz.passes' and who.role == 'client' and isinstance(merged, dict):
+        return _client_passes(who, cur, merged, lambda: get('bookings') if get else [])
     if key == 'bookings' and REQUIRE_PAYMENT and isinstance(merged, list):
         merged = _paid_bookings(who, cur, merged)
     if key == 'partners' and who.role == 'place':

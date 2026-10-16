@@ -4,7 +4,7 @@
 import { PLACES, PAYMENT } from './data.js';
 import {
   store, uid, isoDate, parseDate, hhmm, toMin, plural, hoursFor, scheduleOf, inBreak, BLOCKING, phoneKey, isListed, weekdayOf,
-  spanOf, laneCap, sameLane, MOBILE_ROAD, creditClient, creditBonus, chargedOf, confirmBy, offerBy, pauseOf, price, HOUR,
+  spanOf, laneCap, sameLane, MOBILE_ROAD, creditClient, creditBonus, chargedOf, confirmBy, offerBy, pauseOf, price, HOUR, isCarcar, ACTIVE,
 } from './core.js';
 
 const opsToday = () => isoDate(new Date());
@@ -313,7 +313,7 @@ export function redeemPass(placeId, soldId, amount, bookingId) {
     return s.kind === 'sub' ? { ...s, visitsLeft: s.visitsLeft - 1, history: h } : { ...s, balance: s.balance - amount, history: h };
   });
   savePasses(placeId, { sold });
-  return { soldId, amount };
+  return { soldId, amount, bookingId };
 }
 
 // Повернути візит чи суму, якщо запис скасовано вчасно.
@@ -321,8 +321,8 @@ export function restorePass(placeId, use) {
   if (!use) return;
   const data = passesOf(placeId);
   const sold = data.sold.map((s) => (s.id !== use.soldId ? s : s.kind === 'sub'
-    ? { ...s, visitsLeft: s.visitsLeft + 1, history: [...s.history, { at: Date.now(), amount: -use.amount, note: 'повернення' }] }
-    : { ...s, balance: s.balance + use.amount, history: [...s.history, { at: Date.now(), amount: -use.amount, note: 'повернення' }] }));
+    ? { ...s, visitsLeft: s.visitsLeft + 1, history: [...s.history, { at: Date.now(), bookingId: use.bookingId, amount: -use.amount, note: 'повернення' }] }
+    : { ...s, balance: s.balance + use.amount, history: [...s.history, { at: Date.now(), bookingId: use.bookingId, amount: -use.amount, note: 'повернення' }] }));
   savePasses(placeId, { sold });
 }
 
@@ -429,4 +429,97 @@ export function markNoShow(b, late = false) {
   const placeAmount = Math.round(price(b) * PAYMENT.noShowShare);
   Object.assign(b, { state: 'noshow', placeAmount, refund: 0, closedAt: Date.now(), unfreezeAt: Date.now() + PAYMENT.freezeHours * HOUR, ...(late ? { lateForfeit: true } : {}) });
   return true;
+}
+
+// ---------- картка лояльності ----------
+// Мийка вмикає «кожна N-та мийка — зі знижкою pct%» (100% — безкоштовно). Рахуються візити через CARCAR,
+// виконані в цій мийці; знижку дає сама мийка (з її виручки, комісія CARCAR — з того, що заплатив клієнт).
+export const loyaltyOf = (placeId) => passesOf(placeId).loyalty ?? null;
+export function loyaltyState(placeId, myBookings) {
+  const l = loyaltyOf(placeId);
+  if (!l?.on || !(l.every >= 2)) return null;
+  const done = myBookings.filter((b) => b.placeId === placeId && b.state === 'completed')
+    .sort((a, b) => (a.completedAt ?? a.createdAt ?? 0) - (b.completedAt ?? b.createdAt ?? 0));
+  let stamps = 0;
+  for (const b of done) stamps = b.loyalty ? 0 : stamps + 1;
+  const reserved = myBookings.some((b) => b.placeId === placeId && b.loyalty && [...ACTIVE, 'unpaid'].includes(b.state));
+  const need = l.every - 1;
+  return { every: l.every, pct: l.pct ?? 100, stamps: Math.min(stamps, need), need, due: !reserved && stamps >= need, reserved };
+}
+
+// ---------- каса й зміни ----------
+// День мийки: виконані записи — готівка й картка на місці (свої клієнти), через CARCAR, продані абонементи.
+export function cashDay(bookings, placeId, date) {
+  const list = bookings.filter((b) => b.placeId === placeId && b.date === date && b.state === 'completed');
+  const out = { date, cars: list.length, cash: 0, card: 0, carcar: 0, passes: 0, passCash: 0, passCard: 0, list };
+  for (const b of list) {
+    if (isCarcar(b)) out.carcar += price(b);
+    else if (b.payment === 'cash') out.cash += Number(b.paid) || 0;
+    else out.card += Number(b.paid) || 0;
+  }
+  for (const x of passesOf(placeId).sold) {
+    if (x.buyer !== 'place' || isoDate(new Date(x.soldAt)) !== date) continue;
+    out.passes += x.price;
+    if (x.payment === 'cash') out.passCash += x.price; else out.passCard += x.price;
+  }
+  out.total = out.cash + out.card + out.carcar + out.passes;
+  out.drawer = out.cash + out.passCash; // має бути в касі готівкою
+  return out;
+}
+export const shiftsOf = (placeId) => store.peek('biz.shifts', []).filter((x) => x.placeId === placeId).sort((a, b) => b.date.localeCompare(a.date));
+export const shiftOn = (placeId, date) => shiftsOf(placeId).find((x) => x.date === date) ?? null;
+export function closeShift(placeId, day, counted, note) {
+  const shift = {
+    id: `${placeId}:${day.date}`, placeId, date: day.date, cars: day.cars, cash: day.cash, card: day.card, carcar: day.carcar, passes: day.passes,
+    total: day.total, drawer: day.drawer, counted, diff: counted === null ? null : counted - day.drawer, note, closedAt: Date.now(),
+  };
+  store.set('biz.shifts', [...store.get('biz.shifts', []).filter((x) => x.id !== shift.id), shift]);
+  return shift;
+}
+
+// ---------- зарплата мийників ----------
+// Відсоток від вартості послуг і/або фіксована сума за авто — з виконаних записів, де призначено цього мийника.
+export function salaryFor(w, bookings, placeId, from, to) {
+  const list = bookings.filter((b) => b.placeId === placeId && b.masterId === w.id && b.state === 'completed' && b.date >= from && b.date <= to);
+  const revenue = list.reduce((a, b) => a + (isCarcar(b) ? price(b) : Number(b.paid) || 0), 0);
+  const pay = Math.round((revenue * (Number(w.pct) || 0)) / 100 + list.length * (Number(w.perCar) || 0));
+  return { cars: list.length, revenue, pay };
+}
+
+// ---------- витратні матеріали ----------
+// Для кожного матеріалу: залишок, мінімум (нижче — попередження) і витрата на одне авто для обраних послуг.
+export const stockOf = (placeId) => store.peek('biz.stock', {})[placeId] ?? [];
+export function saveStock(placeId, list) {
+  store.set('biz.stock', { ...store.get('biz.stock', {}), [placeId]: list });
+}
+export const stockLow = (x) => Number(x.min) > 0 && Number(x.qty) <= Number(x.min);
+const round2 = (n) => Math.round(n * 100) / 100;
+// Списати матеріали на виконаний запис (один раз). Повертає назви тих, що щойно стали на мінімумі.
+export function useStock(b) {
+  if (b.stockUsed) return [];
+  b.stockUsed = true;
+  const list = stockOf(b.placeId);
+  const low = [];
+  const next = list.map((x) => {
+    const hit = Number(x.per) > 0 && (!x.services?.length || b.services.some((n) => x.services.includes(n)));
+    if (!hit) return x;
+    const y = { ...x, qty: Math.max(0, round2(Number(x.qty) - Number(x.per))) };
+    if (!stockLow(x) && stockLow(y)) low.push(x.name);
+    return y;
+  });
+  if (list.length) saveStock(b.placeId, next);
+  return low;
+}
+
+// ---------- нотатки й мітки про клієнтів ----------
+// Бачить лише мийка (на сервері — тільки її акаунт). Клієнт CARCAR — за хешем номера, свій — за номером.
+export const NOTE_TAGS = ['VIP', 'Постійний', 'Любить віск', 'Без поспіху', 'Проблемний'];
+export const clientNoteKey = (b) => (b.clientId && b.clientId !== 'device' ? b.clientId
+  : b.clientPhone ? phoneKey(b.clientPhone) ?? b.clientPhone : b.clientName ? `name:${b.clientName.toLowerCase()}` : null);
+export const clientNotesOf = (placeId) => store.peek('biz.clientNotes', {})[placeId] ?? {};
+export function saveClientNote(placeId, key, note) {
+  const all = store.get('biz.clientNotes', {});
+  const mine = { ...(all[placeId] ?? {}) };
+  if (!note.text && !note.tags.length) delete mine[key]; else mine[key] = { ...note, at: Date.now() };
+  store.set('biz.clientNotes', { ...all, [placeId]: mine });
 }

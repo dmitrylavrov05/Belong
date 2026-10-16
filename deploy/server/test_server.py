@@ -230,6 +230,54 @@ class Server(unittest.TestCase):
         self.assertTrue(cfg['demoPlaces'])
         self.assertEqual(cfg['payments'], 'liqpay')
 
+    def test_11_wash_never_sees_client_number(self):
+        ira, ira_id = self.login_client('067 111 11 11')
+        _, j = self.call('POST', '/api/auth/biz', {'demo': True})
+        wash = j['token']
+        view = self.state(wash)
+        b = next(x for x in view['bookings'] if x['id'] == 'b1')
+        self.assertTrue(b['clientId'].startswith('h:'))
+        self.assertNotIn('380671111111', json.dumps(view))
+        # Мийка пише клієнту (повідомлення з хешем) — воно доходить саме цьому клієнту.
+        self.put('messages', [{'id': 'm1', 'placeId': 'blysk', 'clientKey': b['clientId'], 'text': 'Чекаємо'}], wash)
+        self.assertEqual([m['id'] for m in self.state(ira).get('messages', [])], ['m1'])
+        # Мийка змінює запис — справжній клієнт лишається власником.
+        self.put('bookings', [dict(x, note='x') if x['id'] == 'b1' else x for x in self.state(wash)['bookings']], wash)
+        self.assertEqual(next(x for x in self.state(ira)['bookings'] if x['id'] == 'b1')['clientId'], ira_id)
+
+    def test_12_passes_notes_and_cash_are_protected(self):
+        ira, ira_id = self.login_client('067 111 11 11')
+        _, j = self.call('POST', '/api/auth/biz', {'demo': True})
+        wash = j['token']
+        plan = {'id': 'pl1', 'kind': 'sub', 'name': '5 мийок', 'visits': 5, 'price': 1000, 'services': []}
+        self.put('biz.passes', {'blysk': {'plans': [plan], 'sold': [], 'loyalty': {'on': True, 'every': 6, 'pct': 100}}}, wash)
+        self.put('biz.clientNotes', {'blysk': {'h:1': {'note': 'VIP', 'tags': ['VIP']}}}, wash)
+        self.put('biz.shifts', [{'id': 's1', 'placeId': 'blysk', 'cash': 500}], wash)
+        st = self.state(ira)
+        self.assertEqual(st.get('biz.clientNotes'), {})
+        self.assertEqual(st.get('biz.shifts'), [])
+        # Клієнт не міняє планів і не дописує собі візитів (з оплатою LiqPay — не «купує» без банку).
+        hacked = {'blysk': {'plans': [dict(plan, price=1)], 'loyalty': {'on': True, 'every': 1, 'pct': 100},
+                            'sold': [{'id': 'x', 'planId': 'pl1', 'kind': 'sub', 'clientKey': ira_id, 'visitsLeft': 99, 'visits': 99}]}}
+        self.put('biz.passes', hacked, ira)
+        p = self.state(wash)['biz.passes']['blysk']
+        self.assertEqual(p['plans'][0]['price'], 1000)
+        self.assertEqual(p['loyalty']['every'], 6)
+        self.assertEqual(p['sold'], [])
+        # Мийка продала абонемент на місці — клієнт списує візит, але не може додати.
+        sold = {'id': 'sold1', 'planId': 'pl1', 'kind': 'sub', 'name': '5 мийок', 'clientKey': ira_id, 'visits': 5, 'visitsLeft': 5, 'history': [], 'validUntil': '2099-01-01'}
+        self.put('biz.passes', {'blysk': dict(p, sold=[sold])}, wash)
+        mine = self.state(ira)['biz.passes']['blysk']
+        spent = dict(sold, visitsLeft=4, history=[{'at': 1, 'bookingId': 'b1', 'amount': 250}])
+        self.put('biz.passes', {'blysk': dict(mine, sold=[spent])}, ira)
+        self.assertEqual(self.state(wash)['biz.passes']['blysk']['sold'][0]['visitsLeft'], 4)
+        self.put('biz.passes', {'blysk': dict(mine, sold=[dict(spent, visitsLeft=50, visits=50)])}, ira)
+        self.assertEqual(self.state(wash)['biz.passes']['blysk']['sold'][0]['visitsLeft'], 4)
+        # «Повернення» за запис, який не скасовано, не проходить.
+        back = dict(spent, visitsLeft=5, history=spent['history'] + [{'at': 2, 'bookingId': 'b1', 'amount': -250, 'note': 'повернення'}])
+        self.put('biz.passes', {'blysk': dict(mine, sold=[back])}, ira)
+        self.assertEqual(self.state(wash)['biz.passes']['blysk']['sold'][0]['visitsLeft'], 4)
+
     def test_99_login_rate_limit(self):
         codes = [self.call('POST', '/api/auth/admin', {'password': 'x'})[0] for _ in range(12)]
         self.assertIn(429, codes)

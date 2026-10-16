@@ -52,7 +52,8 @@ const LOCAL_KEYS = new Set(['auth', 'profile', 'cars', 'carId', 'theme', 'biz.th
   'seenStates', 'cls', 'city', 'favs', 'view', 'mapLayer', 'campaign', 'referral', 'subscriptions', 'auth.token', 'biz.token', 'admin.token', 'pushSub', 'srv.demoPlaces']);
 const shared = (key) => !LOCAL_KEYS.has(key);
 // Журнал подій великий і пишеться часто — відправляємо рідше.
-const PUSH_DELAY = { analytics: 5000, presence: 2000 };
+// Абонементи — трохи пізніше за записи: повернення візиту сервер перевіряє за вже скасованим записом.
+const PUSH_DELAY = { analytics: 5000, presence: 2000, 'biz.passes': 1500 };
 const sync = { on: false, ver: 0, base: new Map(), timers: new Map(), busy: new Set(), poll: null, gen: 0 };
 const syncNotify = (key) => window.dispatchEvent(new StorageEvent('storage', { key: `carcar.${key}` }));
 export const syncOn = () => sync.on;
