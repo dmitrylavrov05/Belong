@@ -193,6 +193,33 @@ UNIT
 systemctl daemon-reload
 systemctl enable --now carcar-update.timer
 
+echo "==> Реєстр авто МВС для перевірки за держномером (щомісяця, перший раз — у фоні)"
+cat > /etc/systemd/system/carcar-vehicles.service <<UNIT
+[Unit]
+Description=CARCAR: реєстр авто МВС (data.gov.ua) для пошуку за держномером
+After=network-online.target
+
+[Service]
+Type=oneshot
+Nice=10
+IOSchedulingClass=idle
+ExecStart=/usr/bin/python3 $DIR/deploy/server/vehicles_import.py --db /var/lib/carcar/vehicles.db --years 5
+UNIT
+cat > /etc/systemd/system/carcar-vehicles.timer <<UNIT
+[Unit]
+Description=Щомісяця оновлювати реєстр авто CARCAR
+
+[Timer]
+OnCalendar=*-*-05 03:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+UNIT
+systemctl daemon-reload
+systemctl enable --now carcar-vehicles.timer
+[[ -f /var/lib/carcar/vehicles.db ]] || systemctl start --no-block carcar-vehicles
+
 echo "==> Щоденна резервна копія бази (/var/backups/carcar, 14 днів)"
 cat > /etc/systemd/system/carcar-backup.service <<UNIT
 [Unit]

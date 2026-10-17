@@ -34,6 +34,14 @@ class Server(unittest.TestCase):
         cfg['liqpay'] = {'public_key': 'pub', 'private_key': 'priv', 'sandbox': True}
         with open(cls.cfg, 'w') as f:
             json.dump(cfg, f)
+        # Реєстр авто: невеликий файл у форматі відкритих даних МВС (кирилиця в номерах, «;»).
+        csv_path = os.path.join(cls.tmp, 'tz.csv')
+        with open(csv_path, 'w', encoding='utf-8') as f:
+            f.write('"PERSON";"OPER_CODE";"OPER_NAME";"D_REG";"BRAND";"MODEL";"VIN";"MAKE_YEAR";"COLOR";"KIND";"BODY";"PURPOSE";"FUEL";"CAPACITY";"OWN_WEIGHT";"TOTAL_WEIGHT";"N_REG_NEW"\n')
+            f.write('"P";"100";"РЕЄСТРАЦIЯ";"12.03.2021";"TOYOTA";"TOYOTA RAV4";"";"2020";"БІЛИЙ";"ЛЕГКОВИЙ";"УНІВЕРСАЛ-B";"ЗАГАЛЬНИЙ";"БЕНЗИН";"1987";"1500";"2000";"КА0001АА"\n')
+            f.write('"P";"100";"РЕЄСТРАЦIЯ";"02.02.2019";"SKODA";"OCTAVIA";"";"2012";"СІРИЙ";"ЛЕГКОВИЙ";"СЕДАН-B";"ЗАГАЛЬНИЙ";"ДИЗЕЛЬ";"1598";"1300";"1800";"KA0001AA"\n')
+            f.write('"P";"100";"РЕЄСТРАЦIЯ";"05.05.2022";"VOLKSWAGEN";"TRANSPORTER";"";"2015";"ЧОРНИЙ";"ЛЕГКОВИЙ";"МІНІВЕН-B";"ЗАГАЛЬНИЙ";"ДИЗЕЛЬ";"1968";"2000";"3000";"АІ7777КЕ"\n')
+        subprocess.run([sys.executable, os.path.join(HERE, 'vehicles_import.py'), '--db', os.path.join(cls.tmp, 'vehicles.db'), '--file', csv_path], check=True, capture_output=True)
         cls.port = free_port()
         cls.proc = subprocess.Popen([sys.executable, os.path.join(HERE, 'carcar_sync.py'), '--port', str(cls.port), '--db', os.path.join(cls.tmp, 'd.db'),
                                      '--config', cls.cfg, '--public-url', 'https://carcar.test'], stdout=subprocess.PIPE)
@@ -346,6 +354,18 @@ class Server(unittest.TestCase):
         self.put('biz.applications', [{'id': 'ap1', 'status': 'new', 'name': 'spam'}], None)
         self.assertNotIn('ap1', [a['id'] for a in self.state(ira).get('biz.applications', [])])
         self.assertEqual(self.call('GET', '/api/state?since=abc')[0], 400)
+
+    def test_16_vehicle_by_plate(self):
+        self.assertEqual(self.call('GET', '/api/vehicle?plate=KA0001AA')[0], 401)  # лише після входу
+        ira, _ = self.login_client('067 111 11 11')
+        code, j = self.call('GET', '/api/vehicle?plate=ka%200001%20aa', token=ira)
+        self.assertEqual(code, 200)
+        # Найсвіжіша реєстрація номера, марка без дублювання в моделі, кросовер.
+        self.assertEqual({k: j['car'][k] for k in ('make', 'model', 'year', 'color', 'fuel', 'engine', 'cls')},
+                         {'make': 'Toyota', 'model': 'RAV4', 'year': 2020, 'color': 'білий', 'fuel': 'бензин', 'engine': '2,0 л', 'cls': 1})
+        self.assertEqual(self.call('GET', '/api/vehicle?plate=AI7777KE', token=ira)[1]['car']['cls'], 2)
+        self.assertIsNone(self.call('GET', '/api/vehicle?plate=BC5555AA', token=ira)[1]['car'])
+        self.assertEqual(self.call('GET', '/api/vehicle?plate=123', token=ira)[0], 400)
 
     def test_99_login_rate_limit(self):
         codes = [self.call('POST', '/api/auth/admin', {'password': 'x'})[0] for _ in range(12)]

@@ -1,6 +1,6 @@
 // Перевірка авто за держномером: формат номера, регіон реєстрації й дані з реєстру.
-// У прототипі реєстр — кілька вигаданих демо-номерів. У робочій версії сервер звертається
-// до відкритих даних МВС про реєстрацію транспортних засобів.
+// На сервері CARCAR — відкриті дані МВС про реєстрацію транспортних засобів (deploy/server/vehicles_import.py,
+// оновлюються щомісяця). Без сервера — кілька вигаданих демо-номерів.
 
 // Кириличні літери, що пишуться так само, як латинські (на номерах використовують лише їх).
 const VEH_LOOKALIKE = { А: 'A', В: 'B', С: 'C', Е: 'E', Н: 'H', І: 'I', К: 'K', М: 'M', О: 'O', Р: 'P', Т: 'T', Х: 'X' };
@@ -28,6 +28,15 @@ export const DEMO_PLATES = {
   KA0001AA: { make: 'Toyota', model: 'RAV4', year: 2021, color: 'білий', fuel: 'гібрид', engine: '2,5 л', cls: 1 },
   AI7777KE: { make: 'Volkswagen', model: 'Passat', year: 2016, color: 'чорний', fuel: 'дизель', engine: '2,0 л', cls: 0 },
 };
+
+// Перевірка в реєстрі МВС через сервер. registry: false — реєстр на сервері ще не завантажено.
+export async function lookupPlateOnline(raw, api) {
+  const local = lookupPlate(raw);
+  if (local.error) return local;
+  const r = await api(`vehicle?plate=${encodeURIComponent(local.plate)}`);
+  if (!r.ok) return { ...local, car: null, failed: r.data.error || 'Не вдалося перевірити номер' };
+  return { ...local, car: r.data.car ?? null, registry: !!r.data.registry, online: true };
+}
 
 // Результат перевірки: регіон і дані авто (якщо знайдено).
 export function lookupPlate(raw) {

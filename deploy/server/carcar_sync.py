@@ -300,6 +300,68 @@ def call_events(old, new):
     return out
 
 
+def acl_norm_plate(s):
+    lookalike = str.maketrans({'А': 'A', 'В': 'B', 'С': 'C', 'Е': 'E', 'Н': 'H', 'І': 'I', 'К': 'K', 'М': 'M', 'О': 'O', 'Р': 'P', 'Т': 'T', 'Х': 'X'})
+    return re.sub(r'[\s-]', '', str(s or '').upper()).translate(lookalike)
+
+
+# ---------- авто за держномером (реєстр МВС, див. vehicles_import.py) ----------
+
+# Кросовери й позашляховики — щоб одразу підставити клас (ціна мийки залежить від класу).
+CROSSOVERS = {'RAV4', 'RAV 4', 'CR-V', 'HR-V', 'TUCSON', 'SPORTAGE', 'QASHQAI', 'X-TRAIL', 'JUKE', 'KODIAQ', 'KAROQ', 'KAMIQ', 'TIGUAN', 'T-ROC',
+              'DUSTER', 'ARKANA', 'CAPTUR', 'KADJAR', 'KOLEOS', 'CX-3', 'CX-30', 'CX-5', 'ASX', 'ECLIPSE CROSS', 'OUTLANDER', 'VITARA', 'S-CROSS',
+              'SX4', 'FORESTER', 'XV', 'OUTBACK', 'KUGA', 'ECOSPORT', 'PUMA', 'MOKKA', 'GRANDLAND X', 'CROSSLAND X', '2008', '3008', '5008',
+              'C-HR', 'CRETA', 'KONA', 'SELTOS', 'NIRO', 'STONIC', 'X1', 'X2', 'X3', 'X4', 'Q2', 'Q3', 'Q5', 'GLA', 'GLB', 'GLC', 'NX', 'UX', 'XC40', 'XC60',
+              'COMPASS', 'RENEGADE', 'ZS', 'HS', 'TIGGO', 'COOLRAY', 'ATLAS', 'JOLION', 'H6', 'EV6', 'ID.4', 'MODEL Y', 'ENYAQ'}
+SUVS = {'LAND CRUISER', 'LAND CRUISER PRADO', 'PRADO', 'HIGHLANDER', 'SEQUOIA', 'PAJERO', 'PAJERO SPORT', 'PATROL', 'X5', 'X6', 'X7', 'Q7', 'Q8',
+        'TOUAREG', 'GLE', 'GLS', 'G-CLASS', 'GX', 'LX', 'RX', 'XC90', 'CAYENNE', 'RANGE ROVER', 'DISCOVERY', 'DEFENDER', 'SANTA FE', 'SORENTO',
+        'GRAND CHEROKEE', 'EXPLORER', 'TAHOE', 'ESCALADE', 'MODEL X', 'MULTIVAN', 'TRANSPORTER', 'CARAVELLE', 'VITO', 'V-CLASS', 'SPRINTER',
+        'TRAFIC', 'VIVARO', 'EXPERT', 'JUMPY', 'TRANSIT', 'DUCATO', 'BOXER', 'JUMPER', 'MASTER', 'CRAFTER', 'SHARAN', 'GALAXY', 'ZAFIRA',
+        'HILUX', 'L200', 'NAVARA', 'RANGER', 'AMAROK', 'H-1', 'STARIA', 'CARNIVAL', 'SIENNA', 'ODYSSEY', 'ALPHARD'}
+
+
+def car_class(brand, model, body):
+    m = re.sub(r'\s+', ' ', f'{model}'.upper()).strip()
+    b = (body or '').upper()
+    if any(w in b for w in ('ПОЗАШЛЯХ', 'ПІКАП', 'МІНІВЕН', 'ФУРГОН', 'АВТОБУС')):
+        return 2
+    words = m.replace(brand.upper(), '').strip()
+    if any(words == x or words.startswith(x + ' ') for x in SUVS):
+        return 2
+    if any(words == x or words.startswith(x + ' ') for x in CROSSOVERS):
+        return 1
+    return 0
+
+
+def nice(s):
+    """TOYOTA → Toyota, але BMW, VW, ZAZ лишаються великими."""
+    s = re.sub(r'\s+', ' ', str(s or '')).strip()
+    return ' '.join(w if len(w) <= 3 or any(ch.isdigit() for ch in w) else w.capitalize() for w in s.split(' '))
+
+
+class Vehicles:
+    def __init__(self, path):
+        self.path, self.db, self.mtime = path, None, 0
+
+    def lookup(self, plate):
+        try:
+            mtime = os.path.getmtime(self.path)
+        except OSError:
+            return None
+        if self.db is None or mtime != self.mtime:  # база оновилась — відкриваємо нову
+            self.db = sqlite3.connect(f'file:{self.path}?mode=ro', uri=True, check_same_thread=False)
+            self.mtime = mtime
+        row = self.db.execute('SELECT brand, model, year, color, fuel, capacity, body, kind, d_reg FROM vehicles WHERE plate = ?', (plate,)).fetchone()
+        if not row:
+            return {}
+        brand, model, year, color, fuel, cap, body, kind, d_reg = row
+        # У реєстрі модель часто разом з маркою: «TOYOTA RAV4».
+        model_only = re.sub('^' + re.escape(brand) + r'\s+', '', model or '', flags=re.I) if brand else (model or '')
+        return {'make': nice(brand), 'model': nice(model_only), 'year': year, 'color': (color or '').lower(), 'fuel': (fuel or '').lower(),
+                'engine': f"{cap / 1000:.1f} л".replace('.', ',') if cap and cap > 300 else '', 'body': (body or '').lower(),
+                'cls': car_class(brand or '', model_only, body), 'registered': d_reg}
+
+
 def kyiv_now():
     try:
         from zoneinfo import ZoneInfo
@@ -409,6 +471,7 @@ def make_handler(app):
     store, cfg, sessions = app['store'], app['cfg'], app['sessions']
     static_dir = app['static']
     limiter = Limiter()
+    veh_limiter = Limiter(30)  # перевірок номерів на хвилину з одного акаунта — щоб реєстр не вивантажували
 
     def setting(name):
         """Демо-режим: вирішує адмінка (ключ admin.server, діє одразу), інакше — конфігурація сервера.
@@ -510,6 +573,21 @@ def make_handler(app):
                 phone, name, _ = row
                 token = sessions.create('client', {'cid': phone})
                 return self.send_json(200, {'token': token, 'phone': phone, 'name': name})
+            if p == '/api/vehicle':
+                w = self.who()
+                if w.role == 'anon':
+                    return self.send_json(401, {'error': 'Потрібен вхід'})
+                who_key = w.cid or w.login or 'demo'
+                if not veh_limiter.ok(who_key):
+                    return self.send_json(429, {'error': 'Забагато перевірок. Зачекайте хвилину.'})
+                veh_limiter.fail(who_key)
+                plate = acl_norm_plate((q.get('plate') or [''])[0])
+                if not re.match(r'^[A-Z]{2}\d{4}[A-Z]{2}$', plate):
+                    return self.send_json(400, {'error': 'Номер має вигляд AA1234BB'})
+                car = app['vehicles'].lookup(plate)
+                if car is None:
+                    return self.send_json(200, {'plate': plate, 'registry': False})
+                return self.send_json(200, {'plate': plate, 'registry': True, 'car': car or None})
             if p == '/api/ice':
                 return self.send_json(200, {'iceServers': ice_servers(cfg, self.subject(self.who()))})
             if static_dir:
@@ -779,6 +857,7 @@ def main():
     sessions = Sessions(store.db, store.lock)
     webpush = WebPush(os.path.dirname(os.path.abspath(a.db)))
     app = {'store': store, 'cfg': cfg, 'sessions': sessions, 'static': a.static and os.path.abspath(a.static),
+           'vehicles': Vehicles(cfg.get('vehicles_db') or os.path.join(os.path.dirname(os.path.abspath(a.db)), 'vehicles.db')),
            'liqpay': LiqPay(cfg.get('liqpay')), 'webpush': webpush, 'links': {}, 'public_url': a.public_url or cfg.get('public_url', '')}
 
     def on_link(code):

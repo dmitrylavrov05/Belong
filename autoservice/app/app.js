@@ -15,7 +15,7 @@ import {
 } from './ops.js';
 import { mountMap } from './map.js';
 import { initCalls, startCall, logCall, callHistory, callRowText, callMissed, markCallsRead } from './call.js';
-import { lookupPlate, normPlate, DEMO_PLATES } from './vehicles.js';
+import { lookupPlate, lookupPlateOnline, normPlate, plateValid, DEMO_PLATES } from './vehicles.js';
 
 // ---------- сховище (лише на цьому пристрої) ----------
 
@@ -3007,27 +3007,7 @@ document.addEventListener('click', (e) => {
     track('repeat', { placeId: p.id });
     if (time) setTimeout(() => toast(`Той самий запис: ${dayLabel(date, { weekday: 'short', day: 'numeric', month: 'long' })} о ${time} — лишилось оплатити`), 0);
   } else if (action === 'plate-check') {
-    const f = $('#carform');
-    const r = lookupPlate(f.elements.plate.value);
-    const box = $('#plate-result');
-    track('plate_check', { found: !!r.car });
-    if (r.error) { box.innerHTML = `<p class="notice warn" style="margin:0">${r.error}.</p>`; return; }
-    f.elements.plate.value = r.plate;
-    if (r.car) {
-      // Підставляємо знайдені дані — їх можна виправити перед збереженням.
-      f.elements.make.value = r.car.make;
-      f.elements.model.value = r.car.model;
-      f.elements.year.value = r.car.year;
-      f.elements.cls.value = r.car.cls;
-      f.dataset.color = r.car.color;
-    }
-    box.innerHTML = `<div class="notice plate-card">
-      <b>${esc(r.plate)}${r.region ? ` · ${r.region}` : ''}</b>
-      ${r.car ? `<ul><li>${esc(r.car.make)} ${esc(r.car.model)}, ${r.car.year} р., ${esc(r.car.color)}, ${esc(r.car.fuel)} ${esc(r.car.engine)}</li></ul>
-        <span class="small muted">Дані підставлено у форму — перевірте й збережіть.</span>`
-        : `<span class="small">Авто з цим номером немає в демо-реєстрі. Заповніть дані вручну.</span>`}
-      <span class="fine">Демо: перевірка знаходить лише вигадані номери ${Object.keys(DEMO_PLATES).join(', ')}. У робочій версії дані беремо з відкритого реєстру МВС.</span>
-    </div>`;
+    plateCheck();
   } else if (action === 'eta-late') {
     const b = bookings.find((x) => x.id === id);
     b.late = PAYMENT.lateMinutes;
@@ -3219,7 +3199,44 @@ document.addEventListener('change', (e) => {
   }
 });
 
+// Авто за держномером: дані з реєстру МВС підставляються у форму самі, щойно номер введено повністю.
+let plateSeq = 0;
+async function plateCheck() {
+  const f = $('#carform');
+  const box = $('#plate-result');
+  if (!f || !box) return;
+  const seq = ++plateSeq;
+  if (hasServer() && plateValid(f.elements.plate.value)) box.innerHTML = '<p class="small muted" style="margin:0" role="status">Шукаємо авто в реєстрі МВС…</p>';
+  const r = hasServer() ? await lookupPlateOnline(f.elements.plate.value, api) : lookupPlate(f.elements.plate.value);
+  if (seq !== plateSeq || !$('#plate-result')) return; // поки шукали, номер змінили
+  track('plate_check', { found: !!r.car });
+  if (r.error) { box.innerHTML = `<p class="notice warn" style="margin:0">${r.error}.</p>`; return; }
+  if (f.elements.plate.value !== r.plate && normPlate(f.elements.plate.value) === r.plate) f.elements.plate.value = r.plate;
+  const c = r.car;
+  if (c) {
+    // Підставляємо знайдені дані — їх можна виправити перед збереженням.
+    if (c.make) f.elements.make.value = c.make;
+    if (c.model) f.elements.model.value = c.model;
+    if (c.year) f.elements.year.value = c.year;
+    f.elements.cls.value = c.cls ?? 0;
+    f.dataset.color = c.color ?? '';
+  }
+  const details = c ? [c.year ? `${c.year} р.` : '', c.color, [c.fuel, c.engine].filter(Boolean).join(' '), c.body].filter(Boolean).join(', ') : '';
+  box.innerHTML = `<div class="notice plate-card">
+    <b>${esc(r.plate)}${r.region ? ` · ${r.region}` : ''}</b>
+    ${c ? `<ul><li>${esc(c.make)} ${esc(c.model)}${details ? `, ${esc(details)}` : ''}</li></ul>
+      <span class="small muted">Дані підставлено у форму — перевірте клас і збережіть.</span>`
+      : `<span class="small">${r.failed ? esc(r.failed) : r.online && !r.registry ? 'Реєстр авто на сервері ще не завантажено.' : 'Авто з цим номером не знайдено в реєстрі.'} Заповніть дані вручну.</span>`}
+    ${r.online ? '<span class="fine">Дані з відкритого реєстру МВС (data.gov.ua). Нові реєстрації зʼявляються із запізненням до місяця.</span>'
+      : `<span class="fine">Демо: перевірка знаходить лише вигадані номери ${Object.keys(DEMO_PLATES).join(', ')}. На сервері CARCAR — відкритий реєстр МВС.</span>`}
+  </div>`;
+}
+
 document.addEventListener('input', (e) => {
+  if (e.target.name === 'plate' && e.target.closest('#carform')) {
+    clearTimeout(plateCheck.t);
+    if (plateValid(e.target.value)) plateCheck.t = setTimeout(plateCheck, 350);
+  }
   // Номер друкується з пробілами, як на картці: 67 123 45 67.
   if (e.target.id === 'login-phone') {
     const d = phoneDigits(e.target.value);
