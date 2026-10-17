@@ -2609,7 +2609,7 @@ function viewGarage() {
     <details class="fold add-car" id="add-car" ${cars.length && !ui.addCar ? '' : 'open'}><summary>${icon('plus', 20)}${cars.length ? 'Додати ще авто' : 'Додати авто'}</summary>
     ${carForm('carform', `
       <div class="plate-row">
-        <label class="field"><span>Держномер</span><input name="plate" placeholder="AA1234BB" autocomplete="off" aria-describedby="plate-result"></label>
+        <label class="field"><span>Держномер</span><input name="plate" placeholder="AA1234BB" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="12" aria-describedby="plate-result"></label>
         <button class="btn" type="button" data-action="plate-check">${icon('search', 18)}Перевірити</button>
       </div>
       <div id="plate-result" aria-live="polite"></div>
@@ -3226,14 +3226,22 @@ async function plateCheck() {
     <b>${esc(r.plate)}${r.region ? ` · ${r.region}` : ''}</b>
     ${c ? `<ul><li>${esc(c.make)} ${esc(c.model)}${details ? `, ${esc(details)}` : ''}</li></ul>
       <span class="small muted">Дані підставлено у форму — перевірте клас і збережіть.</span>`
-      : `<span class="small">${r.failed ? esc(r.failed) : r.online && !r.registry ? 'Реєстр авто на сервері ще не завантажено.' : 'Авто з цим номером не знайдено в реєстрі.'} Заповніть дані вручну.</span>`}
-    ${r.online ? '<span class="fine">Дані з відкритого реєстру МВС (data.gov.ua). Нові реєстрації зʼявляються із запізненням до місяця.</span>'
+      : `<span class="small">${r.failed ? esc(r.failed) : r.online && !r.registry ? 'Перевірку номерів на сервері ще не налаштовано.' : 'Авто з цим номером не знайдено в реєстрі.'} Заповніть дані вручну.</span>`}
+    ${r.online ? '<span class="fine">Дані МВС про реєстрацію авто. Нові реєстрації можуть зʼявлятися із запізненням.</span>'
       : `<span class="fine">Демо: перевірка знаходить лише вигадані номери ${Object.keys(DEMO_PLATES).join(', ')}. На сервері CARCAR — відкритий реєстр МВС.</span>`}
   </div>`;
 }
 
 document.addEventListener('input', (e) => {
   if (e.target.name === 'plate' && e.target.closest('#carform')) {
+    // Номер — великими літерами, як на табличці (курсор лишається на місці).
+    const el = e.target;
+    const up = el.value.toUpperCase();
+    if (up !== el.value) {
+      const pos = el.selectionStart;
+      el.value = up;
+      el.setSelectionRange(pos, pos);
+    }
     clearTimeout(plateCheck.t);
     if (plateValid(e.target.value)) plateCheck.t = setTimeout(plateCheck, 350);
   }

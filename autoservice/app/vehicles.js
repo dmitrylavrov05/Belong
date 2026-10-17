@@ -1,6 +1,6 @@
 // Перевірка авто за держномером: формат номера, регіон реєстрації й дані з реєстру.
-// На сервері CARCAR — відкриті дані МВС про реєстрацію транспортних засобів (deploy/server/vehicles_import.py,
-// оновлюються щомісяця). Без сервера — кілька вигаданих демо-номерів.
+// На сервері CARCAR — дані МВС: онлайн-сервіс перевірки номерів (baza-gai.com.ua за ключем API) або власна копія
+// відкритого реєстру (deploy/server/vehicles_import.py). Без сервера — кілька вигаданих демо-номерів.
 
 // Кириличні літери, що пишуться так само, як латинські (на номерах використовують лише їх).
 const VEH_LOOKALIKE = { А: 'A', В: 'B', С: 'C', Е: 'E', Н: 'H', І: 'I', К: 'K', М: 'M', О: 'O', Р: 'P', Т: 'T', Х: 'X' };
@@ -35,7 +35,7 @@ export async function lookupPlateOnline(raw, api) {
   if (local.error) return local;
   const r = await api(`vehicle?plate=${encodeURIComponent(local.plate)}`);
   if (!r.ok) return { ...local, car: null, failed: r.data.error || 'Не вдалося перевірити номер' };
-  return { ...local, car: r.data.car ?? null, registry: !!r.data.registry, online: true };
+  return { ...local, car: r.data.car ?? null, registry: !!r.data.registry, online: true, failed: r.data.error ?? null };
 }
 
 // Результат перевірки: регіон і дані авто (якщо знайдено).

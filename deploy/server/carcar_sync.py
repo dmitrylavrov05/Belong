@@ -36,6 +36,9 @@ import sqlite3
 import sys
 import threading
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, unquote
 
@@ -339,11 +342,60 @@ def nice(s):
     return ' '.join(w if len(w) <= 3 or any(ch.isdigit() for ch in w) else w.capitalize() for w in s.split(' '))
 
 
-class Vehicles:
-    def __init__(self, path):
-        self.path, self.db, self.mtime = path, None, 0
+def _txt(v):
+    """Поле відповіді сервісу: рядок або {ua: …, slug: …}."""
+    if isinstance(v, dict):
+        return str(v.get('ua') or v.get('title') or v.get('name') or v.get('slug') or '')
+    return '' if v is None else str(v)
 
-    def lookup(self, plate):
+
+def car_from(brand, model, year, color, fuel, cap, body, registered=''):
+    brand = re.sub(r'\s+', ' ', brand or '').strip()
+    # У реєстрі модель часто разом з маркою: «TOYOTA RAV4».
+    model_only = re.sub('^' + re.escape(brand) + r'\s+', '', model or '', flags=re.I) if brand else (model or '')
+    try:
+        cap = int(float(cap)) if cap not in (None, '') else None
+    except (TypeError, ValueError):
+        cap = None
+    try:
+        year = int(year) if year not in (None, '') else None
+    except (TypeError, ValueError):
+        year = None
+    return {'make': nice(brand), 'model': nice(model_only), 'year': year, 'color': (color or '').lower(), 'fuel': (fuel or '').lower(),
+            'engine': f"{cap / 1000:.1f} л".replace('.', ',') if cap and cap > 300 else '', 'body': (body or '').lower(),
+            'cls': car_class(brand, model_only, body), 'registered': registered}
+
+
+def parse_baza_gai(j):
+    """Відповідь baza-gai.com.ua (дані МВС): марка й модель — зверху, колір, пальне, кузов — в останній операції."""
+    ops = [o for o in j.get('operations') or [] if isinstance(o, dict)]
+    last = next((o for o in ops if o.get('is_last')), ops[0] if ops else {})
+    brand = _txt(j.get('vendor') or last.get('vendor') or j.get('brand') or last.get('brand'))
+    if not brand:
+        return {}
+    return car_from(brand, _txt(j.get('model') or last.get('model')), j.get('model_year') or last.get('model_year') or j.get('year'),
+                    _txt(last.get('color') or j.get('color')), _txt(last.get('fuel') or j.get('fuel')),
+                    last.get('capacity') or j.get('capacity') or last.get('engine_volume'), _txt(last.get('body') or j.get('body')),
+                    _txt(last.get('registered_at') or j.get('registered_at')))
+
+
+class Vehicles:
+    """Авто за держномером. Джерела по черзі: власна копія реєстру МВС (vehicles.db, якщо завантажили)
+    і онлайн-сервіс (baza-gai.com.ua за ключем API). Відповіді сервісу кешуються на 30 днів — щоб не витрачати ліміт."""
+
+    def __init__(self, path, api, store):
+        self.path, self.db, self.mtime = path, None, 0
+        self.api = api if isinstance(api, dict) and api.get('key') else None
+        self.store = store
+        with store.lock:
+            store.db.execute('CREATE TABLE IF NOT EXISTS vehicle_cache (plate TEXT PRIMARY KEY, data TEXT, at INTEGER)')
+            store.db.commit()
+
+    @property
+    def available(self):
+        return bool(self.api) or os.path.exists(self.path)
+
+    def local(self, plate):
         try:
             mtime = os.path.getmtime(self.path)
         except OSError:
@@ -354,12 +406,41 @@ class Vehicles:
         row = self.db.execute('SELECT brand, model, year, color, fuel, capacity, body, kind, d_reg FROM vehicles WHERE plate = ?', (plate,)).fetchone()
         if not row:
             return {}
-        brand, model, year, color, fuel, cap, body, kind, d_reg = row
-        # У реєстрі модель часто разом з маркою: «TOYOTA RAV4».
-        model_only = re.sub('^' + re.escape(brand) + r'\s+', '', model or '', flags=re.I) if brand else (model or '')
-        return {'make': nice(brand), 'model': nice(model_only), 'year': year, 'color': (color or '').lower(), 'fuel': (fuel or '').lower(),
-                'engine': f"{cap / 1000:.1f} л".replace('.', ',') if cap and cap > 300 else '', 'body': (body or '').lower(),
-                'cls': car_class(brand or '', model_only, body), 'registered': d_reg}
+        brand, model, year, color, fuel, cap, body, _kind, d_reg = row
+        return car_from(brand, model, year, color, fuel, cap, body, d_reg)
+
+    def online(self, plate):
+        row = self.store.db.execute('SELECT data, at FROM vehicle_cache WHERE plate = ?', (plate,)).fetchone()
+        if row:
+            data = json.loads(row[0])
+            if time.time() - row[1] < (30 if data else 1) * 86400:
+                return data
+        url = (self.api.get('url') or 'https://baza-gai.com.ua/nomer/{plate}').replace('{plate}', urllib.parse.quote(plate))
+        req = urllib.request.Request(url, headers={'Accept': 'application/json', 'X-Api-Key': self.api['key'], 'User-Agent': 'CARCAR'})
+        try:
+            with urllib.request.urlopen(req, timeout=10) as r:
+                data = parse_baza_gai(json.loads(r.read()))
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                data = {}
+            else:
+                return {'error': 'Сервіс перевірки номерів зараз недоступний' if e.code >= 500 else
+                        'Ліміт перевірок номерів вичерпано' if e.code == 429 else 'Перевірте ключ API сервісу номерів'}
+        except Exception:
+            return {'error': 'Сервіс перевірки номерів зараз недоступний'}
+        with self.store.lock:
+            self.store.db.execute('INSERT OR REPLACE INTO vehicle_cache VALUES (?, ?, ?)', (plate, json.dumps(data, ensure_ascii=False), int(time.time())))
+            self.store.db.commit()
+        return data
+
+    def lookup(self, plate):
+        """None — джерел немає; {} — не знайдено; {'error': …} — сервіс не відповів; інакше — дані авто."""
+        car = self.local(plate)
+        if car:
+            return car
+        if self.api:
+            return self.online(plate)
+        return car
 
 
 def kyiv_now():
@@ -587,6 +668,8 @@ def make_handler(app):
                 car = app['vehicles'].lookup(plate)
                 if car is None:
                     return self.send_json(200, {'plate': plate, 'registry': False})
+                if 'error' in car:
+                    return self.send_json(200, {'plate': plate, 'registry': True, 'car': None, 'error': car['error']})
                 return self.send_json(200, {'plate': plate, 'registry': True, 'car': car or None})
             if p == '/api/ice':
                 return self.send_json(200, {'iceServers': ice_servers(cfg, self.subject(self.who()))})
@@ -857,7 +940,7 @@ def main():
     sessions = Sessions(store.db, store.lock)
     webpush = WebPush(os.path.dirname(os.path.abspath(a.db)))
     app = {'store': store, 'cfg': cfg, 'sessions': sessions, 'static': a.static and os.path.abspath(a.static),
-           'vehicles': Vehicles(cfg.get('vehicles_db') or os.path.join(os.path.dirname(os.path.abspath(a.db)), 'vehicles.db')),
+           'vehicles': Vehicles(cfg.get('vehicles_db') or os.path.join(os.path.dirname(os.path.abspath(a.db)), 'vehicles.db'), cfg.get('vehicle_api'), store),
            'liqpay': LiqPay(cfg.get('liqpay')), 'webpush': webpush, 'links': {}, 'public_url': a.public_url or cfg.get('public_url', '')}
 
     def on_link(code):

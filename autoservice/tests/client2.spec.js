@@ -261,8 +261,10 @@ test('перевірка авто за номером: регіон, марка,
   await expect(r).toContainText('BC5555AA · Львівська обл.');
   await expect(r).toContainText('не знайдено в реєстрі');
 
-  // Повний номер — дані підтягуються самі, без кнопки.
-  await f.getByLabel('Держномер').fill('AA1234BB');
+  // Літери номера — одразу великими; повний номер — дані підтягуються самі, без кнопки.
+  await f.getByLabel('Держномер').fill('');
+  await f.getByLabel('Держномер').pressSequentially('aa1234bb');
+  await expect(f.getByLabel('Держномер')).toHaveValue('AA1234BB');
   await expect(r).toContainText('Skoda Octavia');
   await expect(f.getByLabel('Модель')).toHaveValue('Octavia');
   await f.getByRole('button', { name: 'Зберегти', exact: true }).click();

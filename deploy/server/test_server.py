@@ -8,7 +8,9 @@ import subprocess
 import sys
 import tempfile
 import time
+import threading
 import unittest
+from http.server import BaseHTTPRequestHandler, HTTPServer
 import urllib.error
 import urllib.request
 
@@ -32,6 +34,33 @@ class Server(unittest.TestCase):
         with open(cls.cfg) as f:
             cfg = json.load(f)
         cfg['liqpay'] = {'public_key': 'pub', 'private_key': 'priv', 'sandbox': True}
+        # Онлайн-сервіс номерів (як baza-gai.com.ua) — локальна заглушка.
+        cls.gai_hits = []
+
+        class Gai(BaseHTTPRequestHandler):
+            def do_GET(h):
+                cls.gai_hits.append((h.path, h.headers.get('X-Api-Key')))
+                if h.path.endswith('/BC1234HH'):
+                    body = {'digits': 'BC1234HH', 'vendor': 'HYUNDAI', 'model': 'TUCSON', 'model_year': 2019,
+                            'operations': [{'is_last': True, 'registered_at': '01.06.2023', 'color': {'slug': 'grey', 'ua': 'Сірий'},
+                                            'fuel': {'ua': 'Бензин'}, 'capacity': 1999, 'body': {'ua': 'Універсал'}}]}
+                    code = 200
+                elif h.path.endswith('/AA0000AA'):
+                    body, code = {'error': 'limit'}, 429
+                else:
+                    body, code = {'error': 'not found'}, 404
+                data = json.dumps(body).encode()
+                h.send_response(code)
+                h.send_header('Content-Type', 'application/json')
+                h.send_header('Content-Length', str(len(data)))
+                h.end_headers()
+                h.wfile.write(data)
+
+            def log_message(h, *a):
+                pass
+        cls.gai = HTTPServer(('127.0.0.1', 0), Gai)
+        threading.Thread(target=cls.gai.serve_forever, daemon=True).start()
+        cfg['vehicle_api'] = {'key': 'test-key', 'url': f'http://127.0.0.1:{cls.gai.server_port}/nomer/{{plate}}'}
         with open(cls.cfg, 'w') as f:
             json.dump(cfg, f)
         # Реєстр авто: невеликий файл у форматі відкритих даних МВС (кирилиця в номерах, «;»).
@@ -52,6 +81,8 @@ class Server(unittest.TestCase):
     def tearDownClass(cls):
         cls.proc.kill()
         cls.proc.wait()
+        cls.gai.shutdown()
+        cls.gai.server_close()
         cls.proc.stdout.close()
 
     def call(self, method, path, body=None, token=None, form=False):
@@ -366,6 +397,14 @@ class Server(unittest.TestCase):
         self.assertEqual(self.call('GET', '/api/vehicle?plate=AI7777KE', token=ira)[1]['car']['cls'], 2)
         self.assertIsNone(self.call('GET', '/api/vehicle?plate=BC5555AA', token=ira)[1]['car'])
         self.assertEqual(self.call('GET', '/api/vehicle?plate=123', token=ira)[0], 400)
+        # Немає у своїй копії реєстру — питаємо онлайн-сервіс (з ключем), відповідь кешуємо.
+        car = self.call('GET', '/api/vehicle?plate=BC1234HH', token=ira)[1]['car']
+        self.assertEqual({k: car[k] for k in ('make', 'model', 'year', 'color', 'fuel', 'engine', 'cls')},
+                         {'make': 'Hyundai', 'model': 'Tucson', 'year': 2019, 'color': 'сірий', 'fuel': 'бензин', 'engine': '2,0 л', 'cls': 1})
+        self.call('GET', '/api/vehicle?plate=BC1234HH', token=ira)
+        self.assertEqual([h for h in self.gai_hits if h[0].endswith('BC1234HH')], [('/nomer/BC1234HH', 'test-key')])
+        j = self.call('GET', '/api/vehicle?plate=AA0000AA', token=ira)[1]
+        self.assertEqual((j['car'], j['error']), (None, 'Ліміт перевірок номерів вичерпано'))
 
     def test_99_login_rate_limit(self):
         codes = [self.call('POST', '/api/auth/admin', {'password': 'x'})[0] for _ in range(12)]

@@ -193,7 +193,7 @@ UNIT
 systemctl daemon-reload
 systemctl enable --now carcar-update.timer
 
-echo "==> Реєстр авто МВС для перевірки за держномером (щомісяця, перший раз — у фоні)"
+echo "==> Служба копії реєстру авто МВС (вмикається за бажанням)"
 cat > /etc/systemd/system/carcar-vehicles.service <<UNIT
 [Unit]
 Description=CARCAR: реєстр авто МВС (data.gov.ua) для пошуку за держномером
@@ -217,8 +217,10 @@ Persistent=true
 WantedBy=timers.target
 UNIT
 systemctl daemon-reload
-systemctl enable --now carcar-vehicles.timer
-[[ -f /var/lib/carcar/vehicles.db ]] || systemctl start --no-block carcar-vehicles
+# Власна копія реєстру — необовʼязково (типово номери перевіряє онлайн-сервіс, див. README). Увімкнути:
+#   sudo systemctl enable --now carcar-vehicles.timer && sudo systemctl start --no-block carcar-vehicles
+# Якщо копію вже завантажено — оновлюємо щомісяця.
+[[ -f /var/lib/carcar/vehicles.db ]] && systemctl enable --now carcar-vehicles.timer
 
 echo "==> Щоденна резервна копія бази (/var/backups/carcar, 14 днів)"
 cat > /etc/systemd/system/carcar-backup.service <<UNIT
