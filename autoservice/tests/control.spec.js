@@ -72,7 +72,7 @@ test('підтримка: клієнт пише про запис, модера�
   await page.getByLabel('Усе клієнту').check();
   await page.getByLabel('Пояснення рішення').fill('Точка не надала фото балансування');
   await page.getByRole('button', { name: 'Ухвалити рішення' }).click();
-  await expect(page.locator('#toast')).toHaveText('Гроші повернено клієнту на баланс');
+  await expect(page.locator('#toast')).toHaveText(/^Повернено клієнту/);
 
   await page.goto('/admin.html#/disputes');
   await expect(page.getByRole('region', { name: 'Вирішені спори' })).toContainText('б’ється кермо');
@@ -81,7 +81,7 @@ test('підтримка: клієнт пише про запис, модера�
   await expect(page.locator('#inbox-tab .tab-count')).toHaveText('1');
   await page.locator('#inbox-tab').click();
   await page.locator('.convo.unread', { hasText: 'Підтримка CARCAR' }).click();
-  await expect(page.locator('.thread')).toContainText('Рішення за спором: усю суму повернено вам на баланс CARCAR');
+  await expect(page.locator('.thread')).toContainText('Рішення за спором: усе повернено вам');
   await expect(page.locator('.ticket .pill-s')).toHaveText('Закрито');
   await page.goto('/#/wallet');
   await expect(page.getByRole('region', { name: 'Баланс CARCAR' })).toContainText('900 ₴');

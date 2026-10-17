@@ -132,11 +132,12 @@ class Server(unittest.TestCase):
     def test_04_wallets_are_private(self):
         ira, ira_id = self.login_client('067 111 11 11')
         oleh, _ = self.login_client('050 222 22 22')
-        self.put(f'wallet.{ira_id}', {'money': 100, 'bonus': 0, 'history': []}, ira)
+        # Покласти собі гроші на баланс не можна — баланс рахує сервер.
+        self.put(f'wallet.{ira_id}', {'money': 100, 'bonus': 50, 'history': [{'amount': 100, 'kind': 'money', 'text': 'хочу', 'at': 1}]}, ira)
+        self.assertEqual(self.state(ira)[f'wallet.{ira_id}']['money'], 0)
         self.assertNotIn(f'wallet.{ira_id}', self.state(oleh))
         code, _ = self.put(f'wallet.{ira_id}', {'money': 0}, oleh)
         self.assertEqual(code, 403)
-        self.assertEqual(self.state(ira)[f'wallet.{ira_id}']['money'], 100)
 
     def test_05_logins(self):
         self.assertEqual(self.call('POST', '/api/auth/admin', {'password': 'wrong'})[0], 401)
@@ -292,6 +293,59 @@ class Server(unittest.TestCase):
         self.assertEqual(self.state()['admin.server']['demoPlaces'], False)  # бачать усі — застосунок ховає демо одразу
         self.put('admin.server', {'demoWash': True, 'demoPlaces': True}, admin)
         self.assertEqual(self.call('POST', '/api/auth/biz', {'demo': True})[0], 200)
+
+    def test_14_money_rules(self):
+        ira, ira_id = self.login_client('067 111 11 11')
+        _, j = self.call('POST', '/api/auth/biz', {'demo': True})
+        wash = j['token']
+        mine = lambda: {b['id']: b for b in self.state(ira)['bookings']}
+        # Запис оплачено балансом (175 ₴); мийка відмовляє й повертає гроші на баланс клієнта (знає його лише за хешем).
+        b = {'id': 'm1', 'placeId': 'blysk', 'clientId': ira_id, 'date': '2099-10-10', 'time': '10:00', 'minutes': 30, 'state': 'pending', 'paid': 175,
+             'fromBalance': 175, 'total': 175, 'needsConfirm': True, 'createdAt': int(time.time() * 1000)}
+        self.put('bookings', self.state(ira)['bookings'] + [b], ira)
+        wb = next(x for x in self.state(wash)['bookings'] if x['id'] == 'm1')
+        self.put('bookings', [dict(x, state='cancelled', declined='place', refund=175, refundTo='balance', cancelBy='place') if x['id'] == 'm1' else x for x in self.state(wash)['bookings']], wash)
+        entry = {'amount': 175, 'kind': 'money', 'text': 'Повернення', 'at': 2, 'bookingId': 'm1'}
+        self.assertEqual(self.put(f"wallet.{wb['clientId']}", {'money': 175, 'bonus': 0, 'history': [entry]}, wash)[0], 200)
+        self.assertEqual(self.state(ira)[f'wallet.{ira_id}']['money'], 175)
+        # Вдруге за той самий запис — ні.
+        self.put(f"wallet.{wb['clientId']}", {'money': 350, 'bonus': 0, 'history': [dict(entry, at=3)]}, wash)
+        self.assertEqual(self.state(ira)[f'wallet.{ira_id}']['money'], 175)
+        # Клієнт не може сам «повернути» собі оплату на картку чи змінити суму й мийку оплаченого запису.
+        paid = {'id': 'm2', 'placeId': 'blysk', 'clientId': ira_id, 'date': '2099-10-11', 'time': '10:00', 'minutes': 30, 'state': 'pending', 'paid': 0,
+                'total': 0, 'needsConfirm': True, 'createdAt': int(time.time() * 1000)}
+        self.put('bookings', self.state(ira)['bookings'] + [paid], ira)
+        self.put('bookings', [dict(x, state='refunded', refund=999, refundTo='card', paid=1, placeId='hvylia') if x['id'] == 'm2' else x for x in self.state(ira)['bookings']], ira)
+        got = mine()['m2']
+        self.assertEqual((got['state'], got['placeId'], got.get('refund')), ('pending', 'blysk', None))
+        # Новий запис «одразу підтверджений» без пропозиції мийки — лише на підтвердження.
+        self.put('bookings', self.state(ira)['bookings'] + [dict(paid, id='m3', state='paid', fromReq='fake', needsConfirm=False)], ira)
+        self.assertEqual((mine()['m3']['state'], mine()['m3'].get('fromReq')), ('pending', None))
+        # Пізнє скасування (менше ніж за 1,5 год) — без повернення.
+        soon = time.strftime('%Y-%m-%d', time.localtime(time.time() + 1800)), time.strftime('%H:%M', time.localtime(time.time() + 1800))
+        late = dict(paid, id='m4', date=soon[0], time=soon[1])
+        self.put('bookings', self.state(ira)['bookings'] + [late], ira)
+        self.put('bookings', [dict(x, state='paid') if x['id'] == 'm4' else x for x in self.state(wash)['bookings']], wash)
+        self.put('bookings', [dict(x, state='cancelled', refund=500, refundTo='balance') if x['id'] == 'm4' else x for x in self.state(ira)['bookings']], ira)
+        self.assertEqual(mine()['m4'].get('refund'), 0)
+
+    def test_15_misc_hardening(self):
+        ira, _ = self.login_client('067 111 11 11')
+        _, j = self.call('POST', '/api/auth/biz', {'demo': True})
+        wash = j['token']
+        # Демо-кабінет не керує чужими (не демо) мийками.
+        self.put('bookings', self.state(ira)['bookings'] + [{'id': 'o1', 'placeId': 'p_orphan', 'clientId': 'tel:380671111111', 'date': '2099-01-01', 'time': '10:00', 'minutes': 30, 'state': 'pending', 'paid': 0}], ira)
+        self.assertNotIn('o1', [b['id'] for b in self.state(wash)['bookings'] if 'clientName' in b or b.get('state') == 'cancelled'])
+        self.put('bookings', [dict(b, state='cancelled') if b['id'] == 'o1' else b for b in self.state(wash)['bookings']], wash)
+        self.assertEqual(next(b for b in self.state(ira)['bookings'] if b['id'] == 'o1')['state'], 'pending')
+        # Лічильник номерів лише зростає; журнал подій — не для гостей; заявки — лише після входу.
+        self.put('seq.booking', 100, ira)
+        self.put('seq.booking', 1, ira)
+        self.assertEqual(self.state()['seq.booking'], 100)
+        self.assertEqual(self.put('analytics', [{'id': 'spam', 't': 'x'}], None)[0], 403)
+        self.put('biz.applications', [{'id': 'ap1', 'status': 'new', 'name': 'spam'}], None)
+        self.assertNotIn('ap1', [a['id'] for a in self.state(ira).get('biz.applications', [])])
+        self.assertEqual(self.call('GET', '/api/state?since=abc')[0], 400)
 
     def test_99_login_rate_limit(self):
         codes = [self.call('POST', '/api/auth/admin', {'password': 'x'})[0] for _ in range(12)]

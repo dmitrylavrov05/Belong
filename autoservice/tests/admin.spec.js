@@ -265,7 +265,7 @@ test('спір: модератор ділить суму, клієнт отри�
   await card.getByLabel('Точці, ₴ (для «Розділити»)').fill('600');
   await card.getByLabel('Пояснення рішення').fill('Перевзування виконано, балансування — ні');
   await card.getByRole('button', { name: 'Ухвалити рішення' }).click();
-  await expect(page.locator('#toast')).toHaveText('Точці 600 ₴, решту повернено клієнту');
+  await expect(page.locator('#toast')).toHaveText('Точці 600 ₴, клієнту 300 ₴ на баланс');
   await expect(page.getByRole('region', { name: 'Вирішені спори' })).toContainText('300 ₴');
 
   await page.goto('/#/wallet');

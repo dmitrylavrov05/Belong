@@ -1412,6 +1412,7 @@ body.sheet-open .pro-fab { display: none; }
 .pro-link:hover { color: var(--text); background: var(--soft); }
 .pro-link > .ic:first-child { color: var(--navy); }
 .pro-link span { flex: 1; min-width: 0; display: grid; }
+.pro-link span.count-dot { flex: none; display: grid; }
 .pro-link small { font-size: 13px; color: var(--muted); }
 .pro-link > .ic:last-child { color: var(--muted); }
 
@@ -2377,30 +2378,33 @@ const maskIban = (iban) => `UA…${String(iban).slice(-4)}`;
 const commissionFor = (placeId) => partnerOf(placeId).commission ?? store.get('admin.settings', {}).commission ?? PAYMENT.commission;
 
 // Гроші клієнту на баланс CARCAR (повернення за спором чи скасуванням з будь-якого екрана).
-function creditClient(amount, text, id = 'device') {
+function creditClient(amount, text, id = 'device', bookingId = null) {
   const w = { bonus: 0, money: 0, history: [], ...store.get(walletKey(id), {}) };
   w.money += amount;
-  w.history.unshift({ amount, text, at: Date.now(), kind: 'money' });
+  w.history.unshift({ amount, text, at: Date.now(), kind: 'money', ...(bookingId ? { bookingId } : {}) });
   store.set(walletKey(id), w);
 }
 
 // Рішення за спором: placePart — скільки отримує точка (0 — усе клієнту, повна ціна — усе точці).
-function resolveDispute(b, placePart, note = '') {
+// to — рішення модератора ('client' | 'place' | 'split'): потрібне, коли клієнт заплатив 0 ₴ (абонемент, картка лояльності).
+function resolveDispute(b, placePart, note = '', to = null) {
   const full = price(b);
-  const toPlace = Math.max(0, Math.min(full, Math.round(placePart)));
+  const toPlace = to === 'client' ? 0 : Math.max(0, Math.min(full, Math.round(placePart)));
   const name = PLACES.find((x) => x.id === b.placeId)?.name ?? '';
   b.resolution = { placePart: toPlace, note, at: Date.now() };
-  if (toPlace === full) {
-    complete(b);
+  if (to === 'place' || (to !== 'client' && toPlace === full)) {
+    // Спір щодо неявки: усе точці — лишається неявкою, а не «виконано».
+    if (b.disputeFrom === 'noshow') Object.assign(b, { state: 'noshow', placeAmount: full, refund: 0, closedAt: Date.now() });
+    else complete(b);
     b.unfreezeAt = Date.now(); // модератор уже перевірив замовлення
     return;
   }
   const refund = Math.min(chargedOf(b), full - toPlace);
   Object.assign(b, { state: 'refunded', refund, placeAmount: toPlace, refundTo: 'balance', closedAt: Date.now() });
-  if (refund) creditClient(refund, `Повернення за спором: ${name}`, b.clientId);
+  if (refund) creditClient(refund, `Повернення за спором: ${name}`, b.clientId, b.id);
   // Усе клієнту — повертаємо й бонус, візит абонемента та промокод.
   if (toPlace === 0) {
-    if (b.bonus && !b.bonusReturned) { creditBonus(b.bonus, `Повернення бонусу за спором: ${name}`, b.clientId); b.bonusReturned = true; }
+    if (b.bonus && !b.bonusReturned) { creditBonus(b.bonus, `Повернення бонусу за спором: ${name}`, b.clientId, b.id); b.bonusReturned = true; }
     if (b.passUse) { returnPassUse(b.placeId, b.passUse); b.passUse = null; }
     if (b.promo) b.promo.returned = true;
   }
@@ -2421,10 +2425,10 @@ function resolveLate(b, confirmed, note = '') {
 // Скільки клієнт справді заплатив: за оплати частинами — лише перший платіж (решту банк скасовує) і частину з балансу.
 const chargedOf = (b) => (b.installments ? Math.max(0, b.paid - (b.installments.card ?? b.paid) + b.installments.first) : b.paid);
 
-function creditBonus(amount, text, id = 'device') {
+function creditBonus(amount, text, id = 'device', bookingId = null) {
   const w = { bonus: 0, money: 0, history: [], ...store.get(walletKey(id), {}) };
   w.bonus += amount;
-  w.history.unshift({ amount, text, at: Date.now() });
+  w.history.unshift({ amount, text, at: Date.now(), ...(bookingId ? { bookingId } : {}) });
   store.set(walletKey(id), w);
 }
 
@@ -2599,10 +2603,12 @@ const hidePhones = (text) => String(text ?? '').replace(/\+?\d[\d\s\-().]{7,}\d/
 
 // Клієнт прийшов через CARCAR, але мийка записала його сама (по телефону чи «приїхав сам»):
 // комісія з такого запису утримується з виплат.
-const leadFee = (b) => (b.lead === 'carcar' && b.state === 'completed' ? Math.round((b.paid || 0) * commissionFor(b.placeId)) : 0);
+// Ставка — та, що діяла, коли мийка записала клієнта (зміна ставки не перераховує минулого).
+const leadFee = (b) => (b.lead === 'carcar' && b.state === 'completed' ? Math.round((b.paid || 0) * (b.leadRate ?? commissionFor(b.placeId))) : 0);
 
 function balanceFor(placeId, bookings, payouts) {
-  const own = bookings.filter((b) => b.placeId === placeId && isCarcar(b));
+  // Демо-сигнали антифроду — не гроші мийки.
+  const own = bookings.filter((b) => b.placeId === placeId && isCarcar(b) && !b.demoFraud);
   const earned = own.filter((b) => !isFrozen(b)).reduce((a, b) => a + placeShare(b), 0);
   const withdrawn = payouts.filter((x) => x.placeId === placeId).reduce((a, x) => a + x.gross, 0);
   // Непідтверджений запис ще не гроші точки: якщо мийка відмовить, їх повернуть клієнту.
@@ -2615,7 +2621,11 @@ function balanceFor(placeId, bookings, payouts) {
   const passEarned = sales.filter(ripe).reduce((a, x) => a + x.price, 0);
   const passFrozen = sales.filter((x) => !ripe(x)).reduce((a, x) => a + x.price, 0);
   const leadFees = bookings.filter((b) => b.placeId === placeId).reduce((a, b) => a + leadFee(b), 0);
-  return { available: earned + passEarned - withdrawn - leadFees, frozen: frozen + passFrozen, next, withdrawn, leadFees };
+  // Комісія під час виведення — з виручки через CARCAR, ще не виведеної (а не з суми, зменшеної на комісію за «своїх» клієнтів CARCAR).
+  const feeBase = Math.max(0, earned + passEarned - payouts.filter((x) => x.placeId === placeId).reduce((a, x) => a + (x.base ?? x.gross), 0));
+  const available = earned + passEarned - withdrawn - leadFees;
+  const fee = Math.min(Math.max(0, available), Math.round(feeBase * commissionFor(placeId)));
+  return { available, frozen: frozen + passFrozen, next, withdrawn, leadFees, feeBase, fee };
 }
 
 // Номер запису: шість цифр по порядку, однаковий у клієнта, мийки й підтримки — його називають,
@@ -3324,9 +3334,9 @@ function declineBooking(b, reason, by = 'place') {
     ...(b.installments ? { installments: { ...b.installments, cancelled: Date.now() } } : {}),
   });
   const why = by === 'proposal' ? 'інший час не підійшов' : `${opsPlaceName(b)} не підтвердила запис`;
-  if (fromBalance) creditClient(Math.min(fromBalance, refund), `Повернення: ${why}`, b.clientId);
+  if (fromBalance) creditClient(Math.min(fromBalance, refund), `Повернення: ${why}`, b.clientId, b.id);
   if (b.bonus && !b.bonusReturned) {
-    creditBonus(b.bonus, `Повернення бонусу: ${why}`, b.clientId);
+    creditBonus(b.bonus, `Повернення бонусу: ${why}`, b.clientId, b.id);
     b.bonusReturned = true;
   }
   if (b.passUse) { restorePass(b.placeId, b.passUse); b.passUse = null; }
@@ -3343,6 +3353,7 @@ function declineBooking(b, reason, by = 'place') {
 function proposeTime(b, date, time, note = '') {
   if (b?.state !== 'pending') return false;
   const from = { date: b.date, time: b.time };
+  note = hidePhones(note); // номер мийки — лише через CARCAR
   Object.assign(b, { state: 'offer', date, time, offer: { from, at: Date.now(), note }, respondedAt: b.respondedAt ?? Date.now() });
   clientNote(b, 'offer', `${opsPlaceName(b)} не може прийняти вас ${parseDate(from.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })} о ${from.time} і пропонує ${whenText(b)}.${note ? ` ${note}` : ''} Погодьтеся в записі або скасуйте без втрат.`);
   return true;
@@ -3404,7 +3415,9 @@ function loyaltyState(placeId, myBookings) {
 // ---------- каса й зміни ----------
 // День мийки: виконані записи — готівка й картка на місці (свої клієнти), через CARCAR, продані абонементи.
 function cashDay(bookings, placeId, date) {
-  const list = bookings.filter((b) => b.placeId === placeId && b.date === date && b.state === 'completed');
+  // Гроші — того дня, коли запис виконали (а не на який записувались).
+  const doneDay = (b) => (b.completedAt ? isoDate(new Date(b.completedAt)) : b.date);
+  const list = bookings.filter((b) => b.placeId === placeId && doneDay(b) === date && b.state === 'completed');
   const out = { date, cars: list.length, cash: 0, card: 0, carcar: 0, passes: 0, passCash: 0, passCard: 0, list };
   for (const b of list) {
     if (isCarcar(b)) out.carcar += price(b);
@@ -3434,8 +3447,10 @@ function closeShift(placeId, day, counted, note) {
 // ---------- зарплата мийників ----------
 // Відсоток від вартості послуг і/або фіксована сума за авто — з виконаних записів, де призначено цього мийника.
 function salaryFor(w, bookings, placeId, from, to) {
-  const list = bookings.filter((b) => b.placeId === placeId && b.masterId === w.id && b.state === 'completed' && b.date >= from && b.date <= to);
-  const revenue = list.reduce((a, b) => a + (isCarcar(b) ? price(b) : Number(b.paid) || 0), 0);
+  const day = (b) => (b.completedAt ? isoDate(new Date(b.completedAt)) : b.date);
+  const list = bookings.filter((b) => b.placeId === placeId && b.masterId === w.id && b.state === 'completed' && day(b) >= from && day(b) <= to);
+  // Робота за абонементом чи безкоштовна мийка за карткою лояльності — теж робота мийника.
+  const revenue = list.reduce((a, b) => a + (isCarcar(b) ? price(b) : Number(b.paid) || 0) + (b.covered || 0) + (b.loyalty?.amount || 0), 0);
   const pay = Math.round((revenue * (Number(w.pct) || 0)) / 100 + list.length * (Number(w.perCar) || 0));
   return { cars: list.length, revenue, pay };
 }
@@ -3564,7 +3579,7 @@ const OFFER = {
   draft: 'Проєкт для прототипу. Перед запуском текст має перевірити юрист.',
   sections: [
     ['1. Сторони й предмет', 'CARCAR (Сервіс) надає партнеру — ФОП або юридичній особі, яка надає послуги мийки чи детейлінгу авто (Партнер), — доступ до каталогу, онлайн-запису, приймання оплати від клієнтів і панелі для бізнесу. Партнер приймає ці умови повністю, поставивши позначку про згоду в панелі.'],
-    ['2. Підключення', 'Партнер надає достовірні дані про себе, документи з ЄДР і реквізити рахунку, відкритого на його імʼя. Сервіс перевіряє дані до 3 робочих днів і може відмовити в підключенні або призупинити його, якщо дані недостовірні чи Партнер порушує ці умови.'],
+    ['2. Підключення', 'Партнер надає достовірні дані про себе, документи з ЄДР і реквізити рахунку, відкритого на його імʼя. Сервіс перевіряє дані до 2 робочих днів і може відмовити в підключенні або призупинити його, якщо дані недостовірні чи Партнер порушує ці умови.'],
     ['3. Оплата й утримання коштів', 'Клієнт оплачує замовлення в застосунку. Кошти утримуються, доки клієнт не підтвердить виконання (або 24 години після позначки «Машина готова» без відповіді), потім заморожуються ще на 48 годин для можливого спору й стають доступні до виведення.'],
     ['4. Скасування й неявка', 'Якщо клієнт скасовує запис не пізніше ніж за 1,5 години до візиту, кошти повертаються клієнту повністю. Пізніше скасування або неявка клієнта — оплата зараховується Партнеру за послугу.'],
     ['5. Винагорода Сервісу', 'Сервіс утримує комісію від суми, що виводиться Партнером, у розмірі, вказаному в панелі (типово 10%). Для клієнтів комісії немає. Оплати на місці, внесені Партнером у журнал, комісією не обкладаються.'],
@@ -3876,7 +3891,10 @@ const place = () => placeById(ui.place);
 // Запис, який клієнт ще оплачує, мийці не показуємо: він зʼявиться після оплати (а час уже зайнятий).
 const own = () => bookings.filter((b) => b.placeId === ui.place && b.state !== 'unpaid');
 const isPast = (b) => bookingStart(b).getTime() + b.minutes * 60000 <= Date.now();
-const who = (b) => b.clientName || 'Клієнт CARCAR';
+// Імʼя клієнта CARCAR — без номерів, навіть якщо клієнт вписав його в імʼя.
+// Відсоток без округлення до цілих: 12,5%, а не 13%.
+const pctText = (r) => `${String(Math.round(r * 1000) / 10).replace('.', ',')}%`;
+const who = (b) => (isCarcar(b) ? hidePhones(b.clientName || '') : b.clientName) || 'Клієнт CARCAR';
 const telHref = (phone) => `tel:${String(phone).replace(/[^+\d]/g, '')}`;
 const clock = (at) => new Date(at).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
 const whenShort = (at) => (isoDate(new Date(at)) === todayIso() ? clock(at) : new Date(at).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' }));
@@ -4474,7 +4492,12 @@ function bookingSheet(id) {
   } else if (b.state === 'offer') {
     actions = `<p class="notice">Ви запропонували цей час замість ${dayWord(b.offer.from.date).toLowerCase()}, ${b.offer.from.time}. Клієнт відповість до ${clock(offerBy(b))}; не відповість — запис скасується, гроші повернуться йому.</p>`;
   } else if (b.state === 'booked') {
-    actions = `<form class="stack" id="done-form" data-id="${b.id}" style="gap:10px">
+    // Позначити виконаним можна, коли візит почався (інакше гроші потрапили б не в той день каси).
+    actions = !started(b) ? `<p class="notice">«Виконано й оплачено» можна позначити, коли почнеться візит — ${dayWord(b.date).toLowerCase()} о ${b.time}.</p>
+      <div class="grid2">
+        <button class="btn" type="button" data-action="move" data-id="${b.id}">Перенести</button>
+        <button class="btn text-danger" type="button" data-action="crm-cancel" data-id="${b.id}">Скасувати запис</button>
+      </div>` : `<form class="stack" id="done-form" data-id="${b.id}" style="gap:10px">
         <div class="seg-row" role="radiogroup" aria-label="Оплата на місці">
           <label><input type="radio" name="payment" value="card" checked><span>Картка</span></label>
           <label><input type="radio" name="payment" value="cash"><span>Готівка</span></label></div>
@@ -4496,7 +4519,7 @@ function bookingSheet(id) {
           <label class="field"><span>Коментар для клієнта</span><input name="note" maxlength="200" autocomplete="off"></label>
         </div>
         <button class="btn primary" type="submit">${icon('check', 18)}Машина готова</button>
-        <p class="fine">Так ви підтверджуєте виконання. Клієнт отримає сповіщення, а фото й пробіг потраплять у сервісну книжку авто. Гроші ${PAYMENT.freezeHours} год чекають на випадок спору.</p>
+        <p class="fine">Так ви підтверджуєте виконання. Клієнт отримає сповіщення, а фото потраплять у сервісну книжку авто. Гроші ${PAYMENT.freezeHours} год чекають на випадок спору.</p>
       </form>
       ${late ? `<button class="btn" type="button" data-action="late-claim" data-id="${b.id}">Клієнт запізнився понад ${PAYMENT.lateMinutes} хв — у підтримку</button>
         <button class="btn text-danger" type="button" data-action="carcar-noshow" data-id="${b.id}">Клієнт не приїхав</button>
@@ -4517,7 +4540,7 @@ function bookingSheet(id) {
       <dt>Коли</dt><dd>${dayWord(b.date, true)}, ${b.time}–${hhmm(toMin(b.time) + b.minutes)}</dd>
       <dt>Послуги</dt><dd>${esc(b.services.join(', '))}</dd>
       <dt>Тривалість</dt><dd class="washer-dd"><span>${duration(b.minutes)}</span>${DUR_EDIT.includes(b.state) ? `<button class="btn soft" type="button" data-action="dur" data-id="${b.id}">Уточнити</button>` : ''}</dd>
-      <dt>Авто</dt><dd>${esc(b.car || '—')}</dd>
+      <dt>Авто</dt><dd>${esc((isCarcar(b) ? hidePhones(b.car || '') : b.car) || '—')}</dd>
       ${ACTIVE.includes(b.state) || b.state === 'booked' || b.masterId ? `<dt>Мийник</dt><dd class="washer-dd">${b.masterId && washerName(b.masterId) ? `<b>${esc(washerName(b.masterId))}</b>` : '<span class="muted">не призначено</span>'}
         ${(ACTIVE.includes(b.state) || b.state === 'booked') && b.state !== 'pending' ? `<button class="btn soft" type="button" data-action="washer" data-id="${b.id}">${b.masterId ? 'Змінити' : 'Обрати'}</button>` : ''}</dd>` : ''}
       <dt>Сума</dt><dd>${uah(sumOf(b))}${isCarcar(b) ? ' · оплачено в CARCAR' : b.payment ? ` · ${b.payment === 'cash' ? 'готівка' : 'картка'}` : ' · оплата на місці'}</dd>
@@ -4630,7 +4653,7 @@ function moveSheet(id, date) {
   const b = own().find((x) => x.id === id);
   const d = date ?? b.date;
   const t = todayIso();
-  const starts = openStarts(place(), d, b.minutes, bookings, { lead: 0, skip: b });
+  const starts = openStarts(place(), d, b.minutes, bookings, { lead: 0, skip: b, mobile: !!b.mobile });
   openSheet(`Перенести: ${esc(who(b))}`, `
     <div class="chips day-chips" role="group" aria-label="День">${Array.from({ length: 7 }, (_, i) => shiftDay(t, i)).map((x) => `<button class="chip" type="button" data-action="move-day" data-id="${b.id}" data-date="${x}" aria-pressed="${x === d}" ${hoursFor(place(), x) ? '' : 'disabled'}>${dayWord(x)}</button>`).join('')}</div>
     ${starts.length ? `<div class="slots" role="group" aria-label="Вільний час">${starts.map((s) => `<button class="slot" type="button" data-action="move-to" data-id="${b.id}" data-date="${d}" data-time="${s}">${s}</button>`).join('')}</div>`
@@ -4756,7 +4779,7 @@ function nbHint() {
   const past = key ? own().filter((b) => b.clientPhone && phoneKey(b.clientPhone) === key).sort((a, b) => bookingStart(b) - bookingStart(a)) : [];
   if (carcarLead(nb.phone)) {
     hint.className = 'nb-hint small warn-text';
-    hint.textContent = `Це клієнт CARCAR — з такого запису утримається комісія ${Math.round(commissionFor(ui.place) * 100)}%. Краще надішліть йому пропозицію запису в чаті.`;
+    hint.textContent = `Це клієнт CARCAR — з такого запису утримається комісія ${pctText(commissionFor(ui.place))}. Краще запишіть його через CARCAR: попросіть записатися в застосунку.`;
     return;
   }
   hint.className = 'nb-hint small';
@@ -4786,14 +4809,14 @@ function nbSubmit() {
     clientName: nb.name.trim() || (nb.channel === 'walkin' ? 'Клієнт з вулиці' : 'Клієнт'), clientPhone: nb.phone.trim(), note: '',
     state: 'booked', createdAt: Date.now(),
     // Клієнт уже приходив через CARCAR — запис зараховується CARCAR, комісія утримується з виплат.
-    ...(carcarLead(nb.phone) ? { lead: 'carcar' } : {}),
+    ...(carcarLead(nb.phone) ? { lead: 'carcar', leadRate: commissionFor(ui.place) } : {}),
   };
   bookings.push(b);
   save();
   closeSheet();
   location.hash = `#/bookings/${b.date}`;
   route();
-  toast(`Записано: ${b.clientName}, ${dayWord(b.date).toLowerCase()} о ${b.time}${b.lead ? `. Клієнт CARCAR — утримається комісія ${Math.round(commissionFor(p.id) * 100)}%` : ''}`);
+  toast(`Записано: ${b.clientName}, ${dayWord(b.date).toLowerCase()} о ${b.time}${b.lead ? `. Клієнт CARCAR — утримається комісія ${pctText(commissionFor(p.id))}` : ''}`);
 }
 
 // ---------- мийка: гроші й показники ----------
@@ -4831,7 +4854,7 @@ function viewWash() {
   const week = periodStats(7);
   const month = periodStats(30);
   const bal = balanceFor(p.id, bookings, payouts);
-  const fee = Math.round(bal.available * commissionFor(p.id));
+  const fee = bal.fee;
   const mine = payouts.filter((x) => x.placeId === p.id).sort((a, b) => b.at - a.at).slice(0, 3);
   const loadToday = loadPct(t);
   const loadTomorrow = loadPct(shiftDay(t, 1));
@@ -4852,7 +4875,7 @@ function viewWash() {
       ${payoutReady(p.id)
         ? `<button class="btn primary block" type="button" data-action="payout" ${bal.available > 0 ? '' : 'disabled'}>${bal.available > 0 ? `Вивести ${uah(bal.available - fee)} на ${maskIban(partnerOf(p.id).payout.iban)}` : 'Немає коштів для виведення'}</button>`
         : `<a class="btn block" href="#/payout">${partnerOf(p.id).payout?.iban ? 'Рахунок на перевірці CARCAR' : 'Вказати рахунок для виплат'}</a>`}
-      <p class="fine">Комісія CARCAR ${Math.round(commissionFor(p.id) * 100)}% утримується під час виведення. Оплати на місці не обкладаються.</p>
+      <p class="fine">Комісія CARCAR ${pctText(commissionFor(p.id))} утримується під час виведення — з записів через CARCAR. Оплати на місці від ваших власних клієнтів не обкладаються; клієнти CARCAR, яких ви записали напряму, — з комісією.</p>
       ${mine.length ? `<ul class="plain-list">${mine.map((x) => `<li><span>${fmtTime(x.at)}</span><b>${uah(x.net)}</b></li>`).join('')}</ul>` : ''}
     </section>
     ${suggestCard(true)}
@@ -5094,7 +5117,8 @@ function viewStaff() {
   const cars = (id) => own().filter((b) => b.masterId === id && b.state === 'completed' && b.date >= from).length;
   const per = ui.salP ?? 'month';
   const [sFrom, sTo] = salaryRange(per);
-  const sal = list.map((w) => ({ w, ...salaryFor(w, bookings, ui.place, sFrom, sTo) }));
+  // Прибрані мийники — теж, якщо за період у них є виконані записи.
+  const sal = staffOf(ui.place).filter((x) => x.role === 'master').map((w) => ({ w, ...salaryFor(w, bookings, ui.place, sFrom, sTo) })).filter((x) => x.w.active !== false || x.cars);
   const total = sal.reduce((a, x) => a + x.pay, 0);
   return `<a class="back" href="#/more">${icon('chevL', 22)}Ще</a><h1>Мийники</h1>
     <p class="lead">Обирайте мийника, коли приймаєте запис. Клієнт бачить, хто митиме машину.</p>
@@ -5376,7 +5400,7 @@ function viewAnalytics() {
   const money = list.reduce((a, b) => a + revenue(b), 0);
   const lost = list.filter((b) => ['cancelled', 'noshow'].includes(b.state) && !b.declined).length;
   const past = list.filter((b) => b.state !== 'pending' && bookingStart(b) <= new Date()).length;
-  const key = (b) => (b.clientPhone ? phoneKey(b.clientPhone) : null);
+  const key = (b) => clientNoteKey(b);
   const firstSeen = new Map();
   for (const b of [...own()].sort((a, b) => a.date.localeCompare(b.date))) if (key(b) && !firstSeen.has(key(b))) firstSeen.set(key(b), b.date);
   const clients = [...new Set(done.map(key).filter(Boolean))];
@@ -5502,7 +5526,8 @@ function viewCash(arg) {
   const day = cashDay(bookings, ui.place, date);
   const shift = shiftOn(ui.place, date);
   const left = own().filter((b) => b.date === date && (b.state === 'paid' || b.state === 'booked') && isPast(b)).length;
-  const pay = washers().map((w) => ({ w, ...salaryFor(w, bookings, ui.place, date, date) })).filter((x) => x.cars);
+  // І ті, кого вже прибрали зі списку: зароблене за день лишається.
+  const pay = staffOf(ui.place).filter((x) => x.role === 'master').map((w) => ({ w, ...salaryFor(w, bookings, ui.place, date, date) })).filter((x) => x.cars);
   const reopen = ui.reshift === date;
   return `${backTo('#/more', 'Ще')}<h1>Каса</h1>
     <nav class="day-nav" aria-label="День">
@@ -5771,7 +5796,9 @@ function addQuietDeal(days, from, to, pct) {
 function markReady(b) {
   Object.assign(b, { photos: b.photos ?? [], doneAt: Date.now() });
   complete(b);
+  const sn = stockNote(b);
   save();
+  if (sn) toast(`Матеріали списано${sn}`);
 }
 
 document.addEventListener('click', async (e) => {
@@ -5984,13 +6011,17 @@ document.addEventListener('click', async (e) => {
   if (action === 'move') { moveSheet(id); return; }
   if (action === 'move-day') { moveSheet(id, el.dataset.date); return; }
   if (action === 'move-to') {
-    if (!openStarts(place(), el.dataset.date, b.minutes, bookings, { lead: 0, skip: b }).includes(el.dataset.time)) { toast('Цей час щойно зайняли — оберіть інший'); moveSheet(id, el.dataset.date); return; }
+    if (!openStarts(place(), el.dataset.date, b.minutes, bookings, { lead: 0, skip: b, mobile: !!b.mobile }).includes(el.dataset.time)) { toast('Цей час щойно зайняли — оберіть інший'); moveSheet(id, el.dataset.date); return; }
     b.moves = [...(b.moves ?? []), { date: b.date, time: b.time, at: Date.now(), by: 'place' }];
     const from = `${dayWord(b.date).toLowerCase()}, ${b.time}`;
     Object.assign(b, { date: el.dataset.date, time: el.dataset.time });
     // Нагадування й «Їду» стосувалися старого часу; клієнт бачить новий час у чаті запису.
     for (const k of ['remindDay', 'remind2h', 'eta', 'late', 'etaAt']) delete b[k];
-    if (isCarcar(b)) chatPost(b, 'sys', `Мийка перенесла запис з ${from} на ${dayWord(b.date).toLowerCase()}, ${b.time}`, 'client');
+    if (isCarcar(b)) {
+      const text = `Мийка перенесла запис з ${from} на ${dayWord(b.date).toLowerCase()}, ${b.time}`;
+      chatPost(b, 'sys', text, 'client');
+      sendMessages([{ placeId: b.placeId, clientKey: b.clientId ?? 'device', channel: 'app', kind: 'move', bookingId: b.id, text: `${place().name}: ${text}`, link: `#/bookings/${b.id}` }]);
+    }
     after(`Перенесено на ${dayWord(b.date).toLowerCase()}, ${b.time}`);
     return;
   }
@@ -6094,11 +6125,11 @@ document.addEventListener('click', async (e) => {
     return;
   }
   if (action === 'payout') {
-    const { available } = balanceFor(ui.place, bookings, payouts);
-    const fee = Math.round(available * commissionFor(ui.place));
+    const { available, fee, feeBase } = balanceFor(ui.place, bookings, payouts);
+    if (available <= 0) return;
     const iban = maskIban(partnerOf(ui.place).payout.iban);
     if (!confirm(`Вивести ${uah(available)}? Комісія ${uah(fee)}, на рахунок ${iban} надійде ${uah(available - fee)}.`)) return;
-    payouts.push({ id: uid(), placeId: ui.place, gross: available, fee, net: available - fee, at: Date.now(), iban });
+    payouts.push({ id: uid(), placeId: ui.place, gross: available, base: feeBase, fee, net: available - fee, at: Date.now(), iban });
     save();
     rerender();
     toast(`Виплату відправлено на рахунок ${iban}`);
@@ -6242,7 +6273,11 @@ document.addEventListener('submit', async (e) => {
     if (m > b.minutes && !boxFree(b.date, toMin(b.time), m, b)) { toast('На цей час не вистачає вільного боксу або мийка вже закрита'); return; }
     const was = b.minutes;
     b.minutes = m;
-    if (isCarcar(b) && m !== was) chatPost(b, 'sys', `Мийка уточнила тривалість: ${b.time}–${hhmm(toMin(b.time) + m)}`, 'client');
+    if (isCarcar(b) && m !== was) {
+      const text = `Мийка уточнила тривалість: ${b.time}–${hhmm(toMin(b.time) + m)}`;
+      chatPost(b, 'sys', text, 'client');
+      sendMessages([{ placeId: b.placeId, clientKey: b.clientId ?? 'device', channel: 'app', kind: 'duration', bookingId: b.id, text: `${place().name}: ${text}`, link: `#/bookings/${b.id}` }]);
+    }
     save();
     rerender();
     bookingSheet(b.id);
@@ -6253,7 +6288,7 @@ document.addEventListener('submit', async (e) => {
     const b = own().find((x) => x.id === f.dataset.id);
     const note = String(d.get('note')).trim();
     if (!b || !declineBooking(b, String(d.get('reason')))) { closeSheet(); rerender(); toast('На цей запис уже відповіли або його скасовано'); return; }
-    if (note) chatPost(b, 'biz', note, 'client');
+    if (note) chatPost(b, 'biz', hidePhones(note), 'client');
     save();
     closeSheet();
     rerender();

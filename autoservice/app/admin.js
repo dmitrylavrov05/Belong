@@ -6,10 +6,10 @@ import {
   store, icon, esc, uah, pad, isoDate, parseDate, plural, dayLabel, rating, fmtTime, fmtDate, catById, WEEKDAYS, bookingStart, HOUR,
   PARTNER_STATUS, partnerOf, savePartner, commissionFor, isCarcar, price, placeShare, isFrozen,
   responseStats, pauseOf, liftPause, ratePct, msText, realOrder,
-  ratingFor, visibleReviews, ACTIVE, resolveDispute, resolveLate, settleAll, applyOverrides, promosAll, savePromos, promoUses, promoText,
+  ratingFor, visibleReviews, ACTIVE, chargedOf, resolveDispute, resolveLate, settleAll, applyOverrides, promosAll, savePromos, promoUses, promoText,
   TICKET_TOPICS, TICKET_STATUS, ticketsAll, ticketReply, setTicket, ticketOverdue, slaHours, fraudState, saveFraud, staffOf, phoneKey,
   addCustomPlace, uid, hash,
-  enterView, bizApps, APP_STATUS, approveBizApp, rejectBizApp, bookingNo, findByNo, ticketPhotos, shrinkPhoto,
+  leadFee, isListed, enterView, bizApps, APP_STATUS, approveBizApp, rejectBizApp, bookingNo, findByNo, ticketPhotos, shrinkPhoto,
   hasServer, api, authToken, setAuthToken, isDemoPlace, demoPlacesOn, demoWashOn, demoLoginOn, serverConfig,
 } from './core.js';
 import { ENTITY, TAX, codeValid, ibanValid, ibanBank, formatIban } from './partners.js';
@@ -122,10 +122,12 @@ function viewOverview() {
   const prev = statsFor(rangeOf(n, 1));
   const q = queues();
   const escrow = bookings.filter((b) => isCarcar(b) && (ACTIVE.includes(b.state) || isFrozen(b))).reduce((a, b) => a + price(b), 0);
-  const collected = payouts.filter((x) => x.at >= parseDate(range[0]).getTime()).reduce((a, x) => a + x.fee, 0);
+  // Утримано: комісія з виплат + комісія за клієнтів CARCAR, яких мийки записали напряму.
+  const collected = payouts.filter((x) => x.at >= parseDate(range[0]).getTime()).reduce((a, x) => a + x.fee, 0)
+    + bookings.filter((b) => (b.completedAt ?? 0) >= parseDate(range[0]).getTime()).reduce((a, b) => a + leadFee(b), 0);
   const vis = visibleReviews(reviews);
   const avgRating = vis.length ? vis.reduce((a, r) => a + r.stars, 0) / vis.length : 0;
-  const listed = PLACES.filter((p) => partnerOf(p.id).status === 'approved').length;
+  const listed = PLACES.filter(isListed).length;
 
   const days = [];
   for (let d = range[0]; d <= range[1]; d = addDays(d, 1)) days.push(d);
@@ -412,12 +414,12 @@ function viewDisputes() {
     ${open.length ? open.map((b) => `<article class="panel stack" style="gap:10px" aria-label="Спір: ${esc(placeName(b.placeId))}">
       <div class="head"><div><b>${esc(placeName(b.placeId))}</b><small class="muted" style="display:block">${dayLabel(b.date, { day: 'numeric', month: 'long' })}, ${b.time} · ${esc(b.car)} · ${esc(b.clientName || 'клієнт')}</small></div>
         <b>${uah(price(b))}</b></div>
-      <p class="small" style="margin:0">${esc(b.services.join(', '))}${b.bonus ? ` · з них бонус ${uah(b.bonus)}` : ''}</p>
-      <p class="notice warn" style="margin:0"><b>Скарга клієнта</b>«${esc(b.disputeReason)}»</p>
+      <p class="small" style="margin:0">${esc(b.services.join(', '))} · клієнт заплатив ${uah(chargedOf(b))}${b.bonus ? `, бонус ${uah(b.bonus)}` : ''}${b.promo && !b.promo.returned ? `, промокод ${uah(b.promo.amount)} (доплачує CARCAR)` : ''}${b.covered ? `, абонемент ${uah(b.covered)}` : ''}</p>
+      <p class="notice warn" style="margin:0"><b>${b.lateClaim ? 'Мийка повідомила про запізнення' : 'Скарга клієнта'}</b>«${esc(b.disputeReason)}»</p>
       ${b.note || b.km ? `<p class="small muted" style="margin:0">Коментар точки: ${esc(b.note ?? '')}${b.km ? ` · пробіг ${b.km} км` : ''}</p>` : ''}
       ${b.photos?.length ? `<div class="photos">${b.photos.map((src, i) => `<img src="${esc(src)}" alt="Фото результату ${i + 1}">`).join('')}</div>` : '<p class="small muted" style="margin:0">Точка не додала фото результату.</p>'}
       ${relatedTickets(b)}
-      ${disputeForm(b)}
+      ${b.lateClaim ? lateDecision(b) : disputeForm(b)}
     </article>`).join('') : `<div class="empty-state">${icon('scale', 32)}<h2>Відкритих спорів немає</h2><p>Клієнт може відкрити спір, поки гроші за замовленням заморожені.</p></div>`}
     </div>
     ${done.length ? `<h2 class="biz-h2">Вирішені</h2>
@@ -912,8 +914,8 @@ function viewCommission() {
   const custom = PLACES.filter((p) => partnerOf(p.id).commission !== undefined);
   return `<h1>Комісії й виплати</h1><p class="page-sub">Комісія утримується з суми, яку точка виводить. Для клієнтів комісії немає.</p>
     <section class="kpis" aria-label="Комісії">
-      <div class="kpi hero"><span class="label">Утримано комісії всього</span><span class="value">${uah(all.reduce((a, x) => a + x.fee, 0))}</span>
-        <span class="kpi-note">${all.length} ${plural(all.length, 'виплата', 'виплати', 'виплат')} на ${uah(all.reduce((a, x) => a + x.net, 0))}</span></div>
+      <div class="kpi hero"><span class="label">Утримано комісії всього</span><span class="value">${uah(all.reduce((a, x) => a + x.fee, 0) + bookings.reduce((a, b) => a + leadFee(b), 0))}</span>
+        <span class="kpi-note">${all.length} ${plural(all.length, 'виплата', 'виплати', 'виплат')} на ${uah(all.reduce((a, x) => a + x.net, 0))}${bookings.some((b) => leadFee(b)) ? ` · з них за клієнтів CARCAR, записаних напряму, ${uah(bookings.reduce((a, b) => a + leadFee(b), 0))}` : ''}</span></div>
       <div class="kpi"><span class="label">Загальна ставка</span><span class="value">${pctText(base)}</span></div>
       <div class="kpi"><span class="label">Індивідуальні ставки</span><span class="value">${custom.length}</span></div>
     </section>
@@ -924,7 +926,7 @@ function viewCommission() {
           <label class="field"><span>Комісія, %</span><input name="pct" type="number" min="0" max="30" step="0.5" value="${+(base * 100).toFixed(1)}" required></label>
           <button class="btn primary" type="submit">Зберегти</button>
         </form>
-        <p class="fine">Нова ставка застосовується до наступних виплат. Уже виведені суми не перераховуються. Оферта передбачає повідомлення точок про зміну умов щонайменше за 14 днів.</p>
+        <p class="fine">Нова ставка застосовується до наступних виплат і нових записів; уже виведені суми й комісія за раніше записаних клієнтів не перераховуються. Повідомте мийки про зміну заздалегідь.</p>
       </section>
       <section class="panel" aria-labelledby="h-custom">
         <h2 id="h-custom">Індивідуальні ставки</h2>
@@ -1135,7 +1137,7 @@ function viewStats() {
       <section class="panel" aria-labelledby="h-pay"><h2 id="h-pay">Як платять</h2><p class="sub">Записів через застосунок</p>${hbars(pays, (v) => String(v))}</section>
       <section class="panel" aria-labelledby="h-lead"><h2 id="h-lead">За скільки записуються</h2><p class="sub">Від оплати до візиту</p>${hbars(lead, (v) => String(v))}</section>
       <section class="panel" aria-labelledby="h-geo"><h2 id="h-geo">Райони</h2><p class="sub">Записи через застосунок</p>${geo((p) => p.district).length ? hbars(geo((p) => p.district), (v) => String(v)) : '<p class="muted" style="margin:0">Немає записів.</p>'}</section>
-      <section class="panel" aria-labelledby="h-cat2"><h2 id="h-cat2">Категорії</h2><p class="sub">Записи через застосунок</p>${geo((p) => catById(p.cats[0]).name).length ? hbars(geo((p) => catById(p.cats[0]).name), (v) => String(v)) : '<p class="muted" style="margin:0">Немає записів.</p>'}</section>
+      <section class="panel" aria-labelledby="h-cat2"><h2 id="h-cat2">Категорії</h2><p class="sub">Записи через застосунок</p>${geo((p) => catById(p.cats[0] ?? 'wash')?.name ?? 'Мийки').length ? hbars(geo((p) => catById(p.cats[0] ?? 'wash')?.name ?? 'Мийки'), (v) => String(v)) : '<p class="muted" style="margin:0">Немає записів.</p>'}</section>
       <section class="panel" aria-labelledby="h-search"><h2 id="h-search">Що шукають</h2><p class="sub">Запити в пошуку; без результатів — що варто додати</p>
         ${topSearch.length ? `<ul class="special-list">${topSearch.map((x) => `<li><span><b>«${esc(x.q)}»</b><small>${x.n} ${plural(x.n, 'раз', 'рази', 'разів')}${x.empty ? ` · без результатів ${x.empty}` : ''}</small></span></li>`).join('')}</ul>` : '<p class="muted" style="margin:0">Пошукових запитів немає.</p>'}
       </section>
@@ -1208,7 +1210,7 @@ const NAV = [
 // Мийки реєструються в застосунку; адміністрація перевіряє дані й видає логін і пароль до кабінету.
 function viewApplications() {
   const list = [...bizApps()].sort((a, b) => (a.status === 'new' ? -1 : 0) - (b.status === 'new' ? -1 : 0) || b.at - a.at);
-  return `<h1>Заявки бізнесу</h1><p class="page-sub">Перевірте дані мийки. Після схвалення точка зʼявиться в каталозі, а мийка отримає логін і пароль до кабінету.</p>
+  return `<h1>Заявки бізнесу</h1><p class="page-sub">Перевірте дані мийки. Після схвалення мийка отримає логін і пароль до кабінету, перевірить профіль і сама опублікується в каталозі.</p>
     ${list.length ? `<div class="stack" style="gap:12px">${list.map((a) => {
       const [label, cls] = APP_STATUS[a.status];
       return `<article class="panel stack" style="gap:10px" aria-label="Заявка ${esc(a.name)}">
@@ -1390,7 +1392,7 @@ document.addEventListener('click', (e) => {
   else if (action === 'escalate') {
     const t = ticketsAll().find((x) => x.id === id);
     const b = bookings.find((x) => x.id === t.bookingId);
-    Object.assign(b, { state: 'dispute', disputeReason: t.messages.find((m) => m.from !== 'admin')?.text ?? 'Звернення в підтримку', ticketId: b.ticketId ?? t.id });
+    Object.assign(b, { state: 'dispute', disputeFrom: b.state, disputeReason: t.messages.find((m) => m.from !== 'admin')?.text ?? 'Звернення в підтримку', ticketId: b.ticketId ?? t.id });
     save();
     ticketReply(t.id, 'admin', 'Ми відкрили спір за цим записом: гроші заморожено, доки модератор не ухвалить рішення.', 'open');
     rerender();
@@ -1499,11 +1501,13 @@ document.addEventListener('submit', async (e) => {
     const to = d.get('to');
     const part = to === 'client' ? 0 : to === 'place' ? price(b) : Number(d.get('part'));
     if (to === 'split' && !(part > 0 && part < price(b))) { toast(`Сума точці має бути від 1 до ${price(b) - 1} ₴`); return; }
-    resolveDispute(b, part, d.get('note').trim());
+    resolveDispute(b, part, d.get('note').trim(), to);
     save();
-    notifyResolution(b, `Рішення за спором: ${to === 'client' ? 'усю суму повернено вам на баланс CARCAR' : to === 'place' ? 'оплату передано точці' : `точці ${uah(part)}, решту повернено клієнту на баланс CARCAR`}.${d.get('note').trim() ? ` ${d.get('note').trim()}` : ''}`);
+    // Кажемо, скільки саме повернули: за «Розділити» бонус і промокод не повертаються.
+    const back = b.refund ?? 0;
+    notifyResolution(b, `Рішення за спором: ${to === 'client' ? `усе повернено вам${back ? `: ${uah(back)} на баланс CARCAR` : ''}${b.bonusReturned && b.bonus ? `, бонус ${uah(b.bonus)}` : ''}` : to === 'place' ? 'оплату передано точці' : `точці ${uah(part)}, вам повернено ${uah(back)} на баланс CARCAR`}.${d.get('note').trim() ? ` ${d.get('note').trim()}` : ''}`);
     rerender();
-    toast(to === 'client' ? 'Гроші повернено клієнту на баланс' : to === 'place' ? 'Гроші передано точці' : `Точці ${uah(part)}, решту повернено клієнту`);
+    toast(to === 'client' ? `Повернено клієнту${back ? `: ${uah(back)} на баланс` : ''}` : to === 'place' ? 'Гроші передано точці' : `Точці ${uah(part)}, клієнту ${uah(back)} на баланс`);
   }
 });
 

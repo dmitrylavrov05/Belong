@@ -176,6 +176,7 @@ body.sheet-open .pro-fab { display: none; }
 .pro-link:hover { color: var(--text); background: var(--soft); }
 .pro-link > .ic:first-child { color: var(--navy); }
 .pro-link span { flex: 1; min-width: 0; display: grid; }
+.pro-link span.count-dot { flex: none; display: grid; }
 .pro-link small { font-size: 13px; color: var(--muted); }
 .pro-link > .ic:last-child { color: var(--muted); }
 

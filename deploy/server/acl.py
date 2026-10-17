@@ -108,8 +108,19 @@ def unmask_ids(who, merged, cur_items, get):
     return merged
 
 
+def resolve_client(who, h, get):
+    """Справжній ідентифікатор клієнта за хешем — лише серед клієнтів мийок цього акаунта."""
+    for key in ('bookings', 'requests'):
+        for x in get(key) or []:
+            if isinstance(x, dict) and owns(who, x.get('placeId'), get):
+                v = x.get('clientId')
+                if isinstance(v, str) and v.startswith('tel:') and phone_hash(v) == h:
+                    return v
+    return None
+
+
 # Ключі, у яких мийка бачить клієнтів CARCAR лише за хешем номера.
-MASKED_KEYS = ('bookings', 'requests', 'messages', 'calls', 'callLog', 'waitlist', 'support')
+MASKED_KEYS = ('bookings', 'requests', 'messages', 'calls', 'callLog', 'waitlist', 'support', 'biz.offers')
 
 
 class Who:
@@ -129,8 +140,26 @@ class Who:
         return self.role == 'client' and cid and cid == self.cid
 
 
+def _demo_ids():
+    """Вигадані мийки з data.js застосунку — ними (і доданими в демо) керує демо-кабінет."""
+    import os
+    import re as _re
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'autoservice', 'app', 'data.js')
+    try:
+        with open(path, encoding='utf-8') as f:
+            src = f.read()
+        part = src[src.index('export const PLACES = ['):]
+        part = part[:part.index('\n];')]
+        return set(_re.findall(r"^    id: '([^']+)'", part, _re.M))
+    except (OSError, ValueError):
+        return set()
+
+
+DEMO_IDS = _demo_ids()
+
+
 def account_places(store_get, who):
-    """Мийки акаунта мийки: з biz.accounts; демо-кабінет — усі мийки, що не належать жодному акаунту."""
+    """Мийки акаунта мийки: з biz.accounts; демо-кабінет — лише вигадані мийки й додані в демо."""
     accounts = store_get('biz.accounts') or []
     owned = set()
     for a in accounts:
@@ -138,7 +167,7 @@ def account_places(store_get, who):
     owned.discard(None)
     if who.demo:
         # Демо-мийки з data.js серверу невідомі на імʼя — демо-кабінет керує всім, що не належить справжнім акаунтам.
-        return {'*demo*'} | (set(store_get('biz.demoPlaces') or []) - owned)
+        return (DEMO_IDS | set(store_get('biz.demoPlaces') or [])) - owned
     acc = next((a for a in accounts if a.get('login') == who.login), None)
     if not acc:
         return set()
@@ -150,13 +179,7 @@ def owns(who, pid, store_get=None):
         return True
     if who.role != 'place' or not pid:
         return False
-    if pid in who.places:
-        return True
-    if '*demo*' in who.places and store_get is not None:
-        accounts = store_get('biz.accounts') or []
-        owned = {x for a in accounts for x in [a.get('placeId')] + list(a.get('places') or []) if x}
-        return pid not in owned
-    return False
+    return pid in who.places
 
 
 # ---------- політики ----------
@@ -359,8 +382,8 @@ def read_apps(who, value, get):
 def write_app(who, item, cur, get):
     if who.admin:
         return True
-    # Нову заявку може подати будь-хто (навіть без входу), але не схвалити.
-    return cur is None and item.get('status') == 'new' and not item.get('issued')
+    # Нову заявку подає клієнт, що увійшов за номером (бачитиме статус і дані для входу), але не схвалює.
+    return who.role == 'client' and cur is None and item.get('status') == 'new' and not item.get('issued')
 
 
 # ----- словники {placeId: …} -----
@@ -437,8 +460,97 @@ def read_wallet(who, value, get, key=''):
 
 def write_wallet_key(who, key):
     cid = key[len('wallet.'):] if key.startswith('wallet.') else None
-    # Повернення на баланс роблять мийка (відмова) й адміністрація (спір), тож писати можуть і вони.
-    return who.admin or who.role == 'place' or who.is_client(cid)
+    # Власник гаманця, мийка (повернення за відмову — перевіряє sanitize) і адміністрація.
+    return who.admin or who.is_client(cid) or (who.role == 'place' and bool(cid) and cid.startswith('tel:'))
+
+
+# Як PAYMENT у data.js: скасувати без втрат можна не пізніше ніж за стільки годин до візиту;
+# гроші за виконане замовлення заморожені стільки годин.
+FREE_CANCEL_HOURS = 1.5
+FREEZE_HOURS = 48
+
+
+def booking_start(b):
+    """Початок візиту (Київ) у секундах."""
+    import datetime as _dt
+    try:
+        d = _dt.datetime.strptime(f"{b.get('date')} {b.get('time')}", '%Y-%m-%d %H:%M')
+    except (TypeError, ValueError):
+        return 0
+    try:
+        from zoneinfo import ZoneInfo
+        return d.replace(tzinfo=ZoneInfo('Europe/Kyiv')).timestamp()
+    except Exception:
+        return d.timestamp()
+
+
+def _num(v):
+    try:
+        return max(0.0, float(v or 0))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _wallet_caps(b):
+    """Скільки за цей запис можна повернути на баланс і бонусами."""
+    money = 0.0
+    if b.get('state') in ('cancelled', 'refunded'):
+        refund = _num(b.get('refund'))
+        money = refund if b.get('refundTo') == 'balance' else min(_num(b.get('fromBalance')), refund)
+    if b.get('payFailed'):
+        money = max(money, _num(b.get('fromBalance')))
+    bonus = _num(b.get('bonus')) if b.get('state') in ('cancelled', 'refunded') or b.get('payFailed') else 0.0
+    return money, bonus
+
+
+def sanitize_wallet(who, cur, new, get):
+    """Гаманець рахує сервер: нові записи історії приймаються лише обґрунтовані. Витрачати (мінус) може власник;
+    повертати (плюс) — лише за скасований чи неоплачений запис цього клієнта і не більше, ніж за нього належить."""
+    cur = cur if isinstance(cur, dict) else {}
+    old_hist = [h for h in cur.get('history') or [] if isinstance(h, dict)]
+    seen = {json.dumps(h, sort_keys=True) for h in old_hist}
+    added = [h for h in (new or {}).get('history') or [] if isinstance(h, dict) and json.dumps(h, sort_keys=True) not in seen]
+    money, bonus = _num(cur.get('money')), _num(cur.get('bonus'))
+    owner = who.role == 'client'
+    books = {b.get('id'): b for b in get('bookings') or [] if isinstance(b, dict)}
+    credited = {}
+    for h in old_hist:
+        if (h.get('amount') or 0) > 0 and h.get('bookingId'):
+            k = (h['bookingId'], h.get('kind') == 'money')
+            credited[k] = credited.get(k, 0) + float(h['amount'])
+    ok = []
+    for h in added:
+        try:
+            amount = float(h.get('amount') or 0)
+        except (TypeError, ValueError):
+            continue
+        is_money = h.get('kind') == 'money'
+        if amount < 0:
+            if not owner or (money if is_money else bonus) + amount < 0:
+                continue
+        elif amount > 0:
+            b = books.get(h.get('bookingId'))
+            if not b:
+                continue
+            if owner and not who.is_client(b.get('clientId')):
+                continue
+            if who.role == 'place' and not owns(who, b.get('placeId'), get):
+                continue
+            cap = _wallet_caps(b)[0 if is_money else 1]
+            k = (h['bookingId'], is_money)
+            if credited.get(k, 0) + amount > cap + 0.001:
+                continue
+            credited[k] = credited.get(k, 0) + amount
+        else:
+            continue
+        if is_money:
+            money += amount
+        else:
+            bonus += amount
+        ok.append({'amount': amount, 'text': str(h.get('text') or '')[:200], 'at': h.get('at'), **({'kind': 'money'} if is_money else {}),
+                   **({'bookingId': h['bookingId']} if h.get('bookingId') else {})})
+    return {**{k: v for k, v in cur.items() if k not in ('money', 'bonus', 'history')}, 'money': round(money, 2), 'bonus': round(bonus, 2),
+            'history': (ok + old_hist)[:500]}
 
 
 def read_calls(who, value, get):
@@ -473,11 +585,23 @@ def write_calllog(who, item, cur, get):
     return write_call(who, None, cur, get, item)
 
 
+def _mask_sold(s):
+    """Абонемент, куплений у застосунку CARCAR: мийка не бачить номера покупця (продані на місці — бачить, номер вписала вона)."""
+    if not isinstance(s, dict) or s.get('buyer') == 'place':
+        return s
+    y = mask_ids(s)
+    if y.get('phone'):
+        y = {**y, 'phone': phone_hash(y['phone'])}
+    return y
+
+
 def read_passes(who, value, get):
     out = {}
     for pid, p in (value or {}).items():
-        if who.admin or owns(who, pid, get):
+        if who.admin:
             out[pid] = p
+        elif owns(who, pid, get):
+            out[pid] = {**(p or {}), 'sold': [_mask_sold(s) for s in (p or {}).get('sold', [])]}
         else:
             out[pid] = {**(p or {}), 'sold': [s for s in (p or {}).get('sold', []) if who.is_client(s.get('clientKey'))]}
     return out
@@ -516,7 +640,7 @@ POLICIES = {
     'analytics':       ('list', read_admin, write_append_only),
     'admin.campaigns': ('list', read_all, write_admin),
     'admin.promos':    ('list', read_all, write_admin),
-    'biz.offers':      ('list', lambda w, v, g: [o for o in v or [] if w.admin or owns(w, o.get('placeId'), g) or w.is_client(o.get('clientKey'))], write_by_place_or_client),
+    'biz.offers':      ('list', lambda w, v, g: [o if w.admin or w.is_client(o.get('clientKey')) else mask_ids(o) for o in v or [] if w.admin or owns(w, o.get('placeId'), g) or w.is_client(o.get('clientKey'))], write_by_place_or_client),
     'biz.expenses':    ('list', lambda w, v, g: [x for x in v or [] if owns(w, x.get('placeId'), g)], write_by_place_or_client),
     'biz.demoPlaces':  ('raw', read_all, lambda w, i, c, g: w.admin or (w.role == 'place' and w.demo)),
     'partners':        ('dict', read_partners, write_partner),
@@ -568,6 +692,11 @@ def allowed_change(who, key, base, cur, new, get):
         return base, new, write_wallet_key(who, key)
     if kind == 'raw':
         return base, new, can(who, new, cur, get)
+    if kind == 'list' and key == 'biz.accounts':
+        # Рядки акаунтів без id: мийка змінює лише свій (перелік мийок — у sanitize).
+        if not isinstance(new, list) or who.role != 'place':
+            return base, new, False
+        return [], [a for a in new if isinstance(a, dict) and a.get('login') == who.login], True
     if kind == 'list':
         if not _ids(new) or (cur is not None and not _ids(cur)):
             return base, new, False
@@ -598,6 +727,117 @@ def allowed_change(who, key, base, cur, new, get):
 REQUIRE_PAYMENT = False
 
 
+# Що клієнт не може змінити у вже створеному записі (гроші, мийка, послуги, оплата).
+CLIENT_LOCKED = ('placeId', 'paid', 'total', 'listTotal', 'bonus', 'fromBalance', 'promo', 'covered', 'passUse', 'loyalty', 'payment',
+                 'installments', 'deal', 'clientId', 'fromReq', 'needsConfirm', 'source', 'channel', 'services', 'minutes', 'cls',
+                 'refundDone', 'payFailed', 'placeAmount', 'refund', 'refundTo', 'declined', 'resolution', 'unfreezeAt', 'confirmedAt', 'respondedAt')
+# Куди клієнт може перевести свій запис.
+CLIENT_MOVES = {('pending', 'cancelled'), ('offer', 'cancelled'), ('paid', 'cancelled'), ('unpaid', 'cancelled'),
+                ('offer', 'paid'), ('offer', 'pending'), ('done', 'completed'), ('paid', 'dispute'), ('done', 'dispute'), ('completed', 'dispute')}
+# Мийка не змінює грошей записів CARCAR (лише свої записи з журналу).
+PLACE_LOCKED = ('paid', 'total', 'listTotal', 'bonus', 'fromBalance', 'promo', 'covered', 'passUse', 'loyalty', 'payment', 'installments',
+                'clientId', 'fromReq', 'placeId', 'refundDone', 'resolution')
+
+
+def _client_booking(who, b, old, get):
+    import time as _t
+    if old is None:
+        b = {k: v for k, v in b.items() if k not in ('refund', 'refundTo', 'refundDone', 'placeAmount', 'resolution', 'payment', 'payFailed', 'declined')}
+        for k in ('paid', 'total', 'bonus', 'fromBalance', 'covered'):
+            if k in b:
+                b[k] = _num(b[k])
+        # Запис за пропозицією мийки в чаті — лише якщо така пропозиція справді є для цього клієнта.
+        if b.get('fromReq'):
+            r = next((x for x in get('requests') or [] if isinstance(x, dict) and x.get('id') == b['fromReq']), None)
+            if not (r and who.is_client(r.get('clientId')) and r.get('placeId') == b.get('placeId') and r.get('invite')):
+                b.pop('fromReq', None)
+        auto = (get('biz.autoConfirm') or {}).get(b.get('placeId'))
+        if b.get('state') not in ('unpaid', 'pending', 'paid'):
+            b['state'] = 'pending'
+        if b.get('state') == 'paid' and not (auto or b.get('fromReq')):
+            b['state'], b['needsConfirm'] = 'pending', True
+        return b
+    st_old, st_new = old.get('state'), b.get('state')
+    out = {**b, **{k: old[k] for k in CLIENT_LOCKED if k in old}}
+    for k in CLIENT_LOCKED:
+        if k not in old:
+            out.pop(k, None)
+    if st_new != st_old and (st_old, st_new) not in CLIENT_MOVES:
+        out['state'] = st_old
+        return out
+    if st_new == 'cancelled' and st_old != 'cancelled':
+        # Скасування клієнтом: повернення рахуємо тут, а не беремо на слово.
+        charged = _num(old.get('paid'))
+        if old.get('installments'):
+            inst = old['installments']
+            charged = max(0.0, charged - _num(inst.get('card') or charged) + _num(inst.get('first')))
+        waiting = st_old in ('pending', 'offer', 'unpaid')
+        late = not waiting and _t.time() > booking_start(old) - FREE_CANCEL_HOURS * 3600
+        price = _num(old.get('paid')) + _num(old.get('bonus')) + (_num((old.get('promo') or {}).get('amount')) if isinstance(old.get('promo'), dict) and not old['promo'].get('returned') else 0)
+        if st_old == 'unpaid':
+            refund, to = 0.0, None
+        elif late:
+            refund, to = 0.0, None
+        else:
+            refund = charged
+            to_bal = min(_num(old.get('fromBalance')), refund) if waiting else refund
+            to = 'card' if refund - to_bal > 0 else 'balance'
+        # Мийка не відповіла (5 хв) чи клієнт не прийняв інший час — це не скасування клієнтом.
+        why = b.get('declined')
+        sys_cancel = (why == 'timeout' and st_old == 'pending' and _t.time() * 1000 - (old.get('createdAt') or 0) > 5 * 60000) or (why == 'proposal' and st_old == 'offer')
+        if sys_cancel:
+            refund = charged
+            to = 'balance' if _num(old.get('fromBalance')) >= refund else 'card'
+            late = False
+            out.update(declined=why, cancelBy='system', refund=refund, placeAmount=0)
+        else:
+            out.update(cancelBy='client', refund=refund, placeAmount=price if late else 0)
+        if to:
+            out['refundTo'] = to
+        else:
+            out.pop('refundTo', None)
+        if not late:
+            if isinstance(old.get('promo'), dict):
+                out['promo'] = {**old['promo'], 'returned': True}
+            out['passUse'] = None
+            if old.get('installments'):
+                out['installments'] = {**old['installments'], 'cancelled': int(_t.time() * 1000)}
+        if b.get('payFailed') and st_old == 'unpaid':
+            out['payFailed'] = str(b['payFailed'])[:100]
+    if st_new == 'completed' and st_old == 'done':
+        out['unfreezeAt'] = int((_t.time() + FREEZE_HOURS * 3600) * 1000)
+    return out
+
+
+def _place_booking(who, b, old):
+    if old is None or old.get('source'):
+        return b
+    out = {**b, **{k: old[k] for k in PLACE_LOCKED if k in old}}
+    for k in PLACE_LOCKED:
+        if k not in old:
+            out.pop(k, None)
+    if b.get('state') == 'refunded' and old.get('state') != 'refunded':
+        out['state'] = old.get('state')  # повернення за спором вирішує CARCAR
+    charged = _num(old.get('paid'))
+    if _num(out.get('refund')) > charged:
+        out['refund'] = charged
+    return out
+
+
+def _guard_bookings(who, cur, merged, get):
+    cmap = {b.get('id'): b for b in cur or [] if isinstance(b, dict)}
+    out = []
+    for b in merged:
+        if isinstance(b, dict):
+            old = cmap.get(b.get('id'))
+            if who.role == 'client' and (old is None or who.is_client(old.get('clientId'))):
+                b = _client_booking(who, b, old, get)
+            elif who.role == 'place':
+                b = _place_booking(who, b, old)
+        out.append(b)
+    return out
+
+
 def _paid_bookings(who, cur, merged):
     cmap = {b.get('id'): b for b in cur or [] if isinstance(b, dict)}
     out = []
@@ -605,7 +845,8 @@ def _paid_bookings(who, cur, merged):
         old = cmap.get(b.get('id')) if isinstance(b, dict) else None
         if isinstance(b, dict) and who.role == 'client':
             try:
-                due = float(b.get('paid') or 0) > 0
+                # До сплати карткою — без частини з балансу CARCAR.
+                due = float(b.get('paid') or 0) - float(b.get('fromBalance') or 0) > 0
             except (TypeError, ValueError):
                 due = True
             if old is None and due and b.get('state') != 'unpaid':
@@ -691,10 +932,40 @@ def sanitize(who, key, cur, merged, get=None):
     if who.role == 'place' and key in MASKED_KEYS and get is not None:
         cur_items = list(cur.values()) if isinstance(cur, dict) else cur
         merged = unmask_ids(who, merged, cur_items, get)
+    if key == 'biz.passes' and who.role == 'place' and isinstance(merged, dict):
+        out = {}
+        for pid, p in merged.items():
+            cur_sold = {x.get('id'): x for x in ((cur or {}).get(pid) or {}).get('sold') or [] if isinstance(x, dict)}
+            if isinstance(p, dict):
+                p = {**p, 'sold': [({**s, **{k: cur_sold[s.get('id')][k] for k in ('clientKey', 'clientId', 'phone') if k in cur_sold[s.get('id')]}}
+                                    if isinstance(s, dict) and s.get('id') in cur_sold and any(hidden_phone(s.get(k)) for k in ('clientKey', 'clientId', 'phone')) else s)
+                                   for s in p.get('sold') or []]}
+            out[pid] = p
+        merged = out
     if key == 'biz.passes' and who.role == 'client' and isinstance(merged, dict):
         return _client_passes(who, cur, merged, lambda: get('bookings') if get else [])
+    if key == 'bookings' and isinstance(merged, list) and get is not None:
+        merged = _guard_bookings(who, cur, merged, get)
     if key == 'bookings' and REQUIRE_PAYMENT and isinstance(merged, list):
         merged = _paid_bookings(who, cur, merged)
+    if key.startswith('wallet') and get is not None:
+        return sanitize_wallet(who, cur, merged, get)
+    if key == 'seq.booking':
+        # Лічильник номерів записів лише зростає (і не стрибає).
+        try:
+            old_n = int(cur or 0)
+            n = int(merged)
+        except (TypeError, ValueError):
+            return cur
+        return n if old_n < n <= old_n + 1000 else cur
+    if key == 'biz.applications' and isinstance(merged, list):
+        # Не більше трьох заявок на розгляді від одного клієнта.
+        cur_ids = {a.get('id') for a in cur or [] if isinstance(a, dict)}
+        mine_new = [a for a in merged if isinstance(a, dict) and a.get('id') not in cur_ids]
+        pending = sum(1 for a in cur or [] if isinstance(a, dict) and a.get('status') == 'new' and who.is_client(a.get('clientId')))
+        allowed = set(a.get('id') for a in mine_new[:max(0, 3 - pending)])
+        merged = [a if a.get('id') in cur_ids or a.get('id') in allowed else None for a in merged if isinstance(a, dict)]
+        merged = [dict(a, clientId=who.cid) if a and a.get('id') not in cur_ids else a for a in merged if a]
     if key == 'partners' and who.role == 'place':
         out = dict(merged)
         for pid, pt in merged.items():
@@ -727,10 +998,15 @@ def sanitize(who, key, cur, merged, get=None):
         for a in merged:
             old = cmap.get(a.get('login'))
             if old is not None and a.get('login') == who.login:
-                a = {**old, 'places': list(dict.fromkeys((old.get('places') or []) + [p for p in a.get('places') or [] if p]))}
+                # Додати можна лише власну нову мийку, яку ще не має жоден акаунт.
+                taken = {x for o in cur or [] for x in [o.get('placeId')] + list(o.get('places') or []) if x}
+                created = {x.get('id') for x in (get('places.custom') if get else None) or [] if isinstance(x, dict)}
+                extra = [p for p in a.get('places') or [] if p and p not in taken and p in created]
+                a = {**old, 'places': list(dict.fromkeys((old.get('places') or []) + extra))}
             elif old is not None:
                 a = old
-            out.append(a)
+            if a.get('login') not in {x.get('login') for x in out}:
+                out.append(a)
         return out
     if key == 'reviews' and who.role == 'place':
         cmap = {json.dumps(r.get('id')): r for r in cur or []}

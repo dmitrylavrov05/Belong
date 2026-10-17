@@ -2607,30 +2607,33 @@ const maskIban = (iban) => `UA…${String(iban).slice(-4)}`;
 const commissionFor = (placeId) => partnerOf(placeId).commission ?? store.get('admin.settings', {}).commission ?? PAYMENT.commission;
 
 // Гроші клієнту на баланс CARCAR (повернення за спором чи скасуванням з будь-якого екрана).
-function creditClient(amount, text, id = 'device') {
+function creditClient(amount, text, id = 'device', bookingId = null) {
   const w = { bonus: 0, money: 0, history: [], ...store.get(walletKey(id), {}) };
   w.money += amount;
-  w.history.unshift({ amount, text, at: Date.now(), kind: 'money' });
+  w.history.unshift({ amount, text, at: Date.now(), kind: 'money', ...(bookingId ? { bookingId } : {}) });
   store.set(walletKey(id), w);
 }
 
 // Рішення за спором: placePart — скільки отримує точка (0 — усе клієнту, повна ціна — усе точці).
-function resolveDispute(b, placePart, note = '') {
+// to — рішення модератора ('client' | 'place' | 'split'): потрібне, коли клієнт заплатив 0 ₴ (абонемент, картка лояльності).
+function resolveDispute(b, placePart, note = '', to = null) {
   const full = price(b);
-  const toPlace = Math.max(0, Math.min(full, Math.round(placePart)));
+  const toPlace = to === 'client' ? 0 : Math.max(0, Math.min(full, Math.round(placePart)));
   const name = PLACES.find((x) => x.id === b.placeId)?.name ?? '';
   b.resolution = { placePart: toPlace, note, at: Date.now() };
-  if (toPlace === full) {
-    complete(b);
+  if (to === 'place' || (to !== 'client' && toPlace === full)) {
+    // Спір щодо неявки: усе точці — лишається неявкою, а не «виконано».
+    if (b.disputeFrom === 'noshow') Object.assign(b, { state: 'noshow', placeAmount: full, refund: 0, closedAt: Date.now() });
+    else complete(b);
     b.unfreezeAt = Date.now(); // модератор уже перевірив замовлення
     return;
   }
   const refund = Math.min(chargedOf(b), full - toPlace);
   Object.assign(b, { state: 'refunded', refund, placeAmount: toPlace, refundTo: 'balance', closedAt: Date.now() });
-  if (refund) creditClient(refund, `Повернення за спором: ${name}`, b.clientId);
+  if (refund) creditClient(refund, `Повернення за спором: ${name}`, b.clientId, b.id);
   // Усе клієнту — повертаємо й бонус, візит абонемента та промокод.
   if (toPlace === 0) {
-    if (b.bonus && !b.bonusReturned) { creditBonus(b.bonus, `Повернення бонусу за спором: ${name}`, b.clientId); b.bonusReturned = true; }
+    if (b.bonus && !b.bonusReturned) { creditBonus(b.bonus, `Повернення бонусу за спором: ${name}`, b.clientId, b.id); b.bonusReturned = true; }
     if (b.passUse) { returnPassUse(b.placeId, b.passUse); b.passUse = null; }
     if (b.promo) b.promo.returned = true;
   }
@@ -2651,10 +2654,10 @@ function resolveLate(b, confirmed, note = '') {
 // Скільки клієнт справді заплатив: за оплати частинами — лише перший платіж (решту банк скасовує) і частину з балансу.
 const chargedOf = (b) => (b.installments ? Math.max(0, b.paid - (b.installments.card ?? b.paid) + b.installments.first) : b.paid);
 
-function creditBonus(amount, text, id = 'device') {
+function creditBonus(amount, text, id = 'device', bookingId = null) {
   const w = { bonus: 0, money: 0, history: [], ...store.get(walletKey(id), {}) };
   w.bonus += amount;
-  w.history.unshift({ amount, text, at: Date.now() });
+  w.history.unshift({ amount, text, at: Date.now(), ...(bookingId ? { bookingId } : {}) });
   store.set(walletKey(id), w);
 }
 
@@ -2829,10 +2832,12 @@ const hidePhones = (text) => String(text ?? '').replace(/\+?\d[\d\s\-().]{7,}\d/
 
 // Клієнт прийшов через CARCAR, але мийка записала його сама (по телефону чи «приїхав сам»):
 // комісія з такого запису утримується з виплат.
-const leadFee = (b) => (b.lead === 'carcar' && b.state === 'completed' ? Math.round((b.paid || 0) * commissionFor(b.placeId)) : 0);
+// Ставка — та, що діяла, коли мийка записала клієнта (зміна ставки не перераховує минулого).
+const leadFee = (b) => (b.lead === 'carcar' && b.state === 'completed' ? Math.round((b.paid || 0) * (b.leadRate ?? commissionFor(b.placeId))) : 0);
 
 function balanceFor(placeId, bookings, payouts) {
-  const own = bookings.filter((b) => b.placeId === placeId && isCarcar(b));
+  // Демо-сигнали антифроду — не гроші мийки.
+  const own = bookings.filter((b) => b.placeId === placeId && isCarcar(b) && !b.demoFraud);
   const earned = own.filter((b) => !isFrozen(b)).reduce((a, b) => a + placeShare(b), 0);
   const withdrawn = payouts.filter((x) => x.placeId === placeId).reduce((a, x) => a + x.gross, 0);
   // Непідтверджений запис ще не гроші точки: якщо мийка відмовить, їх повернуть клієнту.
@@ -2845,7 +2850,11 @@ function balanceFor(placeId, bookings, payouts) {
   const passEarned = sales.filter(ripe).reduce((a, x) => a + x.price, 0);
   const passFrozen = sales.filter((x) => !ripe(x)).reduce((a, x) => a + x.price, 0);
   const leadFees = bookings.filter((b) => b.placeId === placeId).reduce((a, b) => a + leadFee(b), 0);
-  return { available: earned + passEarned - withdrawn - leadFees, frozen: frozen + passFrozen, next, withdrawn, leadFees };
+  // Комісія під час виведення — з виручки через CARCAR, ще не виведеної (а не з суми, зменшеної на комісію за «своїх» клієнтів CARCAR).
+  const feeBase = Math.max(0, earned + passEarned - payouts.filter((x) => x.placeId === placeId).reduce((a, x) => a + (x.base ?? x.gross), 0));
+  const available = earned + passEarned - withdrawn - leadFees;
+  const fee = Math.min(Math.max(0, available), Math.round(feeBase * commissionFor(placeId)));
+  return { available, frozen: frozen + passFrozen, next, withdrawn, leadFees, feeBase, fee };
 }
 
 // Номер запису: шість цифр по порядку, однаковий у клієнта, мийки й підтримки — його називають,
@@ -3554,9 +3563,9 @@ function declineBooking(b, reason, by = 'place') {
     ...(b.installments ? { installments: { ...b.installments, cancelled: Date.now() } } : {}),
   });
   const why = by === 'proposal' ? 'інший час не підійшов' : `${opsPlaceName(b)} не підтвердила запис`;
-  if (fromBalance) creditClient(Math.min(fromBalance, refund), `Повернення: ${why}`, b.clientId);
+  if (fromBalance) creditClient(Math.min(fromBalance, refund), `Повернення: ${why}`, b.clientId, b.id);
   if (b.bonus && !b.bonusReturned) {
-    creditBonus(b.bonus, `Повернення бонусу: ${why}`, b.clientId);
+    creditBonus(b.bonus, `Повернення бонусу: ${why}`, b.clientId, b.id);
     b.bonusReturned = true;
   }
   if (b.passUse) { restorePass(b.placeId, b.passUse); b.passUse = null; }
@@ -3573,6 +3582,7 @@ function declineBooking(b, reason, by = 'place') {
 function proposeTime(b, date, time, note = '') {
   if (b?.state !== 'pending') return false;
   const from = { date: b.date, time: b.time };
+  note = hidePhones(note); // номер мийки — лише через CARCAR
   Object.assign(b, { state: 'offer', date, time, offer: { from, at: Date.now(), note }, respondedAt: b.respondedAt ?? Date.now() });
   clientNote(b, 'offer', `${opsPlaceName(b)} не може прийняти вас ${parseDate(from.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })} о ${from.time} і пропонує ${whenText(b)}.${note ? ` ${note}` : ''} Погодьтеся в записі або скасуйте без втрат.`);
   return true;
@@ -3634,7 +3644,9 @@ function loyaltyState(placeId, myBookings) {
 // ---------- каса й зміни ----------
 // День мийки: виконані записи — готівка й картка на місці (свої клієнти), через CARCAR, продані абонементи.
 function cashDay(bookings, placeId, date) {
-  const list = bookings.filter((b) => b.placeId === placeId && b.date === date && b.state === 'completed');
+  // Гроші — того дня, коли запис виконали (а не на який записувались).
+  const doneDay = (b) => (b.completedAt ? isoDate(new Date(b.completedAt)) : b.date);
+  const list = bookings.filter((b) => b.placeId === placeId && doneDay(b) === date && b.state === 'completed');
   const out = { date, cars: list.length, cash: 0, card: 0, carcar: 0, passes: 0, passCash: 0, passCard: 0, list };
   for (const b of list) {
     if (isCarcar(b)) out.carcar += price(b);
@@ -3664,8 +3676,10 @@ function closeShift(placeId, day, counted, note) {
 // ---------- зарплата мийників ----------
 // Відсоток від вартості послуг і/або фіксована сума за авто — з виконаних записів, де призначено цього мийника.
 function salaryFor(w, bookings, placeId, from, to) {
-  const list = bookings.filter((b) => b.placeId === placeId && b.masterId === w.id && b.state === 'completed' && b.date >= from && b.date <= to);
-  const revenue = list.reduce((a, b) => a + (isCarcar(b) ? price(b) : Number(b.paid) || 0), 0);
+  const day = (b) => (b.completedAt ? isoDate(new Date(b.completedAt)) : b.date);
+  const list = bookings.filter((b) => b.placeId === placeId && b.masterId === w.id && b.state === 'completed' && day(b) >= from && day(b) <= to);
+  // Робота за абонементом чи безкоштовна мийка за карткою лояльності — теж робота мийника.
+  const revenue = list.reduce((a, b) => a + (isCarcar(b) ? price(b) : Number(b.paid) || 0) + (b.covered || 0) + (b.loyalty?.amount || 0), 0);
   const pay = Math.round((revenue * (Number(w.pct) || 0)) / 100 + list.length * (Number(w.perCar) || 0));
   return { cars: list.length, revenue, pay };
 }
@@ -3922,7 +3936,7 @@ const OFFER = {
   draft: 'Проєкт для прототипу. Перед запуском текст має перевірити юрист.',
   sections: [
     ['1. Сторони й предмет', 'CARCAR (Сервіс) надає партнеру — ФОП або юридичній особі, яка надає послуги мийки чи детейлінгу авто (Партнер), — доступ до каталогу, онлайн-запису, приймання оплати від клієнтів і панелі для бізнесу. Партнер приймає ці умови повністю, поставивши позначку про згоду в панелі.'],
-    ['2. Підключення', 'Партнер надає достовірні дані про себе, документи з ЄДР і реквізити рахунку, відкритого на його імʼя. Сервіс перевіряє дані до 3 робочих днів і може відмовити в підключенні або призупинити його, якщо дані недостовірні чи Партнер порушує ці умови.'],
+    ['2. Підключення', 'Партнер надає достовірні дані про себе, документи з ЄДР і реквізити рахунку, відкритого на його імʼя. Сервіс перевіряє дані до 2 робочих днів і може відмовити в підключенні або призупинити його, якщо дані недостовірні чи Партнер порушує ці умови.'],
     ['3. Оплата й утримання коштів', 'Клієнт оплачує замовлення в застосунку. Кошти утримуються, доки клієнт не підтвердить виконання (або 24 години після позначки «Машина готова» без відповіді), потім заморожуються ще на 48 годин для можливого спору й стають доступні до виведення.'],
     ['4. Скасування й неявка', 'Якщо клієнт скасовує запис не пізніше ніж за 1,5 години до візиту, кошти повертаються клієнту повністю. Пізніше скасування або неявка клієнта — оплата зараховується Партнеру за послугу.'],
     ['5. Винагорода Сервісу', 'Сервіс утримує комісію від суми, що виводиться Партнером, у розмірі, вказаному в панелі (типово 10%). Для клієнтів комісії немає. Оплати на місці, внесені Партнером у журнал, комісією не обкладаються.'],
@@ -4051,10 +4065,12 @@ function viewOverview() {
   const prev = statsFor(rangeOf(n, 1));
   const q = queues();
   const escrow = bookings.filter((b) => isCarcar(b) && (ACTIVE.includes(b.state) || isFrozen(b))).reduce((a, b) => a + price(b), 0);
-  const collected = payouts.filter((x) => x.at >= parseDate(range[0]).getTime()).reduce((a, x) => a + x.fee, 0);
+  // Утримано: комісія з виплат + комісія за клієнтів CARCAR, яких мийки записали напряму.
+  const collected = payouts.filter((x) => x.at >= parseDate(range[0]).getTime()).reduce((a, x) => a + x.fee, 0)
+    + bookings.filter((b) => (b.completedAt ?? 0) >= parseDate(range[0]).getTime()).reduce((a, b) => a + leadFee(b), 0);
   const vis = visibleReviews(reviews);
   const avgRating = vis.length ? vis.reduce((a, r) => a + r.stars, 0) / vis.length : 0;
-  const listed = PLACES.filter((p) => partnerOf(p.id).status === 'approved').length;
+  const listed = PLACES.filter(isListed).length;
 
   const days = [];
   for (let d = range[0]; d <= range[1]; d = addDays(d, 1)) days.push(d);
@@ -4341,12 +4357,12 @@ function viewDisputes() {
     ${open.length ? open.map((b) => `<article class="panel stack" style="gap:10px" aria-label="Спір: ${esc(placeName(b.placeId))}">
       <div class="head"><div><b>${esc(placeName(b.placeId))}</b><small class="muted" style="display:block">${dayLabel(b.date, { day: 'numeric', month: 'long' })}, ${b.time} · ${esc(b.car)} · ${esc(b.clientName || 'клієнт')}</small></div>
         <b>${uah(price(b))}</b></div>
-      <p class="small" style="margin:0">${esc(b.services.join(', '))}${b.bonus ? ` · з них бонус ${uah(b.bonus)}` : ''}</p>
-      <p class="notice warn" style="margin:0"><b>Скарга клієнта</b>«${esc(b.disputeReason)}»</p>
+      <p class="small" style="margin:0">${esc(b.services.join(', '))} · клієнт заплатив ${uah(chargedOf(b))}${b.bonus ? `, бонус ${uah(b.bonus)}` : ''}${b.promo && !b.promo.returned ? `, промокод ${uah(b.promo.amount)} (доплачує CARCAR)` : ''}${b.covered ? `, абонемент ${uah(b.covered)}` : ''}</p>
+      <p class="notice warn" style="margin:0"><b>${b.lateClaim ? 'Мийка повідомила про запізнення' : 'Скарга клієнта'}</b>«${esc(b.disputeReason)}»</p>
       ${b.note || b.km ? `<p class="small muted" style="margin:0">Коментар точки: ${esc(b.note ?? '')}${b.km ? ` · пробіг ${b.km} км` : ''}</p>` : ''}
       ${b.photos?.length ? `<div class="photos">${b.photos.map((src, i) => `<img src="${esc(src)}" alt="Фото результату ${i + 1}">`).join('')}</div>` : '<p class="small muted" style="margin:0">Точка не додала фото результату.</p>'}
       ${relatedTickets(b)}
-      ${disputeForm(b)}
+      ${b.lateClaim ? lateDecision(b) : disputeForm(b)}
     </article>`).join('') : `<div class="empty-state">${icon('scale', 32)}<h2>Відкритих спорів немає</h2><p>Клієнт може відкрити спір, поки гроші за замовленням заморожені.</p></div>`}
     </div>
     ${done.length ? `<h2 class="biz-h2">Вирішені</h2>
@@ -4841,8 +4857,8 @@ function viewCommission() {
   const custom = PLACES.filter((p) => partnerOf(p.id).commission !== undefined);
   return `<h1>Комісії й виплати</h1><p class="page-sub">Комісія утримується з суми, яку точка виводить. Для клієнтів комісії немає.</p>
     <section class="kpis" aria-label="Комісії">
-      <div class="kpi hero"><span class="label">Утримано комісії всього</span><span class="value">${uah(all.reduce((a, x) => a + x.fee, 0))}</span>
-        <span class="kpi-note">${all.length} ${plural(all.length, 'виплата', 'виплати', 'виплат')} на ${uah(all.reduce((a, x) => a + x.net, 0))}</span></div>
+      <div class="kpi hero"><span class="label">Утримано комісії всього</span><span class="value">${uah(all.reduce((a, x) => a + x.fee, 0) + bookings.reduce((a, b) => a + leadFee(b), 0))}</span>
+        <span class="kpi-note">${all.length} ${plural(all.length, 'виплата', 'виплати', 'виплат')} на ${uah(all.reduce((a, x) => a + x.net, 0))}${bookings.some((b) => leadFee(b)) ? ` · з них за клієнтів CARCAR, записаних напряму, ${uah(bookings.reduce((a, b) => a + leadFee(b), 0))}` : ''}</span></div>
       <div class="kpi"><span class="label">Загальна ставка</span><span class="value">${pctText(base)}</span></div>
       <div class="kpi"><span class="label">Індивідуальні ставки</span><span class="value">${custom.length}</span></div>
     </section>
@@ -4853,7 +4869,7 @@ function viewCommission() {
           <label class="field"><span>Комісія, %</span><input name="pct" type="number" min="0" max="30" step="0.5" value="${+(base * 100).toFixed(1)}" required></label>
           <button class="btn primary" type="submit">Зберегти</button>
         </form>
-        <p class="fine">Нова ставка застосовується до наступних виплат. Уже виведені суми не перераховуються. Оферта передбачає повідомлення точок про зміну умов щонайменше за 14 днів.</p>
+        <p class="fine">Нова ставка застосовується до наступних виплат і нових записів; уже виведені суми й комісія за раніше записаних клієнтів не перераховуються. Повідомте мийки про зміну заздалегідь.</p>
       </section>
       <section class="panel" aria-labelledby="h-custom">
         <h2 id="h-custom">Індивідуальні ставки</h2>
@@ -5064,7 +5080,7 @@ function viewStats() {
       <section class="panel" aria-labelledby="h-pay"><h2 id="h-pay">Як платять</h2><p class="sub">Записів через застосунок</p>${hbars(pays, (v) => String(v))}</section>
       <section class="panel" aria-labelledby="h-lead"><h2 id="h-lead">За скільки записуються</h2><p class="sub">Від оплати до візиту</p>${hbars(lead, (v) => String(v))}</section>
       <section class="panel" aria-labelledby="h-geo"><h2 id="h-geo">Райони</h2><p class="sub">Записи через застосунок</p>${geo((p) => p.district).length ? hbars(geo((p) => p.district), (v) => String(v)) : '<p class="muted" style="margin:0">Немає записів.</p>'}</section>
-      <section class="panel" aria-labelledby="h-cat2"><h2 id="h-cat2">Категорії</h2><p class="sub">Записи через застосунок</p>${geo((p) => catById(p.cats[0]).name).length ? hbars(geo((p) => catById(p.cats[0]).name), (v) => String(v)) : '<p class="muted" style="margin:0">Немає записів.</p>'}</section>
+      <section class="panel" aria-labelledby="h-cat2"><h2 id="h-cat2">Категорії</h2><p class="sub">Записи через застосунок</p>${geo((p) => catById(p.cats[0] ?? 'wash')?.name ?? 'Мийки').length ? hbars(geo((p) => catById(p.cats[0] ?? 'wash')?.name ?? 'Мийки'), (v) => String(v)) : '<p class="muted" style="margin:0">Немає записів.</p>'}</section>
       <section class="panel" aria-labelledby="h-search"><h2 id="h-search">Що шукають</h2><p class="sub">Запити в пошуку; без результатів — що варто додати</p>
         ${topSearch.length ? `<ul class="special-list">${topSearch.map((x) => `<li><span><b>«${esc(x.q)}»</b><small>${x.n} ${plural(x.n, 'раз', 'рази', 'разів')}${x.empty ? ` · без результатів ${x.empty}` : ''}</small></span></li>`).join('')}</ul>` : '<p class="muted" style="margin:0">Пошукових запитів немає.</p>'}
       </section>
@@ -5137,7 +5153,7 @@ const NAV = [
 // Мийки реєструються в застосунку; адміністрація перевіряє дані й видає логін і пароль до кабінету.
 function viewApplications() {
   const list = [...bizApps()].sort((a, b) => (a.status === 'new' ? -1 : 0) - (b.status === 'new' ? -1 : 0) || b.at - a.at);
-  return `<h1>Заявки бізнесу</h1><p class="page-sub">Перевірте дані мийки. Після схвалення точка зʼявиться в каталозі, а мийка отримає логін і пароль до кабінету.</p>
+  return `<h1>Заявки бізнесу</h1><p class="page-sub">Перевірте дані мийки. Після схвалення мийка отримає логін і пароль до кабінету, перевірить профіль і сама опублікується в каталозі.</p>
     ${list.length ? `<div class="stack" style="gap:12px">${list.map((a) => {
       const [label, cls] = APP_STATUS[a.status];
       return `<article class="panel stack" style="gap:10px" aria-label="Заявка ${esc(a.name)}">
@@ -5319,7 +5335,7 @@ document.addEventListener('click', (e) => {
   else if (action === 'escalate') {
     const t = ticketsAll().find((x) => x.id === id);
     const b = bookings.find((x) => x.id === t.bookingId);
-    Object.assign(b, { state: 'dispute', disputeReason: t.messages.find((m) => m.from !== 'admin')?.text ?? 'Звернення в підтримку', ticketId: b.ticketId ?? t.id });
+    Object.assign(b, { state: 'dispute', disputeFrom: b.state, disputeReason: t.messages.find((m) => m.from !== 'admin')?.text ?? 'Звернення в підтримку', ticketId: b.ticketId ?? t.id });
     save();
     ticketReply(t.id, 'admin', 'Ми відкрили спір за цим записом: гроші заморожено, доки модератор не ухвалить рішення.', 'open');
     rerender();
@@ -5428,11 +5444,13 @@ document.addEventListener('submit', async (e) => {
     const to = d.get('to');
     const part = to === 'client' ? 0 : to === 'place' ? price(b) : Number(d.get('part'));
     if (to === 'split' && !(part > 0 && part < price(b))) { toast(`Сума точці має бути від 1 до ${price(b) - 1} ₴`); return; }
-    resolveDispute(b, part, d.get('note').trim());
+    resolveDispute(b, part, d.get('note').trim(), to);
     save();
-    notifyResolution(b, `Рішення за спором: ${to === 'client' ? 'усю суму повернено вам на баланс CARCAR' : to === 'place' ? 'оплату передано точці' : `точці ${uah(part)}, решту повернено клієнту на баланс CARCAR`}.${d.get('note').trim() ? ` ${d.get('note').trim()}` : ''}`);
+    // Кажемо, скільки саме повернули: за «Розділити» бонус і промокод не повертаються.
+    const back = b.refund ?? 0;
+    notifyResolution(b, `Рішення за спором: ${to === 'client' ? `усе повернено вам${back ? `: ${uah(back)} на баланс CARCAR` : ''}${b.bonusReturned && b.bonus ? `, бонус ${uah(b.bonus)}` : ''}` : to === 'place' ? 'оплату передано точці' : `точці ${uah(part)}, вам повернено ${uah(back)} на баланс CARCAR`}.${d.get('note').trim() ? ` ${d.get('note').trim()}` : ''}`);
     rerender();
-    toast(to === 'client' ? 'Гроші повернено клієнту на баланс' : to === 'place' ? 'Гроші передано точці' : `Точці ${uah(part)}, решту повернено клієнту`);
+    toast(to === 'client' ? `Повернено клієнту${back ? `: ${uah(back)} на баланс` : ''}` : to === 'place' ? 'Гроші передано точці' : `Точці ${uah(part)}, клієнту ${uah(back)} на баланс`);
   }
 });
 

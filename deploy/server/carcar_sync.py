@@ -446,7 +446,9 @@ def make_handler(app):
             return json.loads(raw or b'{}')
 
         def ip(self):
-            return self.headers.get('X-Real-IP') or self.client_address[0]
+            # X-Real-IP ставить nginx; напряму (не з цього ж сервера) заголовку не віримо — інакше обійдуть ліміт спроб входу.
+            peer = self.client_address[0]
+            return (self.headers.get('X-Real-IP') or peer) if peer in ('127.0.0.1', '::1') else peer
 
         # --- хто питає ---
         def who(self):
@@ -483,7 +485,10 @@ def make_handler(app):
                 return self.send_json(200, {'role': w.role, 'cid': w.cid, 'login': w.login, 'demo': w.demo, 'places': sorted(w.places)})
             if p == '/api/state':
                 w = self.who()
-                since = int((q.get('since') or ['0'])[0] or 0)
+                try:
+                    since = int((q.get('since') or ['0'])[0] or 0)
+                except ValueError:
+                    return self.send_json(400, {'error': 'bad since'})
 
                 def view(data):
                     out = {}
@@ -611,6 +616,15 @@ def make_handler(app):
             except ValueError:
                 return self.send_json(400, {'error': 'bad body'})
             w = self.who()
+            # Мийка повертає гроші клієнту, якого знає лише за хешем номера, — знаходимо справжній гаманець.
+            if key.startswith('wallet.h:') and w.role == 'place':
+                real = acl.resolve_client(w, key[len('wallet.'):], store.get)
+                if not real:
+                    return self.send_json(403, {'error': 'unknown client'})
+                key = 'wallet.' + real
+                body = {'value': body.get('value')}
+            if key == 'analytics' and w.role == 'anon':
+                return self.send_json(403, {'error': 'login required'})
             if key == 'analytics' and isinstance(body.get('value'), list):
                 return self.send_json(200, {'ver': store.add_events(body['value']), 'value': store.get('analytics') if w.admin else None})
             ver, value, ok = store.put(w, key, body.get('value'), body.get('base'), 'base' in body)
@@ -629,7 +643,12 @@ def make_handler(app):
             view = [x for x in acl.read(w, 'bookings', store.get('bookings'), store.get) or [] if x.get('id') != b['id']]
             store.put(w, 'bookings', view + [b], None, False)
             base = app['public_url'] or f"https://{self.headers.get('Host')}"
-            amount = max(0, float(b.get('paid') or 0))
+            try:
+                amount = float(b.get('paid') or 0)
+            except (TypeError, ValueError):
+                amount = 0
+            if amount <= 0:
+                return self.send_json(400, {'error': 'Нічого сплачувати'})
             form = lp.checkout(b['id'], amount, f"CARCAR: {', '.join(b.get('services') or [])}", f"{base}/#/bookings/{b['id']}", f"{base}/api/pay/liqpay/callback")
             return self.send_json(200, form)
 
@@ -701,7 +720,11 @@ def refunds_loop(app):
         todo = [b for b in store.get('bookings') or [] if (b.get('payment') or {}).get('provider') == 'liqpay'
                 and b.get('refundTo') == 'card' and (b.get('refund') or 0) > 0 and not b.get('refundDone') and b.get('state') in ('cancelled', 'refunded')]
         for b in todo:
-            res = lp.refund(b['id'], b['refund'])
+            card_part = max(0.0, float(b.get('refund') or 0) - min(float(b.get('fromBalance') or 0), float(b.get('refund') or 0)))
+            card_part = min(card_part, float((b.get('payment') or {}).get('amount') or card_part))
+            if card_part <= 0:
+                continue
+            res = lp.refund(b['id'], card_part)
             ok = res.get('status') in ('reversed', 'success', 'sandbox')
 
             def mark(lst, bid=b['id'], ok=ok, res=res):

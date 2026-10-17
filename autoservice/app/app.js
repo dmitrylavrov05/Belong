@@ -242,15 +242,16 @@ function saveReferral() {
   store.set('referral', referral);
 }
 
-function addBonus(amount, text) {
+// bookingId — за який запис повернення: сервер приймає повернення на баланс лише за скасований запис.
+function addBonus(amount, text, bookingId) {
   wallet.bonus += amount;
-  wallet.history.unshift({ amount, text, at: Date.now() });
+  wallet.history.unshift({ amount, text, at: Date.now(), ...(bookingId ? { bookingId } : {}) });
   saveReferral();
 }
 
-function addMoney(amount, text) {
+function addMoney(amount, text, bookingId) {
   wallet.money += amount;
-  wallet.history.unshift({ amount, text, at: Date.now(), kind: 'money' });
+  wallet.history.unshift({ amount, text, at: Date.now(), kind: 'money', ...(bookingId ? { bookingId } : {}) });
   saveReferral();
 }
 
@@ -283,7 +284,8 @@ const walletLink = () => `<a class="card link-card wallet-link" href="#/wallet">
 const inviteLink = () => `${location.origin}${location.pathname}?ref=${referral.code}`;
 
 // Скільки бонусу можна списати із замовлення на суму total.
-const bonusFor = (total) => (total >= REFERRAL.minOrder ? Math.min(wallet.bonus, REFERRAL.bonus, total) : 0);
+// Скільки бонусу можна списати: замовлення (без абонемента) від мінімальної суми, не більше залишку до сплати.
+const bonusFor = (q) => (q.total - q.covered >= REFERRAL.minOrder ? Math.min(wallet.bonus, REFERRAL.bonus, q.rest) : 0);
 
 // Друг відкрив застосунок за посиланням ?ref=КОД: новому користувачу — бонус на перше замовлення.
 // Рекламна кампанія CARCAR: посилання ?c=кампанія&promo=КОД. Запамʼятовуємо на 30 днів (остання кампанія),
@@ -1081,11 +1083,14 @@ function quote(p) {
     const fromLink = draft.promo === undefined && campaignNow()?.code ? promosAll().find((x) => x.code === campaignNow().code && promoFor(x, p, items).ok) : null;
     const pr = draft.promo ? promosAll().find((x) => x.code === draft.promo) : fromLink ?? promosAll().find((x) => x.auto && promoFor(x, p, items).ok);
     const r = pr ? promoFor(pr, p, items) : draft.promo ? { ok: false, why: 'Такого промокоду немає' } : null;
-    if (r?.ok) promo = { code: pr.code, title: pr.title, amount: Math.min(r.amount, total - covered - (loyalty?.amount ?? 0)) };
+    // Промокод зі знижкою 0 ₴ (усе покрив абонемент чи картка лояльності) не застосовуємо — щоб не згорів.
+    const amount = Math.min(r?.amount ?? 0, total - covered - (loyalty?.amount ?? 0));
+    if (r?.ok && amount > 0) promo = { code: pr.code, title: pr.title, amount };
     else if (draft.promo) promoErr = r.why;
   }
   const rest = total - covered - (loyalty?.amount ?? 0) - (promo?.amount ?? 0);
-  const bonus = draft.useBonus !== false ? bonusFor(rest) : 0;
+  // Мінімальна сума для бонусу — від вартості замовлення, а не від залишку після промокоду.
+  const bonus = draft.useBonus !== false ? bonusFor({ total, covered, rest }) : 0;
   const fromBal = draft.useMoney !== false ? Math.min(wallet.money, rest - bonus) : 0;
   const card = rest - bonus - fromBal;
   // Оплата частинами — лише для дорогих послуг і лише карткою.
@@ -1273,9 +1278,9 @@ function renderBook() {
           ${q.promoErr ? `<p class="small bad-text" style="margin:0" role="alert">${esc(q.promoErr)}</p>` : ''}`}
       ${q.subs.length ? `<label class="bonus-line"><input class="check" type="checkbox" id="usesub" ${draft.useSub !== false ? 'checked' : ''}>
             <span>${esc(q.subs[0].name)}<small>Списати 1 візит, лишилось ${passLeft(q.subs[0])}</small></span><b>${q.use?.kind === 'sub' ? `−${uah(q.covered)}` : ''}</b></label>` : ''}
-      ${wallet.bonus ? (bonusFor(q.rest)
+      ${wallet.bonus ? (bonusFor(q)
         ? `<label class="bonus-line"><input class="check" type="checkbox" id="usebonus" ${draft.useBonus !== false ? 'checked' : ''}>
-            <span>Бонус «Приведи друга»<small>Вартість ${uah(total)}, точка отримає повну суму</small></span><b>−${uah(bonusFor(q.rest))}</b></label>`
+            <span>Бонус «Приведи друга»<small>Вартість ${uah(total)}, точка отримає повну суму</small></span><b>−${uah(bonusFor(q))}</b></label>`
         : `<p class="small muted" style="margin:0">Бонус ${uah(wallet.bonus)} діє для замовлень від ${uah(REFERRAL.minOrder)}.</p>`) : ''}
       ${wallet.money > 0 ? `<label class="bonus-line"><input class="check" type="checkbox" id="usemoney" ${draft.useMoney !== false ? 'checked' : ''}>
             <span>Баланс CARCAR<small>Доступно ${uah(wallet.money)}</small></span><b>−${uah(Math.min(wallet.money, q.rest - bonus))}</b></label>` : ''}
@@ -1299,7 +1304,7 @@ function renderBook() {
         <label class="field"><span>Ваше імʼя</span><input id="pf-name" autocomplete="name" value="${esc(draft.pfName ?? profile.name)}"></label>
         <label class="field"><span>Телефон</span><input id="pf-phone" type="tel" autocomplete="tel" placeholder="+380" value="${esc(draft.pfPhone ?? profile.phone)}"></label>
       </div>
-      <p class="demo">Імʼя й телефон бачить лише точка — щоб звʼязатися й показувати вам персональні ціни. Демо-оплата: гроші не списуються.</p>
+      <p class="demo">Імʼя бачить лише точка, а номер телефону — ні: звʼязок через чат і дзвінки в CARCAR — щоб звʼязатися й показувати вам персональні ціни. Демо-оплата: гроші не списуються.</p>
       <div class="dock-space"></div>
       <div class="dock pay-dock">
         <button class="btn primary block${(draft.method ?? 'card') === 'gpay' && q.card > 0 ? ' gpay' : ''}" data-action="pay">${(draft.method ?? 'card') === 'gpay' && q.card > 0 ? '<span class="g-mark" aria-hidden="true">G</span>' : icon('card', 20)}${q.installments ? `Оплатити першу частину ${uah(q.installments.first)}` : q.card > 0 ? `Оплатити ${uah(q.card)}` : fromBal ? 'Оплатити з балансу' : q.covered ? 'Записатися' : `Оплатити ${uah(0)}`}</button>
@@ -1368,7 +1373,7 @@ function confirmBooking() {
   if (!fresh) { Object.assign(draft, { time: null, paying: false, step: 'time' }); renderBook(); toast('Цей час щойно зайняли — оберіть інший'); return; }
   const id = uid();
   // Справжня оплата карткою (LiqPay на сервері): запис чекає оплати, час тримаємо 15 хв.
-  const card = srv?.payments === 'liqpay' && q.rest - bonus > 0;
+  const card = srv?.payments === 'liqpay' && q.card > 0;
   const passUse = q.use ? { ...redeemPass(p.id, q.use.soldId, q.covered, id), kind: q.use.kind } : null;
   const b = {
     id,
@@ -1463,8 +1468,8 @@ function settle() {
     b.walletBack = true;
     back = true;
     const p = placeById(b.placeId);
-    if (b.bonus) addBonus(b.bonus, `Повернено: запис не оплачено (${p?.name ?? 'мийка'})`);
-    if (b.fromBalance) addMoney(b.fromBalance, `Повернено: запис не оплачено (${p?.name ?? 'мийка'})`);
+    if (b.bonus) addBonus(b.bonus, `Повернено: запис не оплачено (${p?.name ?? 'мийка'})`, b.id);
+    if (b.fromBalance) addMoney(b.fromBalance, `Повернено: запис не оплачено (${p?.name ?? 'мийка'})`, b.id);
   }
   if (back) save();
   const done = settleAll(bookings);
@@ -2680,7 +2685,7 @@ function downloadIcs(b) {
 function returnBonus(b, why) {
   if (!b.bonus || b.bonusReturned) return;
   b.bonusReturned = true;
-  addBonus(b.bonus, `Повернення бонусу: ${why}`);
+  addBonus(b.bonus, `Повернення бонусу: ${why}`, b.id);
 }
 
 // Дії із записом з боку клієнта, точки й модератора. Повертають false, якщо нічого не змінилося.
@@ -2701,7 +2706,7 @@ const bookingActions = {
     if (t.kind !== 'late') {
       b.refundTo = toCard ? 'card' : 'balance';
       if (b.installments) b.installments = { ...b.installments, cancelled: Date.now() };
-      if (toBal) addMoney(toBal, `Повернення: ${placeById(b.placeId)?.name ?? 'скасований запис'}`);
+      if (toBal) addMoney(toBal, `Повернення: ${placeById(b.placeId)?.name ?? 'скасований запис'}`, b.id);
       returnBonus(b, 'скасоване замовлення');
       // Візит абонемента чи сума сертифіката повертаються, промокодом можна скористатися знову.
       if (b.passUse) { restorePass(b.placeId, b.passUse); b.passUse = null; }
@@ -2740,7 +2745,7 @@ const bookingActions = {
     if (!(isFrozen(b) || (b.state === 'paid' && bookingStart(b) <= new Date()))) { toast('Спір можна відкрити лише після візиту, поки гроші за записом заморожені'); return false; }
     const reason = prompt('Що пішло не так?')?.trim();
     if (!reason) return false;
-    Object.assign(b, { state: 'dispute', disputeReason: reason });
+    Object.assign(b, { state: 'dispute', disputeReason: reason, disputeFrom: b.state });
     // Спір — це й звернення в підтримку: тут клієнт листується з модератором.
     const t = openTicket({ from: 'client', placeId: b.placeId, bookingId: b.id, topic: 'dispute', text: reason, clientName: profile.name, clientPhone: profile.phone, clientKey: myKeys()[0] });
     b.ticketId = t.id;
@@ -3281,7 +3286,7 @@ document.addEventListener('submit', async (e) => {
     let disputed = false;
     if (f.get('dispute')) {
       if (!b || !(isFrozen(b) || (b.state === 'paid' && bookingStart(b) <= new Date()))) { toast('Спір можна відкрити лише після візиту, поки гроші за записом заморожені'); return; }
-      Object.assign(b, { state: 'dispute', disputeReason: text });
+      Object.assign(b, { state: 'dispute', disputeReason: text, disputeFrom: b.state });
       topic = 'dispute';
       disputed = true;
     }

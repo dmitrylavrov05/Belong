@@ -4,7 +4,7 @@
 import { PLACES, PAYMENT } from './data.js';
 import {
   store, uid, isoDate, parseDate, hhmm, toMin, plural, hoursFor, scheduleOf, inBreak, BLOCKING, phoneKey, isListed, weekdayOf,
-  spanOf, laneCap, sameLane, MOBILE_ROAD, creditClient, creditBonus, chargedOf, confirmBy, offerBy, pauseOf, price, HOUR, isCarcar, ACTIVE,
+  spanOf, laneCap, sameLane, MOBILE_ROAD, creditClient, creditBonus, chargedOf, confirmBy, offerBy, pauseOf, price, HOUR, isCarcar, ACTIVE, hidePhones,
 } from './core.js';
 
 const opsToday = () => isoDate(new Date());
@@ -370,9 +370,9 @@ export function declineBooking(b, reason, by = 'place') {
     ...(b.installments ? { installments: { ...b.installments, cancelled: Date.now() } } : {}),
   });
   const why = by === 'proposal' ? 'інший час не підійшов' : `${opsPlaceName(b)} не підтвердила запис`;
-  if (fromBalance) creditClient(Math.min(fromBalance, refund), `Повернення: ${why}`, b.clientId);
+  if (fromBalance) creditClient(Math.min(fromBalance, refund), `Повернення: ${why}`, b.clientId, b.id);
   if (b.bonus && !b.bonusReturned) {
-    creditBonus(b.bonus, `Повернення бонусу: ${why}`, b.clientId);
+    creditBonus(b.bonus, `Повернення бонусу: ${why}`, b.clientId, b.id);
     b.bonusReturned = true;
   }
   if (b.passUse) { restorePass(b.placeId, b.passUse); b.passUse = null; }
@@ -389,6 +389,7 @@ export function declineBooking(b, reason, by = 'place') {
 export function proposeTime(b, date, time, note = '') {
   if (b?.state !== 'pending') return false;
   const from = { date: b.date, time: b.time };
+  note = hidePhones(note); // номер мийки — лише через CARCAR
   Object.assign(b, { state: 'offer', date, time, offer: { from, at: Date.now(), note }, respondedAt: b.respondedAt ?? Date.now() });
   clientNote(b, 'offer', `${opsPlaceName(b)} не може прийняти вас ${parseDate(from.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })} о ${from.time} і пропонує ${whenText(b)}.${note ? ` ${note}` : ''} Погодьтеся в записі або скасуйте без втрат.`);
   return true;
@@ -450,7 +451,9 @@ export function loyaltyState(placeId, myBookings) {
 // ---------- каса й зміни ----------
 // День мийки: виконані записи — готівка й картка на місці (свої клієнти), через CARCAR, продані абонементи.
 export function cashDay(bookings, placeId, date) {
-  const list = bookings.filter((b) => b.placeId === placeId && b.date === date && b.state === 'completed');
+  // Гроші — того дня, коли запис виконали (а не на який записувались).
+  const doneDay = (b) => (b.completedAt ? isoDate(new Date(b.completedAt)) : b.date);
+  const list = bookings.filter((b) => b.placeId === placeId && doneDay(b) === date && b.state === 'completed');
   const out = { date, cars: list.length, cash: 0, card: 0, carcar: 0, passes: 0, passCash: 0, passCard: 0, list };
   for (const b of list) {
     if (isCarcar(b)) out.carcar += price(b);
@@ -480,8 +483,10 @@ export function closeShift(placeId, day, counted, note) {
 // ---------- зарплата мийників ----------
 // Відсоток від вартості послуг і/або фіксована сума за авто — з виконаних записів, де призначено цього мийника.
 export function salaryFor(w, bookings, placeId, from, to) {
-  const list = bookings.filter((b) => b.placeId === placeId && b.masterId === w.id && b.state === 'completed' && b.date >= from && b.date <= to);
-  const revenue = list.reduce((a, b) => a + (isCarcar(b) ? price(b) : Number(b.paid) || 0), 0);
+  const day = (b) => (b.completedAt ? isoDate(new Date(b.completedAt)) : b.date);
+  const list = bookings.filter((b) => b.placeId === placeId && b.masterId === w.id && b.state === 'completed' && day(b) >= from && day(b) <= to);
+  // Робота за абонементом чи безкоштовна мийка за карткою лояльності — теж робота мийника.
+  const revenue = list.reduce((a, b) => a + (isCarcar(b) ? price(b) : Number(b.paid) || 0) + (b.covered || 0) + (b.loyalty?.amount || 0), 0);
   const pay = Math.round((revenue * (Number(w.pct) || 0)) / 100 + list.length * (Number(w.perCar) || 0));
   return { cars: list.length, revenue, pay };
 }

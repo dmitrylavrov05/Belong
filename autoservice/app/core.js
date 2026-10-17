@@ -531,30 +531,33 @@ export const maskIban = (iban) => `UA…${String(iban).slice(-4)}`;
 export const commissionFor = (placeId) => partnerOf(placeId).commission ?? store.get('admin.settings', {}).commission ?? PAYMENT.commission;
 
 // Гроші клієнту на баланс CARCAR (повернення за спором чи скасуванням з будь-якого екрана).
-export function creditClient(amount, text, id = 'device') {
+export function creditClient(amount, text, id = 'device', bookingId = null) {
   const w = { bonus: 0, money: 0, history: [], ...store.get(walletKey(id), {}) };
   w.money += amount;
-  w.history.unshift({ amount, text, at: Date.now(), kind: 'money' });
+  w.history.unshift({ amount, text, at: Date.now(), kind: 'money', ...(bookingId ? { bookingId } : {}) });
   store.set(walletKey(id), w);
 }
 
 // Рішення за спором: placePart — скільки отримує точка (0 — усе клієнту, повна ціна — усе точці).
-export function resolveDispute(b, placePart, note = '') {
+// to — рішення модератора ('client' | 'place' | 'split'): потрібне, коли клієнт заплатив 0 ₴ (абонемент, картка лояльності).
+export function resolveDispute(b, placePart, note = '', to = null) {
   const full = price(b);
-  const toPlace = Math.max(0, Math.min(full, Math.round(placePart)));
+  const toPlace = to === 'client' ? 0 : Math.max(0, Math.min(full, Math.round(placePart)));
   const name = PLACES.find((x) => x.id === b.placeId)?.name ?? '';
   b.resolution = { placePart: toPlace, note, at: Date.now() };
-  if (toPlace === full) {
-    complete(b);
+  if (to === 'place' || (to !== 'client' && toPlace === full)) {
+    // Спір щодо неявки: усе точці — лишається неявкою, а не «виконано».
+    if (b.disputeFrom === 'noshow') Object.assign(b, { state: 'noshow', placeAmount: full, refund: 0, closedAt: Date.now() });
+    else complete(b);
     b.unfreezeAt = Date.now(); // модератор уже перевірив замовлення
     return;
   }
   const refund = Math.min(chargedOf(b), full - toPlace);
   Object.assign(b, { state: 'refunded', refund, placeAmount: toPlace, refundTo: 'balance', closedAt: Date.now() });
-  if (refund) creditClient(refund, `Повернення за спором: ${name}`, b.clientId);
+  if (refund) creditClient(refund, `Повернення за спором: ${name}`, b.clientId, b.id);
   // Усе клієнту — повертаємо й бонус, візит абонемента та промокод.
   if (toPlace === 0) {
-    if (b.bonus && !b.bonusReturned) { creditBonus(b.bonus, `Повернення бонусу за спором: ${name}`, b.clientId); b.bonusReturned = true; }
+    if (b.bonus && !b.bonusReturned) { creditBonus(b.bonus, `Повернення бонусу за спором: ${name}`, b.clientId, b.id); b.bonusReturned = true; }
     if (b.passUse) { returnPassUse(b.placeId, b.passUse); b.passUse = null; }
     if (b.promo) b.promo.returned = true;
   }
@@ -575,10 +578,10 @@ export function resolveLate(b, confirmed, note = '') {
 // Скільки клієнт справді заплатив: за оплати частинами — лише перший платіж (решту банк скасовує) і частину з балансу.
 export const chargedOf = (b) => (b.installments ? Math.max(0, b.paid - (b.installments.card ?? b.paid) + b.installments.first) : b.paid);
 
-export function creditBonus(amount, text, id = 'device') {
+export function creditBonus(amount, text, id = 'device', bookingId = null) {
   const w = { bonus: 0, money: 0, history: [], ...store.get(walletKey(id), {}) };
   w.bonus += amount;
-  w.history.unshift({ amount, text, at: Date.now() });
+  w.history.unshift({ amount, text, at: Date.now(), ...(bookingId ? { bookingId } : {}) });
   store.set(walletKey(id), w);
 }
 
@@ -753,10 +756,12 @@ export const hidePhones = (text) => String(text ?? '').replace(/\+?\d[\d\s\-().]
 
 // Клієнт прийшов через CARCAR, але мийка записала його сама (по телефону чи «приїхав сам»):
 // комісія з такого запису утримується з виплат.
-export const leadFee = (b) => (b.lead === 'carcar' && b.state === 'completed' ? Math.round((b.paid || 0) * commissionFor(b.placeId)) : 0);
+// Ставка — та, що діяла, коли мийка записала клієнта (зміна ставки не перераховує минулого).
+export const leadFee = (b) => (b.lead === 'carcar' && b.state === 'completed' ? Math.round((b.paid || 0) * (b.leadRate ?? commissionFor(b.placeId))) : 0);
 
 export function balanceFor(placeId, bookings, payouts) {
-  const own = bookings.filter((b) => b.placeId === placeId && isCarcar(b));
+  // Демо-сигнали антифроду — не гроші мийки.
+  const own = bookings.filter((b) => b.placeId === placeId && isCarcar(b) && !b.demoFraud);
   const earned = own.filter((b) => !isFrozen(b)).reduce((a, b) => a + placeShare(b), 0);
   const withdrawn = payouts.filter((x) => x.placeId === placeId).reduce((a, x) => a + x.gross, 0);
   // Непідтверджений запис ще не гроші точки: якщо мийка відмовить, їх повернуть клієнту.
@@ -769,7 +774,11 @@ export function balanceFor(placeId, bookings, payouts) {
   const passEarned = sales.filter(ripe).reduce((a, x) => a + x.price, 0);
   const passFrozen = sales.filter((x) => !ripe(x)).reduce((a, x) => a + x.price, 0);
   const leadFees = bookings.filter((b) => b.placeId === placeId).reduce((a, b) => a + leadFee(b), 0);
-  return { available: earned + passEarned - withdrawn - leadFees, frozen: frozen + passFrozen, next, withdrawn, leadFees };
+  // Комісія під час виведення — з виручки через CARCAR, ще не виведеної (а не з суми, зменшеної на комісію за «своїх» клієнтів CARCAR).
+  const feeBase = Math.max(0, earned + passEarned - payouts.filter((x) => x.placeId === placeId).reduce((a, x) => a + (x.base ?? x.gross), 0));
+  const available = earned + passEarned - withdrawn - leadFees;
+  const fee = Math.min(Math.max(0, available), Math.round(feeBase * commissionFor(placeId)));
+  return { available, frozen: frozen + passFrozen, next, withdrawn, leadFees, feeBase, fee };
 }
 
 // Номер запису: шість цифр по порядку, однаковий у клієнта, мийки й підтримки — його називають,
