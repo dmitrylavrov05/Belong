@@ -1,7 +1,7 @@
 import { CITY, CITIES, CATEGORIES, CAR_CLASSES, PLACES, PAYMENT, MAINTENANCE, REFERRAL } from './data.js';
 import {
   store, icon, esc, uah, pad, hhmm, toMin, isoDate, parseDate, uid, placeById, plural, duration, dayLabel, rating,
-  hoursFor, scheduleOf, inBreak, rangeText, WEEKDAY_NAMES, weekdayOf, phoneKey, offersOf, offerAsService, isOpenNow, hoursText, bookingStart, fmtTime, fmtDate, km, serviceCat, catById, shrinkPhoto,
+  hoursFor, scheduleOf, inBreak, rangeText, WEEKDAY_NAMES, weekdayOf, phoneKey, offersOf, offerAsService, isOpenNow, hoursText, bookingStart, fmtTime, fmtDate, km, serviceCat, catById, shrinkPhoto, avatarSrc, myAvatarId, shrinkAvatar,
   confirmBy, offerBy, pauseOf, responseStats, msText, AWAITING, staffOf, chargedOf, realOrder, hidePhones, clientIdOf, walletKey,
   applyOverrides, isListed, visibleReviews, ACTIVE, BLOCKING, HOUR, price, isFrozen, settleAll, ratingFor,
   powerOf, worksInBlackout, TICKET_TOPICS, CLIENT_TOPICS, TICKET_STATUS, ticketsAll, openTicket, ticketReply, setTicket, isBlocked, mobileOn, spanOf, laneCap, sameLane, MOBILE_ROAD, promosAll, promoCheck,
@@ -648,8 +648,9 @@ function viewCatalog() {
 const reviewPhotos = (r) => (r.photos?.length ? `<div class="photos review-photos">${r.photos.map((src, i) => `<img src="${esc(src)}" alt="Фото клієнта ${i + 1}">`).join('')}</div>` : '');
 
 function reviewItem(r) {
+  const ava = avatarSrc(r.clientAvatar);
   return `<article class="review">
-    <div class="head">${stars(r.stars)}<span class="small muted">${fmtDate(r.date)}</span></div>
+    <div class="head">${ava ? `<span class="avatar has-img rv-ava" aria-hidden="true"><img src="${esc(ava)}" alt=""></span>` : ''}${stars(r.stars)}<span class="small muted">${fmtDate(r.date)}</span></div>
     ${r.text ? `<p>${esc(r.text)}</p>` : ''}
     ${reviewPhotos(r)}
     <div class="small muted">${icon('checkCircle', 14)}Підтверджений візит · ${esc(r.services)}</div>
@@ -826,7 +827,7 @@ function passesBlock(p) {
 
 // Клієнт не знайшов послугу — пише точці. Точка відповідає в панелі й може додати послугу
 // до прайсу або зробити її персональною для цього клієнта (за телефоном).
-const saveRequests = () => store.set('requests', requests);
+const saveRequests = () => { stampAvatar(requests, (r) => (r.clientId ?? 'device') === meId()); return store.set('requests', requests); };
 const requestsOf = (placeId) => requests.filter((r) => r.placeId === placeId && (r.clientId ?? 'device') === meId()).sort((a, b) => b.at - a.at);
 const lastWord = (r) => r.messages.findLast((m) => m.from !== 'sys');
 const reqStatus = (r) => (r.closed ? ['', 'Запит закрито'] : r.service ? ['go', 'Послугу додано'] : !lastWord(r) ? ['', 'Дзвінок через CARCAR']
@@ -1117,13 +1118,8 @@ function quote(p) {
   const bonus = draft.useBonus !== false ? bonusFor({ total, covered, rest }) : 0;
   const fromBal = draft.useMoney !== false ? Math.min(wallet.money, rest - bonus) : 0;
   const card = rest - bonus - fromBal;
-  // Оплата частинами — лише для дорогих послуг і лише карткою.
-  const canParts = card >= PAYMENT.installments.minTotal;
-  const parts = canParts && PAYMENT.installments.parts.includes(draft.parts) ? draft.parts : 0;
-  const monthly = parts ? Math.ceil(card / parts) : 0;
   return {
     cls, list, chosen, minutes, deal: total < listTotal ? deal : null, listTotal, total, fee, subs, covered, use, loyalty, promo, promoErr, rest, bonus, fromBal, card,
-    canParts, parts, installments: parts ? { n: parts, monthly, first: card - monthly * (parts - 1) } : null,
   };
 }
 
@@ -1219,7 +1215,6 @@ function renderBook() {
       <div class="total"><span>${main ? esc(main.name) : chosen.length ? `${chosen.length} ${plural(chosen.length, 'послуга', 'послуги', 'послуг')}` : 'Нічого не обрано'}
         ${chosen.length ? `<small class="dur-chip">${duration(minutes)}${q.fee ? ' · виїзд' : ''}${chosen.length > 1 && main ? ` · +${chosen.length - 1}` : ''}</small>` : ''}</span><b>${priceTag}</b></div>
       ${pills}
-      ${q.canParts && !q.promo && !q.deal ? `<p class="small muted" style="margin:0 0 8px">Можна оплатити частинами: від ${uah(Math.ceil(q.card / Math.max(...PAYMENT.installments.parts)))}/міс</p>` : ''}
       <button class="btn primary block" data-action="to-time" ${chosen.length && where.ok ? '' : 'disabled'}>${!where.ok && chosen.length ? esc(where.why) : !chosen.length ? 'Оберіть послугу' : draft.time ? `Далі: ${when}` : 'Обрати дату й час'}</button>
     </div>`;
   } else if (step === 'time') {
@@ -1266,7 +1261,6 @@ function renderBook() {
       <div class="total"><span>${dayLabel(draft.date, { weekday: 'long', day: 'numeric', month: 'long' })}
         <small class="dur-chip">${draft.time ? `${draft.time}–${slotEnd(draft.time, minutes)} · ` : ''}${duration(minutes)}</small></span><b>${priceTag}</b></div>
       ${pills}
-      ${q.canParts && !q.promo && !q.deal ? `<p class="small muted" style="margin:0 0 8px">Можна оплатити частинами: від ${uah(Math.ceil(q.card / Math.max(...PAYMENT.installments.parts)))}/міс</p>` : ''}
       <button class="btn primary block" data-action="confirm" ${draft.time ? '' : 'disabled'}>${draft.time ? `Записатися на ${when}` : 'Оберіть час'}</button>
     </div>`;
   } else {
@@ -1308,12 +1302,6 @@ function renderBook() {
         : `<p class="small muted" style="margin:0">Бонус ${uah(wallet.bonus)} діє для замовлень від ${uah(REFERRAL.minOrder)}.</p>`) : ''}
       ${wallet.money > 0 ? `<label class="bonus-line"><input class="check" type="checkbox" id="usemoney" ${draft.useMoney !== false ? 'checked' : ''}>
             <span>Баланс CARCAR<small>Доступно ${uah(wallet.money)}</small></span><b>−${uah(Math.min(wallet.money, q.rest - bonus))}</b></label>` : ''}
-      ${q.canParts ? `<fieldset class="parts">
-        <legend>Оплата частинами</legend>
-        <label><input type="radio" name="parts" value="0" ${q.parts ? '' : 'checked'}><span>Одразу<small>${uah(q.card)}</small></span></label>
-        ${PAYMENT.installments.parts.map((n) => `<label><input type="radio" name="parts" value="${n}" ${q.parts === n ? 'checked' : ''}><span>${n} платежі<small>по ${uah(Math.ceil(q.card / n))}/міс</small></span></label>`).join('')}
-        <p class="fine">Без переплати для вас: точка отримує всю суму одразу від банку-партнера, решту частин спишемо з картки щомісяця. Демо: справжньої розстрочки не оформлюємо.</p>
-      </fieldset>` : ''}
       ${q.card > 0 ? `<fieldset class="methods"><legend>Спосіб оплати</legend>
         ${[['gpay', 'Google Pay', 'Швидко, без введення картки'], ['card', 'Банківська картка', 'Visa, Mastercard будь-якого банку']].map(([k, name, sub]) => `<label class="method${(draft.method ?? 'card') === k ? ' on' : ''}">
           <input class="cover-input" type="radio" name="method" value="${k}" ${(draft.method ?? 'card') === k ? 'checked' : ''}>
@@ -1324,14 +1312,14 @@ function renderBook() {
         <li><span class="perk-ic">${icon('undo', 20)}</span>Скасування до ${cancelWindow()} до візиту — уся сума повертається на баланс CARCAR</li>
         <li><span class="perk-ic">${icon('clock', 20)}</span>Запізнення понад ${PAYMENT.lateMinutes} хв — мийка може звернутися в підтримку; якщо CARCAR підтвердить, оплата зараховується мийці</li>
       </ul>
-      <div class="grid2 pf">
+      <div class="grid2 pf" id="pay-end">
         <label class="field"><span>Ваше імʼя</span><input id="pf-name" autocomplete="name" value="${esc(draft.pfName ?? profile.name)}"></label>
         <label class="field"><span>Телефон</span><input id="pf-phone" type="tel" autocomplete="tel" placeholder="+380" value="${esc(draft.pfPhone ?? profile.phone)}"></label>
       </div>
       <p class="demo">Імʼя бачить лише точка, а номер телефону — ні: звʼязок через чат і дзвінки в CARCAR — щоб звʼязатися й показувати вам персональні ціни. Демо-оплата: гроші не списуються.</p>
       <div class="dock-space"></div>
       <div class="dock pay-dock">
-        <button class="btn primary block${(draft.method ?? 'card') === 'gpay' && q.card > 0 ? ' gpay' : ''}" data-action="pay">${(draft.method ?? 'card') === 'gpay' && q.card > 0 ? '<span class="g-mark" aria-hidden="true">G</span>' : icon('card', 20)}${q.installments ? `Оплатити першу частину ${uah(q.installments.first)}` : q.card > 0 ? `Оплатити ${uah(q.card)}` : fromBal ? 'Оплатити з балансу' : q.covered ? 'Записатися' : `Оплатити ${uah(0)}`}</button>
+        ${!draft.payReady ? `<button class="btn primary block" data-action="pay-next">Усе вірно — до оплати${icon('chevD', 20)}</button>` : `<button class="btn primary block${(draft.method ?? 'card') === 'gpay' && q.card > 0 ? ' gpay' : ''}" data-action="pay">${(draft.method ?? 'card') === 'gpay' && q.card > 0 ? '<span class="g-mark" aria-hidden="true">G</span>' : icon('card', 20)}${q.card > 0 ? `Оплатити ${uah(q.card)}` : fromBal ? 'Оплатити з балансу' : q.covered ? 'Записатися' : `Оплатити ${uah(0)}`}</button>`}
       </div>
     </section>`;
   }
@@ -1343,7 +1331,31 @@ function renderBook() {
   const top = $('#view > .back');
   if (top) top.hidden = step !== 'svc';
   if (step === 'svc' && mobileMode()) mountPickMap(p);
+  if (step === 'pay' && !draft.payReady) watchPayEnd();
   karychRoute(`book-${step}`, null, { away: true });
+}
+
+// Екран оплати відкривається згори (чек — перевірити замовлення). Кнопка внизу «Усе вірно — до оплати» гортає до
+// способу оплати й стає «Оплатити». Догорнули самі до кінця — кнопка теж стає «Оплатити».
+let payWatch = null;
+function watchPayEnd() {
+  payWatch?.disconnect();
+  const end = $('#pay-end');
+  if (!end || !('IntersectionObserver' in window)) { draft.payReady = true; return; }
+  payWatch = new IntersectionObserver((es) => {
+    if (!es.some((e) => e.isIntersecting) || !draft?.paying || draft.payReady) return;
+    payWatch.disconnect();
+    payReady(false);
+  }, { rootMargin: `0px 0px -${($('.pay-dock')?.offsetHeight ?? 0) + ($('.tabs')?.offsetHeight ?? 0)}px 0px` });
+  payWatch.observe(end);
+}
+function payReady(scroll) {
+  draft.payReady = true;
+  const y = window.scrollY;
+  renderBook();
+  window.scrollTo({ top: y, behavior: 'instant' });
+  if (scroll) ($('.methods') ?? $('#pay-end'))?.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'center' });
+  $('[data-action="pay"]')?.focus({ preventScroll: true });
 }
 
 // Карта для вибору місця виїзду: точка, радіус виїзду не малюємо — перевіряємо відстань.
@@ -1429,7 +1441,6 @@ function confirmBooking() {
     loyalty: q.loyalty,
     campaign: campaignNow()?.id ?? null,
     firstOrder: !mine().some(realOrder),
-    installments: q.installments ? { ...q.installments, card: q.card } : null,
     // Мийка підтверджує запис сама, якщо не ввімкнула автопідтвердження. Запис за пропозицією мийки — вже погоджений.
     state: card ? 'unpaid' : autoConfirmOf(p.id) || draft.invite ? 'paid' : 'pending',
     needsConfirm: !autoConfirmOf(p.id) && !draft.invite,
@@ -1452,18 +1463,26 @@ function confirmBooking() {
   draft = null;
   location.hash = `#/bookings/${b.id}`;
   track('paid', { placeId: p.id, amount: total, deal: !!q.deal, pass: q.use?.kind ?? null, bonus: !!bonus, balance: !!fromBal, leadH: Math.round((bookingStart(b) - Date.now()) / HOUR),
-    promo: q.promo?.code ?? null, mobile: !!b.mobile, parts: q.parts || 0 });
+    promo: q.promo?.code ?? null, mobile: !!b.mobile });
   if (card) { payCard(b); return; }
   setTimeout(() => karychSay(b.state === 'pending'
     ? `Кар-р! Запис є. Мийка підтвердить протягом ${PAYMENT.confirmMinutes} хв — я одразу повідомлю. Гроші чекають, доки машину не помиють.`
     : 'Кар-р! Ви записані. Нагадаю напередодні й за 2 години до візиту.'), 1200);
   toast(b.state === 'pending' ? 'Оплачено. Чекаємо, коли мийка підтвердить запис'
-    : q.installments ? `Оплачено першу частину, ви записані` : 'Оплачено, ви записані');
+    : 'Оплачено, ви записані');
 }
 
 // ---------- оплата й утримання коштів ----------
 
+// Фото профілю клієнта — номер фото в його записах, запитах і відгуках (мийка бачить фото в чатах і записах).
+function stampAvatar(list, mineOf) {
+  const av = myAvatarId(meId());
+  if (!av) return;
+  for (const x of list) if (mineOf(x) && x.clientAvatar !== av) x.clientAvatar = av;
+}
 function save() {
+  stampAvatar(bookings, (b) => (b.clientId ?? 'device') === meId() && !b.source);
+  stampAvatar(reviews, (r) => (r.clientKey ?? 'device') === meId());
   numberBookings(bookings);
   return store.set('bookings', bookings) && store.set('payouts', payouts) && store.set('reviews', reviews);
 }
@@ -2425,6 +2444,28 @@ function settingsBlock() {
 const businessEntry = () => `<a class="card link-card biz-entry" href="#/business" style="margin-top:16px">${icon('chart', 22)}<span>Для бізнесу
     <small class="small muted" style="display:block;font-weight:400">Для власників мийок: умови й реєстрація</small></span>${icon('chevR', 18)}</a>`;
 
+// Фото профілю: видно мийці в чатах, записах і списку клієнтів, а також у ваших відгуках.
+function avatarPicker() {
+  const src = avatarSrc(myAvatarId(meId()));
+  return `<div class="ava-pick">
+    <span class="avatar big${src ? ' has-img' : ''}" aria-hidden="true">${src ? `<img src="${esc(src)}" alt="">` : icon('user', 30)}</span>
+    <span class="row" style="gap:8px;flex-wrap:wrap">
+      <label class="btn soft">${icon('camera', 18)}${src ? 'Змінити фото' : 'Додати фото профілю'}<input class="sr-only" id="avatar-file" type="file" accept="image/*"></label>
+      ${src ? '<button class="btn" type="button" data-action="avatar-off">Прибрати</button>' : ''}
+    </span></div>`;
+}
+async function setAvatar(file) {
+  const img = file ? await shrinkAvatar(file) : '';
+  if (file && !img) { toast('Не вдалося відкрити фото'); return; }
+  const all = store.get('avatars', {});
+  const id = myAvatarId(meId()) ?? `a${uid()}${uid()}`;
+  store.set('avatars', { ...all, [id]: { by: meId(), img, at: Date.now() } });
+  save();
+  saveRequests();
+  route();
+  toast(img ? 'Фото профілю збережено' : 'Фото профілю прибрано');
+}
+
 // Вихід з акаунта: наступного разу знову вхід за номером. Записи й авто на цьому телефоні лишаються.
 const logoutBlock = () => {
   const a = store.get('auth', null) ?? login.session;
@@ -2616,7 +2657,8 @@ function viewGarage() {
   return `<h1>Гараж</h1>
     <form class="card profile-card" id="profileform">
       <h2 class="car-name">Ваш профіль</h2>
-      <p class="small muted" style="margin:0">Їх бачить лише мийка, до якої ви записуєтесь.</p>
+      ${avatarPicker()}
+      <p class="small muted" style="margin:0">Імʼя й фото бачить мийка, до якої ви записуєтесь, фото — ще й у ваших відгуках. Номер телефону мийка не бачить.</p>
       <div class="grid2">
         <label class="field"><span>Імʼя</span><input name="name" autocomplete="name" value="${esc(profile.name)}"></label>
         <label class="field"><span>Телефон</span><input name="phone" type="tel" autocomplete="tel" placeholder="+380" value="${esc(profile.phone)}"></label>
@@ -2978,11 +3020,15 @@ document.addEventListener('click', (e) => {
     renderBook();
   } else if (action === 'confirm' || action === 'unpay') {
     draft.paying = action === 'confirm';
+    draft.payReady = false;
     if (draft.paying) track('open_pay', { placeId: draft.placeId });
     else draft.step = draft.time ? 'time' : 'svc';
+    window.scrollTo({ top: 0, behavior: 'instant' });
     renderBook();
-    window.scrollTo(0, 0);
-    $(draft.paying ? '[data-action="pay"]' : '[data-action="confirm"]')?.focus();
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    $(draft.paying ? '[data-action="pay-next"], [data-action="pay"]' : '[data-action="confirm"]')?.focus({ preventScroll: true });
+  } else if (action === 'pay-next') {
+    payReady(true);
   } else if (action === 'pay') {
     confirmBooking();
   } else if (action === 'share' || action === 'copy') {
@@ -3033,6 +3079,8 @@ document.addEventListener('click', (e) => {
   } else if (bookingActions[action]) {
     const b = bookings.find((x) => x.id === id);
     if (b && bookingActions[action](b) !== false) { ui.bookFocus = b.id; save(); route(); }
+  } else if (action === 'avatar-off') {
+    setAvatar(null);
   } else if (action === 'call') {
     if (el.matches('.call-row')) markCallsRead('client', (x) => x.placeId === el.dataset.place && (x.clientId ?? 'device') === meId());
     const b = id ? bookings.find((x) => x.id === id) : null;
@@ -3190,6 +3238,7 @@ document.addEventListener('toggle', (e) => {
 document.addEventListener('change', (e) => {
   const t = e.target;
   if (t.matches('.chat-attach')) { sendPhoto(t); return; }
+  if (t.id === 'avatar-file') { if (t.files?.[0]) setAvatar(t.files[0]); return; }
   if (t.name === 'theme' && t.closest('.settings')) { setTheme('theme', t.value); return; }
   if (t.id === 'set-karych') {
     setKarych(t.checked);
@@ -3238,10 +3287,6 @@ document.addEventListener('change', (e) => {
     draft.method = t.value;
     renderBook();
     $(`input[name="method"][value="${t.value}"]`)?.focus();
-  } else if (t.name === 'parts') {
-    draft.parts = Number(t.value);
-    renderBook();
-    $(`input[name="parts"][value="${t.value}"]`)?.focus();
   } else if (t.name === 'item' && t.closest('.estimate')) {
     const form = t.closest('.estimate');
     const b = bookings.find((x) => x.id === form.dataset.id);

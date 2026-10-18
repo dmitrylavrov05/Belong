@@ -1,9 +1,11 @@
 import { test, expect } from '@playwright/test';
+import { payStep } from './pay-step.js';
 import AxeBuilder from '@axe-core/playwright';
 import { PRO, proBooking, proWash } from './helpers.js';
 
 // Неділя, 4 жовтня 2026, 10:00. Завтра — понеділок.
 test.beforeEach(async ({ page }, testInfo) => {
+  await payStep(page);
   // Вхід за телефоном пройдено — крім тестів самого входу (#/login).
   await page.addInitScript(() => { if (!location.hash.startsWith('#/login')) { localStorage.getItem('carcar.auth') ?? localStorage.setItem('carcar.auth', '{"phone":"","at":1}'); localStorage.getItem('carcar.biz.session') ?? localStorage.setItem('carcar.biz.session', '{"demo":true}'); } });
   // Усі точки — мийки, тож акція «Перша мийка −30%» діяла б у кожному тесті. Вимикаємо її,

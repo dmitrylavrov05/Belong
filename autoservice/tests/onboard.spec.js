@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { payStep } from './pay-step.js';
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -57,6 +58,7 @@ async function device(browser, init = () => {}, arg = null) {
   const ctx = await browser.newContext({ baseURL: base, locale: 'uk-UA', reducedMotion: 'reduce' });
   await ctx.addInitScript(init, arg);
   const page = await ctx.newPage();
+  await payStep(page);
   await page.clock.setFixedTime(new Date(2026, 9, 4, 10, 0));
   page.errors = [];
   page.on('pageerror', (e) => page.errors.push(e.message));

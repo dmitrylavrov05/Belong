@@ -5,7 +5,7 @@
 import { CAR_CLASSES, PLACES, PAYMENT, DECLINE_RULES, CITIES } from './data.js';
 import {
   store, icon, esc, uah, hhmm, toMin, isoDate, parseDate, uid, placeById, plural, duration, dayLabel, rating, fmtTime,
-  bookingStart, hoursFor, scheduleOf, rangeText, WEEKDAYS, WEEKDAY_NAMES, phoneKey, applyOverrides, saveOverride, shrinkPhoto, inBreak,
+  bookingStart, hoursFor, scheduleOf, rangeText, WEEKDAYS, WEEKDAY_NAMES, phoneKey, applyOverrides, saveOverride, shrinkPhoto, avatarSrc, inBreak,
   ACTIVE, BLOCKING, isCarcar, price, complete, isFrozen, balanceFor, settleAll, ratingFor, partnerOf, PARTNER_STATUS,
   confirmBy, offerBy, responseStats, pauseOf, ratePct, msText, accountPlaces, addAccountPlace,
   ticketsAll, openTicket, ticketReply, setTicket, TICKET_TOPICS, TICKET_STATUS, PLACE_TOPICS, ticketPhotos,
@@ -68,6 +68,11 @@ const who = (b) => (isCarcar(b) ? hidePhones(b.clientName || '') : b.clientName)
 const telHref = (phone) => `tel:${String(phone).replace(/[^+\d]/g, '')}`;
 const clock = (at) => new Date(at).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
 const whenShort = (at) => (isoDate(new Date(at)) === todayIso() ? clock(at) : new Date(at).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' }));
+// Аватарка клієнта: його фото профілю (якщо додав) або перша літера імені.
+const clientAva = (id, name, cls = '') => {
+  const src = avatarSrc(id);
+  return `<span class="avatar${cls}${src ? ' has-img' : ''}" aria-hidden="true">${src ? `<img src="${esc(src)}" alt="">` : firstLetter(name)}</span>`;
+};
 const safePhoto = (p) => (typeof p === 'string' && p.startsWith('data:image/') ? esc(p) : '');
 const firstLetter = (name) => esc([...String(name).trim()][0]?.toUpperCase() ?? 'К');
 
@@ -385,7 +390,7 @@ function threads() {
     const last = b.chat.at(-1);
     const [label, cls] = stateOf(b);
     return {
-      id: `b-${b.id}`, kind: 'booking', name: who(b), at: last.at, unread: !!b.chatUnreadBiz, label, cls,
+      id: `b-${b.id}`, kind: 'booking', name: who(b), ava: b.clientAvatar, at: last.at, unread: !!b.chatUnreadBiz, label, cls,
       text: last.call ? callLine(last, 'place') : `${last.from === 'biz' ? 'Ви: ' : ''}${msgPreview(last)}`,
       sub: `${b.no ? `${bookingNo(b)} · ` : ''}${dayWord(b.date)}, ${b.time} · ${b.services[0]}${b.services.length > 1 ? ` +${b.services.length - 1}` : ''}`,
       live: ACTIVE.includes(b.state), hasCall: b.chat.some((m) => m.call),
@@ -395,7 +400,7 @@ function threads() {
     const last = r.messages.at(-1);
     const [label, cls] = REQ_STATE[reqState(r)];
     return {
-      id: `r-${r.id}`, kind: 'request', name: r.clientName || 'Клієнт', at: last.at, unread: !!r.unreadBiz, label, cls,
+      id: `r-${r.id}`, kind: 'request', name: r.clientName || 'Клієнт', ava: r.clientAvatar, at: last.at, unread: !!r.unreadBiz, label, cls,
       text: last.call ? callLine(last, 'place') : `${last.from === 'biz' ? 'Ви: ' : ''}${msgPreview(last)}`, sub: `${lastWord(r) ? 'Питання про послугу' : 'Дзвінок через CARCAR'}${r.car ? ` · ${r.car}` : ''}`,
       live: !r.closed && !r.service, hasCall: r.messages.some((m) => m.call),
     };
@@ -429,7 +434,7 @@ function viewMessages() {
     ${reminders()}
     <div class="chips" role="group" aria-label="Які повідомлення показати">${MSG_FILTERS.map(([f, label]) => `<button class="chip" type="button" data-action="msg-filter" data-f="${f}" aria-pressed="${ui.filter === f}">${label}${count(f) ? ` · ${count(f)}` : ''}</button>`).join('')}</div>
     ${list.length ? `<ul class="convos pro-convos">${list.map((t) => (t.kind === 'call' ? callRow(t) : `<li><a class="convo${t.unread ? ' unread' : ''}${t.live ? '' : ' over'}" href="#/chat/${t.id}">
-      <span class="avatar${t.kind === 'request' ? ' req' : ''}" aria-hidden="true">${firstLetter(t.name)}</span>
+      ${clientAva(t.ava, t.name, t.kind === 'request' ? ' req' : '')}
       <span class="convo-body"><span class="convo-top"><b>${esc(t.name)}</b><time>${whenShort(t.at)}</time></span>
         <span class="convo-text">${esc(t.text.length > 80 ? `${t.text.slice(0, 80).trimEnd()}…` : t.text)}</span>
         <span class="convo-meta"><span class="pill ${t.cls}">${t.label}</span><small>${esc(t.sub)}</small></span></span>
@@ -467,10 +472,10 @@ const compose = (thread, quick) => `<div class="chat-compose">
   </div>`;
 
 // Клієнти CARCAR — дзвінок лише через застосунок, номер прихований.
-function chatHead(name, sub, call) {
+function chatHead(name, sub, call, ava = null) {
   return `<header class="chat-head">
       <a class="icon-btn" href="#/" aria-label="До повідомлень">${icon('chevL', 24)}</a>
-      <span class="avatar" aria-hidden="true">${firstLetter(name)}</span>
+      ${clientAva(ava, name)}
       <div class="chat-who"><h1>${esc(name)}</h1><small>${sub}</small></div>
       <button class="icon-btn" type="button" data-action="call" ${call} aria-label="Подзвонити клієнту через CARCAR">${icon('phone', 20)}</button>
     </header>`;
@@ -488,7 +493,7 @@ function viewThread(arg = '') {
     const [label] = stateOf(b);
     const open = ACTIVE.includes(b.state);
     return `<section class="chat-screen" aria-label="Чат з ${esc(who(b))}">
-      ${chatHead(who(b), `${label} · ${dayWord(b.date)}, ${b.time}`, `data-id="${b.id}"`)}
+      ${chatHead(who(b), `${label} · ${dayWord(b.date)}, ${b.time}`, `data-id="${b.id}"`, b.clientAvatar)}
       <button class="chat-pin" type="button" data-action="bk-open" data-id="${b.id}">${icon('calendar', 16)}<span>${b.no ? `${bookingNo(b)} · ` : ''}${esc(b.services.join(', '))} · ${uah(sumOf(b))}${b.car ? ` · ${esc(b.car)}` : ''}</span>${icon('chevR', 16)}</button>
       ${b.state === 'pending' ? `<div class="chat-actions"><button class="btn navy" type="button" data-action="accept" data-id="${b.id}">${icon('check', 18)}Прийняти запис</button><button class="btn" type="button" data-action="decline" data-id="${b.id}">Відмовити</button></div>` : ''}
       ${b.state === 'paid' && started(b) ? `<div class="chat-actions"><button class="btn navy" type="button" data-action="ready" data-id="${b.id}">${icon('check', 18)}Машина готова</button></div>` : ''}
@@ -504,7 +509,7 @@ function viewThread(arg = '') {
   const [label] = REQ_STATE[reqState(r)];
   const open = !r.closed;
   return `<section class="chat-screen" aria-label="Чат з ${esc(r.clientName || 'клієнтом')}">
-    ${chatHead(r.clientName || 'Клієнт', `${label}${r.car ? ` · ${esc(r.car)}` : ''}`, `data-req="${r.id}"`)}
+    ${chatHead(r.clientName || 'Клієнт', `${label}${r.car ? ` · ${esc(r.car)}` : ''}`, `data-req="${r.id}"`, r.clientAvatar)}
     ${open ? `<div class="chat-actions">
       <button class="btn navy" type="button" data-action="nb-open" data-req="${r.id}">${icon('calendar', 16)}Запропонувати запис</button>
       ${r.service ? '' : `<button class="btn" type="button" data-action="svc-new" data-req="${r.id}">${icon('plus', 16)}Додати послугу</button>`}
@@ -707,6 +712,7 @@ function bookingSheet(id) {
     actions = `<p class="notice">${isFrozen(b) ? `Гроші стануть доступні ${fmtTime(b.unfreezeAt)}.` : 'Гроші доступні до виведення в розділі «Мийка».'}</p>`;
   }
   openSheet(`${b.time} · ${esc(who(b))}`, `
+    ${avatarSrc(b.clientAvatar) ? `<div class="row sheet-client">${clientAva(b.clientAvatar, who(b))}<b>${esc(who(b))}</b></div>` : ''}
     <div class="row"><span class="pill ${cls}">${label}</span><span class="pill">${CHANNEL[channelOf(b)]}</span>${b.lead ? '<span class="pill lead">Клієнт CARCAR · з комісією</span>' : ''}${b.no ? `<span class="small muted">${bookingNo(b)}</span>` : ''}</div>
     <dl class="pro-kv">
       <dt>Коли</dt><dd>${dayWord(b.date, true)}, ${b.time}–${hhmm(toMin(b.time) + b.minutes)}</dd>
@@ -1348,6 +1354,7 @@ function clientsList() {
     if (!isCarcar(b) && b.clientPhone) c.phone = b.clientPhone;
     if (b.car) c.cars.add(b.car);
     if (b.state === 'completed') { c.visits += 1; c.spent += sumOf(b); }
+    if (b.clientAvatar) c.ava = b.clientAvatar;
     if (b.date > c.last) { c.last = b.date; c.name = b.clientName || c.name; c.car = b.car || c.car; c.cls = b.cls ?? c.cls; }
     map.set(key, c);
   }
@@ -1365,7 +1372,7 @@ function viewClients() {
     ${byNo ? `<button class="pro-link block-btn" type="button" data-action="bk-open" data-id="${byNo.id}">${icon('calendar', 22)}<span><b>Запис ${bookingNo(byNo)}</b><small>${esc(who(byNo))} · ${dayWord(byNo.date)}, ${byNo.time} · ${esc(byNo.services.join(', '))}</small></span>${icon('chevR', 18)}</button>` : ''}
     <p class="small muted">${all.length} ${plural(all.length, 'клієнт', 'клієнти', 'клієнтів')}</p>
     ${list.length ? `<ul class="client-list">${list.slice(0, 100).map((c) => `<li>
-      <span class="avatar" aria-hidden="true">${firstLetter(c.name)}</span>
+      ${clientAva(c.ava, c.name)}
       <span class="cl-main"><b>${esc(c.name)}</b><small>${esc([...c.cars].join(', ') || '—')}</small>
         <small>${c.visits} ${plural(c.visits, 'візит', 'візити', 'візитів')}${c.spent ? ` · ${uah(c.spent)}` : ''} · востаннє ${dayLabel(c.last, { day: 'numeric', month: 'short' })}</small>${noteLine(c.key)}</span>
       <span class="row"><button class="icon-btn" type="button" data-action="note-open" data-key="${esc(c.key)}" data-name="${esc(c.name)}" aria-label="Нотатка: ${esc(c.name)}">${icon('list', 20)}</button>${c.phone ? `<a class="icon-btn" href="${telHref(c.phone)}" aria-label="Подзвонити: ${esc(c.name)}">${icon('phone', 20)}</a>` : ''}

@@ -1,8 +1,10 @@
 import { test, expect } from '@playwright/test';
+import { payStep } from './pay-step.js';
 import AxeBuilder from '@axe-core/playwright';
 
 // CarCar Business — окремий застосунок мийки. Той самий фіксований час: неділя, 4 жовтня 2026, 10:00.
 test.beforeEach(async ({ page }) => {
+  await payStep(page);
   await page.addInitScript(() => {
     if (!location.protocol.startsWith('http')) return;
     localStorage.getItem('carcar.auth') ?? localStorage.setItem('carcar.auth', '{"phone":"","at":1}');
@@ -678,6 +680,7 @@ test('клієнт скасував запис, поки мийка відпов
   await expect(page.getByRole('dialog', { name: 'Новий запис' })).toBeVisible();
   // Застосунок клієнта в іншій вкладці.
   const client = await context.newPage();
+  await payStep(client);
   await client.clock.setFixedTime(new Date(2026, 9, 4, 10, 1));
   await client.goto('/#/bookings');
   client.once('dialog', (d) => d.accept());
@@ -954,4 +957,33 @@ test('налаштування мийки: сповіщення, тиша поз
   // Тема мийки окрема від теми клієнта.
   await page.goto('/#/garage');
   await expect(page.locator('html')).not.toHaveAttribute('data-theme', /.+/);
+});
+
+test('фото профілю клієнта: ставить у гаражі — мийка бачить його в повідомленнях і чаті', async ({ page, context }) => {
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAAABJRU5ErkJggg==', 'base64');
+  await page.goto('/#/garage');
+  await page.locator('#avatar-file').setInputFiles({ name: 'me.png', mimeType: 'image/png', buffer: png });
+  await expect(page.locator('#toast')).toHaveText('Фото профілю збережено');
+  await expect(page.locator('.ava-pick .avatar img')).toHaveAttribute('src', /^data:image\/jpeg/);
+  await page.getByLabel('Імʼя').fill('Ірина');
+  await page.getByRole('button', { name: 'Зберегти профіль' }).click();
+  // Пише мийці — у мийки аватарка клієнта з фото.
+  await page.goto('/#/ask/blysk');
+  await page.getByLabel('Ваш телефон').fill('+380 67 111 11 11');
+  await page.getByLabel('Повідомлення мийці').fill('Чи робите хімчистку?');
+  await page.getByRole('button', { name: 'Надіслати' }).click();
+  const pro = await context.newPage();
+  await pro.clock.setFixedTime(new Date(2026, 9, 4, 10, 0));
+  await pro.goto(`${PRO}#/`);
+  const convo = pro.locator('.convo', { hasText: 'Ірина' });
+  await expect(convo.locator('.avatar img')).toHaveAttribute('src', /^data:image\/jpeg/);
+  await convo.click();
+  await expect(pro.locator('.chat-head .avatar img')).toBeVisible();
+  // Прибрала фото — знову перша літера.
+  await page.goto('/#/garage');
+  await page.getByRole('button', { name: 'Прибрати' }).click();
+  await expect(page.locator('.ava-pick .avatar img')).toHaveCount(0);
+  await pro.goto(`${PRO}#/`);
+  await expect(pro.locator('.convo', { hasText: 'Ірина' }).locator('.avatar img')).toHaveCount(0);
+  await pro.close();
 });

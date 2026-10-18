@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { payStep } from './pay-step.js';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, writeFileSync } from 'node:fs';
@@ -38,6 +39,7 @@ test('оплата карткою: запис чекає оплати → бан
     localStorage.getItem('carcar.auth.token') ?? localStorage.setItem('carcar.auth.token', JSON.stringify(tok));
   }, t.token);
   const page = await ctx.newPage();
+  await payStep(page);
   await page.clock.setFixedTime(new Date(2026, 9, 4, 10, 0));
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));

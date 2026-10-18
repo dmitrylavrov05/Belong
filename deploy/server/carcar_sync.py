@@ -626,6 +626,20 @@ def make_handler(app):
                     'payments': 'liqpay' if app['liqpay'].on else 'demo', 'sandbox': app['liqpay'].sandbox,
                     'vapid': app['webpush'].public if app['webpush'].ok else None, 'turn': bool(cfg.get('turn')),
                     'googlePlaces': bool(cfg.get('google_places_key'))})
+            if p.startswith('/api/avatar/'):
+                # Фото профілю клієнта за випадковим номером: віддаємо картинкою з довгим кешем (номер версії — у ?v=).
+                got = acl.avatar_image(store.get('avatars'), unquote(p[len('/api/avatar/'):]))
+                if not got:
+                    return self.send_json(404, {'error': 'not found'})
+                ctype, data = got
+                self.send_response(200)
+                self.send_header('Content-Type', ctype)
+                self.send_header('Cache-Control', 'public, max-age=31536000, immutable')
+                self.send_header('X-Content-Type-Options', 'nosniff')
+                self.send_header('Content-Length', str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+                return
             if p == '/api/me':
                 w = self.who()
                 return self.send_json(200, {'role': w.role, 'cid': w.cid, 'login': w.login, 'demo': w.demo, 'places': sorted(w.places)})

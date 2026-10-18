@@ -10,6 +10,7 @@
 (наприклад, зайнятість боксів), віддаємо урізаним — без імен, телефонів, адрес і грошей.
 """
 import copy
+import re
 import json
 
 # ---------- допоміжне ----------
@@ -553,6 +554,51 @@ def sanitize_wallet(who, cur, new, get):
             'history': (ok + old_hist)[:500]}
 
 
+# ---------- фото профілю клієнтів ----------
+# { номер: { by: клієнт, img: data:image/…, at } }. Номер випадковий (не з телефону). Саме фото й «by» бачить лише власник,
+# решта — позначку { at }, а картинку бере за посиланням /api/avatar/<номер> (з кешем браузера), щоб не возити фото всім.
+AVATAR_MAX = 200_000
+
+
+def read_avatars(who, value, get):
+    if who.admin:
+        return value
+    out = {}
+    for k, v in (value or {}).items():
+        if not isinstance(v, dict):
+            continue
+        if who.is_client(v.get('by')):
+            out[k] = v
+        elif v.get('img'):
+            out[k] = {'at': v.get('at') or 0}
+    return out
+
+
+def write_avatar(who, key, cur, item):
+    if who.admin:
+        return True
+    if who.role != 'client' or not isinstance(item, dict) or not isinstance(key, str) or not (8 <= len(key) <= 40):
+        return False
+    if cur is not None and not who.is_client(cur.get('by')):
+        return False  # чуже фото не змінити
+    img = item.get('img')
+    return who.is_client(item.get('by')) and (img == '' or (isinstance(img, str) and img.startswith('data:image/') and len(img) <= AVATAR_MAX))
+
+
+def avatar_image(value, key):
+    """(тип, байти) фото за номером — для /api/avatar/<номер>."""
+    import base64
+    v = (value or {}).get(key)
+    img = v.get('img') if isinstance(v, dict) else None
+    m = re.match(r'^data:(image/(?:jpeg|png|webp|gif));base64,(.+)$', img or '', re.S)
+    if not m:
+        return None
+    try:
+        return m.group(1), base64.b64decode(m.group(2), validate=True)
+    except (ValueError, TypeError):
+        return None
+
+
 def read_calls(who, value, get):
     out = {}
     for cid, c in (value or {}).items():
@@ -657,6 +703,7 @@ POLICIES = {
     'biz.shifts':      ('list', read_own_list, write_own_list),
     'presence':        ('dict', read_all, write_place_key),
     'calls':           ('dict', read_calls, write_call),
+    'avatars':         ('dict', read_avatars, write_avatar),
     'admin.settings':  ('raw', read_all, write_admin),
     'admin.server':    ('raw', read_all, write_admin),
     'admin.pauseLift': ('raw', read_all, write_admin),
@@ -717,6 +764,8 @@ def allowed_change(who, key, base, cur, new, get):
         cur = cur or {}
         if key == 'calls':
             okk = lambda k, v: write_call(who, k, cur.get(k), get, v if isinstance(v, dict) else None)
+        elif key == 'avatars':
+            okk = lambda k, v: write_avatar(who, k, cur.get(k), v)
         else:
             okk = lambda k, v: can(who, k, cur.get(k), get)
         return ({k: v for k, v in (base or {}).items() if okk(k, v)}, {k: v for k, v in new.items() if okk(k, v)}, True)
@@ -735,7 +784,7 @@ CLIENT_LOCKED = ('placeId', 'paid', 'total', 'listTotal', 'bonus', 'fromBalance'
 CLIENT_MOVES = {('pending', 'cancelled'), ('offer', 'cancelled'), ('paid', 'cancelled'), ('unpaid', 'cancelled'),
                 ('offer', 'paid'), ('offer', 'pending'), ('done', 'completed'), ('paid', 'dispute'), ('done', 'dispute'), ('completed', 'dispute')}
 # Мийка не змінює грошей записів CARCAR (лише свої записи з журналу).
-PLACE_LOCKED = ('paid', 'total', 'listTotal', 'bonus', 'fromBalance', 'promo', 'covered', 'passUse', 'loyalty', 'payment', 'installments',
+PLACE_LOCKED = ('clientAvatar', 'paid', 'total', 'listTotal', 'bonus', 'fromBalance', 'promo', 'covered', 'passUse', 'loyalty', 'payment', 'installments',
                 'clientId', 'fromReq', 'placeId', 'refundDone', 'resolution')
 
 

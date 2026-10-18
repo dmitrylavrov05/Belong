@@ -1,8 +1,10 @@
 import { test, expect } from '@playwright/test';
+import { payStep } from './pay-step.js';
 
 // CRM мийки в CarCar Business: каса й зміна, зарплата мийників, витратні матеріали, абонементи й картка
 // лояльності, нотатки про клієнтів. Час той самий: неділя, 4 жовтня 2026, 10:00.
 test.beforeEach(async ({ page }) => {
+  await payStep(page);
   await page.addInitScript(() => {
     if (!location.protocol.startsWith('http')) return;
     sessionStorage.setItem('carcar.splash', '1');

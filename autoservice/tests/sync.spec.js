@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { payStep } from './pay-step.js';
 import { spawn } from 'node:child_process';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -30,6 +31,7 @@ async function device(browser, init, arg) {
   const ctx = await browser.newContext({ baseURL: base, locale: 'uk-UA', reducedMotion: 'reduce' });
   await ctx.addInitScript(init, arg);
   const page = await ctx.newPage();
+  await payStep(page);
   await page.clock.setFixedTime(new Date(2026, 9, 4, 10, 0));
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -154,4 +156,26 @@ test('адмінка на сервері відкривається лише з�
   await page.getByRole('button', { name: 'Увійти' }).click();
   await expect(page.getByRole('alert')).toContainText('Невірний пароль');
   expect(page.errors).toEqual([]);
+});
+
+test('фото профілю клієнта доходить до мийки через сервер — посиланням, а не в даних', async ({ browser }) => {
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAAABJRU5ErkJggg==', 'base64');
+  const ira = await client(browser, '+380 67 555 55 55', 'Марта');
+  await ira.goto('/#/garage');
+  await ira.locator('#avatar-file').setInputFiles({ name: 'me.png', mimeType: 'image/png', buffer: png });
+  await expect(ira.locator('#toast')).toHaveText('Фото профілю збережено');
+  await ira.goto('/#/ask/blysk');
+  await ira.getByLabel('Повідомлення мийці').fill('Добрий день');
+  await ira.getByRole('button', { name: 'Надіслати' }).click();
+
+  const pro = await wash(browser);
+  await pro.goto('/pro.html#/');
+  const img = pro.locator('.convo', { hasText: 'Марта' }).locator('.avatar img');
+  await expect(img).toHaveAttribute('src', /^api\/avatar\/a\w+\?v=\d+$/, { timeout: 15000 });
+  await expect.poll(() => img.evaluate((el) => el.complete && el.naturalWidth)).toBe(256);
+  // Самого фото й номера власника мийка в даних не має.
+  const av = await pro.evaluate(() => localStorage.getItem('carcar.avatars'));
+  expect(av).not.toContain('data:image');
+  expect(av).not.toContain('380675555555');
+  for (const p of [ira, pro]) expect(p.errors).toEqual([]);
 });

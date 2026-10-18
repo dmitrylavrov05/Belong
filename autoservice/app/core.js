@@ -225,6 +225,8 @@ export const ICONS = {
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/>',
   chevR: '<path d="m9 5 7 7-7 7"/>',
   chevL: '<path d="m15 5-7 7 7 7"/>',
+  chevD: '<path d="m5 9 7 7 7-7"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4 4.5-6 8-6s6.5 2 8 6"/>',
   search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/>',
   drop: '<path d="M12 3.5s6 6.4 6 10.5a6 6 0 0 1-12 0c0-4.1 6-10.5 6-10.5z"/>',
   wheel: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5"/>',
@@ -425,6 +427,32 @@ export async function shrinkPhoto(file) {
     canvas.height = Math.round(img.height * k);
     canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
     return canvas.toDataURL('image/jpeg', 0.7);
+  } catch {
+    return null;
+  }
+}
+
+// ---------- фото профілю клієнта ----------
+
+// Фото лежать у спільному 'avatars' під випадковим номером, не повʼязаним із телефоном: { номер: { by, img, at } }.
+// У записах, запитах і відгуках — лише цей номер (clientAvatar): фото видно мийці в чатах і записах, а у відгуках — усім,
+// і номер телефону з нього не дізнатися. Із сервером саме фото й «by» отримує лише власник, решта — позначку { at },
+// а картинку браузер бере за посиланням api/avatar/<номер> (з кешем), щоб синхронізація не возила фото всім.
+export const avatarSrc = (id) => {
+  const v = id && store.peek('avatars', {})[id];
+  if (typeof v?.img === 'string' && v.img.startsWith('data:image/')) return v.img;
+  return v?.at && v.img !== '' && hasServer() ? `api/avatar/${encodeURIComponent(id)}?v=${v.at}` : '';
+};
+export const myAvatarId = (owner) => Object.entries(store.peek('avatars', {})).find(([, v]) => v?.by === owner)?.[0] ?? null;
+// Квадрат 256×256 з центру фото — щоб аватарки були легкими.
+export async function shrinkAvatar(file) {
+  try {
+    const img = await createImageBitmap(file);
+    const side = Math.min(img.width, img.height);
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 256;
+    canvas.getContext('2d').drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 256, 256);
+    return canvas.toDataURL('image/jpeg', 0.8);
   } catch {
     return null;
   }

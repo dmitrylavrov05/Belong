@@ -1287,6 +1287,14 @@ button.convo.call-row { width: 100%; border: 0; background: none; font: inherit;
 @media (prefers-reduced-motion: reduce) {
   .k-body, .k-lids rect, .karych.talking .k-beak-low, .karych.wave .k-wing, .karych.cheer .k-body, .k-bubbles circle, .k-bubble { animation: none !important; }
 }
+
+/* Фото профілю клієнта */
+.ava-pick { display: flex; align-items: center; gap: 14px; }
+.avatar.big { width: 72px; height: 72px; font-size: 26px; }
+.avatar.big:not(.has-img) { background: var(--soft, #eef2f6); color: var(--muted); box-shadow: none; }
+.ava-pick label.btn { cursor: pointer; }
+.ava-pick label.btn:focus-within { outline: 3px solid var(--accent); outline-offset: 2px; }
+.review .head .rv-ava { width: 28px; height: 28px; }
 </style>
   <style>
 /* CarCar Business — застосунок мийки для телефона. Базові кнопки, поля, чат і шторки — зі styles.css. */
@@ -1873,9 +1881,6 @@ const PAYMENT = {
   offerMinutes: 30,
   noShowShare: 1, // частка точці, якщо клієнт не приїхав або скасував пізно
   lateMinutes: 15, // запізнення довше — як неявка: мийка може зарахувати собі оплату
-  // Оплата частинами для дорогих послуг: клієнт платить рівними частинами без переплати,
-  // точка отримує всю суму одразу від банку-партнера (комісію банку в прототипі не враховано).
-  installments: { minTotal: 3000, parts: [3, 4, 6] },
 };
 
 // Обмеження для клієнта одне: сам він переносить запис один раз, далі — через чат з мийкою (MOVE_LIMIT в app.js).
@@ -2127,6 +2132,8 @@ const ICONS = {
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/>',
   chevR: '<path d="m9 5 7 7-7 7"/>',
   chevL: '<path d="m15 5-7 7 7 7"/>',
+  chevD: '<path d="m5 9 7 7 7-7"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4 4.5-6 8-6s6.5 2 8 6"/>',
   search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/>',
   drop: '<path d="M12 3.5s6 6.4 6 10.5a6 6 0 0 1-12 0c0-4.1 6-10.5 6-10.5z"/>',
   wheel: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5"/>',
@@ -2327,6 +2334,32 @@ async function shrinkPhoto(file) {
     canvas.height = Math.round(img.height * k);
     canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
     return canvas.toDataURL('image/jpeg', 0.7);
+  } catch {
+    return null;
+  }
+}
+
+// ---------- фото профілю клієнта ----------
+
+// Фото лежать у спільному 'avatars' під випадковим номером, не повʼязаним із телефоном: { номер: { by, img, at } }.
+// У записах, запитах і відгуках — лише цей номер (clientAvatar): фото видно мийці в чатах і записах, а у відгуках — усім,
+// і номер телефону з нього не дізнатися. Із сервером саме фото й «by» отримує лише власник, решта — позначку { at },
+// а картинку браузер бере за посиланням api/avatar/<номер> (з кешем), щоб синхронізація не возила фото всім.
+const avatarSrc = (id) => {
+  const v = id && store.peek('avatars', {})[id];
+  if (typeof v?.img === 'string' && v.img.startsWith('data:image/')) return v.img;
+  return v?.at && v.img !== '' && hasServer() ? `api/avatar/${encodeURIComponent(id)}?v=${v.at}` : '';
+};
+const myAvatarId = (owner) => Object.entries(store.peek('avatars', {})).find(([, v]) => v?.by === owner)?.[0] ?? null;
+// Квадрат 256×256 з центру фото — щоб аватарки були легкими.
+async function shrinkAvatar(file) {
+  try {
+    const img = await createImageBitmap(file);
+    const side = Math.min(img.width, img.height);
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 256;
+    canvas.getContext('2d').drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 256, 256);
+    return canvas.toDataURL('image/jpeg', 0.8);
   } catch {
     return null;
   }
@@ -4019,6 +4052,11 @@ const who = (b) => (isCarcar(b) ? hidePhones(b.clientName || '') : b.clientName)
 const telHref = (phone) => `tel:${String(phone).replace(/[^+\d]/g, '')}`;
 const clock = (at) => new Date(at).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
 const whenShort = (at) => (isoDate(new Date(at)) === todayIso() ? clock(at) : new Date(at).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' }));
+// Аватарка клієнта: його фото профілю (якщо додав) або перша літера імені.
+const clientAva = (id, name, cls = '') => {
+  const src = avatarSrc(id);
+  return `<span class="avatar${cls}${src ? ' has-img' : ''}" aria-hidden="true">${src ? `<img src="${esc(src)}" alt="">` : firstLetter(name)}</span>`;
+};
 const safePhoto = (p) => (typeof p === 'string' && p.startsWith('data:image/') ? esc(p) : '');
 const firstLetter = (name) => esc([...String(name).trim()][0]?.toUpperCase() ?? 'К');
 
@@ -4336,7 +4374,7 @@ function threads() {
     const last = b.chat.at(-1);
     const [label, cls] = stateOf(b);
     return {
-      id: `b-${b.id}`, kind: 'booking', name: who(b), at: last.at, unread: !!b.chatUnreadBiz, label, cls,
+      id: `b-${b.id}`, kind: 'booking', name: who(b), ava: b.clientAvatar, at: last.at, unread: !!b.chatUnreadBiz, label, cls,
       text: last.call ? callLine(last, 'place') : `${last.from === 'biz' ? 'Ви: ' : ''}${msgPreview(last)}`,
       sub: `${b.no ? `${bookingNo(b)} · ` : ''}${dayWord(b.date)}, ${b.time} · ${b.services[0]}${b.services.length > 1 ? ` +${b.services.length - 1}` : ''}`,
       live: ACTIVE.includes(b.state), hasCall: b.chat.some((m) => m.call),
@@ -4346,7 +4384,7 @@ function threads() {
     const last = r.messages.at(-1);
     const [label, cls] = REQ_STATE[reqState(r)];
     return {
-      id: `r-${r.id}`, kind: 'request', name: r.clientName || 'Клієнт', at: last.at, unread: !!r.unreadBiz, label, cls,
+      id: `r-${r.id}`, kind: 'request', name: r.clientName || 'Клієнт', ava: r.clientAvatar, at: last.at, unread: !!r.unreadBiz, label, cls,
       text: last.call ? callLine(last, 'place') : `${last.from === 'biz' ? 'Ви: ' : ''}${msgPreview(last)}`, sub: `${lastWord(r) ? 'Питання про послугу' : 'Дзвінок через CARCAR'}${r.car ? ` · ${r.car}` : ''}`,
       live: !r.closed && !r.service, hasCall: r.messages.some((m) => m.call),
     };
@@ -4380,7 +4418,7 @@ function viewMessages() {
     ${reminders()}
     <div class="chips" role="group" aria-label="Які повідомлення показати">${MSG_FILTERS.map(([f, label]) => `<button class="chip" type="button" data-action="msg-filter" data-f="${f}" aria-pressed="${ui.filter === f}">${label}${count(f) ? ` · ${count(f)}` : ''}</button>`).join('')}</div>
     ${list.length ? `<ul class="convos pro-convos">${list.map((t) => (t.kind === 'call' ? callRow(t) : `<li><a class="convo${t.unread ? ' unread' : ''}${t.live ? '' : ' over'}" href="#/chat/${t.id}">
-      <span class="avatar${t.kind === 'request' ? ' req' : ''}" aria-hidden="true">${firstLetter(t.name)}</span>
+      ${clientAva(t.ava, t.name, t.kind === 'request' ? ' req' : '')}
       <span class="convo-body"><span class="convo-top"><b>${esc(t.name)}</b><time>${whenShort(t.at)}</time></span>
         <span class="convo-text">${esc(t.text.length > 80 ? `${t.text.slice(0, 80).trimEnd()}…` : t.text)}</span>
         <span class="convo-meta"><span class="pill ${t.cls}">${t.label}</span><small>${esc(t.sub)}</small></span></span>
@@ -4418,10 +4456,10 @@ const compose = (thread, quick) => `<div class="chat-compose">
   </div>`;
 
 // Клієнти CARCAR — дзвінок лише через застосунок, номер прихований.
-function chatHead(name, sub, call) {
+function chatHead(name, sub, call, ava = null) {
   return `<header class="chat-head">
       <a class="icon-btn" href="#/" aria-label="До повідомлень">${icon('chevL', 24)}</a>
-      <span class="avatar" aria-hidden="true">${firstLetter(name)}</span>
+      ${clientAva(ava, name)}
       <div class="chat-who"><h1>${esc(name)}</h1><small>${sub}</small></div>
       <button class="icon-btn" type="button" data-action="call" ${call} aria-label="Подзвонити клієнту через CARCAR">${icon('phone', 20)}</button>
     </header>`;
@@ -4439,7 +4477,7 @@ function viewThread(arg = '') {
     const [label] = stateOf(b);
     const open = ACTIVE.includes(b.state);
     return `<section class="chat-screen" aria-label="Чат з ${esc(who(b))}">
-      ${chatHead(who(b), `${label} · ${dayWord(b.date)}, ${b.time}`, `data-id="${b.id}"`)}
+      ${chatHead(who(b), `${label} · ${dayWord(b.date)}, ${b.time}`, `data-id="${b.id}"`, b.clientAvatar)}
       <button class="chat-pin" type="button" data-action="bk-open" data-id="${b.id}">${icon('calendar', 16)}<span>${b.no ? `${bookingNo(b)} · ` : ''}${esc(b.services.join(', '))} · ${uah(sumOf(b))}${b.car ? ` · ${esc(b.car)}` : ''}</span>${icon('chevR', 16)}</button>
       ${b.state === 'pending' ? `<div class="chat-actions"><button class="btn navy" type="button" data-action="accept" data-id="${b.id}">${icon('check', 18)}Прийняти запис</button><button class="btn" type="button" data-action="decline" data-id="${b.id}">Відмовити</button></div>` : ''}
       ${b.state === 'paid' && started(b) ? `<div class="chat-actions"><button class="btn navy" type="button" data-action="ready" data-id="${b.id}">${icon('check', 18)}Машина готова</button></div>` : ''}
@@ -4455,7 +4493,7 @@ function viewThread(arg = '') {
   const [label] = REQ_STATE[reqState(r)];
   const open = !r.closed;
   return `<section class="chat-screen" aria-label="Чат з ${esc(r.clientName || 'клієнтом')}">
-    ${chatHead(r.clientName || 'Клієнт', `${label}${r.car ? ` · ${esc(r.car)}` : ''}`, `data-req="${r.id}"`)}
+    ${chatHead(r.clientName || 'Клієнт', `${label}${r.car ? ` · ${esc(r.car)}` : ''}`, `data-req="${r.id}"`, r.clientAvatar)}
     ${open ? `<div class="chat-actions">
       <button class="btn navy" type="button" data-action="nb-open" data-req="${r.id}">${icon('calendar', 16)}Запропонувати запис</button>
       ${r.service ? '' : `<button class="btn" type="button" data-action="svc-new" data-req="${r.id}">${icon('plus', 16)}Додати послугу</button>`}
@@ -4658,6 +4696,7 @@ function bookingSheet(id) {
     actions = `<p class="notice">${isFrozen(b) ? `Гроші стануть доступні ${fmtTime(b.unfreezeAt)}.` : 'Гроші доступні до виведення в розділі «Мийка».'}</p>`;
   }
   openSheet(`${b.time} · ${esc(who(b))}`, `
+    ${avatarSrc(b.clientAvatar) ? `<div class="row sheet-client">${clientAva(b.clientAvatar, who(b))}<b>${esc(who(b))}</b></div>` : ''}
     <div class="row"><span class="pill ${cls}">${label}</span><span class="pill">${CHANNEL[channelOf(b)]}</span>${b.lead ? '<span class="pill lead">Клієнт CARCAR · з комісією</span>' : ''}${b.no ? `<span class="small muted">${bookingNo(b)}</span>` : ''}</div>
     <dl class="pro-kv">
       <dt>Коли</dt><dd>${dayWord(b.date, true)}, ${b.time}–${hhmm(toMin(b.time) + b.minutes)}</dd>
@@ -5299,6 +5338,7 @@ function clientsList() {
     if (!isCarcar(b) && b.clientPhone) c.phone = b.clientPhone;
     if (b.car) c.cars.add(b.car);
     if (b.state === 'completed') { c.visits += 1; c.spent += sumOf(b); }
+    if (b.clientAvatar) c.ava = b.clientAvatar;
     if (b.date > c.last) { c.last = b.date; c.name = b.clientName || c.name; c.car = b.car || c.car; c.cls = b.cls ?? c.cls; }
     map.set(key, c);
   }
@@ -5316,7 +5356,7 @@ function viewClients() {
     ${byNo ? `<button class="pro-link block-btn" type="button" data-action="bk-open" data-id="${byNo.id}">${icon('calendar', 22)}<span><b>Запис ${bookingNo(byNo)}</b><small>${esc(who(byNo))} · ${dayWord(byNo.date)}, ${byNo.time} · ${esc(byNo.services.join(', '))}</small></span>${icon('chevR', 18)}</button>` : ''}
     <p class="small muted">${all.length} ${plural(all.length, 'клієнт', 'клієнти', 'клієнтів')}</p>
     ${list.length ? `<ul class="client-list">${list.slice(0, 100).map((c) => `<li>
-      <span class="avatar" aria-hidden="true">${firstLetter(c.name)}</span>
+      ${clientAva(c.ava, c.name)}
       <span class="cl-main"><b>${esc(c.name)}</b><small>${esc([...c.cars].join(', ') || '—')}</small>
         <small>${c.visits} ${plural(c.visits, 'візит', 'візити', 'візитів')}${c.spent ? ` · ${uah(c.spent)}` : ''} · востаннє ${dayLabel(c.last, { day: 'numeric', month: 'short' })}</small>${noteLine(c.key)}</span>
       <span class="row"><button class="icon-btn" type="button" data-action="note-open" data-key="${esc(c.key)}" data-name="${esc(c.name)}" aria-label="Нотатка: ${esc(c.name)}">${icon('list', 20)}</button>${c.phone ? `<a class="icon-btn" href="${telHref(c.phone)}" aria-label="Подзвонити: ${esc(c.name)}">${icon('phone', 20)}</a>` : ''}

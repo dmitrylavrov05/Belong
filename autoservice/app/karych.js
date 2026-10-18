@@ -125,16 +125,23 @@ function onClick(e) {
 }
 
 // Підняти ворона над нижніми панелями (меню, кнопка «Записатися», оплата), щоб не закривав кнопки.
-// Панелі закріплені (position: fixed), тож рахуємо за їхнім фактичним положенням на екрані.
+// Беремо висоту панелей (offsetHeight не залежить від анімації появи), тож ворон одразу стає на місце й не стрибає.
+const shown = (el) => el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+let watched = null;
+const resize = 'ResizeObserver' in window ? new ResizeObserver(() => place()) : null;
 function place() {
   const el = document.getElementById('karych');
   if (!el) return;
-  let top = window.innerHeight;
-  for (const bar of document.querySelectorAll('.tabs, .dock')) {
-    const r = bar.getBoundingClientRect();
-    if (r.height > 0 && r.bottom > window.innerHeight / 2) top = Math.min(top, r.top);
+  const tabs = document.querySelector('.tabs');
+  const dock = [...document.querySelectorAll('.dock')].find(shown);
+  const h = (shown(tabs) ? tabs.offsetHeight : 0) + (dock ? dock.offsetHeight : 0);
+  el.style.setProperty('--k-bottom', `${h + 12}px`);
+  // Висота панелі змінюється (знижка, промокод) — переставляємо ворона.
+  if (resize && dock !== watched) {
+    resize.disconnect();
+    if (dock) resize.observe(dock);
+    watched = dock ?? null;
   }
-  el.style.setProperty('--k-bottom', `${Math.max(0, window.innerHeight - top) + 12}px`);
 }
 
 function render() {
@@ -149,7 +156,7 @@ export function karychRoute(screen, tip, { away = false } = {}) {
   state.tipFor = () => tip;
   state.away = away;
   render();
-  requestAnimationFrame(place);
+  place();
   // Той самий екран перемалювався (обрали послугу, слот) — не закриваємо підказку й не показуємо знову.
   if (screen === state.screen) return;
   state.screen = screen;

@@ -467,6 +467,36 @@ class Server(unittest.TestCase):
         self.assertEqual(pl._week_from_osm('24/7'), [[0, 1440]] * 7)
         self.assertEqual(pl._week_from_google({'periods': [{'open': {'day': 0, 'hour': 0, 'minute': 0}}]}), [[0, 1440]] * 7)
 
+    def test_19_client_avatar(self):
+        import base64
+        ira, ira_id = self.login_client('067 333 33 33')
+        oleh, oleh_id = self.login_client('050 444 44 44')
+        png = base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAAABJRU5ErkJggg==')
+        img = 'data:image/png;base64,' + base64.b64encode(png).decode()
+        code, _ = self.put('avatars', {'aIraPhoto01': {'by': ira_id, 'img': img, 'at': 5}}, ira)
+        self.assertEqual(code, 200)
+        # Власник бачить своє фото повністю, інші — лише позначку, без номера власника.
+        self.assertEqual(self.state(ira)['avatars']['aIraPhoto01']['img'], img)
+        self.assertEqual(self.state(oleh)['avatars']['aIraPhoto01'], {'at': 5})
+        # Картинка — за посиланням, без входу (як <img>), з довгим кешем.
+        with urllib.request.urlopen(self.base + '/api/avatar/aIraPhoto01?v=5') as r:
+            self.assertEqual(r.headers['Content-Type'], 'image/png')
+            self.assertIn('max-age', r.headers['Cache-Control'])
+            self.assertEqual(r.read(), png)
+        # Чуже фото не замінити й не підписати своїм; не картинку не прийняти.
+        self.put('avatars', {'aIraPhoto01': {'by': oleh_id, 'img': img.replace('iVBOR', 'AAAA'), 'at': 6}}, oleh)
+        self.put('avatars', {'aOlehPhoto1': {'by': ira_id, 'img': img, 'at': 6}}, oleh)
+        self.put('avatars', {'aOlehPhoto2': {'by': oleh_id, 'img': 'javascript:alert(1)', 'at': 6}}, oleh)
+        av = self.state(ira)['avatars']
+        self.assertEqual(av['aIraPhoto01']['img'], img)
+        self.assertNotIn('aOlehPhoto1', av)
+        self.assertNotIn('aOlehPhoto2', av)
+        # Прибрала фото — посилання більше не віддає картинку.
+        self.put('avatars', {'aIraPhoto01': {'by': ira_id, 'img': '', 'at': 7}}, ira)
+        self.assertNotIn('aIraPhoto01', self.state(oleh)['avatars'])
+        with self.assertRaises(urllib.error.HTTPError):
+            urllib.request.urlopen(self.base + '/api/avatar/aIraPhoto01?v=7')
+
     def test_99_login_rate_limit(self):
         codes = [self.call('POST', '/api/auth/admin', {'password': 'x'})[0] for _ in range(12)]
         self.assertIn(429, codes)

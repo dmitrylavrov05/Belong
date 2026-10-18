@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { payStep } from './pay-step.js';
 import AxeBuilder from '@axe-core/playwright';
 import { PRO, washReady, proBooking, proWash } from './helpers.js';
 
@@ -6,6 +7,7 @@ import { PRO, washReady, proBooking, proWash } from './helpers.js';
 const TILE = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 
 test.beforeEach(async ({ page }, testInfo) => {
+  await payStep(page);
   // Вхід за телефоном пройдено — крім тестів самого входу (#/login).
   await page.addInitScript(() => { if (!location.hash.startsWith('#/login')) { localStorage.getItem('carcar.auth') ?? localStorage.setItem('carcar.auth', '{"phone":"","at":1}'); localStorage.getItem('carcar.biz.session') ?? localStorage.setItem('carcar.biz.session', '{"demo":true}'); } });
   // Усі точки — мийки, тож акція «Перша мийка −30%» діяла б у кожному тесті. Вимикаємо її,
@@ -332,35 +334,18 @@ test('виїзд до вас: мийка біля дому з адресою н�
   await expect(page.locator('.slot[data-time="10:30"]')).toBeEnabled();
 });
 
-test('оплата частинами для дорогого детейлінгу: перший платіж, точка отримує всю суму', async ({ page }) => {
+test('дорогий детейлінг оплачується одразу — оплати частинами немає', async ({ page }) => {
   await page.goto('/#/book/hlyanets');
   await page.getByLabel(/Керамічне покриття/).check();
   await page.locator('[data-action="to-time"]').click();
   await page.getByRole('button', { name: /Завтра/ }).click();
   await page.locator('.slot[data-time="10:00"]').click();
-  await expect(page.locator('.dock')).toContainText(money('Можна оплатити частинами: від 1 500 ₴/міс'));
-  await page.locator('[data-action="confirm"]').click();
-  const parts = page.getByRole('group', { name: 'Оплата частинами' });
-  await parts.getByLabel(/4 платежі/).check();
-  await expect(parts.getByLabel(/4 платежі/)).toBeChecked();
-  await page.getByRole('button', { name: money('Оплатити першу частину 2 250 ₴') }).click();
-  await expect(page.locator('#toast')).toHaveText('Оплачено першу частину, ви записані');
-  const card = page.locator('article').first();
-  await expect(card).toContainText(money('Частинами: 4 платежі, перший 2 250 ₴, далі по 2 250 ₴/міс'));
-  await expect(card.locator('.bk-price')).toHaveText(money('9 000 ₴'));
-
-  const sheet = await proBooking(page);
-  await expect(sheet).toContainText('Частинами · 4 платежі');
-  await expect(sheet).toContainText(money('9 000 ₴ · оплачено в CARCAR'));
-
-  // Дешеві послуги частинами не оплачуються.
-  await page.goto('/#/book/hlyanets');
-  await page.getByLabel(/Полірування фар/).check();
-  await page.locator('[data-action="to-time"]').click();
-  await page.getByRole('button', { name: /Завтра/ }).click();
-  await page.locator('.slot[data-time="16:00"]').click();
+  await expect(page.locator('.dock')).not.toContainText('частинами');
   await page.locator('[data-action="confirm"]').click();
   await expect(page.getByRole('group', { name: 'Оплата частинами' })).toHaveCount(0);
+  await page.getByRole('button', { name: money('Оплатити 9 000 ₴') }).click();
+  await expect(page.locator('#toast')).toHaveText('Оплачено, ви записані');
+  await expect(page.locator('article').first().locator('.bk-price')).toHaveText(money('9 000 ₴'));
 });
 
 test('промокоди: «Перша мийка −30%» сама, свій код з адмінки, CARCAR доплачує точці', async ({ page }) => {
@@ -453,7 +438,7 @@ const PAGES = {
     await page.getByRole('button', { name: 'Приїду з багажником на даху' }).click();
     await proChat(page);
   },
-  'виїзд і оплата частинами': async (page) => {
+  'виїзд до клієнта': async (page) => {
     await page.goto('/#/book/aqua24');
     await page.getByRole('button', { name: 'Виїзд до мене' }).click();
     await page.getByLabel(/Комплекс/).check();
@@ -464,7 +449,7 @@ const PAGES = {
     await page.getByRole('button', { name: /Завтра/ }).click();
     await page.locator('.slot[data-time="10:00"]').click();
   },
-  'оплата частинами': async (page) => {
+  'оплата дорогої послуги': async (page) => {
     await page.goto('/#/book/hlyanets');
     await page.getByLabel(/Керамічне покриття/).check();
     await page.locator('[data-action="to-time"]').click();

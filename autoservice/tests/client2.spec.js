@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { payStep } from './pay-step.js';
 import AxeBuilder from '@axe-core/playwright';
 import { PRO, proBooking, proWash, washReady } from './helpers.js';
 
@@ -6,6 +7,7 @@ import { PRO, proBooking, proWash, washReady } from './helpers.js';
 const TILE = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 
 test.beforeEach(async ({ page }, testInfo) => {
+  await payStep(page);
   // Вхід за телефоном пройдено — крім тестів самого входу (#/login).
   await page.addInitScript(() => { if (!location.hash.startsWith('#/login')) { localStorage.getItem('carcar.auth') ?? localStorage.setItem('carcar.auth', '{"phone":"","at":1}'); localStorage.getItem('carcar.biz.session') ?? localStorage.setItem('carcar.biz.session', '{"demo":true}'); } });
   // Усі точки — мийки, тож акція «Перша мийка −30%» діяла б у кожному тесті. Вимикаємо її,
@@ -412,4 +414,26 @@ test('Кар Карич не заважає записатися: над кно�
   await expect(page.locator('#toast')).toHaveText('Оплачено, ви записані');
   // Після запису ворон повертається й радіє.
   await expect(page.getByRole('dialog', { name: 'Кар Карич підказує' })).toContainText('Ви записані');
+});
+
+test('оплата: спершу чек згори, «Усе вірно — до оплати» гортає до оплати; оплати частинами немає', async ({ page }) => {
+  await page.removeLocatorHandler(page.payNext);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/#/book/hlyanets');
+  await page.getByLabel(/Керамічне покриття/).check();
+  await page.locator('[data-action="to-time"]').click();
+  await page.getByRole('button', { name: /Завтра/ }).click();
+  await page.locator('.slot[data-time="10:00"]').click();
+  await page.locator('[data-action="confirm"]').click();
+  // Екран оплати — згори: чек видно, до способу оплати ще не догорнули.
+  await expect(page.locator('.receipt')).toBeInViewport();
+  expect(await page.evaluate(() => scrollY)).toBe(0);
+  await expect(page.getByRole('button', { name: /^Оплатити/ })).toHaveCount(0);
+  await expect(page.getByText('Оплата частинами')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Усе вірно — до оплати' }).click();
+  const pay = page.getByRole('button', { name: /^Оплатити/ });
+  await expect(pay).toBeVisible();
+  await expect(page.locator('.methods')).toBeInViewport();
+  await pay.click();
+  await expect(page.locator('#toast')).toHaveText('Оплачено, ви записані');
 });

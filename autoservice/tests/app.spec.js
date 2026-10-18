@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { payStep } from './pay-step.js';
 import AxeBuilder from '@axe-core/playwright';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, mkdtempSync } from 'node:fs';
@@ -8,6 +9,7 @@ import { PRO, proBooking, washReady, proWash, moderate } from './helpers.js';
 
 // Фіксований час: неділя, 4 жовтня 2026, 10:00 — сезон перевзування.
 test.beforeEach(async ({ page }, testInfo) => {
+  await payStep(page);
   // Вхід за телефоном пройдено — крім тестів самого входу (#/login).
   await page.addInitScript(() => { if (!location.hash.startsWith('#/login')) { localStorage.getItem('carcar.auth') ?? localStorage.setItem('carcar.auth', '{"phone":"","at":1}'); localStorage.getItem('carcar.biz.session') ?? localStorage.setItem('carcar.biz.session', '{"demo":true}'); } });
   // Усі точки — мийки, тож акція «Перша мийка −30%» діяла б у кожному тесті. Вимикаємо її,
