@@ -31,7 +31,7 @@ export const KARYCH_SVG = `<svg class="k-bird" viewBox="0 0 120 120" aria-hidden
   </g>
 </svg>`;
 
-const state = { tipFor: null, faq: [], opts: {}, hideTimer: 0, talkTimer: 0 };
+const state = { away: false, screen: null, tipFor: null, faq: [], opts: {}, hideTimer: 0, talkTimer: 0 };
 const prefs = () => ({ off: false, seen: {}, ...store.get(KEY, {}) });
 const savePrefs = (p) => store.set(KEY, p);
 export const karychOn = () => !prefs().off;
@@ -124,39 +124,49 @@ function onClick(e) {
   }
 }
 
-// Підняти ворона над нижніми панелями (меню, кнопка «Записатися», оплата).
+// Підняти ворона над нижніми панелями (меню, кнопка «Записатися», оплата), щоб не закривав кнопки.
+// Панелі закріплені (position: fixed), тож рахуємо за їхнім фактичним положенням на екрані.
 function place() {
   const el = document.getElementById('karych');
   if (!el) return;
-  let h = document.querySelector('.tabs')?.offsetHeight ?? 64;
-  const dock = document.querySelector('.dock');
-  if (dock && dock.offsetParent !== null) h += dock.offsetHeight;
-  el.style.setProperty('--k-bottom', `${h + 12}px`);
+  let top = window.innerHeight;
+  for (const bar of document.querySelectorAll('.tabs, .dock')) {
+    const r = bar.getBoundingClientRect();
+    if (r.height > 0 && r.bottom > window.innerHeight / 2) top = Math.min(top, r.top);
+  }
+  el.style.setProperty('--k-bottom', `${Math.max(0, window.innerHeight - top) + 12}px`);
 }
 
 function render() {
   const el = root();
-  el.hidden = !karychOn();
+  el.hidden = !karychOn() || state.away;
   if (el.hidden) close();
 }
 
 // Після кожного переходу між екранами: перша підказка на новому екрані зʼявляється сама.
-export function karychRoute(screen, tip) {
+// away — ворон ховається (оформлення запису: там важлива кожна кнопка, нічого не має заважати).
+export function karychRoute(screen, tip, { away = false } = {}) {
   state.tipFor = () => tip;
+  state.away = away;
   render();
-  close();
   requestAnimationFrame(place);
+  // Той самий екран перемалювався (обрали послугу, слот) — не закриваємо підказку й не показуємо знову.
+  if (screen === state.screen) return;
+  state.screen = screen;
+  close();
   if (!karychOn() || !tip || !screen) return;
   const p = prefs();
   if (p.seen[screen]) return;
   p.seen[screen] = true;
   savePrefs(p);
-  setTimeout(() => { if (state.tipFor?.() === tip && karychOn()) open(tipHtml(tip), { auto: true }); }, 700);
+  setTimeout(() => { if (state.screen === screen && karychOn()) open(tipHtml(tip), { auto: true }); }, 700);
 }
 
 // Подія: радіє (запис зроблено) чи щось пояснює.
 export function karychSay(text, moodName = 'cheer') {
   if (!karychOn()) return;
+  state.away = false;
+  render();
   open(`<p class="k-text">${esc(text)}</p>`, { auto: true, moodName });
 }
 

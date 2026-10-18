@@ -383,3 +383,33 @@ test('Кар Карич: підказка на екрані один раз, в�
   await page.getByLabel(/Помічник Кар Карич/).check();
   await expect(k.getByRole('button', { name: 'Кар Карич — помічник' })).toBeVisible();
 });
+
+test('Кар Карич не заважає записатися: над кнопкою картки мийки, на кроках запису схований', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/#/place/blysk');
+  const crow = page.getByRole('button', { name: 'Кар Карич — помічник' });
+  await expect(crow).toBeVisible();
+  // Ворон стоїть над нижньою панеллю «Записатися онлайн», а не на ній.
+  await expect.poll(async () => {
+    const c = await crow.boundingBox();
+    const d = await page.locator('.dock').boundingBox();
+    return c.y + c.height <= d.y;
+  }).toBe(true);
+  await page.getByRole('link', { name: 'Записатися онлайн' }).click();
+  await expect(crow).toBeHidden();
+  await page.getByLabel(/Експрес-мийка кузова/).check();
+  // Кнопку внизу можна натиснути будь-де — навіть з правого краю, де раніше сидів ворон.
+  const next = page.locator('[data-action="to-time"]');
+  const b = await next.boundingBox();
+  await page.mouse.click(b.x + b.width - 12, b.y + b.height / 2);
+  await page.getByRole('button', { name: /Завтра/ }).click();
+  await page.locator('.slot[data-time="10:00"]').click();
+  await expect(crow).toBeHidden();
+  const confirm = page.locator('[data-action="confirm"]');
+  const cb = await confirm.boundingBox();
+  await page.mouse.click(cb.x + cb.width - 12, cb.y + cb.height / 2);
+  await page.getByRole('button', { name: /^Оплатити/ }).click();
+  await expect(page.locator('#toast')).toHaveText('Оплачено, ви записані');
+  // Після запису ворон повертається й радіє.
+  await expect(page.getByRole('dialog', { name: 'Кар Карич підказує' })).toContainText('Ви записані');
+});
