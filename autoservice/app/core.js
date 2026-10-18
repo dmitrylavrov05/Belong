@@ -49,7 +49,7 @@ export const store = {
 // клієнту — свої записи, мийці — записи своїх мийок, адмінці — усе (див. deploy/server/acl.py).
 // Без сервера (файл з диска, тести) — лише цей пристрій. Особисте лишається на пристрої.
 const LOCAL_KEYS = new Set(['auth', 'profile', 'cars', 'carId', 'theme', 'biz.theme', 'notify', 'biz.notify', 'biz.session', 'partner',
-  'seenStates', 'cls', 'city', 'favs', 'view', 'mapLayer', 'campaign', 'referral', 'subscriptions', 'auth.token', 'biz.token', 'admin.token', 'pushSub', 'srv.demoPlaces']);
+  'seenStates', 'cls', 'city', 'favs', 'view', 'mapLayer', 'campaign', 'referral', 'subscriptions', 'auth.token', 'biz.token', 'admin.token', 'pushSub', 'srv.demoPlaces', 'karych']);
 const shared = (key) => !LOCAL_KEYS.has(key);
 // Журнал подій великий і пишеться часто — відправляємо рідше.
 // Абонементи — трохи пізніше за записи: повернення візиту сервер перевіряє за вже скасованим записом.

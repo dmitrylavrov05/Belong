@@ -354,3 +354,32 @@ test('налаштування клієнта: тема темна/світла 
   await expect(page.locator('#toast')).toContainText('Сповіщення вимкнено');
   expect(await page.evaluate(() => localStorage.getItem('carcar.notify'))).toBe('false');
 });
+
+test('Кар Карич: підказка на екрані один раз, відповіді на питання, вимкнення в налаштуваннях', async ({ page }) => {
+  await page.goto('/');
+  const k = page.locator('#karych');
+  const bubble = k.getByRole('dialog', { name: 'Кар Карич підказує' });
+  await expect(bubble).toContainText('Я Кар Карич, ваш помічник');
+  await bubble.getByRole('button', { name: 'Закрити підказку' }).click();
+  await expect(bubble).toBeHidden();
+  // Повторно на тому самому екрані сам не зʼявляється.
+  await page.goto('/#/garage');
+  await expect(bubble).toContainText('Введіть держномер');
+  await page.goto('/');
+  await page.waitForTimeout(1000);
+  await expect(bubble).toBeHidden();
+  // Питання — відповідь із правилами платформи.
+  await k.getByRole('button', { name: 'Кар Карич — помічник' }).click();
+  await bubble.getByRole('button', { name: 'Як скасувати чи перенести?' }).click();
+  await expect(bubble).toContainText('не пізніше ніж за 1,5 год до візиту');
+  await bubble.getByRole('link', { name: 'Мої записи' }).click();
+  await expect(page).toHaveURL(/#\/bookings$/);
+  // Вимкнули в налаштуваннях — ворона немає.
+  await page.goto('/#/garage');
+  await page.getByLabel(/Помічник Кар Карич/).uncheck();
+  await expect(k).toBeHidden();
+  await page.reload();
+  await expect(k).toBeHidden();
+  await page.getByLabel(/Помічник Кар Карич/).check();
+  await expect(k.getByRole('button', { name: 'Кар Карич — помічник' })).toBeVisible();
+});

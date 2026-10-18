@@ -1231,6 +1231,59 @@ button.convo.call-row { width: 100%; border: 0; background: none; font: inherit;
 .stamps i { width: 22px; height: 22px; border-radius: 50%; border: 2px dashed var(--line); display: grid; place-items: center; color: var(--muted); }
 .stamps i.on { border: 2px solid var(--accent); background: var(--accent); color: #fff; }
 .stamps i.prize { border-style: solid; }
+
+/* ---------- Кар Карич — ворон-помічник ---------- */
+.karych { position: fixed; z-index: 30; right: 12px; bottom: calc(var(--k-bottom, 76px) + env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; }
+.karych[hidden], body.in-auth .karych, body.in-chat .karych, body.guest .karych { display: none; }
+.karych > * { pointer-events: auto; }
+.k-btn { width: 66px; height: 66px; padding: 2px; border: 0; border-radius: 50%; background: radial-gradient(circle at 50% 40%, #ffffff, #e8eef8); box-shadow: 0 6px 18px rgb(16 24 40 / 22%), 0 0 0 2px var(--line); cursor: pointer; display: grid; place-items: center; }
+.k-btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.k-bird { width: 60px; height: 60px; overflow: visible; }
+.k-torso, .k-head, .k-tail, .k-wing path { fill: #232838; }
+.k-belly { fill: #3d465c; }
+.k-cap { fill: #c8402b; }
+.k-visor { fill: #9e2f1f; }
+.k-cap-text { fill: #fff; font: 800 9px/1 system-ui, sans-serif; letter-spacing: .5px; }
+.k-eyes ellipse { fill: #fff; }
+.k-pupil { fill: #111; }
+.k-glint { fill: #fff; }
+.k-lids rect { fill: #232838; transform-box: fill-box; transform-origin: center top; transform: scaleY(0); }
+.k-beak-up, .k-beak-low { fill: #f4a43b; }
+.k-beak-low { transform-box: fill-box; transform-origin: left center; }
+.k-cheek { fill: #ff8a80; opacity: .55; }
+.k-legs { fill: none; stroke: #f4a43b; stroke-width: 3; stroke-linecap: round; }
+.k-shadow { fill: rgb(0 0 0 / 12%); }
+.k-sponge { fill: #ffd54a; }
+.k-bubbles circle { fill: #bfe3ff; stroke: #7cc0f5; stroke-width: 1; opacity: 0; }
+.k-wing { transform-box: fill-box; transform-origin: 80% 15%; }
+.k-body { transform-box: fill-box; transform-origin: center bottom; animation: k-bob 3.2s ease-in-out infinite; }
+.k-lids rect { animation: k-blink 5.5s infinite; }
+.karych.talking .k-beak-low { animation: k-talk .22s ease-in-out infinite alternate; }
+.karych.wave .k-wing { animation: k-wave .45s ease-in-out 3; }
+.karych.cheer .k-body { animation: k-hop .55s ease-out 2; }
+.karych.cheer .k-bubbles circle, .karych.open .k-bubbles circle { animation: k-bubble 2.4s ease-out infinite; }
+.karych .k-bubbles circle:nth-child(2) { animation-delay: .6s; }
+.karych .k-bubbles circle:nth-child(3) { animation-delay: 1.2s; }
+@keyframes k-bob { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-3px) rotate(-2deg); } }
+@keyframes k-blink { 0%, 92%, 100% { transform: scaleY(0); } 95% { transform: scaleY(1); } }
+@keyframes k-talk { from { transform: rotate(0); } to { transform: rotate(16deg); } }
+@keyframes k-wave { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-38deg); } }
+@keyframes k-hop { 0% { transform: translateY(0) scale(1); } 30% { transform: translateY(-14px) scale(1.04, .96); } 60% { transform: translateY(0) scale(1.06, .92); } 100% { transform: translateY(0) scale(1); } }
+@keyframes k-bubble { 0% { opacity: 0; transform: translateY(8px) scale(.6); } 25% { opacity: .9; } 100% { opacity: 0; transform: translateY(-22px) scale(1.15); } }
+.k-bubble { position: relative; width: min(320px, calc(100vw - 24px)); padding: 14px 14px 12px; border-radius: 18px 18px 6px 18px; background: var(--bg); color: var(--text);
+  box-shadow: 0 10px 30px rgb(16 24 40 / 22%), 0 0 0 1px var(--line); display: grid; gap: 8px; animation: k-pop .22s ease-out; }
+.k-bubble[hidden] { display: none; }
+@keyframes k-pop { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
+.k-name { font-size: 13px; color: var(--accent); }
+.k-text, .k-q { margin: 0; font-size: 15px; line-height: 1.45; }
+.k-q { font-weight: 700; }
+.k-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.k-chips .chip { font-size: 13px; }
+.k-close { position: absolute; top: 6px; right: 8px; width: 32px; height: 32px; border: 0; background: transparent; color: var(--muted); font-size: 22px; line-height: 1; cursor: pointer; border-radius: 50%; }
+.k-off { justify-self: start; font-size: 13px; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) {
+  .k-body, .k-lids rect, .karych.talking .k-beak-low, .karych.wave .k-wing, .karych.cheer .k-body, .k-bubbles circle, .k-bubble { animation: none !important; }
+}
 </style>
   <style>
 /* Панель для бізнесу CARCAR: десктоп-перший макет поверх токенів і компонентів styles.css. */
@@ -2125,7 +2178,7 @@ const store = {
 // клієнту — свої записи, мийці — записи своїх мийок, адмінці — усе (див. deploy/server/acl.py).
 // Без сервера (файл з диска, тести) — лише цей пристрій. Особисте лишається на пристрої.
 const LOCAL_KEYS = new Set(['auth', 'profile', 'cars', 'carId', 'theme', 'biz.theme', 'notify', 'biz.notify', 'biz.session', 'partner',
-  'seenStates', 'cls', 'city', 'favs', 'view', 'mapLayer', 'campaign', 'referral', 'subscriptions', 'auth.token', 'biz.token', 'admin.token', 'pushSub', 'srv.demoPlaces']);
+  'seenStates', 'cls', 'city', 'favs', 'view', 'mapLayer', 'campaign', 'referral', 'subscriptions', 'auth.token', 'biz.token', 'admin.token', 'pushSub', 'srv.demoPlaces', 'karych']);
 const shared = (key) => !LOCAL_KEYS.has(key);
 // Журнал подій великий і пишеться часто — відправляємо рідше.
 // Абонементи — трохи пізніше за записи: повернення візиту сервер перевіряє за вже скасованим записом.

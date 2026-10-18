@@ -16,6 +16,7 @@ import {
 import { mountMap } from './map.js';
 import { initCalls, startCall, logCall, callHistory, callRowText, callMissed, markCallsRead } from './call.js';
 import { lookupPlate, lookupPlateOnline, normPlate, plateValid, DEMO_PLATES } from './vehicles.js';
+import { initKarych, karychRoute, karychSay, karychOn, setKarych } from './karych.js';
 
 // ---------- сховище (лише на цьому пристрої) ----------
 
@@ -1319,6 +1320,7 @@ function renderBook() {
   const top = $('#view > .back');
   if (top) top.hidden = step !== 'svc';
   if (step === 'svc' && mobileMode()) mountPickMap(p);
+  karychRoute(`book-${step}`, karychTip(`book-${step}`));
 }
 
 // Карта для вибору місця виїзду: точка, радіус виїзду не малюємо — перевіряємо відстань.
@@ -1429,6 +1431,9 @@ function confirmBooking() {
   track('paid', { placeId: p.id, amount: total, deal: !!q.deal, pass: q.use?.kind ?? null, bonus: !!bonus, balance: !!fromBal, leadH: Math.round((bookingStart(b) - Date.now()) / HOUR),
     promo: q.promo?.code ?? null, mobile: !!b.mobile, parts: q.parts || 0 });
   if (card) { payCard(b); return; }
+  setTimeout(() => karychSay(b.state === 'pending'
+    ? `Кар-р! Запис є. Мийка підтвердить протягом ${PAYMENT.confirmMinutes} хв — я одразу повідомлю. Гроші чекають, доки машину не помиють.`
+    : 'Кар-р! Ви записані. Нагадаю напередодні й за 2 години до візиту.'), 1200);
   toast(b.state === 'pending' ? 'Оплачено. Чекаємо, коли мийка підтвердить запис'
     : q.installments ? `Оплачено першу частину, ви записані` : 'Оплачено, ви записані');
 }
@@ -2385,6 +2390,8 @@ function settingsBlock() {
     <label class="check-row"><input class="check" type="checkbox" id="set-notify" ${notifyOn() ? 'checked' : ''}><span><b>Сповіщення</b>
       <small class="muted">Мийка підтвердила запис, запропонувала інший час, відповіла в чаті${denied && notifyOn() ? '. Зараз вони заборонені в налаштуваннях браузера — дозвольте їх там' : ''}</small></span></label>
     ${srv?.telegramBot ? `<button class="btn soft" type="button" data-action="tg-notify">${icon('send', 18)}Отримувати сповіщення в Telegram</button>` : ''}
+    <label class="check-row"><input class="check" type="checkbox" id="set-karych" ${karychOn() ? 'checked' : ''}><span><b>Помічник Кар Карич</b>
+      <small class="muted">Ворон у кутку екрана підказує, як записатися, скасувати чи перенести запис</small></span></label>
     <div><span class="lbl">Тема</span>${themePicker(store.get('theme', 'system'))}</div>
     <p class="small muted" style="margin:0"><a href="legal/privacy.html" target="_blank">Політика конфіденційності</a> · <a href="legal/offer.html" target="_blank">Умови користування</a></p>
   </section>`;
@@ -2755,6 +2762,37 @@ const bookingActions = {
 
 // ---------- роутер і події ----------
 
+// ---------- Кар Карич: підказки на екранах і часті питання ----------
+
+const cancelHoursText = () => `${String(PAYMENT.freeCancelHours).replace('.', ',')} год`;
+function karychTip(screen) {
+  const waiting = mine().some((b) => b.state === 'pending');
+  const tips = {
+    catalog: 'Кар! Я Кар Карич, ваш помічник. Оберіть мийку зі списку чи на карті — ціна вже зі знижками. Тисніть на мене, якщо щось незрозуміло.',
+    place: 'Тут ціни, графік і відгуки мийки. «Записатися онлайн» — і жодних дзвінків.',
+    'book-svc': 'Оберіть послуги — час і суму я порахую сам. Клас авто беру з вашого гаража.',
+    'book-time': 'Вільні години — ті, на які можна натиснути. Години зі знижкою позначено окремо.',
+    'book-pay': `Гроші утримуються, доки машину не помиють. Мийка підтвердить запис за ${PAYMENT.confirmMinutes} хв, а не підтвердить — повернемо все.`,
+    bookings: waiting ? 'Мийка вже бачить ваш запис. Щойно підтвердить — я повідомлю.'
+      : `Скасувати без втрат можна за ${cancelHoursText()} до візиту, перенести — один раз. Далі — домовляйтеся з мийкою в чаті.`,
+    garage: 'Введіть держномер — марку, модель і клас підставлю сам. За класом рахується ціна мийки.',
+    inbox: 'Тут чати з мийками й дзвінки через CARCAR — без номерів телефонів.',
+    wallet: 'Тут баланс CARCAR і бонуси. Під час оплати вони списуються самі.',
+    support: 'Опишіть, що сталося, і додайте номер запису — підтримка відповість у чаті.',
+  };
+  return tips[screen] ? { text: tips[screen] } : null;
+}
+const KARYCH_FAQ = [
+  { q: 'Як записатися?', a: 'Оберіть мийку → послуги → день і час → оплата. Мийка підтверджує запис за кілька хвилин, а я повідомлю, щойно це станеться.', href: '#/', link: 'До мийок' },
+  { q: 'Як скасувати чи перенести?', a: `У «Моїх записах» відкрийте запис. Скасувати без втрат — не пізніше ніж за ${String(PAYMENT.freeCancelHours).replace('.', ',')} год до візиту, тоді гроші повертаються повністю. Перенести можна один раз, далі — через чат із мийкою.`, href: '#/bookings', link: 'Мої записи' },
+  { q: 'Що, як мийка не підтвердить?', a: `У мийки є ${PAYMENT.confirmMinutes} хв робочого часу на відповідь. Не підтвердила чи відмовила — гроші повертаються повністю, а ви обираєте інший час чи мийку.` },
+  { q: 'Як працює оплата?', a: 'Ви платите при записі, але гроші утримуються, доки мийка не виконає роботу. Якщо щось не так — відкрийте спір у записі, і CARCAR розбереться.' },
+  { q: 'Бонуси, абонементи, лояльність', a: 'Бонуси й баланс CARCAR списуються під час оплати самі. Абонементи мийок і картка лояльності («кожна N-та мийка безкоштовно») — на сторінці мийки.', href: '#/wallet', link: 'Мій баланс' },
+  { q: 'Як звʼязатися з мийкою?', a: 'Відкрийте запис — там чат і дзвінок через CARCAR. Номер телефону не потрібен ні вам, ні мийці.', href: '#/inbox', link: 'Повідомлення' },
+  { q: 'Потрібна допомога людини', a: 'Напишіть у підтримку CARCAR — відповідаємо в чаті, зазвичай протягом двох годин.', href: '#/support', link: 'Підтримка' },
+];
+initKarych({ faq: KARYCH_FAQ, onOff: () => { toast('Кар Карич сховався. Повернути — в «Гараж» → «Налаштування»'); if ($('.settings')) route(); } });
+
 function route() {
   const [, page = '', arg, sub, extra] = location.hash.replace(/^#/, '').split('/');
   // Вхід за номером телефону — перед будь-яким екраном застосунку.
@@ -2854,6 +2892,7 @@ function route() {
   }
   enterView(view, `${page}/${arg ?? ''}` !== ui.lastView);
   ui.lastView = `${page}/${arg ?? ''}`;
+  if (page !== 'book') karychRoute(page || 'catalog', karychTip(page || 'catalog'));
   const target = arg && page === 'bookings' ? $(`#b-${arg}`) : page === 'garage' && arg === 'add' ? $('#add-car') : null;
   if (target) target.scrollIntoView({ block: 'center' });
   else window.scrollTo(0, 0);
@@ -3130,6 +3169,11 @@ document.addEventListener('change', (e) => {
   const t = e.target;
   if (t.matches('.chat-attach')) { sendPhoto(t); return; }
   if (t.name === 'theme' && t.closest('.settings')) { setTheme('theme', t.value); return; }
+  if (t.id === 'set-karych') {
+    setKarych(t.checked);
+    toast(t.checked ? 'Кар Карич повернувся' : 'Кар Карич сховався. Повернути — тут, у налаштуваннях');
+    return;
+  }
   if (t.id === 'set-notify') {
     store.set('notify', t.checked);
     if (t.checked && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission().then(() => { route(); notifySync({ on: true }); });

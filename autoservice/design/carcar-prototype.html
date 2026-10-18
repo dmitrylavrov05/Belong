@@ -1232,6 +1232,59 @@ button.convo.call-row { width: 100%; border: 0; background: none; font: inherit;
 .stamps i { width: 22px; height: 22px; border-radius: 50%; border: 2px dashed var(--line); display: grid; place-items: center; color: var(--muted); }
 .stamps i.on { border: 2px solid var(--accent); background: var(--accent); color: #fff; }
 .stamps i.prize { border-style: solid; }
+
+/* ---------- Кар Карич — ворон-помічник ---------- */
+.karych { position: fixed; z-index: 30; right: 12px; bottom: calc(var(--k-bottom, 76px) + env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; }
+.karych[hidden], body.in-auth .karych, body.in-chat .karych, body.guest .karych { display: none; }
+.karych > * { pointer-events: auto; }
+.k-btn { width: 66px; height: 66px; padding: 2px; border: 0; border-radius: 50%; background: radial-gradient(circle at 50% 40%, #ffffff, #e8eef8); box-shadow: 0 6px 18px rgb(16 24 40 / 22%), 0 0 0 2px var(--line); cursor: pointer; display: grid; place-items: center; }
+.k-btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.k-bird { width: 60px; height: 60px; overflow: visible; }
+.k-torso, .k-head, .k-tail, .k-wing path { fill: #232838; }
+.k-belly { fill: #3d465c; }
+.k-cap { fill: #c8402b; }
+.k-visor { fill: #9e2f1f; }
+.k-cap-text { fill: #fff; font: 800 9px/1 system-ui, sans-serif; letter-spacing: .5px; }
+.k-eyes ellipse { fill: #fff; }
+.k-pupil { fill: #111; }
+.k-glint { fill: #fff; }
+.k-lids rect { fill: #232838; transform-box: fill-box; transform-origin: center top; transform: scaleY(0); }
+.k-beak-up, .k-beak-low { fill: #f4a43b; }
+.k-beak-low { transform-box: fill-box; transform-origin: left center; }
+.k-cheek { fill: #ff8a80; opacity: .55; }
+.k-legs { fill: none; stroke: #f4a43b; stroke-width: 3; stroke-linecap: round; }
+.k-shadow { fill: rgb(0 0 0 / 12%); }
+.k-sponge { fill: #ffd54a; }
+.k-bubbles circle { fill: #bfe3ff; stroke: #7cc0f5; stroke-width: 1; opacity: 0; }
+.k-wing { transform-box: fill-box; transform-origin: 80% 15%; }
+.k-body { transform-box: fill-box; transform-origin: center bottom; animation: k-bob 3.2s ease-in-out infinite; }
+.k-lids rect { animation: k-blink 5.5s infinite; }
+.karych.talking .k-beak-low { animation: k-talk .22s ease-in-out infinite alternate; }
+.karych.wave .k-wing { animation: k-wave .45s ease-in-out 3; }
+.karych.cheer .k-body { animation: k-hop .55s ease-out 2; }
+.karych.cheer .k-bubbles circle, .karych.open .k-bubbles circle { animation: k-bubble 2.4s ease-out infinite; }
+.karych .k-bubbles circle:nth-child(2) { animation-delay: .6s; }
+.karych .k-bubbles circle:nth-child(3) { animation-delay: 1.2s; }
+@keyframes k-bob { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-3px) rotate(-2deg); } }
+@keyframes k-blink { 0%, 92%, 100% { transform: scaleY(0); } 95% { transform: scaleY(1); } }
+@keyframes k-talk { from { transform: rotate(0); } to { transform: rotate(16deg); } }
+@keyframes k-wave { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-38deg); } }
+@keyframes k-hop { 0% { transform: translateY(0) scale(1); } 30% { transform: translateY(-14px) scale(1.04, .96); } 60% { transform: translateY(0) scale(1.06, .92); } 100% { transform: translateY(0) scale(1); } }
+@keyframes k-bubble { 0% { opacity: 0; transform: translateY(8px) scale(.6); } 25% { opacity: .9; } 100% { opacity: 0; transform: translateY(-22px) scale(1.15); } }
+.k-bubble { position: relative; width: min(320px, calc(100vw - 24px)); padding: 14px 14px 12px; border-radius: 18px 18px 6px 18px; background: var(--bg); color: var(--text);
+  box-shadow: 0 10px 30px rgb(16 24 40 / 22%), 0 0 0 1px var(--line); display: grid; gap: 8px; animation: k-pop .22s ease-out; }
+.k-bubble[hidden] { display: none; }
+@keyframes k-pop { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
+.k-name { font-size: 13px; color: var(--accent); }
+.k-text, .k-q { margin: 0; font-size: 15px; line-height: 1.45; }
+.k-q { font-weight: 700; }
+.k-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.k-chips .chip { font-size: 13px; }
+.k-close { position: absolute; top: 6px; right: 8px; width: 32px; height: 32px; border: 0; background: transparent; color: var(--muted); font-size: 22px; line-height: 1; cursor: pointer; border-radius: 50%; }
+.k-off { justify-self: start; font-size: 13px; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) {
+  .k-body, .k-lids rect, .karych.talking .k-beak-low, .karych.wave .k-wing, .karych.cheer .k-body, .k-bubbles circle, .k-bubble { animation: none !important; }
+}
 </style>
   <style>
     /* Заставка під час запуску: піна, бульбашки, логотип із відблиском і розкриття застосунку колом.
@@ -1631,7 +1684,7 @@ const store = {
 // клієнту — свої записи, мийці — записи своїх мийок, адмінці — усе (див. deploy/server/acl.py).
 // Без сервера (файл з диска, тести) — лише цей пристрій. Особисте лишається на пристрої.
 const LOCAL_KEYS = new Set(['auth', 'profile', 'cars', 'carId', 'theme', 'biz.theme', 'notify', 'biz.notify', 'biz.session', 'partner',
-  'seenStates', 'cls', 'city', 'favs', 'view', 'mapLayer', 'campaign', 'referral', 'subscriptions', 'auth.token', 'biz.token', 'admin.token', 'pushSub', 'srv.demoPlaces']);
+  'seenStates', 'cls', 'city', 'favs', 'view', 'mapLayer', 'campaign', 'referral', 'subscriptions', 'auth.token', 'biz.token', 'admin.token', 'pushSub', 'srv.demoPlaces', 'karych']);
 const shared = (key) => !LOCAL_KEYS.has(key);
 // Журнал подій великий і пишеться часто — відправляємо рідше.
 // Абонементи — трохи пізніше за записи: повернення візиту сервер перевіряє за вже скасованим записом.
@@ -3811,6 +3864,174 @@ function markCallsRead(side, pick) {
   store.set('callLog', log.map((x) => (x[key] && pick(x) ? { ...x, [key]: false } : x)));
 }
 
+// Кар Карич — мультяшний ворон-помічник у застосунку клієнта. Сидить у кутку екрана, підказує, що робити
+// на поточному екрані (раз на екран), відповідає на часті питання й радіє, коли запис зроблено.
+// Підказки — заздалегідь написані правила, без ШІ. Вимикається в налаштуваннях.
+
+const KEY = 'karych'; // { off, seen: { екран: true } } — лише на цьому телефоні
+
+// Ворон у кепці автомийника: тіло, крило з губкою, очі з повіками, дзьоб із рухомою нижньою частиною.
+const KARYCH_SVG = `<svg class="k-bird" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
+  <g class="k-bubbles"><circle cx="18" cy="40" r="5"/><circle cx="12" cy="58" r="3.5"/><circle cx="104" cy="30" r="4"/></g>
+  <g class="k-body">
+    <ellipse class="k-shadow" cx="62" cy="113" rx="26" ry="4"/>
+    <path class="k-legs" d="M54 98v10m-5 0h10M70 98v10m-5 0h10"/>
+    <path class="k-tail" d="M40 88 22 100l6-16z"/>
+    <ellipse class="k-torso" cx="62" cy="78" rx="27" ry="24"/>
+    <ellipse class="k-belly" cx="66" cy="84" rx="15" ry="14"/>
+    <g class="k-wing"><path d="M42 70c-10 6-14 18-10 28 10-2 18-10 20-22z"/><rect class="k-sponge" x="22" y="90" width="15" height="10" rx="3"/></g>
+    <circle class="k-head" cx="66" cy="44" r="23"/>
+    <path class="k-cap" d="M44 38c2-14 13-21 24-21s21 7 22 19z"/>
+    <path class="k-visor" d="M84 34c8 0 15 2 18 5-6 2-13 2-20 1z"/>
+    <text class="k-cap-text" x="66" y="32" text-anchor="middle">CC</text>
+    <g class="k-eyes">
+      <ellipse cx="60" cy="46" rx="7" ry="8"/><ellipse cx="77" cy="46" rx="7" ry="8"/>
+      <circle class="k-pupil" cx="62" cy="47" r="3.3"/><circle class="k-pupil" cx="79" cy="47" r="3.3"/>
+      <circle class="k-glint" cx="63.4" cy="45.4" r="1.1"/><circle class="k-glint" cx="80.4" cy="45.4" r="1.1"/>
+      <g class="k-lids"><rect x="52" y="37" width="16" height="18" rx="8"/><rect x="69" y="37" width="16" height="18" rx="8"/></g>
+    </g>
+    <path class="k-beak-up" d="M80 54c8 0 16 2 20 6-7 2-14 2-21 0z"/>
+    <path class="k-beak-low" d="M80 58c6 1 12 2 16 3-5 3-11 3-16 1z"/>
+    <circle class="k-cheek" cx="54" cy="56" r="3.5"/>
+  </g>
+</svg>`;
+
+const state = { tipFor: null, faq: [], opts: {}, hideTimer: 0, talkTimer: 0 };
+const prefs = () => ({ off: false, seen: {}, ...store.get(KEY, {}) });
+const savePrefs = (p) => store.set(KEY, p);
+const karychOn = () => !prefs().off;
+function setKarych(on) {
+  savePrefs({ ...prefs(), off: !on });
+  render();
+}
+
+function root() {
+  let el = document.getElementById('karych');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'karych';
+    el.className = 'karych';
+    el.innerHTML = `<div class="k-bubble" id="k-bubble" role="dialog" aria-label="Кар Карич підказує" hidden></div>
+      <button class="k-btn" type="button" data-k="toggle" aria-label="Кар Карич — помічник" aria-expanded="false" aria-controls="k-bubble">${KARYCH_SVG}</button>`;
+    document.body.append(el);
+    el.addEventListener('click', onClick);
+  }
+  return el;
+}
+
+// Ворон «говорить»: дзьоб рухається, поки читаєте фразу (недовго).
+function talk(ms) {
+  const el = root();
+  el.classList.add('talking');
+  clearTimeout(state.talkTimer);
+  state.talkTimer = setTimeout(() => el.classList.remove('talking'), Math.min(2600, Math.max(700, ms)));
+}
+
+function mood(name) {
+  const el = root();
+  el.classList.remove('wave', 'cheer');
+  void el.offsetWidth; // перезапуск анімації
+  if (name) el.classList.add(name);
+}
+
+function open(html, { auto = false, moodName = 'wave' } = {}) {
+  const el = root();
+  const b = el.querySelector('#k-bubble');
+  b.innerHTML = `<button class="k-close" type="button" data-k="close" aria-label="Закрити підказку">×</button>
+    <b class="k-name">Кар Карич</b>${html}`;
+  b.hidden = false;
+  el.classList.add('open');
+  el.querySelector('.k-btn').setAttribute('aria-expanded', 'true');
+  mood(moodName);
+  talk(b.textContent.length * 35);
+  clearTimeout(state.hideTimer);
+  // Підказка, що зʼявилась сама, ховається сама; відкриту вручну закриває клієнт.
+  if (auto) state.hideTimer = setTimeout(close, 9000);
+}
+
+function close() {
+  const el = document.getElementById('karych');
+  if (!el) return;
+  el.querySelector('#k-bubble').hidden = true;
+  el.classList.remove('open', 'talking');
+  el.querySelector('.k-btn').setAttribute('aria-expanded', 'false');
+  clearTimeout(state.hideTimer);
+}
+
+const tipHtml = (tip) => `<p class="k-text">${esc(tip.text)}</p>`;
+
+function menuHtml() {
+  const tip = state.tipFor?.();
+  return `${tip ? tipHtml(tip) : '<p class="k-text">Кар! Я Кар Карич. Підкажу, як усе працює. Що цікавить?</p>'}
+    <div class="k-chips">${state.faq.map((q, i) => `<button class="chip" type="button" data-k="faq" data-i="${i}">${esc(q.q)}</button>`).join('')}</div>
+    <button class="k-off link-btn" type="button" data-k="off">Не показувати помічника</button>`;
+}
+
+function onClick(e) {
+  const t = e.target.closest('[data-k]');
+  if (!t) return;
+  const k = t.dataset.k;
+  if (k === 'toggle') {
+    // Підказка зʼявилась сама — дотик відкриває питання; відкриті питання — закриває.
+    if (root().classList.contains('open') && root().querySelector('.k-chips')) close(); else open(menuHtml());
+  } else if (k === 'close') {
+    close();
+  } else if (k === 'faq') {
+    const q = state.faq[Number(t.dataset.i)];
+    open(`<p class="k-q">${esc(q.q)}</p><p class="k-text">${esc(q.a)}</p>
+      ${q.href ? `<a class="btn soft" href="${q.href}" data-k="close">${esc(q.link ?? 'Відкрити')}</a>` : ''}
+      <button class="link-btn" type="button" data-k="menu">← Інші питання</button>`, { moodName: null });
+  } else if (k === 'menu') {
+    open(menuHtml(), { moodName: null });
+  } else if (k === 'off') {
+    setKarych(false);
+    state.opts.onOff?.();
+  }
+}
+
+// Підняти ворона над нижніми панелями (меню, кнопка «Записатися», оплата).
+function place() {
+  const el = document.getElementById('karych');
+  if (!el) return;
+  let h = document.querySelector('.tabs')?.offsetHeight ?? 64;
+  const dock = document.querySelector('.dock');
+  if (dock && dock.offsetParent !== null) h += dock.offsetHeight;
+  el.style.setProperty('--k-bottom', `${h + 12}px`);
+}
+
+function render() {
+  const el = root();
+  el.hidden = !karychOn();
+  if (el.hidden) close();
+}
+
+// Після кожного переходу між екранами: перша підказка на новому екрані зʼявляється сама.
+function karychRoute(screen, tip) {
+  state.tipFor = () => tip;
+  render();
+  close();
+  requestAnimationFrame(place);
+  if (!karychOn() || !tip || !screen) return;
+  const p = prefs();
+  if (p.seen[screen]) return;
+  p.seen[screen] = true;
+  savePrefs(p);
+  setTimeout(() => { if (state.tipFor?.() === tip && karychOn()) open(tipHtml(tip), { auto: true }); }, 700);
+}
+
+// Подія: радіє (запис зроблено) чи щось пояснює.
+function karychSay(text, moodName = 'cheer') {
+  if (!karychOn()) return;
+  open(`<p class="k-text">${esc(text)}</p>`, { auto: true, moodName });
+}
+
+function initKarych({ faq, onOff }) {
+  state.faq = faq;
+  state.opts = { onOff };
+  render();
+  window.addEventListener('resize', place);
+}
+
 
 // ---------- сховище (лише на цьому пристрої) ----------
 
@@ -5114,6 +5335,7 @@ function renderBook() {
   const top = $('#view > .back');
   if (top) top.hidden = step !== 'svc';
   if (step === 'svc' && mobileMode()) mountPickMap(p);
+  karychRoute(`book-${step}`, karychTip(`book-${step}`));
 }
 
 // Карта для вибору місця виїзду: точка, радіус виїзду не малюємо — перевіряємо відстань.
@@ -5224,6 +5446,9 @@ function confirmBooking() {
   track('paid', { placeId: p.id, amount: total, deal: !!q.deal, pass: q.use?.kind ?? null, bonus: !!bonus, balance: !!fromBal, leadH: Math.round((bookingStart(b) - Date.now()) / HOUR),
     promo: q.promo?.code ?? null, mobile: !!b.mobile, parts: q.parts || 0 });
   if (card) { payCard(b); return; }
+  setTimeout(() => karychSay(b.state === 'pending'
+    ? `Кар-р! Запис є. Мийка підтвердить протягом ${PAYMENT.confirmMinutes} хв — я одразу повідомлю. Гроші чекають, доки машину не помиють.`
+    : 'Кар-р! Ви записані. Нагадаю напередодні й за 2 години до візиту.'), 1200);
   toast(b.state === 'pending' ? 'Оплачено. Чекаємо, коли мийка підтвердить запис'
     : q.installments ? `Оплачено першу частину, ви записані` : 'Оплачено, ви записані');
 }
@@ -6180,6 +6405,8 @@ function settingsBlock() {
     <label class="check-row"><input class="check" type="checkbox" id="set-notify" ${notifyOn() ? 'checked' : ''}><span><b>Сповіщення</b>
       <small class="muted">Мийка підтвердила запис, запропонувала інший час, відповіла в чаті${denied && notifyOn() ? '. Зараз вони заборонені в налаштуваннях браузера — дозвольте їх там' : ''}</small></span></label>
     ${srv?.telegramBot ? `<button class="btn soft" type="button" data-action="tg-notify">${icon('send', 18)}Отримувати сповіщення в Telegram</button>` : ''}
+    <label class="check-row"><input class="check" type="checkbox" id="set-karych" ${karychOn() ? 'checked' : ''}><span><b>Помічник Кар Карич</b>
+      <small class="muted">Ворон у кутку екрана підказує, як записатися, скасувати чи перенести запис</small></span></label>
     <div><span class="lbl">Тема</span>${themePicker(store.get('theme', 'system'))}</div>
     <p class="small muted" style="margin:0"><a href="legal/privacy.html" target="_blank">Політика конфіденційності</a> · <a href="legal/offer.html" target="_blank">Умови користування</a></p>
   </section>`;
@@ -6550,6 +6777,37 @@ const bookingActions = {
 
 // ---------- роутер і події ----------
 
+// ---------- Кар Карич: підказки на екранах і часті питання ----------
+
+const cancelHoursText = () => `${String(PAYMENT.freeCancelHours).replace('.', ',')} год`;
+function karychTip(screen) {
+  const waiting = mine().some((b) => b.state === 'pending');
+  const tips = {
+    catalog: 'Кар! Я Кар Карич, ваш помічник. Оберіть мийку зі списку чи на карті — ціна вже зі знижками. Тисніть на мене, якщо щось незрозуміло.',
+    place: 'Тут ціни, графік і відгуки мийки. «Записатися онлайн» — і жодних дзвінків.',
+    'book-svc': 'Оберіть послуги — час і суму я порахую сам. Клас авто беру з вашого гаража.',
+    'book-time': 'Вільні години — ті, на які можна натиснути. Години зі знижкою позначено окремо.',
+    'book-pay': `Гроші утримуються, доки машину не помиють. Мийка підтвердить запис за ${PAYMENT.confirmMinutes} хв, а не підтвердить — повернемо все.`,
+    bookings: waiting ? 'Мийка вже бачить ваш запис. Щойно підтвердить — я повідомлю.'
+      : `Скасувати без втрат можна за ${cancelHoursText()} до візиту, перенести — один раз. Далі — домовляйтеся з мийкою в чаті.`,
+    garage: 'Введіть держномер — марку, модель і клас підставлю сам. За класом рахується ціна мийки.',
+    inbox: 'Тут чати з мийками й дзвінки через CARCAR — без номерів телефонів.',
+    wallet: 'Тут баланс CARCAR і бонуси. Під час оплати вони списуються самі.',
+    support: 'Опишіть, що сталося, і додайте номер запису — підтримка відповість у чаті.',
+  };
+  return tips[screen] ? { text: tips[screen] } : null;
+}
+const KARYCH_FAQ = [
+  { q: 'Як записатися?', a: 'Оберіть мийку → послуги → день і час → оплата. Мийка підтверджує запис за кілька хвилин, а я повідомлю, щойно це станеться.', href: '#/', link: 'До мийок' },
+  { q: 'Як скасувати чи перенести?', a: `У «Моїх записах» відкрийте запис. Скасувати без втрат — не пізніше ніж за ${String(PAYMENT.freeCancelHours).replace('.', ',')} год до візиту, тоді гроші повертаються повністю. Перенести можна один раз, далі — через чат із мийкою.`, href: '#/bookings', link: 'Мої записи' },
+  { q: 'Що, як мийка не підтвердить?', a: `У мийки є ${PAYMENT.confirmMinutes} хв робочого часу на відповідь. Не підтвердила чи відмовила — гроші повертаються повністю, а ви обираєте інший час чи мийку.` },
+  { q: 'Як працює оплата?', a: 'Ви платите при записі, але гроші утримуються, доки мийка не виконає роботу. Якщо щось не так — відкрийте спір у записі, і CARCAR розбереться.' },
+  { q: 'Бонуси, абонементи, лояльність', a: 'Бонуси й баланс CARCAR списуються під час оплати самі. Абонементи мийок і картка лояльності («кожна N-та мийка безкоштовно») — на сторінці мийки.', href: '#/wallet', link: 'Мій баланс' },
+  { q: 'Як звʼязатися з мийкою?', a: 'Відкрийте запис — там чат і дзвінок через CARCAR. Номер телефону не потрібен ні вам, ні мийці.', href: '#/inbox', link: 'Повідомлення' },
+  { q: 'Потрібна допомога людини', a: 'Напишіть у підтримку CARCAR — відповідаємо в чаті, зазвичай протягом двох годин.', href: '#/support', link: 'Підтримка' },
+];
+initKarych({ faq: KARYCH_FAQ, onOff: () => { toast('Кар Карич сховався. Повернути — в «Гараж» → «Налаштування»'); if ($('.settings')) route(); } });
+
 function route() {
   const [, page = '', arg, sub, extra] = location.hash.replace(/^#/, '').split('/');
   // Вхід за номером телефону — перед будь-яким екраном застосунку.
@@ -6649,6 +6907,7 @@ function route() {
   }
   enterView(view, `${page}/${arg ?? ''}` !== ui.lastView);
   ui.lastView = `${page}/${arg ?? ''}`;
+  if (page !== 'book') karychRoute(page || 'catalog', karychTip(page || 'catalog'));
   const target = arg && page === 'bookings' ? $(`#b-${arg}`) : page === 'garage' && arg === 'add' ? $('#add-car') : null;
   if (target) target.scrollIntoView({ block: 'center' });
   else window.scrollTo(0, 0);
@@ -6925,6 +7184,11 @@ document.addEventListener('change', (e) => {
   const t = e.target;
   if (t.matches('.chat-attach')) { sendPhoto(t); return; }
   if (t.name === 'theme' && t.closest('.settings')) { setTheme('theme', t.value); return; }
+  if (t.id === 'set-karych') {
+    setKarych(t.checked);
+    toast(t.checked ? 'Кар Карич повернувся' : 'Кар Карич сховався. Повернути — тут, у налаштуваннях');
+    return;
+  }
   if (t.id === 'set-notify') {
     store.set('notify', t.checked);
     if (t.checked && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission().then(() => { route(); notifySync({ on: true }); });
