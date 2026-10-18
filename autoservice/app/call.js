@@ -5,7 +5,6 @@
 // NAT (мобільний інтернет) голос іде через TURN-сервер CARCAR (coturn, тимчасові паролі видає /api/ice).
 // Про вхідний дзвінок у закритий застосунок сервер надсилає push.
 import { store, icon, esc, hasServer, api } from './core.js';
-import { chatPost } from './ops.js';
 
 const RING_MS = 30000;
 const CALL_KEY = 'calls'; // { id: дзвінок } — у кожної пари клієнт—мийка свій
@@ -20,8 +19,9 @@ let callRingTimer = null;
 let callHooks = { onLog: () => {} };
 let callWarn = ''; // мікрофон недоступний тощо
 
-// Поточний дзвінок цього застосунку: найсвіжіший, де ми учасник.
-const callGet = () => Object.values(store.peek(CALL_KEY, {})).filter((c) => callMine(c)).sort((a, b) => b.at - a.at)[0] ?? null;
+const live = (c) => (['ringing', 'active'].includes(c.state) ? 1 : 0);
+// Поточний дзвінок цього застосунку: найсвіжіший, де ми учасник (за однакового часу — той, що ще триває).
+const callGet = () => Object.values(store.peek(CALL_KEY, {})).filter((c) => callMine(c)).sort((a, b) => (b.at - a.at) || (live(b) - live(a)))[0] ?? null;
 const callSet = (c) => {
   const old = Date.now() - 6 * 3600e3;
   const all = Object.fromEntries(Object.entries(store.get(CALL_KEY, {})).filter(([, x]) => x.at > old));
@@ -44,11 +44,15 @@ export function initCalls(side, mine, hooks = {}) {
   callSync();
 }
 
-// Почати дзвінок. who: { bookingId, placeId, placeName, clientName }.
+export const newCallId = () => `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+// Чи йде вже дзвінок (новий не починаємо).
+export const callBusy = () => ['ringing', 'active'].includes(callGet()?.state);
+
+// Почати дзвінок. who: { id?, bookingId | reqId — чат, куди записати дзвінок, placeId, placeName, clientName }.
 export async function startCall(who) {
   const cur = callGet();
   if (cur && ['ringing', 'active'].includes(cur.state)) { callSync(); return; }
-  const c = { id: `c${Date.now().toString(36)}`, from: callSide, state: 'ringing', at: Date.now(), ...who };
+  const c = { id: newCallId(), from: callSide, state: 'ringing', at: Date.now(), ...who };
   callSet(c);
   callRender(c);
   const sdp = await callPrepare(c, null);
@@ -213,22 +217,50 @@ export function callLogText(c) {
   if (c.state === 'ended' && c.answeredAt) return `Дзвінок через CARCAR · ${callClock(c.endedAt - c.answeredAt)}`;
   return c.state === 'declined' ? `Дзвінок від ${by} відхилено` : `Пропущений дзвінок від ${by}`;
 }
-// Кожен дзвінок — у журналі дзвінків («Повідомлення» в обох застосунках), а дзвінок за записом — ще й у чаті запису.
-export function logCall(bookings, c, save) {
+// Дзвінок записується в той самий діалог із мийкою — чат запису чи загальний чат (запит), а не окремим рядком.
+// Журнал дзвінків лишається для історії; окремим рядком у «Повідомленнях» показуються лише давні дзвінки без чату.
+export const callLinked = (x) => !!(x.bookingId || x.reqId);
+// Повідомлення в чаті: на початку дзвінка (якщо чат створено для дзвінка) — «Дзвінок через CARCAR», після — результат.
+export function callNote(list, c) {
   const answered = c.state === 'ended' && !!c.answeredAt;
+  const info = { text: c.state === 'ringing' ? 'Дзвінок через CARCAR' : callLogText(c), callFrom: c.from ?? 'client',
+    callState: answered ? 'ended' : c.state, dur: answered ? c.endedAt - c.answeredAt : null };
+  const msg = list.find((m) => m.call === c.id);
+  if (msg) return Object.assign(msg, info);
+  const m = { from: 'sys', at: c.at, call: c.id, ...info };
+  list.push(m);
+  return m;
+}
+// ctx: { bookings, requests, save }.
+export function logCall(ctx, c) {
+  const answered = c.state === 'ended' && !!c.answeredAt;
+  const b = c.bookingId && ctx.bookings.find((x) => x.id === c.bookingId);
+  const r = !b && c.reqId && ctx.requests?.find((x) => x.id === c.reqId);
   const log = store.peek('callLog', []);
   if (!log.some((x) => x.id === c.id)) {
     store.set('callLog', [...log, {
-      id: c.id, placeId: c.placeId, bookingId: c.bookingId ?? null, clientId: c.clientId ?? 'device', from: c.from, state: answered ? 'ended' : c.state, at: c.endedAt ?? Date.now(),
+      id: c.id, placeId: c.placeId, bookingId: b ? b.id : null, reqId: r ? r.id : null, clientId: c.clientId ?? 'device', from: c.from, state: answered ? 'ended' : c.state, at: c.endedAt ?? Date.now(),
       dur: answered ? c.endedAt - c.answeredAt : null, clientName: c.clientName ?? '', placeName: c.placeName ?? '',
-      // Пропущений дзвінок — непрочитаний для того, кому дзвонили.
-      unreadClient: !answered && c.from === 'place', unreadBiz: !answered && c.from === 'client',
+      // Пропущений дзвінок без чату — непрочитаний для того, кому дзвонили (у чаті непрочитаність позначає сам чат).
+      unreadClient: !b && !r && !answered && c.from === 'place', unreadBiz: !b && !r && !answered && c.from === 'client',
     }].slice(-300));
   }
-  const b = c.bookingId && bookings.find((x) => x.id === c.bookingId);
-  if (!b) return;
-  chatPost(b, 'sys', callLogText(c), c.from === 'client' ? 'biz' : 'client');
-  save();
+  if (!b && !r) return;
+  // Хто має побачити: пропущений — той, кому дзвонили; відхилений — той, хто дзвонив; розмова — нікому.
+  const to = answered ? null : (c.state === 'declined') === (c.from === 'client') ? 'client' : 'biz';
+  if (b) {
+    b.chat = b.chat ?? [];
+    callNote(b.chat, c);
+    b.chat.sort((x, y) => x.at - y.at);
+    if (to === 'biz') b.chatUnreadBiz = true;
+    if (to === 'client') b.chatUnreadClient = true;
+  } else {
+    callNote(r.messages, c);
+    r.messages.sort((x, y) => x.at - y.at);
+    if (to === 'biz') r.unreadBiz = true;
+    if (to === 'client') r.unreadClient = true;
+  }
+  ctx.save();
 }
 
 export const callHistory = () => store.peek('callLog', []);
@@ -239,6 +271,8 @@ export function callRowText(x, side) {
   if (out) return x.state === 'declined' ? 'Дзвінок відхилено' : 'Не відповіли на дзвінок';
   return 'Пропущений дзвінок';
 }
+// Рядок дзвінка в чаті з погляду side: «Вихідний дзвінок · 1:23», «Пропущений дзвінок»…
+export const callLine = (m, side) => (m.callState && m.callState !== 'ringing' ? callRowText({ from: m.callFrom, state: m.callState, dur: m.dur }, side) : m.text);
 export const callMissed = (x, side) => (side === 'client' ? x.unreadClient : x.unreadBiz);
 export function markCallsRead(side, pick) {
   const log = store.peek('callLog', []);

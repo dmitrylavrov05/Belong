@@ -869,39 +869,64 @@ test('дзвінок через CARCAR: клієнт дзвонить з кар�
   // Дзвінок записано в чат запису.
   const b = await page.evaluate(() => JSON.parse(localStorage.getItem('carcar.bookings'))[0]);
   expect(b.chat.at(-1).text).toMatch(/^Дзвінок через CARCAR · \d+:\d\d$/);
-  // Дзвінок видно в «Повідомленнях» обох застосунків.
+  // У «Повідомленнях» обох застосунків дзвінок — у тому самому чаті запису, а не окремим рядком.
   await page.goto('/#/inbox');
-  await expect(page.locator('.call-row').first()).toContainText(/Вихідний дзвінок · \d+:\d\d/);
+  await expect(page.locator('.call-row')).toHaveCount(0);
+  await expect(page.locator('.convo').first()).toContainText(/Вихідний дзвінок · \d+:\d\d/);
   await pro.goto(`${PRO}#/`);
-  await expect(pro.locator('.call-row').first()).toContainText(/Вхідний дзвінок · \d+:\d\d/);
+  await expect(pro.locator('.call-row')).toHaveCount(0);
+  await expect(pro.locator('.convo').first()).toContainText(/Вхідний дзвінок · \d+:\d\d/);
   await pro.close();
 });
 
-test('пропущений дзвінок зі сторінки мийки видно в «Повідомленнях» мийки — можна передзвонити', async ({ page, context }) => {
+test('дзвінки зі сторінки мийки — в одному діалозі з мийкою: пропущений видно, можна передзвонити', async ({ page, context }) => {
   const pro = await context.newPage();
   await pro.clock.setFixedTime(new Date(2026, 9, 4, 10, 0));
   await pro.goto(`${PRO}#/bookings`);
-  await page.goto('/#/place/blysk');
-  await page.getByRole('button', { name: 'Подзвонити', exact: true }).click();
-  await expect(pro.locator('#call-screen')).toContainText('Вхідний дзвінок CARCAR');
-  // Клієнт поклав трубку, поки мийка не відповіла.
-  await page.locator('#call-screen').getByRole('button', { name: 'Завершити' }).click();
-  await expect(pro.locator('#call-screen')).toContainText('Пропущений дзвінок');
-  await pro.locator('#call-screen').getByRole('button', { name: 'Закрити' }).click();
+  const missedCall = async () => {
+    await page.goto('/#/place/blysk');
+    await page.getByRole('button', { name: 'Подзвонити', exact: true }).click();
+    await expect(pro.locator('#call-screen')).toContainText('Вхідний дзвінок CARCAR');
+    // Клієнт поклав трубку, поки мийка не відповіла.
+    await page.locator('#call-screen').getByRole('button', { name: 'Завершити' }).click();
+    await expect(pro.locator('#call-screen')).toContainText('Пропущений дзвінок');
+    await pro.locator('#call-screen').getByRole('button', { name: 'Закрити' }).click();
+    await page.locator('#call-screen').getByRole('button', { name: 'Закрити' }).click();
+  };
+  await missedCall();
+  await missedCall();
 
+  // У мийки — один діалог із клієнтом, у ньому обидва дзвінки.
   await pro.goto(`${PRO}#/`);
   await expect(pro.getByLabel(/Непрочитані: \d/)).toBeVisible();
-  await pro.getByRole('button', { name: 'Дзвінки' }).click();
-  const row = pro.locator('.call-row').first();
-  await expect(row).toContainText('Пропущений дзвінок');
-  await expect(row).toContainText('Пропущений');
-  await row.click();
+  await pro.getByRole('button', { name: /^Дзвінки/ }).click();
+  await expect(pro.locator('.call-row')).toHaveCount(0);
+  const convo = pro.locator('.convo');
+  await expect(convo).toHaveCount(1);
+  await expect(convo).toContainText('Пропущений дзвінок');
+  await convo.click();
+  await expect(pro.locator('.chat-msgs .call-log')).toHaveCount(2);
+  // Передзвонити з того самого чату — дзвінок дописується туди ж.
+  await pro.getByRole('button', { name: 'Подзвонити клієнту через CARCAR' }).click();
   await expect(pro.locator('#call-screen')).toContainText('Дзвонимо…');
   await pro.locator('#call-screen').getByRole('button', { name: 'Завершити' }).click();
+  await expect(pro.locator('.chat-msgs .call-log')).toHaveCount(3);
 
-  // У клієнта — його вихідний дзвінок без відповіді.
+  // У клієнта — теж один діалог з мийкою, а не рядок на кожен дзвінок.
   await page.goto('/#/inbox');
-  await expect(page.locator('.call-row', { hasText: 'Не відповіли на дзвінок' })).toBeVisible();
+  await expect(page.locator('.call-row')).toHaveCount(0);
+  const mine = page.locator('.convo', { hasText: 'Блиск' });
+  await expect(mine).toHaveCount(1);
+  await expect(mine).toContainText('Пропущений дзвінок');
+  await expect(mine).toContainText('Чат з мийкою');
+  await mine.click();
+  await expect(page.locator('.chat-msgs .call-log')).toHaveCount(3);
+  await expect(page.locator('.chat-msgs .call-log').first()).toContainText('Не відповіли на дзвінок');
+  // Написали в тому самому чаті — та сама переписка.
+  await page.getByLabel('Повідомлення мийці').fill('Передзвоніть, будь ласка');
+  await page.getByRole('button', { name: 'Надіслати' }).click();
+  await page.goto('/#/inbox');
+  await expect(page.locator('.convo', { hasText: 'Блиск' })).toHaveCount(1);
   await pro.close();
 });
 

@@ -888,6 +888,8 @@ body.in-chat .top, body.in-chat .tabs { display: none; }
 .bubble.them { align-self: flex-start; background: var(--soft); color: var(--text); border-bottom-left-radius: 6px; }
 .bubble.me + .bubble.me, .bubble.them + .bubble.them { margin-top: -1px; }
 .bubble.sys { align-self: center; max-width: 90%; padding: 6px 12px; border-radius: 999px; font-size: 12px; color: var(--muted); background: transparent; border: 1px dashed var(--line); text-align: center; }
+.bubble.sys.call-log { display: inline-flex; align-items: center; gap: 6px; border-style: solid; color: var(--text); }
+.bubble.sys.call-log time { position: static; margin-left: 2px; color: var(--muted); opacity: 1; }
 .day-sep { align-self: center; margin: 10px 0 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
 .chat-empty { margin: auto; display: grid; justify-items: center; gap: 8px; text-align: center; color: var(--muted); max-width: 280px; }
 .chat-empty .avatar { width: 72px; height: 72px; font-size: 30px; }

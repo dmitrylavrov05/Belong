@@ -14,7 +14,7 @@ import {
   chatPost, chatTimeline, readMessages, msgPreview, presenceOf, PRESENCE_KEY, CLIENT_QUICK, ITEM_KIND, itemSum, estimateTotal, warrantyUntil,
 } from './ops.js';
 import { mountMap } from './map.js';
-import { initCalls, startCall, logCall, callHistory, callRowText, callMissed, markCallsRead } from './call.js';
+import { initCalls, startCall, logCall, callHistory, callRowText, callMissed, markCallsRead, callLinked, callNote, callBusy, newCallId, callLine } from './call.js';
 import { lookupPlate, lookupPlateOnline, normPlate, plateValid, DEMO_PLATES } from './vehicles.js';
 import { initKarych, karychRoute, karychSay, karychOn, setKarych } from './karych.js';
 
@@ -828,8 +828,9 @@ function passesBlock(p) {
 // до прайсу або зробити її персональною для цього клієнта (за телефоном).
 const saveRequests = () => store.set('requests', requests);
 const requestsOf = (placeId) => requests.filter((r) => r.placeId === placeId && (r.clientId ?? 'device') === meId()).sort((a, b) => b.at - a.at);
-const reqStatus = (r) => (r.closed ? ['', 'Запит закрито'] : r.service ? ['go', 'Послугу додано']
-  : r.messages.at(-1).from === 'biz' ? ['go', 'Точка відповіла'] : ['', 'Чекає відповіді точки']);
+const lastWord = (r) => r.messages.findLast((m) => m.from !== 'sys');
+const reqStatus = (r) => (r.closed ? ['', 'Запит закрито'] : r.service ? ['go', 'Послугу додано'] : !lastWord(r) ? ['', 'Дзвінок через CARCAR']
+  : lastWord(r).from === 'biz' ? ['go', 'Точка відповіла'] : ['', 'Чекає відповіді точки']);
 
 const ASK_QUICK = ['Чи робите хімчистку салону?', 'Чи можна помити автобудинок?', 'Чи відмиєте сліди фарби?', 'Чи є мийка двигуна?'];
 
@@ -860,6 +861,7 @@ function viewAsk(id) {
     const sep = day !== lastDay ? `<li class="day-sep"><span>${dayName(day)}</span></li>` : '';
     lastDay = day;
     if (m.from === 'mark') return `${sep}<li class="chat-mark closed">${icon('x', 14)}<b>${esc(m.text)}</b></li>`;
+    if (m.from === 'sys') return `${sep}${sysLine(m)}`;
     // Мийка пропонує запис: клієнт підтверджує й оплачує тут — це запис CARCAR.
     if (m.invite) {
       const r = list.find((x) => x.invite?.id === m.invite);
@@ -886,7 +888,7 @@ function viewAsk(id) {
       <div class="chat-who"><h1>${esc(p.name)}</h1>${presenceLine(p.id)}</div>
       <button class="icon-btn" data-action="call" data-place="${p.id}" aria-label="Подзвонити через CARCAR">${icon('phone', 20)}</button>
     </header>
-    <div class="chat-pin">${icon('chat', 16)}<span>Запит про послугу${list.length ? ` · ${reqStatus(list.at(-1))[1]}` : ''}</span></div>
+    <div class="chat-pin">${icon('chat', 16)}<span>${list.some(lastWord) ? `Запит про послугу · ${reqStatus(list.at(-1))[1]}` : 'Чат з мийкою'}</span></div>
     <ol class="chat-msgs" aria-label="Повідомлення">
       ${items || `<li class="chat-empty">${avatar(p.name, false, p.avatar)}<b>Не знайшли потрібну послугу?</b><span>Напишіть, що потрібно зробити. Мийка може додати послугу до прайсу або підготувати персональну ціну для вас.</span></li>`}
     </ol>
@@ -968,6 +970,27 @@ function askSend(placeId, raw, photo = null) {
   route();
   $('.ask-form [name="text"]')?.focus();
   track('ask', { placeId });
+}
+
+// Дзвінок мийці записується в поточний діалог з нею: чат запису (з картки запису — саме цього) або,
+// якщо дзвонять зі сторінки мийки, — у найсвіжішу відкриту переписку з нею. Немає жодної — відкриваємо чат з мийкою.
+function callPlace(p, b = null) {
+  if (callBusy()) { startCall({}); return; }
+  const who = { placeId: p.id, placeName: p.name, clientId: meId(), clientName: profile.name || 'Клієнт CARCAR' };
+  const activity = (x) => (x.chat ?? x.messages ?? []).at(-1)?.at ?? x.createdAt ?? x.at ?? 0;
+  const thread = b ?? [
+    ...mine().filter((x) => x.placeId === p.id && ACTIVE.includes(x.state)),
+    ...requestsOf(p.id).filter((r) => !r.closed && !r.service),
+  ].sort((x, y) => activity(y) - activity(x))[0];
+  if (thread?.messages) { startCall({ ...who, reqId: thread.id }); return; }
+  if (thread) { startCall({ ...who, bookingId: thread.id }); return; }
+  const id = newCallId();
+  const r = { id: uid(), placeId: p.id, clientId: meId(), clientName: profile.name, clientPhone: profile.phone,
+    car: cars[0] ? carLabel(cars[0]) : '', cls: cars[0]?.cls ?? ui.cls, messages: [], at: Date.now() };
+  callNote(r.messages, { id, state: 'ringing', at: r.at });
+  requests.push(r);
+  saveRequests();
+  startCall({ ...who, id, reqId: r.id });
 }
 
 // Запити на сторінці «Мої записи»: де відповіли й куди повернутися.
@@ -1763,6 +1786,8 @@ function bubble(m, them) {
   const photo = safePhoto(m.photo);
   return `<li class="bubble ${mine ? 'me' : 'them'}${photo ? ' has-photo' : ''}"><span class="sr-only">${mine ? 'Ви' : esc(them)}: </span>${photo ? `<button class="chat-photo" type="button" data-action="photo-open" aria-label="Відкрити фото"><img src="${photo}" alt="Фото"></button>` : ''}${m.text ? `<span class="b-text">${esc(m.text)}</span>` : ''}<time>${msgTime(m.at)}${mine ? `<span class="ticks${m.readAt ? ' read' : ''}" aria-hidden="true">${m.readAt ? '✓✓' : '✓'}</span>` : ''}</time></li>`;
 }
+// Службовий рядок у чаті; дзвінок — з іконкою й часом.
+const sysLine = (m) => (m.call ? `<li class="bubble sys call-log">${icon('phone', 14)}${esc(callLine(m, 'client'))}<time>${msgTime(m.at)}</time></li>` : `<li class="bubble sys">${esc(m.text)}</li>`);
 // Під останнім своїм повідомленням — «Прочитано» чи «Не прочитано».
 const readLine = (m) => `<li class="read-state${m.readAt ? ' read' : ''}">${m.readAt ? `Прочитано ${msgTime(m.readAt)}` : 'Не прочитано'}</li>`;
 
@@ -1784,7 +1809,7 @@ function viewChat(id) {
     const sep = day !== lastDay ? `<li class="day-sep"><span>${dayName(day)}</span></li>` : '';
     lastDay = day;
     if (m.from === 'mark') return `${sep}<li class="chat-mark ${m.kind}">${icon(m.kind === 'closed' ? 'x' : 'check', 14)}<b>${esc(m.text)}</b><time>${new Date(m.at).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}</time></li>`;
-    if (m.from === 'sys') return `${sep}<li class="bubble sys">${esc(m.text)}</li>`;
+    if (m.from === 'sys') return `${sep}${sysLine(m)}`;
     return `${sep}${bubble(m, p.name)}${m === lastOwn ? readLine(m) : ''}`;
   }).join('');
   const open = ACTIVE.includes(b.state);
@@ -2013,15 +2038,15 @@ function conversations() {
       const p = placeById(b.placeId);
       const st = visitState(b);
       return { at: last.at, href: `#/chat/${b.id}`, name: p?.name ?? 'Мийка', sub: `${dayLabel(b.date, { day: 'numeric', month: 'short' })}, ${b.time}`,
-        text: `${last.from === 'client' ? 'Ви: ' : ''}${msgPreview(last)}`, unread: !!b.chatUnreadClient, placeId: b.placeId, status: st.label, over: st.over };
+        text: last.call ? callLine(last, 'client') : `${last.from === 'client' ? 'Ви: ' : ''}${msgPreview(last)}`, unread: !!b.chatUnreadClient, placeId: b.placeId, status: st.label, over: st.over };
     }),
     ...requests.map((r) => {
       const last = r.messages.at(-1);
-      return { at: last.at, href: `#/ask/${r.placeId}`, name: placeById(r.placeId)?.name ?? 'Мийка', sub: `Запит про послугу · ${reqStatus(r)[1]}`,
-        text: `${last.from === 'client' ? 'Ви: ' : ''}${msgPreview(last)}`, unread: !!r.unreadClient, placeId: r.placeId, over: !!r.closed && !r.unreadClient };
+      return { at: last.at, href: `#/ask/${r.placeId}`, name: placeById(r.placeId)?.name ?? 'Мийка', sub: lastWord(r) ? `Запит про послугу · ${reqStatus(r)[1]}` : 'Чат з мийкою',
+        text: last.call ? callLine(last, 'client') : `${last.from === 'client' ? 'Ви: ' : ''}${msgPreview(last)}`, unread: !!r.unreadClient, placeId: r.placeId, over: !!r.closed && !r.unreadClient };
     }),
     // Дзвінки через CARCAR: торкнутися — передзвонити.
-    ...callHistory().filter((x) => placeById(x.placeId) && (x.clientId ?? 'device') === meId()).map((x) => ({ at: x.at, call: x, name: placeById(x.placeId).name, placeId: x.placeId,
+    ...callHistory().filter((x) => !callLinked(x) && placeById(x.placeId) && (x.clientId ?? 'device') === meId()).map((x) => ({ at: x.at, call: x, name: placeById(x.placeId).name, placeId: x.placeId,
       sub: 'Натисніть, щоб передзвонити', text: callRowText(x, 'client'), unread: !!x.unreadClient })),
     ...myTickets().map((t) => {
       const last = t.messages.at(-1);
@@ -2372,7 +2397,7 @@ function viewInbox() {
 
 // Лічильник на вкладці «Повідомлення»: непрочитані сповіщення й нові відповіді точок у чатах.
 function updateInboxBadge() {
-  const unread = inboxFor(myKeys()).filter((m) => !m.read && ((m.kind === 'waitlist' && !staleNote(m)) || m.kind === 'sub')).length + requests.filter((r) => r.unreadClient).length + mine().filter((b) => b.chatUnreadClient).length + myTickets().filter((t) => t.unreadUser).length + callHistory().filter((x) => (x.clientId ?? 'device') === meId() && callMissed(x, 'client')).length;
+  const unread = inboxFor(myKeys()).filter((m) => !m.read && ((m.kind === 'waitlist' && !staleNote(m)) || m.kind === 'sub')).length + requests.filter((r) => r.unreadClient).length + mine().filter((b) => b.chatUnreadClient).length + myTickets().filter((t) => t.unreadUser).length + callHistory().filter((x) => !callLinked(x) && (x.clientId ?? 'device') === meId() && callMissed(x, 'client')).length;
   const count = $('#inbox-tab .tab-count');
   count.textContent = unread > 9 ? '9+' : unread;
   count.hidden = !unread;
@@ -3012,7 +3037,7 @@ document.addEventListener('click', (e) => {
     if (el.matches('.call-row')) markCallsRead('client', (x) => x.placeId === el.dataset.place && (x.clientId ?? 'device') === meId());
     const b = id ? bookings.find((x) => x.id === id) : null;
     const p = placeById(b?.placeId ?? el.dataset.place);
-    if (p) startCall({ bookingId: b?.id ?? null, placeId: p.id, placeName: p.name, clientId: meId(), clientName: profile.name || 'Клієнт CARCAR' });
+    if (p) callPlace(p, b);
   } else if (action === 'invite-book') {
     // Пропозиція мийки з чату: ті самі послуги, день і час — одразу до оплати.
     const r = requests.find((x) => x.id === el.dataset.req);
@@ -3546,7 +3571,7 @@ acceptCampaign();
 track('session', { view: ui.view });
 keepChatOnKeyboard();
 // Вхідні дзвінки від мийок — за записами клієнта.
-initCalls('client', (c) => (c.clientId ?? 'device') === meId(), { onLog: (c) => logCall(bookings, c, save) });
+initCalls('client', (c) => (c.clientId ?? 'device') === meId(), { onLog: (c) => logCall({ bookings, requests, save: () => { save(); saveRequests(); } }, c) });
 route();
 acceptInvite();
 

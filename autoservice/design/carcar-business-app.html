@@ -899,6 +899,8 @@ body.in-chat .top, body.in-chat .tabs { display: none; }
 .bubble.them { align-self: flex-start; background: var(--soft); color: var(--text); border-bottom-left-radius: 6px; }
 .bubble.me + .bubble.me, .bubble.them + .bubble.them { margin-top: -1px; }
 .bubble.sys { align-self: center; max-width: 90%; padding: 6px 12px; border-radius: 999px; font-size: 12px; color: var(--muted); background: transparent; border: 1px dashed var(--line); text-align: center; }
+.bubble.sys.call-log { display: inline-flex; align-items: center; gap: 6px; border-style: solid; color: var(--text); }
+.bubble.sys.call-log time { position: static; margin-left: 2px; color: var(--muted); opacity: 1; }
 .day-sep { align-self: center; margin: 10px 0 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
 .chat-empty { margin: auto; display: grid; justify-items: center; gap: 8px; text-align: center; color: var(--muted); max-width: 280px; }
 .chat-empty .avatar { width: 72px; height: 72px; font-size: 30px; }
@@ -3702,8 +3704,9 @@ let callRingTimer = null;
 let callHooks = { onLog: () => {} };
 let callWarn = ''; // мікрофон недоступний тощо
 
-// Поточний дзвінок цього застосунку: найсвіжіший, де ми учасник.
-const callGet = () => Object.values(store.peek(CALL_KEY, {})).filter((c) => callMine(c)).sort((a, b) => b.at - a.at)[0] ?? null;
+const live = (c) => (['ringing', 'active'].includes(c.state) ? 1 : 0);
+// Поточний дзвінок цього застосунку: найсвіжіший, де ми учасник (за однакового часу — той, що ще триває).
+const callGet = () => Object.values(store.peek(CALL_KEY, {})).filter((c) => callMine(c)).sort((a, b) => (b.at - a.at) || (live(b) - live(a)))[0] ?? null;
 const callSet = (c) => {
   const old = Date.now() - 6 * 3600e3;
   const all = Object.fromEntries(Object.entries(store.get(CALL_KEY, {})).filter(([, x]) => x.at > old));
@@ -3726,11 +3729,15 @@ function initCalls(side, mine, hooks = {}) {
   callSync();
 }
 
-// Почати дзвінок. who: { bookingId, placeId, placeName, clientName }.
+const newCallId = () => `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+// Чи йде вже дзвінок (новий не починаємо).
+const callBusy = () => ['ringing', 'active'].includes(callGet()?.state);
+
+// Почати дзвінок. who: { id?, bookingId | reqId — чат, куди записати дзвінок, placeId, placeName, clientName }.
 async function startCall(who) {
   const cur = callGet();
   if (cur && ['ringing', 'active'].includes(cur.state)) { callSync(); return; }
-  const c = { id: `c${Date.now().toString(36)}`, from: callSide, state: 'ringing', at: Date.now(), ...who };
+  const c = { id: newCallId(), from: callSide, state: 'ringing', at: Date.now(), ...who };
   callSet(c);
   callRender(c);
   const sdp = await callPrepare(c, null);
@@ -3895,22 +3902,50 @@ function callLogText(c) {
   if (c.state === 'ended' && c.answeredAt) return `Дзвінок через CARCAR · ${callClock(c.endedAt - c.answeredAt)}`;
   return c.state === 'declined' ? `Дзвінок від ${by} відхилено` : `Пропущений дзвінок від ${by}`;
 }
-// Кожен дзвінок — у журналі дзвінків («Повідомлення» в обох застосунках), а дзвінок за записом — ще й у чаті запису.
-function logCall(bookings, c, save) {
+// Дзвінок записується в той самий діалог із мийкою — чат запису чи загальний чат (запит), а не окремим рядком.
+// Журнал дзвінків лишається для історії; окремим рядком у «Повідомленнях» показуються лише давні дзвінки без чату.
+const callLinked = (x) => !!(x.bookingId || x.reqId);
+// Повідомлення в чаті: на початку дзвінка (якщо чат створено для дзвінка) — «Дзвінок через CARCAR», після — результат.
+function callNote(list, c) {
   const answered = c.state === 'ended' && !!c.answeredAt;
+  const info = { text: c.state === 'ringing' ? 'Дзвінок через CARCAR' : callLogText(c), callFrom: c.from ?? 'client',
+    callState: answered ? 'ended' : c.state, dur: answered ? c.endedAt - c.answeredAt : null };
+  const msg = list.find((m) => m.call === c.id);
+  if (msg) return Object.assign(msg, info);
+  const m = { from: 'sys', at: c.at, call: c.id, ...info };
+  list.push(m);
+  return m;
+}
+// ctx: { bookings, requests, save }.
+function logCall(ctx, c) {
+  const answered = c.state === 'ended' && !!c.answeredAt;
+  const b = c.bookingId && ctx.bookings.find((x) => x.id === c.bookingId);
+  const r = !b && c.reqId && ctx.requests?.find((x) => x.id === c.reqId);
   const log = store.peek('callLog', []);
   if (!log.some((x) => x.id === c.id)) {
     store.set('callLog', [...log, {
-      id: c.id, placeId: c.placeId, bookingId: c.bookingId ?? null, clientId: c.clientId ?? 'device', from: c.from, state: answered ? 'ended' : c.state, at: c.endedAt ?? Date.now(),
+      id: c.id, placeId: c.placeId, bookingId: b ? b.id : null, reqId: r ? r.id : null, clientId: c.clientId ?? 'device', from: c.from, state: answered ? 'ended' : c.state, at: c.endedAt ?? Date.now(),
       dur: answered ? c.endedAt - c.answeredAt : null, clientName: c.clientName ?? '', placeName: c.placeName ?? '',
-      // Пропущений дзвінок — непрочитаний для того, кому дзвонили.
-      unreadClient: !answered && c.from === 'place', unreadBiz: !answered && c.from === 'client',
+      // Пропущений дзвінок без чату — непрочитаний для того, кому дзвонили (у чаті непрочитаність позначає сам чат).
+      unreadClient: !b && !r && !answered && c.from === 'place', unreadBiz: !b && !r && !answered && c.from === 'client',
     }].slice(-300));
   }
-  const b = c.bookingId && bookings.find((x) => x.id === c.bookingId);
-  if (!b) return;
-  chatPost(b, 'sys', callLogText(c), c.from === 'client' ? 'biz' : 'client');
-  save();
+  if (!b && !r) return;
+  // Хто має побачити: пропущений — той, кому дзвонили; відхилений — той, хто дзвонив; розмова — нікому.
+  const to = answered ? null : (c.state === 'declined') === (c.from === 'client') ? 'client' : 'biz';
+  if (b) {
+    b.chat = b.chat ?? [];
+    callNote(b.chat, c);
+    b.chat.sort((x, y) => x.at - y.at);
+    if (to === 'biz') b.chatUnreadBiz = true;
+    if (to === 'client') b.chatUnreadClient = true;
+  } else {
+    callNote(r.messages, c);
+    r.messages.sort((x, y) => x.at - y.at);
+    if (to === 'biz') r.unreadBiz = true;
+    if (to === 'client') r.unreadClient = true;
+  }
+  ctx.save();
 }
 
 const callHistory = () => store.peek('callLog', []);
@@ -3921,6 +3956,8 @@ function callRowText(x, side) {
   if (out) return x.state === 'declined' ? 'Дзвінок відхилено' : 'Не відповіли на дзвінок';
   return 'Пропущений дзвінок';
 }
+// Рядок дзвінка в чаті з погляду side: «Вихідний дзвінок · 1:23», «Пропущений дзвінок»…
+const callLine = (m, side) => (m.callState && m.callState !== 'ringing' ? callRowText({ from: m.callFrom, state: m.callState, dur: m.dur }, side) : m.text);
 const callMissed = (x, side) => (side === 'client' ? x.unreadClient : x.unreadBiz);
 function markCallsRead(side, pick) {
   const log = store.peek('callLog', []);
@@ -4036,8 +4073,10 @@ const washerBusy = (id, b) => own().find((x) => x !== b && x.masterId === id && 
 // Клієнт натиснув «Їду» чи «Запізнююсь» у нагадуванні.
 const etaText = (b) => (b.state !== 'paid' ? '' : [b.eta === 'onway' ? 'їде' : '', b.late ? `запізниться на ${b.late} хв` : ''].filter(Boolean).join(', '));
 
-const REQ_STATE = { new: ['Новий запит', 'warn'], answered: ['Відповіли', 'carcar'], added: ['Послугу додано', 'ok'], closed: ['Закрито', 'muted'] };
-const reqState = (r) => (r.closed ? 'closed' : r.service ? 'added' : r.messages.at(-1).from === 'client' ? 'new' : 'answered');
+const REQ_STATE = { new: ['Новий запит', 'warn'], answered: ['Відповіли', 'carcar'], added: ['Послугу додано', 'ok'], closed: ['Закрито', 'muted'], call: ['Дзвінок', ''] };
+// Рядки про дзвінки — службові, стан запиту за ними не змінюється.
+const lastWord = (r) => r.messages.findLast((m) => m.from !== 'sys');
+const reqState = (r) => (r.closed ? 'closed' : r.service ? 'added' : !lastWord(r) ? 'call' : lastWord(r).from === 'client' ? 'new' : 'answered');
 const ownRequests = () => requests.filter((r) => r.placeId === ui.place);
 
 // Записи, які вже минули, але мийка не позначила, чим вони закінчились.
@@ -4046,7 +4085,7 @@ const unmarked = () => own().filter((b) => (b.state === 'paid' || b.state === 'b
 const allMine = () => { const ids = accountPlaces(session()); return bookings.filter((b) => ids.includes(b.placeId)); };
 const pendingList = () => allMine().filter((b) => b.state === 'pending').sort((a, b) => confirmBy(a) - confirmBy(b));
 const unreadCount = () => own().filter((b) => b.chatUnreadBiz && b.state !== 'pending').length + pendingList().length + ownRequests().filter((r) => r.unreadBiz).length
-  + callHistory().filter((x) => x.placeId === ui.place && callMissed(x, 'place')).length;
+  + callHistory().filter((x) => !callLinked(x) && x.placeId === ui.place && callMissed(x, 'place')).length;
 const washLabel = (b) => (b.placeId !== ui.place ? `<span class="pill">${esc(placeById(b.placeId)?.name ?? '')}</span>` : '');
 // Візит почався: тільки тоді можна «Машина готова»; неявку — через lateMinutes після початку.
 const started = (b) => bookingStart(b) <= new Date();
@@ -4298,9 +4337,9 @@ function threads() {
     const [label, cls] = stateOf(b);
     return {
       id: `b-${b.id}`, kind: 'booking', name: who(b), at: last.at, unread: !!b.chatUnreadBiz, label, cls,
-      text: `${last.from === 'biz' ? 'Ви: ' : ''}${msgPreview(last)}`,
+      text: last.call ? callLine(last, 'place') : `${last.from === 'biz' ? 'Ви: ' : ''}${msgPreview(last)}`,
       sub: `${b.no ? `${bookingNo(b)} · ` : ''}${dayWord(b.date)}, ${b.time} · ${b.services[0]}${b.services.length > 1 ? ` +${b.services.length - 1}` : ''}`,
-      live: ACTIVE.includes(b.state),
+      live: ACTIVE.includes(b.state), hasCall: b.chat.some((m) => m.call),
     };
   });
   const rq = ownRequests().map((r) => {
@@ -4308,12 +4347,12 @@ function threads() {
     const [label, cls] = REQ_STATE[reqState(r)];
     return {
       id: `r-${r.id}`, kind: 'request', name: r.clientName || 'Клієнт', at: last.at, unread: !!r.unreadBiz, label, cls,
-      text: `${last.from === 'biz' ? 'Ви: ' : ''}${msgPreview(last)}`, sub: `Питання про послугу${r.car ? ` · ${r.car}` : ''}`,
-      live: !r.closed && !r.service,
+      text: last.call ? callLine(last, 'place') : `${last.from === 'biz' ? 'Ви: ' : ''}${msgPreview(last)}`, sub: `${lastWord(r) ? 'Питання про послугу' : 'Дзвінок через CARCAR'}${r.car ? ` · ${r.car}` : ''}`,
+      live: !r.closed && !r.service, hasCall: r.messages.some((m) => m.call),
     };
   });
-  // Дзвінки клієнтів через CARCAR: торкнутися — передзвонити.
-  const cl = callHistory().filter((x) => x.placeId === ui.place).map((x) => ({
+  // Давні дзвінки без чату (нові записуються в чат із клієнтом): торкнутися — передзвонити.
+  const cl = callHistory().filter((x) => !callLinked(x) && x.placeId === ui.place).map((x) => ({
     id: x.id, kind: 'call', call: x, name: x.clientName || 'Клієнт CARCAR', at: x.at, unread: !!x.unreadBiz,
     label: x.state === 'ended' ? 'Дзвінок' : x.from === 'client' ? 'Пропущений' : 'Без відповіді', cls: x.state === 'ended' ? '' : x.from === 'client' ? 'warn' : '',
     text: callRowText(x, 'place'), sub: 'Натисніть, щоб передзвонити', live: !!x.unreadBiz,
@@ -4333,9 +4372,9 @@ const callRow = (t) => `<li><button class="convo call-row${t.unread ? ' unread m
 
 function viewMessages() {
   const all = threads();
-  const pass = (t) => (ui.filter === 'all' ? true : ui.filter === 'new' ? t.unread : t.kind === ui.filter);
-  const list = all.filter(pass);
-  const count = (f) => all.filter((t) => (f === 'all' ? true : f === 'new' ? t.unread : t.kind === f)).length;
+  const fits = (t, f) => (f === 'all' ? true : f === 'new' ? t.unread : t.kind === f || (f === 'call' && t.hasCall));
+  const list = all.filter((t) => fits(t, ui.filter));
+  const count = (f) => all.filter((t) => fits(t, f)).length;
   return `<h1>Повідомлення</h1>
     ${pendingBlock()}
     ${reminders()}
@@ -4352,7 +4391,7 @@ function viewMessages() {
 
 function bubbleHtml(m) {
   if (m.from === 'mark') return `<li class="chat-mark ${m.kind}">${icon(m.kind === 'closed' ? 'x' : 'check', 14)}<b>${esc(m.text)}</b><time>${clock(m.at)}</time></li>`;
-  if (m.from === 'sys') return `<li class="bubble sys">${esc(m.text)}</li>`;
+  if (m.from === 'sys') return m.call ? `<li class="bubble sys call-log">${icon('phone', 14)}${esc(callLine(m, 'place'))}<time>${clock(m.at)}</time></li>` : `<li class="bubble sys">${esc(m.text)}</li>`;
   const me = m.from === 'biz';
   const photo = safePhoto(m.photo);
   return `<li class="bubble ${me ? 'me' : 'them'}${photo ? ' has-photo' : ''}"><span class="sr-only">${me ? 'Ви' : 'Клієнт'}: </span>${photo ? `<a class="chat-photo" href="${photo}" download="foto.jpg"><img src="${photo}" alt="Фото"></a>` : ''}${m.text ? `<span class="b-text">${esc(m.text)}</span>` : ''}<time>${clock(m.at)}${me ? `<span class="ticks" aria-hidden="true">${m.readAt ? '✓✓' : '✓'}</span>` : ''}</time></li>`;
@@ -6013,7 +6052,10 @@ document.addEventListener('click', async (e) => {
     const r = el.dataset.req ? requests.find((x) => x.id === el.dataset.req) : null;
     const pid = b?.placeId ?? r?.placeId ?? el.dataset.place ?? ui.place;
     const clientId = b?.clientId ?? r?.clientId ?? callHistory().find((x) => x.id === el.dataset.callId)?.clientId ?? 'device';
-    startCall({ bookingId: b?.id ?? null, reqId: r?.id ?? null, placeId: pid, placeName: placeById(pid)?.name ?? '', clientId, clientName: b ? who(b) : r?.clientName || el.dataset.name || 'Клієнт' });
+    // Дзвінок без чату (з журналу) — у поточний діалог з цим клієнтом, якщо він є.
+    const thread = b || r ? null : [...own().filter((x) => x.clientId === clientId && ACTIVE.includes(x.state)), ...ownRequests().filter((x) => x.clientId === clientId && !x.closed)]
+      .sort((x, y) => ((y.chat ?? y.messages ?? []).at(-1)?.at ?? y.at ?? 0) - ((x.chat ?? x.messages ?? []).at(-1)?.at ?? x.at ?? 0))[0];
+    startCall({ bookingId: b?.id ?? (thread && !thread.messages ? thread.id : null), reqId: r?.id ?? (thread?.messages ? thread.id : null), placeId: pid, placeName: placeById(pid)?.name ?? '', clientId, clientName: b ? who(b) : r?.clientName || el.dataset.name || 'Клієнт' });
     return;
   }
   if (action === 'dur') { durSheet(id); return; }
@@ -6632,7 +6674,7 @@ navigator.serviceWorker?.addEventListener('message', (e) => {
 });
 keepChatOnKeyboard();
 // Вхідні дзвінки клієнтів CARCAR — у будь-яку мийку акаунта.
-initCalls('place', (c) => !!session() && accountPlaces(session()).includes(c.placeId), { onLog: (c) => logCall(bookings, c, save) });
+initCalls('place', (c) => !!session() && accountPlaces(session()).includes(c.placeId), { onLog: (c) => logCall({ bookings, requests, save }, c) });
 route();
 
 </script>

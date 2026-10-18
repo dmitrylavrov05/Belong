@@ -18,7 +18,7 @@ import {
   stockOf, saveStock, stockLow, useStock, NOTE_TAGS, clientNoteKey, clientNotesOf, saveClientNote,
 } from './ops.js';
 import { ibanValid, normIban, formatIban, codeValid } from './partners.js';
-import { initCalls, startCall, logCall, callHistory, callRowText, callMissed, markCallsRead } from './call.js';
+import { initCalls, startCall, logCall, callHistory, callRowText, callMissed, markCallsRead, callLinked, callLine } from './call.js';
 
 // ---------- дані ----------
 
@@ -122,8 +122,10 @@ const washerBusy = (id, b) => own().find((x) => x !== b && x.masterId === id && 
 // Клієнт натиснув «Їду» чи «Запізнююсь» у нагадуванні.
 const etaText = (b) => (b.state !== 'paid' ? '' : [b.eta === 'onway' ? 'їде' : '', b.late ? `запізниться на ${b.late} хв` : ''].filter(Boolean).join(', '));
 
-const REQ_STATE = { new: ['Новий запит', 'warn'], answered: ['Відповіли', 'carcar'], added: ['Послугу додано', 'ok'], closed: ['Закрито', 'muted'] };
-const reqState = (r) => (r.closed ? 'closed' : r.service ? 'added' : r.messages.at(-1).from === 'client' ? 'new' : 'answered');
+const REQ_STATE = { new: ['Новий запит', 'warn'], answered: ['Відповіли', 'carcar'], added: ['Послугу додано', 'ok'], closed: ['Закрито', 'muted'], call: ['Дзвінок', ''] };
+// Рядки про дзвінки — службові, стан запиту за ними не змінюється.
+const lastWord = (r) => r.messages.findLast((m) => m.from !== 'sys');
+const reqState = (r) => (r.closed ? 'closed' : r.service ? 'added' : !lastWord(r) ? 'call' : lastWord(r).from === 'client' ? 'new' : 'answered');
 const ownRequests = () => requests.filter((r) => r.placeId === ui.place);
 
 // Записи, які вже минули, але мийка не позначила, чим вони закінчились.
@@ -132,7 +134,7 @@ const unmarked = () => own().filter((b) => (b.state === 'paid' || b.state === 'b
 const allMine = () => { const ids = accountPlaces(session()); return bookings.filter((b) => ids.includes(b.placeId)); };
 const pendingList = () => allMine().filter((b) => b.state === 'pending').sort((a, b) => confirmBy(a) - confirmBy(b));
 const unreadCount = () => own().filter((b) => b.chatUnreadBiz && b.state !== 'pending').length + pendingList().length + ownRequests().filter((r) => r.unreadBiz).length
-  + callHistory().filter((x) => x.placeId === ui.place && callMissed(x, 'place')).length;
+  + callHistory().filter((x) => !callLinked(x) && x.placeId === ui.place && callMissed(x, 'place')).length;
 const washLabel = (b) => (b.placeId !== ui.place ? `<span class="pill">${esc(placeById(b.placeId)?.name ?? '')}</span>` : '');
 // Візит почався: тільки тоді можна «Машина готова»; неявку — через lateMinutes після початку.
 const started = (b) => bookingStart(b) <= new Date();
@@ -384,9 +386,9 @@ function threads() {
     const [label, cls] = stateOf(b);
     return {
       id: `b-${b.id}`, kind: 'booking', name: who(b), at: last.at, unread: !!b.chatUnreadBiz, label, cls,
-      text: `${last.from === 'biz' ? 'Ви: ' : ''}${msgPreview(last)}`,
+      text: last.call ? callLine(last, 'place') : `${last.from === 'biz' ? 'Ви: ' : ''}${msgPreview(last)}`,
       sub: `${b.no ? `${bookingNo(b)} · ` : ''}${dayWord(b.date)}, ${b.time} · ${b.services[0]}${b.services.length > 1 ? ` +${b.services.length - 1}` : ''}`,
-      live: ACTIVE.includes(b.state),
+      live: ACTIVE.includes(b.state), hasCall: b.chat.some((m) => m.call),
     };
   });
   const rq = ownRequests().map((r) => {
@@ -394,12 +396,12 @@ function threads() {
     const [label, cls] = REQ_STATE[reqState(r)];
     return {
       id: `r-${r.id}`, kind: 'request', name: r.clientName || 'Клієнт', at: last.at, unread: !!r.unreadBiz, label, cls,
-      text: `${last.from === 'biz' ? 'Ви: ' : ''}${msgPreview(last)}`, sub: `Питання про послугу${r.car ? ` · ${r.car}` : ''}`,
-      live: !r.closed && !r.service,
+      text: last.call ? callLine(last, 'place') : `${last.from === 'biz' ? 'Ви: ' : ''}${msgPreview(last)}`, sub: `${lastWord(r) ? 'Питання про послугу' : 'Дзвінок через CARCAR'}${r.car ? ` · ${r.car}` : ''}`,
+      live: !r.closed && !r.service, hasCall: r.messages.some((m) => m.call),
     };
   });
-  // Дзвінки клієнтів через CARCAR: торкнутися — передзвонити.
-  const cl = callHistory().filter((x) => x.placeId === ui.place).map((x) => ({
+  // Давні дзвінки без чату (нові записуються в чат із клієнтом): торкнутися — передзвонити.
+  const cl = callHistory().filter((x) => !callLinked(x) && x.placeId === ui.place).map((x) => ({
     id: x.id, kind: 'call', call: x, name: x.clientName || 'Клієнт CARCAR', at: x.at, unread: !!x.unreadBiz,
     label: x.state === 'ended' ? 'Дзвінок' : x.from === 'client' ? 'Пропущений' : 'Без відповіді', cls: x.state === 'ended' ? '' : x.from === 'client' ? 'warn' : '',
     text: callRowText(x, 'place'), sub: 'Натисніть, щоб передзвонити', live: !!x.unreadBiz,
@@ -419,9 +421,9 @@ const callRow = (t) => `<li><button class="convo call-row${t.unread ? ' unread m
 
 function viewMessages() {
   const all = threads();
-  const pass = (t) => (ui.filter === 'all' ? true : ui.filter === 'new' ? t.unread : t.kind === ui.filter);
-  const list = all.filter(pass);
-  const count = (f) => all.filter((t) => (f === 'all' ? true : f === 'new' ? t.unread : t.kind === f)).length;
+  const fits = (t, f) => (f === 'all' ? true : f === 'new' ? t.unread : t.kind === f || (f === 'call' && t.hasCall));
+  const list = all.filter((t) => fits(t, ui.filter));
+  const count = (f) => all.filter((t) => fits(t, f)).length;
   return `<h1>Повідомлення</h1>
     ${pendingBlock()}
     ${reminders()}
@@ -438,7 +440,7 @@ function viewMessages() {
 
 function bubbleHtml(m) {
   if (m.from === 'mark') return `<li class="chat-mark ${m.kind}">${icon(m.kind === 'closed' ? 'x' : 'check', 14)}<b>${esc(m.text)}</b><time>${clock(m.at)}</time></li>`;
-  if (m.from === 'sys') return `<li class="bubble sys">${esc(m.text)}</li>`;
+  if (m.from === 'sys') return m.call ? `<li class="bubble sys call-log">${icon('phone', 14)}${esc(callLine(m, 'place'))}<time>${clock(m.at)}</time></li>` : `<li class="bubble sys">${esc(m.text)}</li>`;
   const me = m.from === 'biz';
   const photo = safePhoto(m.photo);
   return `<li class="bubble ${me ? 'me' : 'them'}${photo ? ' has-photo' : ''}"><span class="sr-only">${me ? 'Ви' : 'Клієнт'}: </span>${photo ? `<a class="chat-photo" href="${photo}" download="foto.jpg"><img src="${photo}" alt="Фото"></a>` : ''}${m.text ? `<span class="b-text">${esc(m.text)}</span>` : ''}<time>${clock(m.at)}${me ? `<span class="ticks" aria-hidden="true">${m.readAt ? '✓✓' : '✓'}</span>` : ''}</time></li>`;
@@ -2099,7 +2101,10 @@ document.addEventListener('click', async (e) => {
     const r = el.dataset.req ? requests.find((x) => x.id === el.dataset.req) : null;
     const pid = b?.placeId ?? r?.placeId ?? el.dataset.place ?? ui.place;
     const clientId = b?.clientId ?? r?.clientId ?? callHistory().find((x) => x.id === el.dataset.callId)?.clientId ?? 'device';
-    startCall({ bookingId: b?.id ?? null, reqId: r?.id ?? null, placeId: pid, placeName: placeById(pid)?.name ?? '', clientId, clientName: b ? who(b) : r?.clientName || el.dataset.name || 'Клієнт' });
+    // Дзвінок без чату (з журналу) — у поточний діалог з цим клієнтом, якщо він є.
+    const thread = b || r ? null : [...own().filter((x) => x.clientId === clientId && ACTIVE.includes(x.state)), ...ownRequests().filter((x) => x.clientId === clientId && !x.closed)]
+      .sort((x, y) => ((y.chat ?? y.messages ?? []).at(-1)?.at ?? y.at ?? 0) - ((x.chat ?? x.messages ?? []).at(-1)?.at ?? x.at ?? 0))[0];
+    startCall({ bookingId: b?.id ?? (thread && !thread.messages ? thread.id : null), reqId: r?.id ?? (thread?.messages ? thread.id : null), placeId: pid, placeName: placeById(pid)?.name ?? '', clientId, clientName: b ? who(b) : r?.clientName || el.dataset.name || 'Клієнт' });
     return;
   }
   if (action === 'dur') { durSheet(id); return; }
@@ -2718,7 +2723,7 @@ navigator.serviceWorker?.addEventListener('message', (e) => {
 });
 keepChatOnKeyboard();
 // Вхідні дзвінки клієнтів CARCAR — у будь-яку мийку акаунта.
-initCalls('place', (c) => !!session() && accountPlaces(session()).includes(c.placeId), { onLog: (c) => logCall(bookings, c, save) });
+initCalls('place', (c) => !!session() && accountPlaces(session()).includes(c.placeId), { onLog: (c) => logCall({ bookings, requests, save }, c) });
 route();
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
