@@ -1,7 +1,7 @@
 // Адмінка CARCAR: зведена статистика платформи, модерація підключення точок, відгуків і спорів, комісії.
 // Працює з тими самими даними, що й застосунок клієнта та CarCar Business (сховище цього пристрою).
 // У робочій версії сюди мають доступ лише співробітники CARCAR (вхід із двофакторною автентифікацією).
-import { CATEGORIES, PLACES, PAYMENT } from './data.js';
+import { CATEGORIES, PLACES, PAYMENT, CITIES } from './data.js';
 import {
   store, icon, esc, uah, pad, isoDate, parseDate, plural, dayLabel, rating, fmtTime, fmtDate, catById, WEEKDAYS, bookingStart, HOUR,
   PARTNER_STATUS, partnerOf, savePartner, commissionFor, isCarcar, price, placeShare, isFrozen,
@@ -9,7 +9,7 @@ import {
   ratingFor, visibleReviews, ACTIVE, chargedOf, resolveDispute, resolveLate, settleAll, applyOverrides, promosAll, savePromos, promoUses, promoText,
   TICKET_TOPICS, TICKET_STATUS, ticketsAll, ticketReply, setTicket, ticketOverdue, slaHours, fraudState, saveFraud, staffOf, phoneKey,
   addCustomPlace, uid, hash,
-  leadFee, isListed, enterView, bizApps, APP_STATUS, approveBizApp, rejectBizApp, bookingNo, findByNo, ticketPhotos, shrinkPhoto,
+  leadFee, isListed, createPlace, enterView, bizApps, APP_STATUS, approveBizApp, rejectBizApp, bookingNo, findByNo, ticketPhotos, shrinkPhoto,
   hasServer, api, authToken, setAuthToken, isDemoPlace, demoPlacesOn, demoWashOn, demoLoginOn, serverConfig,
 } from './core.js';
 import { ENTITY, TAX, codeValid, ibanValid, ibanBank, formatIban } from './partners.js';
@@ -201,7 +201,9 @@ const PLACE_FILTERS = {
 function viewPlaces() {
   const all = PLACES.map((p) => ({ p, pt: partnerOf(p.id) }));
   const list = all.filter(({ pt }) => PLACE_FILTERS[ui.places][1](pt));
-  return `<h1>Точки</h1><p class="page-sub">Перевірка юрособи, документів і реквізитів, оферта, статус у каталозі й комісія</p>
+  return `<div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><h1 style="margin:0">Точки</h1>
+      <a class="btn primary" href="#/places/new">${icon('plus', 18)}Додати мийку</a></div>
+    <p class="page-sub">Перевірка юрособи, документів і реквізитів, оферта, статус у каталозі й комісія</p>
     <div class="filters"><div class="seg" role="group" aria-label="Фільтр точок">
       ${Object.entries(PLACE_FILTERS).map(([k, [label, fn]]) => `<button data-action="place-filter" data-f="${k}" aria-pressed="${ui.places === k}">${label} · ${all.filter(({ pt }) => fn(pt)).length}</button>`).join('')}
     </div></div>
@@ -244,6 +246,109 @@ function relPanel(id) {
 }
 
 const check = (ok, yes, no) => `<li class="${ok ? 'ok-text' : 'bad-text'}">${icon(ok ? 'checkCircle' : 'warn', 16)}${ok ? yes : no}</li>`;
+
+// ---------- нова мийка (адміністрація додає сама, за даними з Google Карт) ----------
+
+const DAY_SHORT = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
+const hm = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+const weekText = (week) => (week ? week.map((d, i) => `${DAY_SHORT[i]} ${d ? `${hm(d[0])}–${d[1] >= 1440 ? '24:00' : hm(d[1])}` : 'вихідний'}`).join(' · ') : '');
+const placeDraft = () => (ui.newPlace ??= { name: '', city: CITIES[0].name, address: '', phone: '', boxes: 2, lat: '', lng: '', about: '', week: null, photos: [], pick: [] });
+
+function viewAddPlace() {
+  const d = placeDraft();
+  const done = ui.placeCreated;
+  const found = ui.placeFound;
+  return `<a class="back" href="#/places">${icon('chevL', 20)}Точки</a><h1>Нова мийка</h1>
+    ${done ? `<div class="notice ok stack" style="gap:6px"><b>Мийку «${esc(done.name)}» додано${done.published ? ' й опубліковано в каталозі' : ''}</b>
+      ${done.login ? `<span>Доступ до CarCar Business: логін <b class="code">${esc(done.login)}</b>, пароль <b class="code">${esc(done.password)}</b>. Передайте їх власнику мийки — пароль більше ніде не показується.</span>` : ''}
+      <span class="row" style="gap:8px"><a class="btn" href="#/places/${done.placeId}">Картка точки</a><button class="btn" type="button" data-action="place-another">Додати ще одну</button></span></div>` : `
+    <section class="panel stack" aria-labelledby="h-find" style="gap:10px">
+      <h2 id="h-find" style="margin:0">Знайти на картах</h2>
+      <form id="place-find" class="inline-form">
+        <label class="field" style="flex:1"><span>Посилання з Google Карт або назва й місто</span><input name="q" autocomplete="off" placeholder="https://maps.app.goo.gl/… або «Автомийка Хмаринка Київ»" value="${esc(ui.placeQ ?? '')}"></label>
+        <button class="btn primary" type="submit">${icon('search', 18)}Знайти</button>
+      </form>
+      <p class="small muted" style="margin:0">${!hasServer() ? 'Пошук на картах працює на сервері CARCAR. Тут можна заповнити дані вручну.'
+        : srv?.googlePlaces ? 'Дані з Google Карт: назва, адреса, координати, телефон, графік роботи, рейтинг і фото.'
+          : 'Ключа Google Places не налаштовано — шукаємо в OpenStreetMap (адреса й координати, інколи телефон і графік). Як підключити Google — deploy/ubuntu/README.md.'}</p>
+      ${ui.placeBusy ? '<p class="small muted" role="status" style="margin:0">Шукаємо…</p>' : ''}
+      ${found?.error ? `<p class="notice warn" role="alert" style="margin:0">${esc(found.error)}</p>` : ''}
+      ${found?.results ? (found.results.length ? `<div class="stack" style="gap:8px">${found.results.map((r, i) => `<div class="card row" style="justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <span style="min-width:0"><b>${esc(r.name)}</b><small class="muted" style="display:block">${esc([r.address, r.city].filter(Boolean).join(', '))}${r.phone ? ` · ${esc(r.phone)}` : ''}</small>
+            ${r.rating ? `<small style="display:block">★ ${String(r.rating).replace('.', ',')} · ${r.ratingCount ?? 0} відгуків у Google</small>` : ''}
+            ${r.week ? `<small class="muted" style="display:block">${esc(weekText(r.week))}</small>` : ''}</span>
+          <button class="btn" type="button" data-action="place-use" data-i="${i}">Заповнити</button></div>`).join('')}</div>`
+        : '<p class="small muted" style="margin:0">Нічого не знайдено. Спробуйте назву разом із містом або посилання «Поділитися» з Google Карт.</p>') : ''}
+    </section>
+    <form class="panel stack" id="place-new" style="gap:12px;margin-top:12px">
+      <h2 style="margin:0">Дані мийки</h2>
+      <div class="form-grid">
+        <label class="field"><span>Назва</span><input name="name" required maxlength="80" value="${esc(d.name)}"></label>
+        <label class="field"><span>Місто</span><select name="city">${CITIES.map((c) => `<option ${c.name === d.city ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>
+        <label class="field"><span>Адреса</span><input name="address" required maxlength="120" value="${esc(d.address)}"></label>
+        <label class="field"><span>Телефон мийки</span><input name="phone" type="tel" maxlength="30" value="${esc(d.phone)}"></label>
+        <label class="field"><span>Боксів</span><input name="boxes" type="number" min="1" max="30" value="${esc(String(d.boxes))}"></label>
+        <label class="field"><span>Широта</span><input name="lat" inputmode="decimal" value="${esc(String(d.lat ?? ''))}" placeholder="заповниться з карти"></label>
+        <label class="field"><span>Довгота</span><input name="lng" inputmode="decimal" value="${esc(String(d.lng ?? ''))}" placeholder="заповниться з карти"></label>
+      </div>
+      <label class="field"><span>Опис для клієнтів (необовʼязково)</span><textarea name="about" rows="2" maxlength="600">${esc(d.about)}</textarea></label>
+      <p class="small" style="margin:0"><b>Графік:</b> ${d.week ? esc(weekText(d.week)) : 'щодня 08:00–21:00 (мийка змінить у кабінеті)'}</p>
+      ${d.photos.length ? `<fieldset class="check-grid"><legend>Фото з карт (позначені додамо в профіль)</legend>
+        ${d.photos.map((src, i) => `<label class="check-row"><input class="check" type="checkbox" name="photo" value="${i}" ${d.pick.includes(i) ? 'checked' : ''}><img src="${src}" alt="Фото ${i + 1}" style="width:96px;height:64px;object-fit:cover;border-radius:8px"></label>`).join('')}
+      </fieldset>` : ''}
+      <label class="check-row"><input class="check" type="checkbox" name="publish" checked><span><b>Одразу опублікувати в каталозі</b><small class="muted">Інакше мийка перевірить дані в кабінеті й опублікується сама</small></span></label>
+      <label class="check-row"><input class="check" type="checkbox" name="account" checked><span><b>Видати логін і пароль до CarCar Business</b><small class="muted">Щоб мийка приймала записи</small></span></label>
+      <button class="btn primary" type="submit" style="align-self:flex-start">Додати мийку</button>
+    </form>`}`;
+}
+
+// Поточні значення форми — щоб не загубити введене, коли сторінка перемальовується (пошук, фото).
+function keepPlaceDraft() {
+  const f = $('#place-new');
+  if (!f) return;
+  const d = placeDraft();
+  const fd = new FormData(f);
+  for (const k of ['name', 'city', 'address', 'phone', 'boxes', 'lat', 'lng', 'about']) d[k] = String(fd.get(k) ?? d[k] ?? '');
+  d.pick = fd.getAll('photo').map(Number);
+}
+
+async function placeFind(q) {
+  keepPlaceDraft();
+  ui.placeQ = q;
+  if (!hasServer()) { ui.placeFound = { error: 'Пошук на картах працює на сервері CARCAR' }; rerender(); return; }
+  ui.placeBusy = true;
+  ui.placeFound = null;
+  rerender();
+  const r = await api(`admin/place-lookup?q=${encodeURIComponent(q)}`);
+  ui.placeBusy = false;
+  ui.placeFound = r.ok ? { results: r.data.results ?? [] } : { error: r.data.error ?? 'Не вдалося знайти' };
+  rerender();
+}
+
+async function placeUse(i) {
+  keepPlaceDraft();
+  const r = ui.placeFound?.results?.[i];
+  if (!r) return;
+  const d = placeDraft();
+  const city = CITIES.find((c) => c.name === r.city)?.name;
+  Object.assign(d, {
+    name: r.name || d.name, address: r.address || d.address, phone: r.phone || d.phone, lat: r.lat ?? d.lat, lng: r.lng ?? d.lng,
+    about: r.about || d.about, week: r.week || d.week, googleId: r.googleId ?? null, googleUrl: r.googleUrl ?? '', source: r.source,
+    ...(city ? { city } : {}), photos: [], pick: [],
+  });
+  ui.placeFound = null;
+  rerender();
+  toast(city || !r.city ? 'Дані підставлено — перевірте й додайте мийку' : `Місто «${r.city}» немає в списку — оберіть вручну`);
+  // Фото з Google — до трьох, у фоні.
+  for (const name of (r.photos ?? []).slice(0, 3)) {
+    const ph = await api(`admin/place-photo?name=${encodeURIComponent(name)}`);
+    if (!ph.ok || placeDraft() !== d) break;
+    keepPlaceDraft();
+    d.photos.push(ph.data.photo);
+    d.pick.push(d.photos.length - 1);
+    rerender();
+  }
+}
 
 function viewPlace(id) {
   const p = PLACES.find((x) => x.id === id);
@@ -1283,7 +1388,7 @@ function route() {
   const view = $('#view');
   if (page === '') view.innerHTML = viewOverview();
   else if (page === 'applications') view.innerHTML = viewApplications();
-  else if (page === 'places') view.innerHTML = arg ? viewPlace(arg) : viewPlaces();
+  else if (page === 'places') view.innerHTML = arg === 'new' ? viewAddPlace() : arg ? viewPlace(arg) : viewPlaces();
   else if (page === 'reviews') view.innerHTML = viewReviews();
   else if (page === 'disputes') view.innerHTML = viewDisputes();
   else if (page === 'commission') view.innerHTML = viewCommission();
@@ -1311,6 +1416,8 @@ document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-action]');
   if (!el) return;
   const { action, id } = el.dataset;
+  if (action === 'place-use') { placeUse(Number(el.dataset.i)); return; }
+  if (action === 'place-another') { ui.newPlace = null; ui.placeCreated = null; ui.placeFound = null; ui.placeQ = ''; rerender(); return; }
   if (action === 'demo-all-off') {
     if (!confirm('Вимкнути все демо? Клієнти бачитимуть лише справжні мийки.')) return;
     saveDemo({ demoPlaces: false, demoWash: false, ...(srv?.telegramBot ? { demoLogin: false } : {}) });
@@ -1415,6 +1522,28 @@ document.addEventListener('submit', async (e) => {
   const f = e.target;
   e.preventDefault();
   const d = new FormData(f);
+  if (f.id === 'place-find') {
+    const q = String(d.get('q') ?? '').trim();
+    if (q) placeFind(q);
+    return;
+  }
+  if (f.id === 'place-new') {
+    keepPlaceDraft();
+    const p = placeDraft();
+    const num = (v) => (String(v).trim() === '' ? NaN : Number(String(v).replace(',', '.')));
+    const res = await createPlace({
+      name: p.name.trim(), city: p.city, address: p.address.trim(), phone: p.phone.trim(), boxes: Number(p.boxes) || 1,
+      lat: num(p.lat), lng: num(p.lng), about: p.about.trim(), photos: p.pick.map((i) => p.photos[i]).filter(Boolean),
+      schedule: p.week ? { week: p.week } : null, googleId: p.googleId, googleUrl: p.googleUrl, source: p.source === 'google' ? 'google' : 'admin',
+    }, { publish: d.get('publish') === 'on', account: d.get('account') === 'on' });
+    ui.placeCreated = { ...res, name: p.name.trim(), published: d.get('publish') === 'on' };
+    ui.newPlace = null;
+    applyOverrides();
+    load();
+    rerender();
+    toast('Мийку додано');
+    return;
+  }
   if (f.id === 'demo-form') {
     saveDemo({ demoPlaces: d.get('demoPlaces') === 'on', demoWash: d.get('demoWash') === 'on', ...(srv?.telegramBot ? { demoLogin: d.get('demoLogin') === 'on' } : {}) });
     return;

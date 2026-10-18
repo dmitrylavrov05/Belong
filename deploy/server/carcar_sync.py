@@ -46,6 +46,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import acl  # noqa: E402
 from auth import Sessions, TelegramBot, biz_hash, check_admin, make_admin_hash, tg_link_url  # noqa: E402
 from pay import LiqPay  # noqa: E402
+import places_lookup  # noqa: E402
 from push import WebPush  # noqa: E402
 
 KEY_RE = re.compile(r'^[A-Za-z0-9_.:\-]{1,120}$')  # wallet.tel:380… — двокрапка теж
@@ -623,7 +624,8 @@ def make_handler(app):
                     'telegramBot': cfg.get('telegram_bot') if cfg.get('telegram_token') else None,
                     'demoLogin': setting('demoLogin'), 'demoWash': setting('demoWash'), 'demoPlaces': setting('demoPlaces'),
                     'payments': 'liqpay' if app['liqpay'].on else 'demo', 'sandbox': app['liqpay'].sandbox,
-                    'vapid': app['webpush'].public if app['webpush'].ok else None, 'turn': bool(cfg.get('turn'))})
+                    'vapid': app['webpush'].public if app['webpush'].ok else None, 'turn': bool(cfg.get('turn')),
+                    'googlePlaces': bool(cfg.get('google_places_key'))})
             if p == '/api/me':
                 w = self.who()
                 return self.send_json(200, {'role': w.role, 'cid': w.cid, 'login': w.login, 'demo': w.demo, 'places': sorted(w.places)})
@@ -654,6 +656,24 @@ def make_handler(app):
                 phone, name, _ = row
                 token = sessions.create('client', {'cid': phone})
                 return self.send_json(200, {'token': token, 'phone': phone, 'name': name})
+            if p in ('/api/admin/place-lookup', '/api/admin/place-photo'):
+                if not self.who().admin:
+                    return self.send_json(403, {'error': 'Лише для адміністрації'})
+                try:
+                    if p == '/api/admin/place-photo':
+                        if not cfg.get('google_places_key'):
+                            return self.send_json(400, {'error': 'Немає ключа Google Places'})
+                        url = places_lookup.google_photo(cfg['google_places_key'], (q.get('name') or [''])[0], cfg.get('google_places_url') or places_lookup.GOOGLE)
+                        return self.send_json(200, {'photo': url})
+                    text = (q.get('q') or [''])[0][:500]
+                    if not text.strip():
+                        return self.send_json(400, {'error': 'Вставте посилання на Google Карти або назву й місто'})
+                    found, source = places_lookup.lookup(cfg, text)
+                    return self.send_json(200, {'results': found, 'source': source})
+                except urllib.error.HTTPError as e:
+                    return self.send_json(502, {'error': 'Google не прийняв ключ або вичерпано ліміт' if e.code in (401, 403, 429) else f'Сервіс карт відповів помилкою {e.code}'})
+                except Exception:
+                    return self.send_json(502, {'error': 'Сервіс карт зараз недоступний'})
             if p == '/api/vehicle':
                 w = self.who()
                 if w.role == 'anon':

@@ -58,6 +58,38 @@ class Server(unittest.TestCase):
 
             def log_message(h, *a):
                 pass
+        class Goo(BaseHTTPRequestHandler):
+            def do_POST(h):
+                body = json.loads(h.rfile.read(int(h.headers.get('Content-Length') or 0)))
+                cls.goo_req = (h.path, h.headers.get('X-Goog-Api-Key'), body)
+                data = json.dumps({'places': [{
+                    'id': 'ChIJ1', 'displayName': {'text': 'Автомийка Хмаринка'}, 'formattedAddress': 'вулиця Хрещатик, 1, Київ, Україна, 02000',
+                    'location': {'latitude': 50.447, 'longitude': 30.522}, 'internationalPhoneNumber': '+380 44 123 4567',
+                    'regularOpeningHours': {'periods': [{'open': {'day': d, 'hour': 8, 'minute': 0}, 'close': {'day': d, 'hour': 21, 'minute': 0}} for d in range(1, 6)],
+                                            'weekdayDescriptions': ['понеділок: 08:00–21:00']},
+                    'rating': 4.7, 'userRatingCount': 312, 'googleMapsUri': 'https://maps.google.com/?cid=1',
+                    'addressComponents': [{'longText': 'Київ', 'types': ['locality', 'political']}],
+                    'photos': [{'name': 'places/ChIJ1/photos/AbC'}]}]}).encode()
+                h.send_response(200)
+                h.send_header('Content-Type', 'application/json')
+                h.send_header('Content-Length', str(len(data)))
+                h.end_headers()
+                h.wfile.write(data)
+
+            def do_GET(h):
+                data = b'\xff\xd8\xffJPEG'
+                h.send_response(200)
+                h.send_header('Content-Type', 'image/jpeg')
+                h.send_header('Content-Length', str(len(data)))
+                h.end_headers()
+                h.wfile.write(data)
+
+            def log_message(h, *a):
+                pass
+        cls.goo = HTTPServer(('127.0.0.1', 0), Goo)
+        threading.Thread(target=cls.goo.serve_forever, daemon=True).start()
+        cfg['google_places_key'] = 'gkey'
+        cfg['google_places_url'] = f'http://127.0.0.1:{cls.goo.server_port}'
         cls.gai = HTTPServer(('127.0.0.1', 0), Gai)
         threading.Thread(target=cls.gai.serve_forever, daemon=True).start()
         cfg['vehicle_api'] = {'key': 'test-key', 'url': f'http://127.0.0.1:{cls.gai.server_port}/nomer/{{plate}}'}
@@ -83,6 +115,8 @@ class Server(unittest.TestCase):
         cls.proc.wait()
         cls.gai.shutdown()
         cls.gai.server_close()
+        cls.goo.shutdown()
+        cls.goo.server_close()
         cls.proc.stdout.close()
 
     def call(self, method, path, body=None, token=None, form=False):
@@ -405,6 +439,33 @@ class Server(unittest.TestCase):
         self.assertEqual([h for h in self.gai_hits if h[0].endswith('BC1234HH')], [('/nomer/BC1234HH', 'test-key')])
         j = self.call('GET', '/api/vehicle?plate=AA0000AA', token=ira)[1]
         self.assertEqual((j['car'], j['error']), (None, 'Ліміт перевірок номерів вичерпано'))
+
+    def test_17_place_from_google_maps(self):
+        ira, _ = self.login_client('067 111 11 11')
+        self.assertEqual(self.call('GET', '/api/admin/place-lookup?q=x', token=ira)[0], 403)  # лише адмінка
+        _, j = self.call('POST', '/api/auth/admin', {'password': 'secret-admin'})
+        admin = j['token']
+        code, j = self.call('GET', '/api/admin/place-lookup?q=' + urllib.request.quote('Хмаринка Київ'), token=admin)
+        self.assertEqual((code, j['source']), (200, 'google'))
+        r = j['results'][0]
+        self.assertEqual((r['name'], r['city'], r['address'], r['phone'], r['rating']), ('Автомийка Хмаринка', 'Київ', 'вулиця Хрещатик, 1', '+380 44 123 4567', 4.7))
+        self.assertEqual(r['week'][0], [480, 1260])  # понеділок 08:00–21:00
+        self.assertIsNone(r['week'][6])  # неділя — вихідний
+        self.assertEqual(self.goo_req[1], 'gkey')
+        photo = self.call('GET', '/api/admin/place-photo?name=places/ChIJ1/photos/AbC', token=admin)[1]['photo']
+        self.assertTrue(photo.startswith('data:image/jpeg;base64,'))
+        self.assertEqual(self.call('GET', '/api/admin/place-photo?name=../../etc', token=admin)[0], 502)
+
+    def test_18_maps_links_and_hours(self):
+        sys.path.insert(0, HERE)
+        import places_lookup as pl
+        fetch = lambda url, *a, **k: ('https://www.google.com/maps/place/%D0%90%D0%B2%D1%82%D0%BE%D0%BC%D0%B8%D0%B9%D0%BA%D0%B0+%D0%9B%D1%96%D0%B4%D0%B5%D1%80/@50.4012,30.6543,17z/data=!3d50.40123!4d30.65432', b'', '')
+        link = pl.parse_maps_link('https://maps.app.goo.gl/abc', fetch)
+        self.assertEqual((link['name'], link['loc']), ('Автомийка Лідер', (50.40123, 30.65432)))
+        self.assertIsNone(pl.parse_maps_link('Мийка Лідер Київ', fetch))
+        self.assertEqual(pl._week_from_osm('Mo-Fr 08:00-20:00; Sa,Su 09:00-18:00')[5], [540, 1080])
+        self.assertEqual(pl._week_from_osm('24/7'), [[0, 1440]] * 7)
+        self.assertEqual(pl._week_from_google({'periods': [{'open': {'day': 0, 'hour': 0, 'minute': 0}}]}), [[0, 1440]] * 7)
 
     def test_99_login_rate_limit(self):
         codes = [self.call('POST', '/api/auth/admin', {'password': 'x'})[0] for _ in range(12)]

@@ -126,6 +126,22 @@ sudo systemctl restart carcar-sync
 на диску й година на перше завантаження): `sudo systemctl enable --now carcar-vehicles.timer && sudo systemctl start
 --no-block carcar-vehicles`. Тоді спершу шукаємо в копії, а якщо номера там немає — в онлайн-сервісі.
 
+### Мийка з Google Карт (адмінка)
+
+Адмінка → «Точки» → «Додати мийку». Вставте посилання з Google Карт («Поділитися» → «Копіювати посилання»)
+або назву з містом і натисніть «Знайти» → «Заповнити»: назва, адреса, координати, телефон, графік, рейтинг і до 3 фото
+підставляться самі. Далі — «Додати мийку»: вона одразу в каталозі (можна вимкнути), а адмінка показує логін і пароль
+до CarCar Business для власника.
+
+Без ключа Google — дані з OpenStreetMap (адреса й координати, інколи телефон і графік). Щоб брати все з Google:
+
+1. [console.cloud.google.com](https://console.cloud.google.com) → створіть проєкт → «APIs & Services» → увімкніть **Places API (New)**
+   (потрібен платіжний акаунт; Google дає безкоштовний щомісячний ліміт — перевірте актуальні умови).
+2. «Credentials» → «Create credentials» → «API key». Обмежте ключ: «API restrictions» → лише Places API (New).
+3. У `/etc/carcar/config.json`: `"google_places_key": "ваш-ключ"`, потім `sudo systemctl restart carcar-sync`.
+
+Ключ лишається на сервері; запити до Google йдуть лише з адмінки, коли ви шукаєте мийку.
+
 ### Юридичні сторінки
 
 `autoservice/app/legal/`: політика конфіденційності, умови для клієнтів, договір для мийок. Це шаблони —

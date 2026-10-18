@@ -2570,6 +2570,37 @@ async function approveBizApp(id) {
   return { login, password, placeId };
 }
 
+// Мийку додає сама адміністрація (наприклад, за даними з Google Карт): точка, профіль для клієнтів, статус,
+// за бажанням — одразу в каталозі й логін до кабінету для власника.
+async function createPlace(d, { publish = true, account = true } = {}) {
+  const placeId = `p_${uid()}`;
+  const c = (CITIES.find((x) => x.name === d.city) ?? CITIES[0]).center;
+  const lat = Number.isFinite(d.lat) ? d.lat : c.lat + (Math.random() - 0.5) * 0.03;
+  const lng = Number.isFinite(d.lng) ? d.lng : c.lng + (Math.random() - 0.5) * 0.05;
+  addCustomPlace({
+    id: placeId, custom: true, name: d.name, cats: ['wash'], city: d.city || CITIES[0].name, district: d.district || '', address: d.address, phone: d.phone || '',
+    boxes: Math.max(1, Number(d.boxes) || 1), hours: [8, 21], lat, lng, tags: [], createdAt: Date.now(), source: d.source || 'admin',
+    ...(d.googleId ? { googleId: d.googleId, googleUrl: d.googleUrl || '' } : {}),
+    services: Object.entries(SERVICE_TEMPLATES.wash).map(([sid, x]) => ({ id: sid, ...x, price: [...x.price] })),
+  });
+  const profile = {
+    ...(d.schedule ? { schedule: d.schedule } : {}),
+    ...(d.about ? { about: d.about } : {}),
+    ...(d.photos?.length ? { photos: d.photos } : {}),
+  };
+  if (Object.keys(profile).length) saveOverride(placeId, profile);
+  savePartner(placeId, {
+    status: publish ? 'approved' : 'setup', ...(publish ? { publishedAt: Date.now() } : {}),
+    history: [{ at: Date.now(), by: 'admin', status: publish ? 'approved' : 'setup', note: publish ? 'Мийку додала адміністрація й опублікувала' : 'Мийку додала адміністрація' }],
+  });
+  if (!account) return { placeId };
+  let login = slug(d.name);
+  while (bizAccounts().some((x) => x.login === login)) login = `${slug(d.name)}${Math.floor(10 + Math.random() * 90)}`;
+  const password = randomPass();
+  store.set('biz.accounts', [...bizAccounts(), { login, hash: await hashPass(login, password), placeId, createdAt: Date.now(), byAdmin: true }]);
+  return { placeId, login, password };
+}
+
 function rejectBizApp(id, reason) {
   const apps = bizApps();
   const a = apps.find((x) => x.id === id);
