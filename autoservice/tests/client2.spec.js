@@ -475,3 +475,72 @@ test('оновлення з сервера не гортає сторінку в
   await page.goto('/#/bookings');
   expect(await page.evaluate(() => scrollY)).toBe(0);
 });
+
+test('нажали на послугу на сторінці мийки — одразу запис з нею; фото можна обрати й з файлів', async ({ page }) => {
+  await page.goto('/#/place/blysk');
+  await page.getByRole('button', { name: /Записатися: Комплекс: кузов \+ салон/ }).click();
+  await expect(page).toHaveURL(/#\/book\/blysk$/);
+  await expect(page.getByLabel(/Комплекс: кузов \+ салон/)).toBeChecked();
+  // Інша основна мийка замінює обрану, а не додається.
+  await page.goto('/#/place/blysk');
+  await page.getByRole('button', { name: /Записатися: Експрес-мийка кузова/ }).click();
+  await expect(page.getByLabel(/Експрес-мийка кузова/)).toBeChecked();
+  await expect(page.getByLabel(/Комплекс: кузов \+ салон/)).not.toBeChecked();
+  await page.locator('[data-action="to-time"]').click();
+  await page.getByRole('button', { name: /Завтра/ }).click();
+  await page.locator('.slot[data-time="10:00"]').click();
+  await page.locator('[data-action="confirm"]').click();
+  await page.getByRole('button', { name: /^Оплатити/ }).click();
+  await expect(page.locator('#toast')).toHaveText('Оплачено, ви записані');
+  // Поля фото приймають і файли (на Android відкривається вибір з «Файлів», а не лише галерея).
+  await page.goto('/#/garage');
+  await expect(page.locator('#avatar-file')).toHaveAttribute('accept', /\.jpg/);
+});
+
+test('перемальовування не губить підставлене за номером, ширина каталогу — по екрану, чат не стрибає вниз', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const remote = (key) => page.evaluate((k) => window.dispatchEvent(new StorageEvent('storage', { key: `carcar.${k}` })), key);
+  // Каталог не ширший за екран (інакше сторінка їздить убік).
+  await page.goto('/');
+  await expect(page.locator('#list article').first()).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+
+  // Гараж: дані за номером підставились — оновлення з сервера їх не стирає.
+  await page.goto('/#/garage/add');
+  const f = page.locator('#carform');
+  await f.getByLabel('Держномер').pressSequentially('aa1234bb');
+  await expect(f.getByLabel('Модель')).toHaveValue('Octavia');
+  await remote('bookings');
+  await page.waitForTimeout(300);
+  await expect(f.getByLabel('Модель')).toHaveValue('Octavia');
+  await expect(page.locator('#plate-result')).toContainText('Skoda Octavia');
+  // Перемикач сповіщень на тому ж екрані теж не стирає набране.
+  await page.getByLabel(/Сповіщення/).first().click();
+  await expect(f.getByLabel('Держномер')).toHaveValue('AA1234BB');
+  await f.getByRole('button', { name: 'Зберегти', exact: true }).click();
+  await expect(page.locator('.car-card').first()).toBeVisible();
+
+  // Чат: прогорнули історію вгору — оновлення не кидає вниз.
+  await page.goto('/#/book/blysk');
+  await page.getByLabel(/Експрес-мийка кузова/).check();
+  await page.locator('[data-action="to-time"]').click();
+  await page.getByRole('button', { name: /Завтра/ }).click();
+  await page.locator('.slot[data-time="10:00"]').click();
+  await page.locator('[data-action="confirm"]').click();
+  await page.getByRole('button', { name: /^Оплатити/ }).click();
+  const id = await page.evaluate(() => JSON.parse(localStorage.getItem('carcar.bookings')).at(-1).id);
+  await page.evaluate((bid) => {
+    const all = JSON.parse(localStorage.getItem('carcar.bookings'));
+    const b = all.find((x) => x.id === bid);
+    b.chat = Array.from({ length: 40 }, (_, i) => ({ from: i % 2 ? 'biz' : 'client', text: `Повідомлення ${i + 1}`, at: Date.now() - (40 - i) * 60000 }));
+    localStorage.setItem('carcar.bookings', JSON.stringify(all));
+  }, id);
+  await page.goto(`/#/chat/${id}`);
+  await page.reload();
+  const list = page.locator('.chat-msgs');
+  await expect(list).toContainText('Повідомлення 40');
+  await list.evaluate((el) => { el.scrollTop = 100; });
+  await remote('bookings');
+  await page.waitForTimeout(300);
+  expect(await list.evaluate((el) => el.scrollTop)).toBe(100);
+});

@@ -147,6 +147,7 @@ function place() {
 function render() {
   const el = root();
   el.hidden = !karychOn() || state.away;
+  document.body.classList.toggle('karych-on', !el.hidden);
   if (el.hidden) close();
 }
 

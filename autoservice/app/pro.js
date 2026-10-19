@@ -466,7 +466,7 @@ function threadList(msgs) {
 const compose = (thread, quick) => `<div class="chat-compose">
     ${quick ? `<div class="quick" role="group" aria-label="Швидкі відповіді">${BIZ_QUICK.map((t) => `<button class="chip" type="button" data-action="quick" data-text="${esc(t)}">${esc(t)}</button>`).join('')}</div>` : ''}
     <form class="chat-form" id="pro-chat" data-thread="${thread}">
-      <label class="attach-btn">${icon('camera', 22)}<input class="sr-only" id="pro-attach" type="file" accept="image/*" aria-label="Додати фото"></label>
+      <label class="attach-btn">${icon('camera', 22)}<input class="sr-only" id="pro-attach" type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" aria-label="Додати фото"></label>
       <input name="text" required maxlength="500" autocomplete="off" placeholder="Повідомлення…" aria-label="Повідомлення клієнту">
       <button class="send-btn" type="submit" aria-label="Надіслати">${icon('send', 20)}</button>
     </form>
@@ -692,7 +692,7 @@ function bookingSheet(id) {
     actions = !started(b) ? `<p class="notice">«Машина готова» можна позначити, коли почнеться візит — ${dayWord(b.date).toLowerCase()} о ${b.time}.</p>
       <button class="btn" type="button" data-action="move" data-id="${b.id}">${icon('calendar', 18)}Перенести за домовленістю з клієнтом</button>` : `<form class="stack ready-form" id="ready-form" data-id="${b.id}" style="gap:10px">
         <label class="dropzone small-drop">${icon('camera', 20)}Фото результату (до 3, необовʼязково)<span class="photo-count" aria-live="polite"></span>
-          <input class="sr-only" name="photos" type="file" accept="image/*" multiple></label>
+          <input class="sr-only" name="photos" type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" multiple></label>
         <div class="grid2">
           <label class="field"><span>Коментар для клієнта</span><input name="note" maxlength="200" autocomplete="off"></label>
         </div>
@@ -1164,12 +1164,12 @@ function infoCard(p, r) {
       <div class="ava-row">
         ${imgSrc(p.avatar) ? `<img class="ava" src="${imgSrc(p.avatar)}" alt="Аватар мийки">` : `<span class="avatar ava" aria-hidden="true">${letter}</span>`}
         <div class="stack" style="gap:6px"><small class="muted">${r.count ? `★ ${rating(r.avg)} · ${r.count} ${plural(r.count, 'відгук', 'відгуки', 'відгуків')}` : 'Відгуків ще немає'}</small>
-          <div class="row"><label class="btn soft">${icon('camera', 16)}${p.avatar ? 'Змінити аватар' : 'Додати аватар'}<input class="sr-only" type="file" accept="image/*" id="pf-avatar" aria-label="Аватар мийки"></label>
+          <div class="row"><label class="btn soft">${icon('camera', 16)}${p.avatar ? 'Змінити аватар' : 'Додати аватар'}<input class="sr-only" type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" id="pf-avatar" aria-label="Аватар мийки"></label>
           ${p.avatar ? '<button class="btn text-danger" type="button" data-action="ava-del">Прибрати</button>' : ''}</div></div>
       </div>
       <div><span class="lbl">Фото мийки (${photos.length} з ${MAX_PHOTOS}) — перше стає обкладинкою</span>
         <div class="photo-grid">${photos.map((src, i) => `<figure><img src="${imgSrc(src)}" alt="Фото ${i + 1}"><button class="photo-del" type="button" data-action="photo-del" data-i="${i}" aria-label="Видалити фото ${i + 1}">${icon('x', 16)}</button>${i ? `<button class="photo-first" type="button" data-action="photo-first" data-i="${i}">Обкладинка</button>` : ''}</figure>`).join('')}
-        ${photos.length < MAX_PHOTOS ? `<label class="photo-add">${icon('plus', 22)}<span>Фото</span><input class="sr-only" type="file" accept="image/*" multiple id="pf-photos" aria-label="Додати фото мийки"></label>` : ''}</div></div>
+        ${photos.length < MAX_PHOTOS ? `<label class="photo-add">${icon('plus', 22)}<span>Фото</span><input class="sr-only" type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" multiple id="pf-photos" aria-label="Додати фото мийки"></label>` : ''}</div></div>
       <label class="field"><span>Назва</span><input name="name" required maxlength="80" value="${esc(p.name)}" autocomplete="off"></label>
       <label class="field"><span>Адреса</span><input name="address" required maxlength="120" value="${esc(p.address)}" autocomplete="off"></label>
       <label class="field"><span>Опис</span><textarea name="about" rows="4" maxlength="500" placeholder="Що вирізняє мийку: хімія, зона очікування з кавою, швидкість, оплата карткою">${esc(p.about ?? '')}</textarea></label>
@@ -1426,7 +1426,7 @@ function viewSupport(openId) {
       <button class="btn primary" type="submit">Надіслати</button>
     </form>`;
 }
-const photoPick = () => `<label class="dropzone small-drop">${icon('camera', 20)}Додати фото (до 3)<span class="photo-count" aria-live="polite"></span><input class="sr-only" name="photos" type="file" accept="image/*" multiple></label>`;
+const photoPick = () => `<label class="dropzone small-drop">${icon('camera', 20)}Додати фото (до 3)<span class="photo-count" aria-live="polite"></span><input class="sr-only" name="photos" type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" multiple></label>`;
 
 // ---------- аналітика й знижки на тихі години ----------
 
@@ -1891,6 +1891,7 @@ function pickWash(id) {
 function notFound() { return '<h1>Не знайдено</h1><p class="muted">Можливо, запис видалили. <a href="#/">До повідомлень</a></p>'; }
 
 function route() {
+  if (ui.lastView) (ui.scrollMem ??= {})[ui.lastView] = window.scrollY; // куди повернутися з чату
   const s = session();
   document.body.classList.toggle('locked', !s);
   if (!s) {
@@ -1951,14 +1952,15 @@ function route() {
   }
   alertPending();
   const key = `${page}/${page === 'chat' ? arg : ''}`;
-  if (key !== ui.lastView && page !== 'chat') window.scrollTo(0, 0);
+  // Новий екран — згори; повернулися з чату до списку — туди, де були.
+  if (key !== ui.lastView && page !== 'chat') window.scrollTo({ top: ui.lastView?.startsWith('chat/') ? ui.scrollMem?.[key] ?? 0 : 0, behavior: 'instant' });
   ui.lastView = key;
 }
 
+// Перемалювати той самий екран: прокрутка, набране в інших картках, розгорнуте й обрані фото лишаються (keepUi).
 function rerender() {
-  const y = window.scrollY;
-  route();
-  window.scrollTo(0, y);
+  const before = ui.lastView;
+  keepUi(route, () => ui.lastView === before);
 }
 
 // Нова знижка на години (одна на ті самі дні й години: стара вимикається).
@@ -2695,9 +2697,11 @@ window.addEventListener('storage', (e) => {
   load();
   checkSheet();
   if (nb || document.body.classList.contains('sheet-open')) { renderChrome(location.hash.split('/')[1] ?? ''); alertPending(); return; }
+  // Присутність, журнал подій і дзвінки (їх показує call.js) екран не змінюють.
+  if (['carcar.presence', 'carcar.analytics', 'carcar.calls'].includes(e.key)) return;
   const input = $('#pro-chat [name="text"]');
   if (document.activeElement?.matches('input, textarea, select') && document.activeElement !== input) { renderChrome(location.hash.split('/')[1] ?? ''); alertPending(); return; }
-  keepUi(rerender);
+  rerender();
 });
 
 // Перехід між екранами закриває шторки — крім сповіщення про новий запис: воно чекає відповіді.
@@ -2727,7 +2731,7 @@ navigator.serviceWorker?.addEventListener('message', (e) => {
 });
 keepChatOnKeyboard();
 // Вхідні дзвінки клієнтів CARCAR — у будь-яку мийку акаунта.
-initCalls('place', (c) => !!session() && accountPlaces(session()).includes(c.placeId), { onLog: (c) => logCall({ bookings, requests, save }, c) });
+initCalls('place', (c) => !!session() && accountPlaces(session()).includes(c.placeId), { onLog: (c) => { logCall({ bookings, requests, save }, c); rerender(); } });
 route();
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {

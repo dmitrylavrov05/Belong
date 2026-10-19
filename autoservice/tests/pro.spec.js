@@ -987,3 +987,16 @@ test('фото профілю клієнта: ставить у гаражі —
   await expect(pro.locator('.convo', { hasText: 'Ірина' }).locator('.avatar img')).toHaveCount(0);
   await pro.close();
 });
+
+test('профіль мийки: дія в одній картці не стирає несохранене в іншій', async ({ page }) => {
+  await page.goto(`${PRO}#/profile`);
+  const about = page.locator('#pf-info textarea').first();
+  await about.fill('Миємо швидко й акуратно');
+  const phone = page.locator('#pf-main [name="phone"]');
+  await phone.fill('+380 44 123 45 67');
+  await page.locator('#auto-confirm').click();
+  await expect(about).toHaveValue('Миємо швидко й акуратно');
+  await expect(phone).toHaveValue('+380 44 123 45 67');
+  await page.evaluate(() => window.dispatchEvent(new StorageEvent('storage', { key: 'carcar.bookings' })));
+  await expect(about).toHaveValue('Миємо швидко й акуратно');
+});

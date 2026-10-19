@@ -765,7 +765,7 @@ label.item { cursor: pointer; padding: 10px 14px; }
 
 /* ---------- каталог: пошук із перемикачем вигляду й картки-обкладинки ---------- */
 .search-row { display: flex; gap: 10px; align-items: center; margin-top: 14px; }
-.search-row .search { flex: 1; }
+.search-row .search { flex: 1; min-width: 0; } /* інакше поле не стискається й сторінка ширша за екран */
 .view-toggle { display: inline-flex; gap: 2px; padding: 3px; border-radius: 14px; background: var(--soft); flex: none; }
 .view-toggle button { width: 42px; height: 42px; border: 0; border-radius: 11px; background: transparent; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
 .view-toggle button[aria-pressed="true"] { background: var(--bg); color: var(--accent); box-shadow: var(--shadow-1); }
@@ -1295,6 +1295,16 @@ button.convo.call-row { width: 100%; border: 0; background: none; font: inherit;
 .ava-pick label.btn { cursor: pointer; }
 .ava-pick label.btn:focus-within { outline: 3px solid var(--accent); outline-offset: 2px; }
 .review .head .rv-ava { width: 28px; height: 28px; }
+
+/* Послуга на сторінці мийки — кнопка: одразу до запису з нею */
+button.item.svc-go { width: 100%; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+button.item.svc-go:hover { background: var(--soft, #f3f5f8); }
+button.item.svc-go:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; border-radius: 12px; }
+button.item.svc-go .price { display: inline-flex; align-items: center; gap: 4px; }
+button.item.svc-go .price svg { color: var(--muted); }
+
+/* Кар Карич сидить у правому нижньому куті — останні кнопки сторінки мають догортатися вище за нього */
+body.karych-on main { padding-bottom: 84px; }
 </style>
   <style>
     /* Заставка під час запуску: піна, бульбашки, логотип із відблиском і розкриття застосунку колом.
@@ -2577,28 +2587,63 @@ const isBlocked = (keys) => keys.some((k) => k && fraudState().blocked[k]);
 // Поява сторінки й «набігання» чисел у показниках — лише при переході на інший екран
 // і якщо людина не просила зменшити анімацію.
 const calm = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-// Фонове перемальовування (прийшли зміни з сервера, спрацював таймер) не має збивати людину: прокрутка, набраний
-// текст, курсор і позначки в полях лишаються як були. Відновлюємо лише поля, які людина змінювала сама.
+// Перемальовування екрана (прийшли зміни з сервера, спрацював таймер, людина змінила щось в іншій картці) не має
+// збивати людину: прокрутка (і всередині стрічок та галерей), набраний чи підставлений текст, обрані файли, курсор,
+// розгорнуті блоки й результати пошуку ([data-keep]) лишаються як були. Поля щойно надісланої форми не відновлюємо —
+// у них уже збережене.
 const touched = new WeakSet();
+let lastSubmit = { form: null, at: 0 };
 if (typeof document !== 'undefined') {
   for (const ev of ['input', 'change']) document.addEventListener(ev, (e) => e.target?.matches?.('input, textarea, select') && touched.add(e.target), true);
+  document.addEventListener('submit', (e) => { lastSubmit = { form: e.target, at: Date.now() }; }, true);
 }
-const fieldKey = (el) => `${el.closest('form[id], form[data-id], [data-id], [id]:not(input):not(textarea):not(select)')?.getAttribute('id') ?? ''}|${el.closest('[data-id]')?.dataset.id ?? ''}|${el.id || el.name}|${['checkbox', 'radio'].includes(el.type) ? el.value : ''}`;
-function keepUi(fn) {
+const FIELDS = 'input, textarea, select';
+const fieldKey = (el) => `${el.closest('form[id], [data-id], [id]:not(input):not(textarea):not(select)')?.getAttribute('id') ?? ''}|${el.closest('[data-id]')?.dataset.id ?? ''}|${el.id || el.name}|${['checkbox', 'radio'].includes(el.type) ? el.value : ''}`;
+const changedField = (el) => {
+  if (['checkbox', 'radio'].includes(el.type)) return el.checked !== el.defaultChecked;
+  if (el.type === 'file') return el.files?.length > 0;
+  if (el.tagName === 'SELECT') return [...el.options].some((o) => o.selected !== o.defaultSelected);
+  return el.type !== 'hidden' && el.value !== el.defaultValue;
+};
+// Блоки без id впізнаємо за класом і порядком на сторінці.
+const sig = (el) => {
+  const cls = [...el.classList].sort().join('.');
+  const same = [...document.querySelectorAll(`${el.tagName}${cls ? `.${[...el.classList].map((c) => CSS.escape(c)).join('.')}` : ''}`)];
+  return `${el.id || ''}#${el.dataset.id ?? ''}#${el.tagName}.${cls}#${same.indexOf(el)}`;
+};
+function keepUi(fn, same = () => true) {
   const y = window.scrollY;
+  const fresh = Date.now() - lastSubmit.at < 1500 ? lastSubmit.form : null;
   const saved = new Map();
-  for (const el of document.querySelectorAll('input, textarea, select')) {
-    if (!touched.has(el) || !(el.id || el.name) || el.type === 'file') continue;
-    saved.set(fieldKey(el), ['checkbox', 'radio'].includes(el.type) ? el.checked : el.value);
+  for (const el of document.querySelectorAll(FIELDS)) {
+    if (!(el.id || el.name) || (fresh && fresh.contains(el)) || !(touched.has(el) || changedField(el))) continue;
+    // Файли зберігаємо лише в полях «photos» форм (відгук, звернення) — решта фото завантажуються одразу при виборі.
+    if (el.type === 'file' && el.name !== 'photos') continue;
+    saved.set(fieldKey(el), el.type === 'file' ? [...el.files] : ['checkbox', 'radio'].includes(el.type) ? el.checked : el.value);
   }
   const a = document.activeElement;
-  const focus = a?.matches?.('input, textarea, select') && (a.id || a.name) ? { key: fieldKey(a), from: a.selectionStart, to: a.selectionEnd } : null;
-  const open = new Set([...document.querySelectorAll('details[open][id], details[open][data-id]')].map((d) => d.id || d.dataset.id));
+  const focus = a?.matches?.(FIELDS) && (a.id || a.name) ? { key: fieldKey(a), from: a.selectionStart, to: a.selectionEnd } : null;
+  const open = new Set([...document.querySelectorAll('details[open]')].map(sig));
+  const scrolled = new Map();
+  for (const el of document.querySelectorAll('main *, .sheet *')) {
+    if ((el.scrollLeft > 0 || el.scrollTop > 0) && !el.matches(FIELDS)) scrolled.set(sig(el), [el.scrollLeft, el.scrollTop, el.scrollHeight - el.scrollTop - el.clientHeight < 40]);
+  }
+  const kept = new Map([...document.querySelectorAll('[data-keep][id]')].map((el) => [el.id, { html: el.innerHTML, data: { ...el.dataset } }]));
   fn();
-  for (const el of document.querySelectorAll('input, textarea, select')) {
+  if (!same()) return; // відкрився інший екран — він починається згори й з чистими полями
+  for (const el of document.querySelectorAll(FIELDS)) {
     const k = fieldKey(el);
     if (saved.has(k)) {
-      if (['checkbox', 'radio'].includes(el.type)) el.checked = saved.get(k); else if (el.value !== saved.get(k)) el.value = saved.get(k);
+      const v = saved.get(k);
+      if (el.type === 'file') {
+        try {
+          const dt = new DataTransfer();
+          for (const f of v) dt.items.add(f);
+          el.files = dt.files;
+          if (el.name === 'photos') el.dispatchEvent(new Event('change', { bubbles: true })); // лічильник «Обрано фото»
+        } catch { /* браузер не дає підставити файли */ }
+      } else if (['checkbox', 'radio'].includes(el.type)) el.checked = v;
+      else if (el.value !== v) el.value = v;
       touched.add(el);
     }
     if (focus && k === focus.key && document.activeElement !== el) {
@@ -2606,7 +2651,21 @@ function keepUi(fn) {
       try { if (focus.from != null) el.setSelectionRange(focus.from, focus.to); } catch { /* поле без курсора */ }
     }
   }
-  for (const d of document.querySelectorAll('details[id], details[data-id]')) if (open.has(d.id || d.dataset.id)) d.open = true;
+  for (const d of document.querySelectorAll('details')) if (open.has(sig(d))) d.open = true;
+  for (const el of scrolled.size ? document.querySelectorAll('main *, .sheet *') : []) {
+    if (el.scrollWidth <= el.clientWidth && el.scrollHeight <= el.clientHeight) continue;
+    const s = scrolled.get(sig(el));
+    if (!s) continue;
+    el.scrollLeft = s[0];
+    // Стрічка чату, догорнута донизу, лишається внизу (нове повідомлення видно); прогорнута вгору — на місці.
+    if (!(el.matches('.chat-msgs') && s[2])) el.scrollTop = s[1];
+  }
+  for (const el of document.querySelectorAll('[data-keep][id]')) {
+    const k = kept.get(el.id);
+    if (!k) continue;
+    if (el.dataset.keep === 'html' && !el.innerHTML.trim() && k.html.trim()) el.innerHTML = k.html;
+    for (const [n, v] of Object.entries(k.data)) if (!(n in el.dataset)) el.dataset[n] = v;
+  }
   if (Math.abs(window.scrollY - y) > 1) window.scrollTo({ top: y, behavior: 'instant' });
 }
 
@@ -4115,6 +4174,7 @@ function place() {
 function render() {
   const el = root();
   el.hidden = !karychOn() || state.away;
+  document.body.classList.toggle('karych-on', !el.hidden);
   if (el.hidden) close();
 }
 
@@ -4878,10 +4938,13 @@ function viewPlace(id) {
     ${groups.map(([c, items]) => `
       ${groups.length > 1 ? `<h3 class="cat-label">${icon(c.icon, 15)}${c.name}</h3>` : ''}
       <div class="list" style="margin-top:10px">
-        ${items.map((s) => `<div class="item">
+        ${items.map((s) => (isListed(p) ? `<button class="item svc-go" type="button" data-action="book-svc" data-place="${p.id}" data-id="${esc(s.id)}" aria-label="Записатися: ${esc(s.name)}, ${uah(s.price[ui.cls])}">
+          <span class="name">${esc(s.name)}<small>${duration(s.min)}</small></span>
+          <span class="price">${uah(s.price[ui.cls])}${icon('chevR', 16)}</span>
+        </button>` : `<div class="item">
           <span class="name">${esc(s.name)}<small>${duration(s.min)}</small></span>
           <span class="price">${uah(s.price[ui.cls])}</span>
-        </div>`).join('')}
+        </div>`)).join('')}
       </div>`).join('')}
     ${mobileOn(p) ? `<section class="card mobile-card" aria-label="Виїзд до вас">${icon('carSide', 22)}<div><b>Можемо приїхати до вас</b>
       <span class="small">У радіусі ${p.mobile.radiusKm} км, виїзд +${uah(p.mobile.fee)}. Оберіть «Виїзд до мене» під час запису.</span></div></section>` : ''}
@@ -5740,7 +5803,7 @@ function reviewBlock(b) {
     </fieldset>
     <label class="field"><span>Відгук (необовʼязково)</span><textarea name="text" rows="3" maxlength="600" placeholder="Що сподобалось, що варто покращити"></textarea></label>
     <label class="dropzone">${icon('camera', 22)}Додати фото результату (до 3)<span class="photo-count" aria-live="polite"></span>
-      <input class="sr-only" name="photos" type="file" accept="image/*" multiple></label>
+      <input class="sr-only" name="photos" type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" multiple></label>
     <button class="btn primary block" type="submit">Надіслати відгук</button>
   </form>`;
 }
@@ -5946,7 +6009,7 @@ const sysLine = (m) => (m.call ? `<li class="bubble sys call-log">${icon('phone'
 const readLine = (m) => `<li class="read-state${m.readAt ? ' read' : ''}">${m.readAt ? `Прочитано ${msgTime(m.readAt)}` : 'Не прочитано'}</li>`;
 
 // Кнопка фото в полі вводу.
-const attachBtn = () => `<label class="attach-btn">${icon('camera', 22)}<input class="sr-only chat-attach" type="file" accept="image/*" aria-label="Додати фото"></label>`;
+const attachBtn = () => `<label class="attach-btn">${icon('camera', 22)}<input class="sr-only chat-attach" type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" aria-label="Додати фото"></label>`;
 
 function viewChat(id) {
   const b = mine().find((x) => x.id === id);
@@ -6282,7 +6345,7 @@ function viewSupport(sub, arg) {
 
 // Фото до звернення: до 3 знімків, зменшених до 720 px.
 const photoPick = (label) => `<label class="dropzone small-drop">${icon('camera', 20)}${label}<span class="photo-count" aria-live="polite"></span>
-  <input class="sr-only" name="photos" type="file" accept="image/*" multiple></label>`;
+  <input class="sr-only" name="photos" type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" multiple></label>`;
 const formPhotos = async (f) => (await Promise.all(f.getAll('photos').filter((x) => x.size).slice(0, 3).map(shrinkPhoto))).filter(Boolean);
 
 function supportCard() {
@@ -6585,7 +6648,7 @@ function avatarPicker() {
   return `<div class="ava-pick">
     <span class="avatar big${src ? ' has-img' : ''}" aria-hidden="true">${src ? `<img src="${esc(src)}" alt="">` : icon('user', 30)}</span>
     <span class="row" style="gap:8px;flex-wrap:wrap">
-      <label class="btn soft">${icon('camera', 18)}${src ? 'Змінити фото' : 'Додати фото профілю'}<input class="sr-only" id="avatar-file" type="file" accept="image/*"></label>
+      <label class="btn soft">${icon('camera', 18)}${src ? 'Змінити фото' : 'Додати фото профілю'}<input class="sr-only" id="avatar-file" type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif"></label>
       ${src ? '<button class="btn" type="button" data-action="avatar-off">Прибрати</button>' : ''}
     </span></div>`;
 }
@@ -6785,7 +6848,7 @@ const reminderRow = (r) => `<div class="reminder ${r.level}">
   </div>`;
 
 function carForm(id, fields, submit) {
-  return `<form class="form-box" id="${id}">${fields}<button class="btn primary block" type="submit">${submit}</button></form>`;
+  return `<form class="form-box" id="${id}"${id === 'carform' ? ' data-keep="attrs"' : ''}>${fields}<button class="btn primary block" type="submit">${submit}</button></form>`;
 }
 
 function viewGarage() {
@@ -6821,7 +6884,7 @@ function viewGarage() {
         <label class="field"><span>Держномер</span><input name="plate" placeholder="AA1234BB" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="12" aria-describedby="plate-result"></label>
         <button class="btn" type="button" data-action="plate-check">${icon('search', 18)}Перевірити</button>
       </div>
-      <div id="plate-result" aria-live="polite"></div>
+      <div id="plate-result" data-keep="html" aria-live="polite"></div>
       <label class="field"><span>Марка</span><input name="make" required placeholder="Наприклад, Skoda" autocomplete="off"></label>
       <label class="field"><span>Модель</span><input name="model" required placeholder="Наприклад, Octavia" autocomplete="off"></label>
       <label class="field"><span>Рік випуску (необовʼязково)</span><input name="year" type="number" inputmode="numeric" min="1950" max="${new Date().getFullYear() + 1}" autocomplete="off"></label>
@@ -6992,7 +7055,13 @@ const KARYCH_FAQ = [
 ];
 initKarych({ faq: KARYCH_FAQ, onOff: () => { toast('Кар Карич сховався. Повернути — в «Гараж» → «Налаштування»'); if ($('.settings')) route(); } });
 
+// Перемалювати поточний екран: той самий екран — без стрибків і з набраним (keepUi); інший — згори.
 function route() {
+  const before = ui.lastView;
+  keepUi(renderRoute, () => ui.lastView === before);
+}
+function renderRoute() {
+  if (ui.lastView) (ui.scrollMem ??= {})[ui.lastView] = window.scrollY; // куди повернутися з чату
   const [, page = '', arg, sub, extra] = location.hash.replace(/^#/, '').split('/');
   // Вхід за номером телефону — перед будь-яким екраном застосунку.
   const authed = isAuthed();
@@ -7090,6 +7159,7 @@ function route() {
     return;
   }
   const changed = `${page}/${arg ?? ''}` !== ui.lastView;
+  const fromChat = /^(chat|ask)\//.test(ui.lastView ?? '');
   enterView(view, changed);
   ui.lastView = `${page}/${arg ?? ''}`;
   if (page !== 'book') karychRoute(page || 'catalog', karychTip(page || 'catalog'));
@@ -7097,7 +7167,8 @@ function route() {
   if (!changed) return;
   const target = arg && page === 'bookings' ? $(`#b-${arg}`) : page === 'garage' && arg === 'add' ? $('#add-car') : null;
   if (target) target.scrollIntoView({ block: 'center' });
-  else window.scrollTo(0, 0);
+  // Повернулися з чату до списку — туди, де були; інший екран — згори.
+  else window.scrollTo({ top: fromChat ? ui.scrollMem?.[ui.lastView] ?? 0 : 0, behavior: 'instant' });
 }
 
 document.addEventListener('click', (e) => {
@@ -7217,6 +7288,18 @@ document.addEventListener('click', (e) => {
   } else if (bookingActions[action]) {
     const b = bookings.find((x) => x.id === id);
     if (b && bookingActions[action](b) !== false) { ui.bookFocus = b.id; save(); route(); }
+  } else if (action === 'book-svc') {
+    // Послуга на сторінці мийки — одразу до запису з нею: основна мийка замінює обрану раніше, додаткова додається.
+    const p = placeById(el.dataset.place);
+    const s = p && bookable(p).find((x) => x.id === el.dataset.id);
+    if (!s) return;
+    if (draft?.placeId !== p.id) draft = { placeId: p.id, services: new Set(), date: firstOpenDay(p), time: null, wantTime: null, carId: mainCar()?.id ?? null };
+    if (mobileMode() && !p.mobile.services.includes(s.id)) draft.mode = null; // цієї послуги на виїзді немає — запис на мийці
+    if (s.main || s.personal) for (const x of bookableIn(p)) if (x.main || x.personal) draft.services.delete(x.id);
+    draft.services.add(s.id);
+    Object.assign(draft, { paying: false, step: 'svc' });
+    track('svc_click', { placeId: p.id });
+    location.hash = `#/book/${p.id}`;
   } else if (action === 'avatar-off') {
     setAvatar(null);
   } else if (action === 'call') {
@@ -7724,7 +7807,7 @@ window.addEventListener('hashchange', route);
 setInterval(() => {
   const timers = document.querySelectorAll('[data-due]');
   for (const el of timers) el.textContent = leftText(Number(el.dataset.due));
-  if ([...timers].some((el) => Number(el.dataset.due) <= Date.now()) && !draft?.paying) keepUi(route);
+  if ([...timers].some((el) => Number(el.dataset.due) <= Date.now()) && !draft?.paying) route();
 }, 1000);
 
 // Ключі, зміни яких не стосуються екрана клієнта: журнал подій, дзвінки (їх показує call.js), чужі службові дані.
@@ -7747,7 +7830,7 @@ function applyRemote() {
   profile = { name: '', phone: '', optIn: false, ...store.get('profile', {}) };
   wallet = { bonus: 0, money: 0, history: [], ...store.get(walletKey(meId()), {}) };
   applyOverrides();
-  if (!draft?.paying) keepUi(route);
+  if (!draft?.paying) route();
 }
 function refreshPresence() {
   for (const el of document.querySelectorAll('.chat-presence')) {
@@ -7762,7 +7845,7 @@ acceptCampaign();
 track('session', { view: ui.view });
 keepChatOnKeyboard();
 // Вхідні дзвінки від мийок — за записами клієнта.
-initCalls('client', (c) => (c.clientId ?? 'device') === meId(), { onLog: (c) => logCall({ bookings, requests, save: () => { save(); saveRequests(); } }, c) });
+initCalls('client', (c) => (c.clientId ?? 'device') === meId(), { onLog: (c) => { logCall({ bookings, requests, save: () => { save(); saveRequests(); } }, c); route(); } });
 route();
 acceptInvite();
 

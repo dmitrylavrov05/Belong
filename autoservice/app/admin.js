@@ -616,7 +616,7 @@ function viewTicket(id) {
           <div class="quick" role="group" aria-label="Шаблони відповідей">${REPLY_TEMPLATES.map((x, i) => `<button class="chip" type="button" data-action="tpl" data-i="${i}">${esc(x.split(/[.!—]/)[0])}</button>`).join('')}</div>
           <label class="field"><span>Відповідь</span><textarea name="text" rows="3" maxlength="1000"></textarea></label>
           <label class="dropzone small-drop">${icon('camera', 20)}Додати фото (до 3)<span class="photo-count" aria-live="polite"></span>
-            <input class="sr-only" name="photos" type="file" accept="image/*" multiple></label>
+            <input class="sr-only" name="photos" type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" multiple></label>
           <div class="row">
             <label class="field" style="flex:1"><span>Після відповіді</span><select name="status">
               <option value="waiting">Чекаємо відповіді автора</option><option value="open">Залишити в роботі</option><option value="closed">Закрити звернення</option></select></label>

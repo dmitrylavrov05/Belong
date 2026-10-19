@@ -935,28 +935,63 @@ export const isBlocked = (keys) => keys.some((k) => k && fraudState().blocked[k]
 // Поява сторінки й «набігання» чисел у показниках — лише при переході на інший екран
 // і якщо людина не просила зменшити анімацію.
 const calm = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-// Фонове перемальовування (прийшли зміни з сервера, спрацював таймер) не має збивати людину: прокрутка, набраний
-// текст, курсор і позначки в полях лишаються як були. Відновлюємо лише поля, які людина змінювала сама.
+// Перемальовування екрана (прийшли зміни з сервера, спрацював таймер, людина змінила щось в іншій картці) не має
+// збивати людину: прокрутка (і всередині стрічок та галерей), набраний чи підставлений текст, обрані файли, курсор,
+// розгорнуті блоки й результати пошуку ([data-keep]) лишаються як були. Поля щойно надісланої форми не відновлюємо —
+// у них уже збережене.
 const touched = new WeakSet();
+let lastSubmit = { form: null, at: 0 };
 if (typeof document !== 'undefined') {
   for (const ev of ['input', 'change']) document.addEventListener(ev, (e) => e.target?.matches?.('input, textarea, select') && touched.add(e.target), true);
+  document.addEventListener('submit', (e) => { lastSubmit = { form: e.target, at: Date.now() }; }, true);
 }
-const fieldKey = (el) => `${el.closest('form[id], form[data-id], [data-id], [id]:not(input):not(textarea):not(select)')?.getAttribute('id') ?? ''}|${el.closest('[data-id]')?.dataset.id ?? ''}|${el.id || el.name}|${['checkbox', 'radio'].includes(el.type) ? el.value : ''}`;
-export function keepUi(fn) {
+const FIELDS = 'input, textarea, select';
+const fieldKey = (el) => `${el.closest('form[id], [data-id], [id]:not(input):not(textarea):not(select)')?.getAttribute('id') ?? ''}|${el.closest('[data-id]')?.dataset.id ?? ''}|${el.id || el.name}|${['checkbox', 'radio'].includes(el.type) ? el.value : ''}`;
+const changedField = (el) => {
+  if (['checkbox', 'radio'].includes(el.type)) return el.checked !== el.defaultChecked;
+  if (el.type === 'file') return el.files?.length > 0;
+  if (el.tagName === 'SELECT') return [...el.options].some((o) => o.selected !== o.defaultSelected);
+  return el.type !== 'hidden' && el.value !== el.defaultValue;
+};
+// Блоки без id впізнаємо за класом і порядком на сторінці.
+const sig = (el) => {
+  const cls = [...el.classList].sort().join('.');
+  const same = [...document.querySelectorAll(`${el.tagName}${cls ? `.${[...el.classList].map((c) => CSS.escape(c)).join('.')}` : ''}`)];
+  return `${el.id || ''}#${el.dataset.id ?? ''}#${el.tagName}.${cls}#${same.indexOf(el)}`;
+};
+export function keepUi(fn, same = () => true) {
   const y = window.scrollY;
+  const fresh = Date.now() - lastSubmit.at < 1500 ? lastSubmit.form : null;
   const saved = new Map();
-  for (const el of document.querySelectorAll('input, textarea, select')) {
-    if (!touched.has(el) || !(el.id || el.name) || el.type === 'file') continue;
-    saved.set(fieldKey(el), ['checkbox', 'radio'].includes(el.type) ? el.checked : el.value);
+  for (const el of document.querySelectorAll(FIELDS)) {
+    if (!(el.id || el.name) || (fresh && fresh.contains(el)) || !(touched.has(el) || changedField(el))) continue;
+    // Файли зберігаємо лише в полях «photos» форм (відгук, звернення) — решта фото завантажуються одразу при виборі.
+    if (el.type === 'file' && el.name !== 'photos') continue;
+    saved.set(fieldKey(el), el.type === 'file' ? [...el.files] : ['checkbox', 'radio'].includes(el.type) ? el.checked : el.value);
   }
   const a = document.activeElement;
-  const focus = a?.matches?.('input, textarea, select') && (a.id || a.name) ? { key: fieldKey(a), from: a.selectionStart, to: a.selectionEnd } : null;
-  const open = new Set([...document.querySelectorAll('details[open][id], details[open][data-id]')].map((d) => d.id || d.dataset.id));
+  const focus = a?.matches?.(FIELDS) && (a.id || a.name) ? { key: fieldKey(a), from: a.selectionStart, to: a.selectionEnd } : null;
+  const open = new Set([...document.querySelectorAll('details[open]')].map(sig));
+  const scrolled = new Map();
+  for (const el of document.querySelectorAll('main *, .sheet *')) {
+    if ((el.scrollLeft > 0 || el.scrollTop > 0) && !el.matches(FIELDS)) scrolled.set(sig(el), [el.scrollLeft, el.scrollTop, el.scrollHeight - el.scrollTop - el.clientHeight < 40]);
+  }
+  const kept = new Map([...document.querySelectorAll('[data-keep][id]')].map((el) => [el.id, { html: el.innerHTML, data: { ...el.dataset } }]));
   fn();
-  for (const el of document.querySelectorAll('input, textarea, select')) {
+  if (!same()) return; // відкрився інший екран — він починається згори й з чистими полями
+  for (const el of document.querySelectorAll(FIELDS)) {
     const k = fieldKey(el);
     if (saved.has(k)) {
-      if (['checkbox', 'radio'].includes(el.type)) el.checked = saved.get(k); else if (el.value !== saved.get(k)) el.value = saved.get(k);
+      const v = saved.get(k);
+      if (el.type === 'file') {
+        try {
+          const dt = new DataTransfer();
+          for (const f of v) dt.items.add(f);
+          el.files = dt.files;
+          if (el.name === 'photos') el.dispatchEvent(new Event('change', { bubbles: true })); // лічильник «Обрано фото»
+        } catch { /* браузер не дає підставити файли */ }
+      } else if (['checkbox', 'radio'].includes(el.type)) el.checked = v;
+      else if (el.value !== v) el.value = v;
       touched.add(el);
     }
     if (focus && k === focus.key && document.activeElement !== el) {
@@ -964,7 +999,21 @@ export function keepUi(fn) {
       try { if (focus.from != null) el.setSelectionRange(focus.from, focus.to); } catch { /* поле без курсора */ }
     }
   }
-  for (const d of document.querySelectorAll('details[id], details[data-id]')) if (open.has(d.id || d.dataset.id)) d.open = true;
+  for (const d of document.querySelectorAll('details')) if (open.has(sig(d))) d.open = true;
+  for (const el of scrolled.size ? document.querySelectorAll('main *, .sheet *') : []) {
+    if (el.scrollWidth <= el.clientWidth && el.scrollHeight <= el.clientHeight) continue;
+    const s = scrolled.get(sig(el));
+    if (!s) continue;
+    el.scrollLeft = s[0];
+    // Стрічка чату, догорнута донизу, лишається внизу (нове повідомлення видно); прогорнута вгору — на місці.
+    if (!(el.matches('.chat-msgs') && s[2])) el.scrollTop = s[1];
+  }
+  for (const el of document.querySelectorAll('[data-keep][id]')) {
+    const k = kept.get(el.id);
+    if (!k) continue;
+    if (el.dataset.keep === 'html' && !el.innerHTML.trim() && k.html.trim()) el.innerHTML = k.html;
+    for (const [n, v] of Object.entries(k.data)) if (!(n in el.dataset)) el.dataset[n] = v;
+  }
   if (Math.abs(window.scrollY - y) > 1) window.scrollTo({ top: y, behavior: 'instant' });
 }
 

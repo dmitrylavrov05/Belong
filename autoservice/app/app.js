@@ -743,10 +743,13 @@ function viewPlace(id) {
     ${groups.map(([c, items]) => `
       ${groups.length > 1 ? `<h3 class="cat-label">${icon(c.icon, 15)}${c.name}</h3>` : ''}
       <div class="list" style="margin-top:10px">
-        ${items.map((s) => `<div class="item">
+        ${items.map((s) => (isListed(p) ? `<button class="item svc-go" type="button" data-action="book-svc" data-place="${p.id}" data-id="${esc(s.id)}" aria-label="Записатися: ${esc(s.name)}, ${uah(s.price[ui.cls])}">
+          <span class="name">${esc(s.name)}<small>${duration(s.min)}</small></span>
+          <span class="price">${uah(s.price[ui.cls])}${icon('chevR', 16)}</span>
+        </button>` : `<div class="item">
           <span class="name">${esc(s.name)}<small>${duration(s.min)}</small></span>
           <span class="price">${uah(s.price[ui.cls])}</span>
-        </div>`).join('')}
+        </div>`)).join('')}
       </div>`).join('')}
     ${mobileOn(p) ? `<section class="card mobile-card" aria-label="Виїзд до вас">${icon('carSide', 22)}<div><b>Можемо приїхати до вас</b>
       <span class="small">У радіусі ${p.mobile.radiusKm} км, виїзд +${uah(p.mobile.fee)}. Оберіть «Виїзд до мене» під час запису.</span></div></section>` : ''}
@@ -1605,7 +1608,7 @@ function reviewBlock(b) {
     </fieldset>
     <label class="field"><span>Відгук (необовʼязково)</span><textarea name="text" rows="3" maxlength="600" placeholder="Що сподобалось, що варто покращити"></textarea></label>
     <label class="dropzone">${icon('camera', 22)}Додати фото результату (до 3)<span class="photo-count" aria-live="polite"></span>
-      <input class="sr-only" name="photos" type="file" accept="image/*" multiple></label>
+      <input class="sr-only" name="photos" type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" multiple></label>
     <button class="btn primary block" type="submit">Надіслати відгук</button>
   </form>`;
 }
@@ -1811,7 +1814,7 @@ const sysLine = (m) => (m.call ? `<li class="bubble sys call-log">${icon('phone'
 const readLine = (m) => `<li class="read-state${m.readAt ? ' read' : ''}">${m.readAt ? `Прочитано ${msgTime(m.readAt)}` : 'Не прочитано'}</li>`;
 
 // Кнопка фото в полі вводу.
-const attachBtn = () => `<label class="attach-btn">${icon('camera', 22)}<input class="sr-only chat-attach" type="file" accept="image/*" aria-label="Додати фото"></label>`;
+const attachBtn = () => `<label class="attach-btn">${icon('camera', 22)}<input class="sr-only chat-attach" type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" aria-label="Додати фото"></label>`;
 
 function viewChat(id) {
   const b = mine().find((x) => x.id === id);
@@ -2147,7 +2150,7 @@ function viewSupport(sub, arg) {
 
 // Фото до звернення: до 3 знімків, зменшених до 720 px.
 const photoPick = (label) => `<label class="dropzone small-drop">${icon('camera', 20)}${label}<span class="photo-count" aria-live="polite"></span>
-  <input class="sr-only" name="photos" type="file" accept="image/*" multiple></label>`;
+  <input class="sr-only" name="photos" type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" multiple></label>`;
 const formPhotos = async (f) => (await Promise.all(f.getAll('photos').filter((x) => x.size).slice(0, 3).map(shrinkPhoto))).filter(Boolean);
 
 function supportCard() {
@@ -2450,7 +2453,7 @@ function avatarPicker() {
   return `<div class="ava-pick">
     <span class="avatar big${src ? ' has-img' : ''}" aria-hidden="true">${src ? `<img src="${esc(src)}" alt="">` : icon('user', 30)}</span>
     <span class="row" style="gap:8px;flex-wrap:wrap">
-      <label class="btn soft">${icon('camera', 18)}${src ? 'Змінити фото' : 'Додати фото профілю'}<input class="sr-only" id="avatar-file" type="file" accept="image/*"></label>
+      <label class="btn soft">${icon('camera', 18)}${src ? 'Змінити фото' : 'Додати фото профілю'}<input class="sr-only" id="avatar-file" type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif"></label>
       ${src ? '<button class="btn" type="button" data-action="avatar-off">Прибрати</button>' : ''}
     </span></div>`;
 }
@@ -2650,7 +2653,7 @@ const reminderRow = (r) => `<div class="reminder ${r.level}">
   </div>`;
 
 function carForm(id, fields, submit) {
-  return `<form class="form-box" id="${id}">${fields}<button class="btn primary block" type="submit">${submit}</button></form>`;
+  return `<form class="form-box" id="${id}"${id === 'carform' ? ' data-keep="attrs"' : ''}>${fields}<button class="btn primary block" type="submit">${submit}</button></form>`;
 }
 
 function viewGarage() {
@@ -2686,7 +2689,7 @@ function viewGarage() {
         <label class="field"><span>Держномер</span><input name="plate" placeholder="AA1234BB" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="12" aria-describedby="plate-result"></label>
         <button class="btn" type="button" data-action="plate-check">${icon('search', 18)}Перевірити</button>
       </div>
-      <div id="plate-result" aria-live="polite"></div>
+      <div id="plate-result" data-keep="html" aria-live="polite"></div>
       <label class="field"><span>Марка</span><input name="make" required placeholder="Наприклад, Skoda" autocomplete="off"></label>
       <label class="field"><span>Модель</span><input name="model" required placeholder="Наприклад, Octavia" autocomplete="off"></label>
       <label class="field"><span>Рік випуску (необовʼязково)</span><input name="year" type="number" inputmode="numeric" min="1950" max="${new Date().getFullYear() + 1}" autocomplete="off"></label>
@@ -2857,7 +2860,13 @@ const KARYCH_FAQ = [
 ];
 initKarych({ faq: KARYCH_FAQ, onOff: () => { toast('Кар Карич сховався. Повернути — в «Гараж» → «Налаштування»'); if ($('.settings')) route(); } });
 
+// Перемалювати поточний екран: той самий екран — без стрибків і з набраним (keepUi); інший — згори.
 function route() {
+  const before = ui.lastView;
+  keepUi(renderRoute, () => ui.lastView === before);
+}
+function renderRoute() {
+  if (ui.lastView) (ui.scrollMem ??= {})[ui.lastView] = window.scrollY; // куди повернутися з чату
   const [, page = '', arg, sub, extra] = location.hash.replace(/^#/, '').split('/');
   // Вхід за номером телефону — перед будь-яким екраном застосунку.
   const authed = isAuthed();
@@ -2955,6 +2964,7 @@ function route() {
     return;
   }
   const changed = `${page}/${arg ?? ''}` !== ui.lastView;
+  const fromChat = /^(chat|ask)\//.test(ui.lastView ?? '');
   enterView(view, changed);
   ui.lastView = `${page}/${arg ?? ''}`;
   if (page !== 'book') karychRoute(page || 'catalog', karychTip(page || 'catalog'));
@@ -2962,7 +2972,8 @@ function route() {
   if (!changed) return;
   const target = arg && page === 'bookings' ? $(`#b-${arg}`) : page === 'garage' && arg === 'add' ? $('#add-car') : null;
   if (target) target.scrollIntoView({ block: 'center' });
-  else window.scrollTo(0, 0);
+  // Повернулися з чату до списку — туди, де були; інший екран — згори.
+  else window.scrollTo({ top: fromChat ? ui.scrollMem?.[ui.lastView] ?? 0 : 0, behavior: 'instant' });
 }
 
 document.addEventListener('click', (e) => {
@@ -3082,6 +3093,18 @@ document.addEventListener('click', (e) => {
   } else if (bookingActions[action]) {
     const b = bookings.find((x) => x.id === id);
     if (b && bookingActions[action](b) !== false) { ui.bookFocus = b.id; save(); route(); }
+  } else if (action === 'book-svc') {
+    // Послуга на сторінці мийки — одразу до запису з нею: основна мийка замінює обрану раніше, додаткова додається.
+    const p = placeById(el.dataset.place);
+    const s = p && bookable(p).find((x) => x.id === el.dataset.id);
+    if (!s) return;
+    if (draft?.placeId !== p.id) draft = { placeId: p.id, services: new Set(), date: firstOpenDay(p), time: null, wantTime: null, carId: mainCar()?.id ?? null };
+    if (mobileMode() && !p.mobile.services.includes(s.id)) draft.mode = null; // цієї послуги на виїзді немає — запис на мийці
+    if (s.main || s.personal) for (const x of bookableIn(p)) if (x.main || x.personal) draft.services.delete(x.id);
+    draft.services.add(s.id);
+    Object.assign(draft, { paying: false, step: 'svc' });
+    track('svc_click', { placeId: p.id });
+    location.hash = `#/book/${p.id}`;
   } else if (action === 'avatar-off') {
     setAvatar(null);
   } else if (action === 'call') {
@@ -3589,7 +3612,7 @@ window.addEventListener('hashchange', route);
 setInterval(() => {
   const timers = document.querySelectorAll('[data-due]');
   for (const el of timers) el.textContent = leftText(Number(el.dataset.due));
-  if ([...timers].some((el) => Number(el.dataset.due) <= Date.now()) && !draft?.paying) keepUi(route);
+  if ([...timers].some((el) => Number(el.dataset.due) <= Date.now()) && !draft?.paying) route();
 }, 1000);
 
 // Ключі, зміни яких не стосуються екрана клієнта: журнал подій, дзвінки (їх показує call.js), чужі службові дані.
@@ -3612,7 +3635,7 @@ function applyRemote() {
   profile = { name: '', phone: '', optIn: false, ...store.get('profile', {}) };
   wallet = { bonus: 0, money: 0, history: [], ...store.get(walletKey(meId()), {}) };
   applyOverrides();
-  if (!draft?.paying) keepUi(route);
+  if (!draft?.paying) route();
 }
 function refreshPresence() {
   for (const el of document.querySelectorAll('.chat-presence')) {
@@ -3627,7 +3650,7 @@ acceptCampaign();
 track('session', { view: ui.view });
 keepChatOnKeyboard();
 // Вхідні дзвінки від мийок — за записами клієнта.
-initCalls('client', (c) => (c.clientId ?? 'device') === meId(), { onLog: (c) => logCall({ bookings, requests, save: () => { save(); saveRequests(); } }, c) });
+initCalls('client', (c) => (c.clientId ?? 'device') === meId(), { onLog: (c) => { logCall({ bookings, requests, save: () => { save(); saveRequests(); } }, c); route(); } });
 route();
 acceptInvite();
 

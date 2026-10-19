@@ -754,7 +754,7 @@ label.item { cursor: pointer; padding: 10px 14px; }
 
 /* ---------- каталог: пошук із перемикачем вигляду й картки-обкладинки ---------- */
 .search-row { display: flex; gap: 10px; align-items: center; margin-top: 14px; }
-.search-row .search { flex: 1; }
+.search-row .search { flex: 1; min-width: 0; } /* інакше поле не стискається й сторінка ширша за екран */
 .view-toggle { display: inline-flex; gap: 2px; padding: 3px; border-radius: 14px; background: var(--soft); flex: none; }
 .view-toggle button { width: 42px; height: 42px; border: 0; border-radius: 11px; background: transparent; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
 .view-toggle button[aria-pressed="true"] { background: var(--bg); color: var(--accent); box-shadow: var(--shadow-1); }
@@ -1284,3 +1284,13 @@ button.convo.call-row { width: 100%; border: 0; background: none; font: inherit;
 .ava-pick label.btn { cursor: pointer; }
 .ava-pick label.btn:focus-within { outline: 3px solid var(--accent); outline-offset: 2px; }
 .review .head .rv-ava { width: 28px; height: 28px; }
+
+/* Послуга на сторінці мийки — кнопка: одразу до запису з нею */
+button.item.svc-go { width: 100%; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+button.item.svc-go:hover { background: var(--soft, #f3f5f8); }
+button.item.svc-go:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; border-radius: 12px; }
+button.item.svc-go .price { display: inline-flex; align-items: center; gap: 4px; }
+button.item.svc-go .price svg { color: var(--muted); }
+
+/* Кар Карич сидить у правому нижньому куті — останні кнопки сторінки мають догортатися вище за нього */
+body.karych-on main { padding-bottom: 84px; }

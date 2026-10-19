@@ -765,7 +765,7 @@ label.item { cursor: pointer; padding: 10px 14px; }
 
 /* ---------- каталог: пошук із перемикачем вигляду й картки-обкладинки ---------- */
 .search-row { display: flex; gap: 10px; align-items: center; margin-top: 14px; }
-.search-row .search { flex: 1; }
+.search-row .search { flex: 1; min-width: 0; } /* інакше поле не стискається й сторінка ширша за екран */
 .view-toggle { display: inline-flex; gap: 2px; padding: 3px; border-radius: 14px; background: var(--soft); flex: none; }
 .view-toggle button { width: 42px; height: 42px; border: 0; border-radius: 11px; background: transparent; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
 .view-toggle button[aria-pressed="true"] { background: var(--bg); color: var(--accent); box-shadow: var(--shadow-1); }
@@ -1295,6 +1295,16 @@ button.convo.call-row { width: 100%; border: 0; background: none; font: inherit;
 .ava-pick label.btn { cursor: pointer; }
 .ava-pick label.btn:focus-within { outline: 3px solid var(--accent); outline-offset: 2px; }
 .review .head .rv-ava { width: 28px; height: 28px; }
+
+/* Послуга на сторінці мийки — кнопка: одразу до запису з нею */
+button.item.svc-go { width: 100%; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+button.item.svc-go:hover { background: var(--soft, #f3f5f8); }
+button.item.svc-go:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; border-radius: 12px; }
+button.item.svc-go .price { display: inline-flex; align-items: center; gap: 4px; }
+button.item.svc-go .price svg { color: var(--muted); }
+
+/* Кар Карич сидить у правому нижньому куті — останні кнопки сторінки мають догортатися вище за нього */
+body.karych-on main { padding-bottom: 84px; }
 </style>
   <style>
 /* CarCar Business — застосунок мийки для телефона. Базові кнопки, поля, чат і шторки — зі styles.css. */
@@ -1649,6 +1659,10 @@ body.pro.locked .pro-tabs { display: none; }
 .cash-list li small { color: var(--muted); }
 .check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; border: 0; padding: 0; margin: 0; }
 .check-grid legend { font-size: 14px; color: var(--muted); margin-bottom: 4px; padding: 0; }
+
+/* Відкрита шторка: сповіщення зверху, щоб не закривало її кнопки */
+body.sheet-open .toast { top: calc(env(safe-area-inset-top) + 12px); bottom: auto; transform: translate(-50%, -20px); }
+body.sheet-open .toast.show { transform: translate(-50%, 0); }
 </style>
   <script>
     // Тема з налаштувань — до малювання сторінки, щоб не блимала.
@@ -2842,28 +2856,63 @@ const isBlocked = (keys) => keys.some((k) => k && fraudState().blocked[k]);
 // Поява сторінки й «набігання» чисел у показниках — лише при переході на інший екран
 // і якщо людина не просила зменшити анімацію.
 const calm = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-// Фонове перемальовування (прийшли зміни з сервера, спрацював таймер) не має збивати людину: прокрутка, набраний
-// текст, курсор і позначки в полях лишаються як були. Відновлюємо лише поля, які людина змінювала сама.
+// Перемальовування екрана (прийшли зміни з сервера, спрацював таймер, людина змінила щось в іншій картці) не має
+// збивати людину: прокрутка (і всередині стрічок та галерей), набраний чи підставлений текст, обрані файли, курсор,
+// розгорнуті блоки й результати пошуку ([data-keep]) лишаються як були. Поля щойно надісланої форми не відновлюємо —
+// у них уже збережене.
 const touched = new WeakSet();
+let lastSubmit = { form: null, at: 0 };
 if (typeof document !== 'undefined') {
   for (const ev of ['input', 'change']) document.addEventListener(ev, (e) => e.target?.matches?.('input, textarea, select') && touched.add(e.target), true);
+  document.addEventListener('submit', (e) => { lastSubmit = { form: e.target, at: Date.now() }; }, true);
 }
-const fieldKey = (el) => `${el.closest('form[id], form[data-id], [data-id], [id]:not(input):not(textarea):not(select)')?.getAttribute('id') ?? ''}|${el.closest('[data-id]')?.dataset.id ?? ''}|${el.id || el.name}|${['checkbox', 'radio'].includes(el.type) ? el.value : ''}`;
-function keepUi(fn) {
+const FIELDS = 'input, textarea, select';
+const fieldKey = (el) => `${el.closest('form[id], [data-id], [id]:not(input):not(textarea):not(select)')?.getAttribute('id') ?? ''}|${el.closest('[data-id]')?.dataset.id ?? ''}|${el.id || el.name}|${['checkbox', 'radio'].includes(el.type) ? el.value : ''}`;
+const changedField = (el) => {
+  if (['checkbox', 'radio'].includes(el.type)) return el.checked !== el.defaultChecked;
+  if (el.type === 'file') return el.files?.length > 0;
+  if (el.tagName === 'SELECT') return [...el.options].some((o) => o.selected !== o.defaultSelected);
+  return el.type !== 'hidden' && el.value !== el.defaultValue;
+};
+// Блоки без id впізнаємо за класом і порядком на сторінці.
+const sig = (el) => {
+  const cls = [...el.classList].sort().join('.');
+  const same = [...document.querySelectorAll(`${el.tagName}${cls ? `.${[...el.classList].map((c) => CSS.escape(c)).join('.')}` : ''}`)];
+  return `${el.id || ''}#${el.dataset.id ?? ''}#${el.tagName}.${cls}#${same.indexOf(el)}`;
+};
+function keepUi(fn, same = () => true) {
   const y = window.scrollY;
+  const fresh = Date.now() - lastSubmit.at < 1500 ? lastSubmit.form : null;
   const saved = new Map();
-  for (const el of document.querySelectorAll('input, textarea, select')) {
-    if (!touched.has(el) || !(el.id || el.name) || el.type === 'file') continue;
-    saved.set(fieldKey(el), ['checkbox', 'radio'].includes(el.type) ? el.checked : el.value);
+  for (const el of document.querySelectorAll(FIELDS)) {
+    if (!(el.id || el.name) || (fresh && fresh.contains(el)) || !(touched.has(el) || changedField(el))) continue;
+    // Файли зберігаємо лише в полях «photos» форм (відгук, звернення) — решта фото завантажуються одразу при виборі.
+    if (el.type === 'file' && el.name !== 'photos') continue;
+    saved.set(fieldKey(el), el.type === 'file' ? [...el.files] : ['checkbox', 'radio'].includes(el.type) ? el.checked : el.value);
   }
   const a = document.activeElement;
-  const focus = a?.matches?.('input, textarea, select') && (a.id || a.name) ? { key: fieldKey(a), from: a.selectionStart, to: a.selectionEnd } : null;
-  const open = new Set([...document.querySelectorAll('details[open][id], details[open][data-id]')].map((d) => d.id || d.dataset.id));
+  const focus = a?.matches?.(FIELDS) && (a.id || a.name) ? { key: fieldKey(a), from: a.selectionStart, to: a.selectionEnd } : null;
+  const open = new Set([...document.querySelectorAll('details[open]')].map(sig));
+  const scrolled = new Map();
+  for (const el of document.querySelectorAll('main *, .sheet *')) {
+    if ((el.scrollLeft > 0 || el.scrollTop > 0) && !el.matches(FIELDS)) scrolled.set(sig(el), [el.scrollLeft, el.scrollTop, el.scrollHeight - el.scrollTop - el.clientHeight < 40]);
+  }
+  const kept = new Map([...document.querySelectorAll('[data-keep][id]')].map((el) => [el.id, { html: el.innerHTML, data: { ...el.dataset } }]));
   fn();
-  for (const el of document.querySelectorAll('input, textarea, select')) {
+  if (!same()) return; // відкрився інший екран — він починається згори й з чистими полями
+  for (const el of document.querySelectorAll(FIELDS)) {
     const k = fieldKey(el);
     if (saved.has(k)) {
-      if (['checkbox', 'radio'].includes(el.type)) el.checked = saved.get(k); else if (el.value !== saved.get(k)) el.value = saved.get(k);
+      const v = saved.get(k);
+      if (el.type === 'file') {
+        try {
+          const dt = new DataTransfer();
+          for (const f of v) dt.items.add(f);
+          el.files = dt.files;
+          if (el.name === 'photos') el.dispatchEvent(new Event('change', { bubbles: true })); // лічильник «Обрано фото»
+        } catch { /* браузер не дає підставити файли */ }
+      } else if (['checkbox', 'radio'].includes(el.type)) el.checked = v;
+      else if (el.value !== v) el.value = v;
       touched.add(el);
     }
     if (focus && k === focus.key && document.activeElement !== el) {
@@ -2871,7 +2920,21 @@ function keepUi(fn) {
       try { if (focus.from != null) el.setSelectionRange(focus.from, focus.to); } catch { /* поле без курсора */ }
     }
   }
-  for (const d of document.querySelectorAll('details[id], details[data-id]')) if (open.has(d.id || d.dataset.id)) d.open = true;
+  for (const d of document.querySelectorAll('details')) if (open.has(sig(d))) d.open = true;
+  for (const el of scrolled.size ? document.querySelectorAll('main *, .sheet *') : []) {
+    if (el.scrollWidth <= el.clientWidth && el.scrollHeight <= el.clientHeight) continue;
+    const s = scrolled.get(sig(el));
+    if (!s) continue;
+    el.scrollLeft = s[0];
+    // Стрічка чату, догорнута донизу, лишається внизу (нове повідомлення видно); прогорнута вгору — на місці.
+    if (!(el.matches('.chat-msgs') && s[2])) el.scrollTop = s[1];
+  }
+  for (const el of document.querySelectorAll('[data-keep][id]')) {
+    const k = kept.get(el.id);
+    if (!k) continue;
+    if (el.dataset.keep === 'html' && !el.innerHTML.trim() && k.html.trim()) el.innerHTML = k.html;
+    for (const [n, v] of Object.entries(k.data)) if (!(n in el.dataset)) el.dataset[n] = v;
+  }
   if (Math.abs(window.scrollY - y) > 1) window.scrollTo({ top: y, behavior: 'instant' });
 }
 
@@ -4482,7 +4545,7 @@ function threadList(msgs) {
 const compose = (thread, quick) => `<div class="chat-compose">
     ${quick ? `<div class="quick" role="group" aria-label="Швидкі відповіді">${BIZ_QUICK.map((t) => `<button class="chip" type="button" data-action="quick" data-text="${esc(t)}">${esc(t)}</button>`).join('')}</div>` : ''}
     <form class="chat-form" id="pro-chat" data-thread="${thread}">
-      <label class="attach-btn">${icon('camera', 22)}<input class="sr-only" id="pro-attach" type="file" accept="image/*" aria-label="Додати фото"></label>
+      <label class="attach-btn">${icon('camera', 22)}<input class="sr-only" id="pro-attach" type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" aria-label="Додати фото"></label>
       <input name="text" required maxlength="500" autocomplete="off" placeholder="Повідомлення…" aria-label="Повідомлення клієнту">
       <button class="send-btn" type="submit" aria-label="Надіслати">${icon('send', 20)}</button>
     </form>
@@ -4708,7 +4771,7 @@ function bookingSheet(id) {
     actions = !started(b) ? `<p class="notice">«Машина готова» можна позначити, коли почнеться візит — ${dayWord(b.date).toLowerCase()} о ${b.time}.</p>
       <button class="btn" type="button" data-action="move" data-id="${b.id}">${icon('calendar', 18)}Перенести за домовленістю з клієнтом</button>` : `<form class="stack ready-form" id="ready-form" data-id="${b.id}" style="gap:10px">
         <label class="dropzone small-drop">${icon('camera', 20)}Фото результату (до 3, необовʼязково)<span class="photo-count" aria-live="polite"></span>
-          <input class="sr-only" name="photos" type="file" accept="image/*" multiple></label>
+          <input class="sr-only" name="photos" type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" multiple></label>
         <div class="grid2">
           <label class="field"><span>Коментар для клієнта</span><input name="note" maxlength="200" autocomplete="off"></label>
         </div>
@@ -5180,12 +5243,12 @@ function infoCard(p, r) {
       <div class="ava-row">
         ${imgSrc(p.avatar) ? `<img class="ava" src="${imgSrc(p.avatar)}" alt="Аватар мийки">` : `<span class="avatar ava" aria-hidden="true">${letter}</span>`}
         <div class="stack" style="gap:6px"><small class="muted">${r.count ? `★ ${rating(r.avg)} · ${r.count} ${plural(r.count, 'відгук', 'відгуки', 'відгуків')}` : 'Відгуків ще немає'}</small>
-          <div class="row"><label class="btn soft">${icon('camera', 16)}${p.avatar ? 'Змінити аватар' : 'Додати аватар'}<input class="sr-only" type="file" accept="image/*" id="pf-avatar" aria-label="Аватар мийки"></label>
+          <div class="row"><label class="btn soft">${icon('camera', 16)}${p.avatar ? 'Змінити аватар' : 'Додати аватар'}<input class="sr-only" type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" id="pf-avatar" aria-label="Аватар мийки"></label>
           ${p.avatar ? '<button class="btn text-danger" type="button" data-action="ava-del">Прибрати</button>' : ''}</div></div>
       </div>
       <div><span class="lbl">Фото мийки (${photos.length} з ${MAX_PHOTOS}) — перше стає обкладинкою</span>
         <div class="photo-grid">${photos.map((src, i) => `<figure><img src="${imgSrc(src)}" alt="Фото ${i + 1}"><button class="photo-del" type="button" data-action="photo-del" data-i="${i}" aria-label="Видалити фото ${i + 1}">${icon('x', 16)}</button>${i ? `<button class="photo-first" type="button" data-action="photo-first" data-i="${i}">Обкладинка</button>` : ''}</figure>`).join('')}
-        ${photos.length < MAX_PHOTOS ? `<label class="photo-add">${icon('plus', 22)}<span>Фото</span><input class="sr-only" type="file" accept="image/*" multiple id="pf-photos" aria-label="Додати фото мийки"></label>` : ''}</div></div>
+        ${photos.length < MAX_PHOTOS ? `<label class="photo-add">${icon('plus', 22)}<span>Фото</span><input class="sr-only" type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" multiple id="pf-photos" aria-label="Додати фото мийки"></label>` : ''}</div></div>
       <label class="field"><span>Назва</span><input name="name" required maxlength="80" value="${esc(p.name)}" autocomplete="off"></label>
       <label class="field"><span>Адреса</span><input name="address" required maxlength="120" value="${esc(p.address)}" autocomplete="off"></label>
       <label class="field"><span>Опис</span><textarea name="about" rows="4" maxlength="500" placeholder="Що вирізняє мийку: хімія, зона очікування з кавою, швидкість, оплата карткою">${esc(p.about ?? '')}</textarea></label>
@@ -5442,7 +5505,7 @@ function viewSupport(openId) {
       <button class="btn primary" type="submit">Надіслати</button>
     </form>`;
 }
-const photoPick = () => `<label class="dropzone small-drop">${icon('camera', 20)}Додати фото (до 3)<span class="photo-count" aria-live="polite"></span><input class="sr-only" name="photos" type="file" accept="image/*" multiple></label>`;
+const photoPick = () => `<label class="dropzone small-drop">${icon('camera', 20)}Додати фото (до 3)<span class="photo-count" aria-live="polite"></span><input class="sr-only" name="photos" type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" multiple></label>`;
 
 // ---------- аналітика й знижки на тихі години ----------
 
@@ -5907,6 +5970,7 @@ function pickWash(id) {
 function notFound() { return '<h1>Не знайдено</h1><p class="muted">Можливо, запис видалили. <a href="#/">До повідомлень</a></p>'; }
 
 function route() {
+  if (ui.lastView) (ui.scrollMem ??= {})[ui.lastView] = window.scrollY; // куди повернутися з чату
   const s = session();
   document.body.classList.toggle('locked', !s);
   if (!s) {
@@ -5967,14 +6031,15 @@ function route() {
   }
   alertPending();
   const key = `${page}/${page === 'chat' ? arg : ''}`;
-  if (key !== ui.lastView && page !== 'chat') window.scrollTo(0, 0);
+  // Новий екран — згори; повернулися з чату до списку — туди, де були.
+  if (key !== ui.lastView && page !== 'chat') window.scrollTo({ top: ui.lastView?.startsWith('chat/') ? ui.scrollMem?.[key] ?? 0 : 0, behavior: 'instant' });
   ui.lastView = key;
 }
 
+// Перемалювати той самий екран: прокрутка, набране в інших картках, розгорнуте й обрані фото лишаються (keepUi).
 function rerender() {
-  const y = window.scrollY;
-  route();
-  window.scrollTo(0, y);
+  const before = ui.lastView;
+  keepUi(route, () => ui.lastView === before);
 }
 
 // Нова знижка на години (одна на ті самі дні й години: стара вимикається).
@@ -6711,9 +6776,11 @@ window.addEventListener('storage', (e) => {
   load();
   checkSheet();
   if (nb || document.body.classList.contains('sheet-open')) { renderChrome(location.hash.split('/')[1] ?? ''); alertPending(); return; }
+  // Присутність, журнал подій і дзвінки (їх показує call.js) екран не змінюють.
+  if (['carcar.presence', 'carcar.analytics', 'carcar.calls'].includes(e.key)) return;
   const input = $('#pro-chat [name="text"]');
   if (document.activeElement?.matches('input, textarea, select') && document.activeElement !== input) { renderChrome(location.hash.split('/')[1] ?? ''); alertPending(); return; }
-  keepUi(rerender);
+  rerender();
 });
 
 // Перехід між екранами закриває шторки — крім сповіщення про новий запис: воно чекає відповіді.
@@ -6743,7 +6810,7 @@ navigator.serviceWorker?.addEventListener('message', (e) => {
 });
 keepChatOnKeyboard();
 // Вхідні дзвінки клієнтів CARCAR — у будь-яку мийку акаунта.
-initCalls('place', (c) => !!session() && accountPlaces(session()).includes(c.placeId), { onLog: (c) => logCall({ bookings, requests, save }, c) });
+initCalls('place', (c) => !!session() && accountPlaces(session()).includes(c.placeId), { onLog: (c) => { logCall({ bookings, requests, save }, c); rerender(); } });
 route();
 
 </script>
