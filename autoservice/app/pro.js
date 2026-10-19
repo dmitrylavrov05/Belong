@@ -10,6 +10,7 @@ import {
   confirmBy, offerBy, responseStats, pauseOf, ratePct, msText, accountPlaces, addAccountPlace,
   ticketsAll, openTicket, ticketReply, setTicket, TICKET_TOPICS, TICKET_STATUS, PLACE_TOPICS, ticketPhotos,
   payoutReady, maskIban, hidePhones, themePicker, setTheme, samePhone, hasServer, api, authToken, setAuthToken, serverConfig, demoWashOn, notifySync, pushForget, telegramNotify, fitChatScreen, keepChatOnKeyboard, commissionFor, savePartner, staffOf, checkBizLogin, numberBookings, bookingNo, POWER, powerOf, setPower,
+  keepUi,
 } from './core.js';
 import {
   openStarts, chatPost, chatTimeline, readMessages, msgPreview, touchPresence, BIZ_QUICK, sendMessages, checkWaitlist,
@@ -2695,12 +2696,8 @@ window.addEventListener('storage', (e) => {
   checkSheet();
   if (nb || document.body.classList.contains('sheet-open')) { renderChrome(location.hash.split('/')[1] ?? ''); alertPending(); return; }
   const input = $('#pro-chat [name="text"]');
-  const draft = input?.value ?? '';
-  const focused = document.activeElement === input;
-  if (document.activeElement?.matches('input, textarea, select') && !focused) { renderChrome(location.hash.split('/')[1] ?? ''); alertPending(); return; }
-  rerender();
-  const again = $('#pro-chat [name="text"]');
-  if (again) { again.value = draft; if (focused) again.focus(); }
+  if (document.activeElement?.matches('input, textarea, select') && document.activeElement !== input) { renderChrome(location.hash.split('/')[1] ?? ''); alertPending(); return; }
+  keepUi(rerender);
 });
 
 // Перехід між екранами закриває шторки — крім сповіщення про новий запис: воно чекає відповіді.

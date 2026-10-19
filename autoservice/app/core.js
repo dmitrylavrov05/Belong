@@ -935,6 +935,39 @@ export const isBlocked = (keys) => keys.some((k) => k && fraudState().blocked[k]
 // Поява сторінки й «набігання» чисел у показниках — лише при переході на інший екран
 // і якщо людина не просила зменшити анімацію.
 const calm = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Фонове перемальовування (прийшли зміни з сервера, спрацював таймер) не має збивати людину: прокрутка, набраний
+// текст, курсор і позначки в полях лишаються як були. Відновлюємо лише поля, які людина змінювала сама.
+const touched = new WeakSet();
+if (typeof document !== 'undefined') {
+  for (const ev of ['input', 'change']) document.addEventListener(ev, (e) => e.target?.matches?.('input, textarea, select') && touched.add(e.target), true);
+}
+const fieldKey = (el) => `${el.closest('form[id], form[data-id], [data-id], [id]:not(input):not(textarea):not(select)')?.getAttribute('id') ?? ''}|${el.closest('[data-id]')?.dataset.id ?? ''}|${el.id || el.name}|${['checkbox', 'radio'].includes(el.type) ? el.value : ''}`;
+export function keepUi(fn) {
+  const y = window.scrollY;
+  const saved = new Map();
+  for (const el of document.querySelectorAll('input, textarea, select')) {
+    if (!touched.has(el) || !(el.id || el.name) || el.type === 'file') continue;
+    saved.set(fieldKey(el), ['checkbox', 'radio'].includes(el.type) ? el.checked : el.value);
+  }
+  const a = document.activeElement;
+  const focus = a?.matches?.('input, textarea, select') && (a.id || a.name) ? { key: fieldKey(a), from: a.selectionStart, to: a.selectionEnd } : null;
+  const open = new Set([...document.querySelectorAll('details[open][id], details[open][data-id]')].map((d) => d.id || d.dataset.id));
+  fn();
+  for (const el of document.querySelectorAll('input, textarea, select')) {
+    const k = fieldKey(el);
+    if (saved.has(k)) {
+      if (['checkbox', 'radio'].includes(el.type)) el.checked = saved.get(k); else if (el.value !== saved.get(k)) el.value = saved.get(k);
+      touched.add(el);
+    }
+    if (focus && k === focus.key && document.activeElement !== el) {
+      el.focus({ preventScroll: true });
+      try { if (focus.from != null) el.setSelectionRange(focus.from, focus.to); } catch { /* поле без курсора */ }
+    }
+  }
+  for (const d of document.querySelectorAll('details[id], details[data-id]')) if (open.has(d.id || d.dataset.id)) d.open = true;
+  if (Math.abs(window.scrollY - y) > 1) window.scrollTo({ top: y, behavior: 'instant' });
+}
+
 export function enterView(view, changed) {
   if (!changed || calm()) return;
   view.classList.remove('view-enter');

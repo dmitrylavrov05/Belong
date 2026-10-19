@@ -437,3 +437,41 @@ test('оплата: спершу чек згори, «Усе вірно — до
   await pay.click();
   await expect(page.locator('#toast')).toHaveText('Оплачено, ви записані');
 });
+
+test('оновлення з сервера не гортає сторінку вгору й не стирає набране', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const remote = (key) => page.evaluate((k) => window.dispatchEvent(new StorageEvent('storage', { key: `carcar.${k}` })), key);
+  // Сторінка мийки: догорнули до відгуків — прийшли чужі записи й зміни прайсу.
+  await page.goto('/#/place/blysk');
+  await page.evaluate(() => window.scrollTo(0, 900));
+  await page.waitForTimeout(100);
+  const y = await page.evaluate(() => scrollY);
+  expect(y).toBeGreaterThan(500);
+  for (const k of ['bookings', 'reviews', 'biz.places', 'avatars']) await remote(k);
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => scrollY)).toBe(y);
+
+  // Гараж: набирає імʼя, не зберігши, — оновлення не стирає й не забирає курсор.
+  await page.goto('/#/garage');
+  const name = page.getByLabel('Імʼя');
+  await name.fill('Олександра');
+  await remote('bookings');
+  await page.waitForTimeout(300);
+  await expect(name).toHaveValue('Олександра');
+  await expect(name).toBeFocused();
+
+  // Запис: обрали послугу й догорнули до часу — оновлення зайнятості не скидає прокрутку.
+  await page.goto('/#/book/blysk');
+  await page.getByLabel(/Експрес-мийка кузова/).check();
+  await page.locator('[data-action="to-time"]').click();
+  await page.getByRole('button', { name: /Завтра/ }).click();
+  await page.evaluate(() => window.scrollTo(0, 400));
+  await page.waitForTimeout(100);
+  const y2 = await page.evaluate(() => scrollY);
+  await remote('bookings');
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => scrollY)).toBe(y2);
+  // Перехід на інший екран — як і раніше, згори.
+  await page.goto('/#/bookings');
+  expect(await page.evaluate(() => scrollY)).toBe(0);
+});

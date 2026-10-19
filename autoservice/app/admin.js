@@ -11,6 +11,7 @@ import {
   addCustomPlace, uid, hash,
   leadFee, isListed, createPlace, enterView, bizApps, APP_STATUS, approveBizApp, rejectBizApp, bookingNo, findByNo, ticketPhotos, shrinkPhoto,
   hasServer, api, authToken, setAuthToken, isDemoPlace, demoPlacesOn, demoWashOn, demoLoginOn, serverConfig,
+  keepUi,
 } from './core.js';
 import { ENTITY, TAX, codeValid, ibanValid, ibanBank, formatIban } from './partners.js';
 import { drawColumns, legend, tableView, hbars, hideTip } from './charts.js';
@@ -1642,9 +1643,11 @@ document.addEventListener('submit', async (e) => {
 
 // Застосунок чи панель в іншій вкладці змінили дані — перечитуємо.
 window.addEventListener('storage', (e) => {
-  if (!e.key?.startsWith('carcar.') || e.key === 'carcar.presence') return;
+  if (!e.key?.startsWith('carcar.') || ['carcar.presence', 'carcar.analytics', 'carcar.calls'].includes(e.key)) return;
   load();
-  rerender();
+  // Адміністратор друкує (пошук мийки, відповідь, рішення спору) — не перемальовуємо під руками.
+  if (document.activeElement?.matches('input, textarea, select')) return;
+  keepUi(rerender);
 });
 
 $('#to-biz').innerHTML = `${icon('chevL', 18)}CarCar Business`;

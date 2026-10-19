@@ -5,7 +5,7 @@ import {
   confirmBy, offerBy, pauseOf, responseStats, msText, AWAITING, staffOf, chargedOf, realOrder, hidePhones, clientIdOf, walletKey,
   applyOverrides, isListed, visibleReviews, ACTIVE, BLOCKING, HOUR, price, isFrozen, settleAll, ratingFor,
   powerOf, worksInBlackout, TICKET_TOPICS, CLIENT_TOPICS, TICKET_STATUS, ticketsAll, openTicket, ticketReply, setTicket, isBlocked, mobileOn, spanOf, laneCap, sameLane, MOBILE_ROAD, promosAll, promoCheck,
-  enterView, fitChatScreen, keepChatOnKeyboard, themePicker, setTheme, bizApps, saveBizApps, APP_STATUS, numberBookings, bookingNo, findByNo, ticketPhotos,
+  enterView, keepUi, fitChatScreen, keepChatOnKeyboard, themePicker, setTheme, bizApps, saveBizApps, APP_STATUS, numberBookings, bookingNo, findByNo, ticketPhotos,
   hasServer, api, authToken, setAuthToken, serverConfig, notifySync, pushForget, telegramNotify, demoLoginOn,
 } from './core.js';
 import {
@@ -2954,9 +2954,12 @@ function route() {
     }
     return;
   }
-  enterView(view, `${page}/${arg ?? ''}` !== ui.lastView);
+  const changed = `${page}/${arg ?? ''}` !== ui.lastView;
+  enterView(view, changed);
   ui.lastView = `${page}/${arg ?? ''}`;
   if (page !== 'book') karychRoute(page || 'catalog', karychTip(page || 'catalog'));
+  // Той самий екран перемалювався (дані оновились) — лишаємо прокрутку як була; згори — лише новий екран.
+  if (!changed) return;
   const target = arg && page === 'bookings' ? $(`#b-${arg}`) : page === 'garage' && arg === 'add' ? $('#add-car') : null;
   if (target) target.scrollIntoView({ block: 'center' });
   else window.scrollTo(0, 0);
@@ -3586,14 +3589,22 @@ window.addEventListener('hashchange', route);
 setInterval(() => {
   const timers = document.querySelectorAll('[data-due]');
   for (const el of timers) el.textContent = leftText(Number(el.dataset.due));
-  if ([...timers].some((el) => Number(el.dataset.due) <= Date.now()) && !draft?.paying) route();
+  if ([...timers].some((el) => Number(el.dataset.due) <= Date.now()) && !draft?.paying) keepUi(route);
 }, 1000);
 
+// Ключі, зміни яких не стосуються екрана клієнта: журнал подій, дзвінки (їх показує call.js), чужі службові дані.
+const QUIET_KEYS = new Set(['carcar.seenStates', 'carcar.analytics', 'carcar.calls', 'carcar.callLog', 'carcar.biz.shifts', 'carcar.biz.stock',
+  'carcar.biz.clientNotes', 'carcar.biz.accounts', 'carcar.admin.fraud', 'carcar.karych']);
+let remoteTimer = 0;
 window.addEventListener('storage', (e) => {
-  if (!e.key?.startsWith('carcar.')) return;
-  if (e.key === 'carcar.seenStates') return;
+  if (!e.key?.startsWith('carcar.') || QUIET_KEYS.has(e.key)) return;
   // Мийка відкрила чи закрила панель — оновлюємо лише «у мережі», без перемальовування.
   if (e.key === `carcar.${PRESENCE_KEY}`) { refreshPresence(); return; }
+  // Кілька ключів приходять разом — перемальовуємо один раз.
+  clearTimeout(remoteTimer);
+  remoteTimer = setTimeout(applyRemote, 60);
+});
+function applyRemote() {
   bookings = store.get('bookings', []);
   payouts = store.get('payouts', []);
   reviews = store.get('reviews', []);
@@ -3601,8 +3612,8 @@ window.addEventListener('storage', (e) => {
   profile = { name: '', phone: '', optIn: false, ...store.get('profile', {}) };
   wallet = { bonus: 0, money: 0, history: [], ...store.get(walletKey(meId()), {}) };
   applyOverrides();
-  if (!draft?.paying) route();
-});
+  if (!draft?.paying) keepUi(route);
+}
 function refreshPresence() {
   for (const el of document.querySelectorAll('.chat-presence')) {
     const on = presenceOf(el.dataset.place).online;
