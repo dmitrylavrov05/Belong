@@ -5729,14 +5729,14 @@ function renderBook() {
         <li><span class="perk-ic">${icon('undo', 20)}</span>Скасування до ${cancelWindow()} до візиту — уся сума повертається на баланс CARCAR</li>
         <li><span class="perk-ic">${icon('clock', 20)}</span>Запізнення понад ${PAYMENT.lateMinutes} хв — мийка може звернутися в підтримку; якщо CARCAR підтвердить, оплата зараховується мийці</li>
       </ul>
-      <div class="grid2 pf" id="pay-end">
+      <div class="grid2 pf">
         <label class="field"><span>Ваше імʼя</span><input id="pf-name" autocomplete="name" value="${esc(draft.pfName ?? profile.name)}"></label>
         <label class="field"><span>Телефон</span><input id="pf-phone" type="tel" autocomplete="tel" placeholder="+380" value="${esc(draft.pfPhone ?? profile.phone)}"></label>
       </div>
       <p class="demo">Імʼя бачить лише точка, а номер телефону — ні: звʼязок через чат і дзвінки в CARCAR — щоб звʼязатися й показувати вам персональні ціни. Демо-оплата: гроші не списуються.</p>
       <div class="dock-space"></div>
       <div class="dock pay-dock">
-        ${!draft.payReady ? `<button class="btn primary block" data-action="pay-next">Усе вірно — до оплати${icon('chevD', 20)}</button>` : `<button class="btn primary block${(draft.method ?? 'card') === 'gpay' && q.card > 0 ? ' gpay' : ''}" data-action="pay">${(draft.method ?? 'card') === 'gpay' && q.card > 0 ? '<span class="g-mark" aria-hidden="true">G</span>' : icon('card', 20)}${q.card > 0 ? `Оплатити ${uah(q.card)}` : fromBal ? 'Оплатити з балансу' : q.covered ? 'Записатися' : `Оплатити ${uah(0)}`}</button>`}
+        ${`<button class="btn primary block${(draft.method ?? 'card') === 'gpay' && q.card > 0 ? ' gpay' : ''}" data-action="pay">${(draft.method ?? 'card') === 'gpay' && q.card > 0 ? '<span class="g-mark" aria-hidden="true">G</span>' : icon('card', 20)}${q.card > 0 ? `Оплатити ${uah(q.card)}` : fromBal ? 'Оплатити з балансу' : q.covered ? 'Записатися' : `Оплатити ${uah(0)}`}</button>`}
       </div>
     </section>`;
   }
@@ -5748,31 +5748,7 @@ function renderBook() {
   const top = $('#view > .back');
   if (top) top.hidden = step !== 'svc';
   if (step === 'svc' && mobileMode()) mountPickMap(p);
-  if (step === 'pay' && !draft.payReady) watchPayEnd();
   karychRoute(`book-${step}`, null, { away: true });
-}
-
-// Екран оплати відкривається згори (чек — перевірити замовлення). Кнопка внизу «Усе вірно — до оплати» гортає до
-// способу оплати й стає «Оплатити». Догорнули самі до кінця — кнопка теж стає «Оплатити».
-let payWatch = null;
-function watchPayEnd() {
-  payWatch?.disconnect();
-  const end = $('#pay-end');
-  if (!end || !('IntersectionObserver' in window)) { draft.payReady = true; return; }
-  payWatch = new IntersectionObserver((es) => {
-    if (!es.some((e) => e.isIntersecting) || !draft?.paying || draft.payReady) return;
-    payWatch.disconnect();
-    payReady(false);
-  }, { rootMargin: `0px 0px -${($('.pay-dock')?.offsetHeight ?? 0) + ($('.tabs')?.offsetHeight ?? 0)}px 0px` });
-  payWatch.observe(end);
-}
-function payReady(scroll) {
-  draft.payReady = true;
-  const y = window.scrollY;
-  renderBook();
-  window.scrollTo({ top: y, behavior: 'instant' });
-  if (scroll) ($('.methods') ?? $('#pay-end'))?.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'center' });
-  $('[data-action="pay"]')?.focus({ preventScroll: true });
 }
 
 // Карта для вибору місця виїзду: точка, радіус виїзду не малюємо — перевіряємо відстань.
@@ -7469,15 +7445,14 @@ document.addEventListener('click', (e) => {
   } else if (action === 'confirm' || action === 'unpay') {
     if (action === 'confirm' && !draft.paying) history.pushState({ bookStep: 'pay' }, '', location.hash);
     draft.paying = action === 'confirm';
-    draft.payReady = false;
     if (draft.paying) track('open_pay', { placeId: draft.placeId });
     else draft.step = draft.time ? 'time' : 'svc';
     window.scrollTo({ top: 0, behavior: 'instant' });
     renderBook();
     window.scrollTo({ top: 0, behavior: 'instant' });
-    $(draft.paying ? '[data-action="pay-next"], [data-action="pay"]' : '[data-action="confirm"]')?.focus({ preventScroll: true });
-  } else if (action === 'pay-next') {
-    payReady(true);
+    // Екран оплати — згори (чек), далі людина гортає сама: жодних автоматичних прокручувань чи фокусу,
+    // від якого телефон міг сам прогорнути сторінку вниз.
+    if (!draft.paying) $('[data-action="confirm"]')?.focus({ preventScroll: true });
   } else if (action === 'pay') {
     confirmBooking();
   } else if (action === 'share' || action === 'copy') {
@@ -8064,7 +8039,7 @@ const QUIET_KEYS = new Set(['carcar.seenStates', 'carcar.analytics', 'carcar.cal
 // «Назад» на кроках запису: з оплати — до часу, з часу — до послуг (кроки ми додали в історію).
 window.addEventListener('popstate', () => {
   if (!draft || !location.hash.startsWith(`#/book/${draft.placeId}`) || !$('#book')) return;
-  if (draft.paying) { draft.paying = false; draft.payReady = false; draft.step = 'time'; } else if (draft.step === 'time') draft.step = 'svc';
+  if (draft.paying) { draft.paying = false; draft.step = 'time'; } else if (draft.step === 'time') draft.step = 'svc';
   renderBook();
   window.scrollTo({ top: 0, behavior: 'instant' });
 });

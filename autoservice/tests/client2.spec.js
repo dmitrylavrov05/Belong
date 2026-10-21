@@ -416,25 +416,20 @@ test('Кар Карич не заважає записатися: над кно�
   await expect(page.getByRole('dialog', { name: 'Кар Карич підказує' })).toContainText('Ви записані');
 });
 
-test('оплата: спершу чек згори, «Усе вірно — до оплати» гортає до оплати; оплати частинами немає', async ({ page }) => {
-  await page.removeLocatorHandler(page.payNext);
+test('оплата: екран відкривається згори й сам не гортає вниз; оплати частинами немає', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/#/book/hlyanets');
   await page.getByLabel(/Керамічне покриття/).check();
   await page.locator('[data-action="to-time"]').click();
   await page.getByRole('button', { name: /Завтра/ }).click();
+  await page.evaluate(() => window.scrollTo(0, 400));
   await page.locator('.slot[data-time="10:00"]').click();
   await page.locator('[data-action="confirm"]').click();
-  // Екран оплати — згори: чек видно, до способу оплати ще не догорнули.
   await expect(page.locator('.receipt')).toBeInViewport();
-  expect(await page.evaluate(() => scrollY)).toBe(0);
-  await expect(page.getByRole('button', { name: /^Оплатити/ })).toHaveCount(0);
+  await page.waitForTimeout(1500);
+  expect(await page.evaluate(() => scrollY)).toBe(0); // жодного автоматичного переходу вниз
   await expect(page.getByText('Оплата частинами')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Усе вірно — до оплати' }).click();
-  const pay = page.getByRole('button', { name: /^Оплатити/ });
-  await expect(pay).toBeVisible();
-  await expect(page.locator('.methods')).toBeInViewport();
-  await pay.click();
+  await page.getByRole('button', { name: /^Оплатити/ }).click();
   await expect(page.locator('#toast')).toHaveText('Оплачено, ви записані');
 });
 
