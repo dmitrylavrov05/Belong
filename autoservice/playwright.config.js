@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const PORT = 4174;
+const PORT = Number(process.env.PW_PORT) || 4174; // PW_PORT — окремий порт для паралельних прогонів
 
 export default defineConfig({
   testDir: './tests',
