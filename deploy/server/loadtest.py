@@ -17,6 +17,7 @@ POLLERS = int(sys.argv[2])
 WRITERS = int(sys.argv[3])
 SECONDS = int(sys.argv[4])
 PREFILL = int(sys.argv[5])
+DELTA = (sys.argv[6] if len(sys.argv) > 6 else 'delta') == 'delta'  # як телефони: списки змінами
 u = urllib.parse.urlparse(base)
 
 
@@ -65,7 +66,7 @@ def poller(tok):
         ver = j['ver']
         bytes_in[0] += n
         while time.time() < stop:
-            st, j, n = req('GET', f'/api/state?since={ver}&wait=1', token=tok, timeout=40, light=True)
+            st, j, n = req('GET', f'/api/state?since={ver}&wait=1' + ('&delta=1' if DELTA else ''), token=tok, timeout=40, light=True)
             if st != 200:
                 errors[0] += 1
                 time.sleep(1)

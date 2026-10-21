@@ -27,6 +27,7 @@ import argparse
 import base64
 import hashlib
 import hmac
+import bisect
 import json
 import mimetypes
 import os
@@ -142,6 +143,22 @@ def value_json(v):
 ANALYTICS_MAX = 50_000  # журнал подій: останні N (старіші — у резервних копіях)
 
 
+# Списки, які телефонам надсилаємо змінами (лише нові й змінені елементи та id видалених), а не цілком:
+# інакше кожен новий запис будь-де розсилав би всім клієнтам увесь список зайнятості (десятки КБ на телефон).
+DELTA_KEYS = {'bookings', 'requests', 'messages', 'support', 'reviews', 'waitlist', 'payouts', 'callLog'}
+DELTA_LOG = 50_000  # скільки останніх змін памʼятаємо; хто відстав сильніше — отримує список цілком
+# Зміни цих ключів міняють, що саме бачить користувач (мийки акаунта, демо) — тоді списки віддаємо цілком.
+SCOPE_KEYS = {'biz.accounts', 'biz.places', 'admin.server', 'places.custom'}
+
+
+class Delta:
+    """Зміни списку з версії N: змінені елементи (як є, до прав доступу) і id видалених."""
+    __slots__ = ('items', 'gone')
+
+    def __init__(self, items, gone):
+        self.items, self.gone = items, gone
+
+
 class Store:
     """Дані в памʼяті (розібрані один раз) + SQLite на диску. Читання не чіпає диск і не розбирає JSON —
     так сотні телефонів з довгим опитуванням не навантажують сервер."""
@@ -159,11 +176,54 @@ class Store:
         self.changed = threading.Condition(self.lock)
         self.cache = {k: (v, json.loads(raw)) for k, raw, v in self.db.execute('SELECT key, value, ver FROM kv')}
         self.ver = max([v for v, _ in self.cache.values()], default=0)
+        # Журнал змін елементів списків з цього запуску: [(версія, id як JSON, видалено)], і елементи за id.
+        # Хто питає «з версії» до запуску сервера — отримує списки цілком.
+        self.boot_ver = self.ver
+        self.dlog = {k: [] for k in DELTA_KEYS}
+        self.ditems = {}
         self.on_change = None  # (key, old, new) — для сповіщень
         self._seen = None  # id подій журналу
 
-    def since(self, ver):
-        return {k: val for k, (v, val) in list(self.cache.items()) if v > ver}
+    def since(self, ver, delta=False):
+        """Змінене після версії ver. delta=True — списки з DELTA_KEYS як Delta (лише змінені елементи)."""
+        changed = {k: val for k, (v, val) in list(self.cache.items()) if v > ver}
+        if not delta or ver <= 0 or ver < self.boot_ver or SCOPE_KEYS & changed.keys():
+            return changed
+        for k in DELTA_KEYS & changed.keys():
+            log = self.dlog.get(k) or []
+            if not isinstance(changed[k], list) or not log or log[0][0] > ver + 1 and len(log) >= DELTA_LOG:
+                continue  # відстав більше, ніж памʼятаємо, — цілком
+            i = bisect.bisect_right(log, (ver, '\uffff', True))
+            ids, gone = {}, {}
+            for _, idk, rm in log[i:]:
+                (gone if rm else ids)[idk] = True
+                (ids if rm else gone).pop(idk, None)
+            items_by = self.ditems.get(k, {})
+            changed[k] = Delta([items_by[i] for i in ids if i in items_by], [json.loads(i) for i in gone])
+        return changed
+
+    def _track(self, key, old, new):
+        """Які елементи списку змінились при збереженні (для розсилки змінами)."""
+        if key not in DELTA_KEYS or not isinstance(new, list):
+            return
+        om = {}
+        for x in old if isinstance(old, list) else []:
+            if isinstance(x, dict) and 'id' in x:
+                om[json.dumps(x['id'])] = x
+        log, by = self.dlog.setdefault(key, []), {}
+        for x in new:
+            if not isinstance(x, dict) or 'id' not in x:
+                continue
+            idk = json.dumps(x['id'])
+            by[idk] = x
+            o = om.pop(idk, None)
+            if o is not x and o != x:
+                log.append((self.ver, idk, False))
+        for idk in om:
+            log.append((self.ver, idk, True))
+        self.ditems[key] = by
+        if len(log) > DELTA_LOG:
+            del log[:len(log) - DELTA_LOG]
 
     def get(self, key):
         e = self.cache.get(key)
@@ -171,6 +231,7 @@ class Store:
 
     def _save(self, key, value):
         self.ver += 1
+        self._track(key, self.cache.get(key, (0, None))[1], value)
         self.cache[key] = (self.ver, value)
         self.db.execute('INSERT INTO kv (key, value, ver) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, ver = excluded.ver',
                         (key, value_json(value), self.ver))
@@ -217,7 +278,7 @@ class Store:
                     threading.Thread(target=self.on_change, args=(key, cur, new), daemon=True).start()
             return new
 
-    def wait(self, ver, seconds, view):
+    def wait(self, ver, seconds, view, delta=False):
         """Довге опитування: чекаємо змін, які цей користувач бачить (чужі гаманці, журнал подій тощо його не будять)."""
         deadline = time.time() + seconds
         while True:
@@ -225,7 +286,7 @@ class Store:
                 if self.ver <= ver:
                     self.changed.wait(max(0.0, deadline - time.time()))
                 cur = self.ver
-            out = view(self.since(ver))
+            out = view(self.since(ver, delta))
             # Порожнє ({} чи []) — це чуже, що змінилося (нотатки іншої мийки тощо): не будимо через нього.
             if any(v not in ({}, []) for v in out.values()) or time.time() >= deadline:
                 return cur, out
@@ -653,14 +714,23 @@ def make_handler(app):
                 def view(data):
                     out = {}
                     for k, v in data.items():
+                        if isinstance(v, Delta):
+                            # Лише змінене, з урахуванням прав; те, що цьому користувачу більше не видно, — у «зниклі».
+                            vis = acl.read(w, k, v.items, store.get) or []
+                            seen = {json.dumps(x.get('id')) for x in vis if isinstance(x, dict)}
+                            gone = v.gone + [x['id'] for x in v.items if json.dumps(x['id']) not in seen]
+                            if vis or gone:
+                                out[k] = {'$delta': vis, '$gone': gone}
+                            continue
                         r = acl.read_fast(w, k, v, store.get, item_json)
                         if r is not None:
                             out[k] = r
                     return out
+                delta = (q.get('delta') or ['0'])[0] == '1'
                 if (q.get('wait') or ['0'])[0] == '1':
-                    ver, out = store.wait(since, WAIT_SECONDS, view)
+                    ver, out = store.wait(since, WAIT_SECONDS, view, delta)
                 else:
-                    ver, out = store.ver, view(store.since(since))
+                    ver, out = store.ver, view(store.since(since, delta))
                 data = ','.join(json.dumps(k, ensure_ascii=False) + ':' + value_json(v) for k, v in out.items())
                 return self.send_json(200, None, raw=f'{{"ver":{ver},"data":{{{data}}}}}')
             if p == '/api/auth/tg/check':

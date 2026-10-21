@@ -497,6 +497,32 @@ class Server(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError):
             urllib.request.urlopen(self.base + '/api/avatar/aIraPhoto01?v=7')
 
+    def test_20_lists_sent_as_changes(self):
+        ira, ira_id = self.login_client('067 666 66 66')
+        oleh, _ = self.login_client('050 777 77 77')
+        mk = lambda i, t: {'id': f'd{i}', 'placeId': 'blysk', 'clientId': ira_id, 'clientName': 'Ірина', 'date': '2099-11-01', 'time': t, 'minutes': 30, 'state': 'pending', 'paid': 0, 'total': 250}
+        cur = self.state(ira).get('bookings', [])
+        self.put('bookings', cur + [mk(1, '10:00'), mk(2, '11:00')], ira)
+        ver = self.call('GET', '/api/state?since=0', token=oleh)[1]['ver']
+        # Нова зміна — Олег отримує лише її (урізаною), а не весь список.
+        cur = self.state(ira)['bookings']
+        self.put('bookings', cur + [mk(3, '12:00')], ira)
+        j = self.call('GET', f'/api/state?since={ver}&delta=1', token=oleh)[1]
+        d = j['data']['bookings']
+        self.assertEqual([x['id'] for x in d['$delta']], ['d3'])
+        self.assertNotIn('clientName', d['$delta'][0])
+        self.assertEqual(d['$gone'], [])
+        # Видалили — приходить id у «зниклих».
+        ver = j['ver']
+        cur = self.state(ira)['bookings']
+        self.put('bookings', [x for x in cur if x['id'] != 'd2'], ira, base=cur)
+        d = self.call('GET', f'/api/state?since={ver}&delta=1', token=oleh)[1]['data']['bookings']
+        self.assertEqual(d['$delta'], [])
+        self.assertEqual(d['$gone'], ['d2'])
+        # Без delta=1 (старі застосунки) і з since=0 — список цілком.
+        full = self.call('GET', f'/api/state?since={ver}', token=oleh)[1]['data']['bookings']
+        self.assertIsInstance(full, list)
+
     def test_99_login_rate_limit(self):
         codes = [self.call('POST', '/api/auth/admin', {'password': 'x'})[0] for _ in range(12)]
         self.assertIn(429, codes)

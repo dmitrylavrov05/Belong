@@ -212,6 +212,7 @@ def _public_view(value):
     day = _t.strftime('%Y-%m-%d', _t.localtime(_t.time() - 86400))
     if _pub['src'] is value and _pub['day'] == day:
         return _pub['items']
+    small = len(value or []) < 500  # зміни для довгого опитування — рахуємо без спільного кешу повного списку
     since_ms = (_t.time() - STATS_DAYS * 86400) * 1000
     items = []
     for b in value or []:
@@ -220,7 +221,8 @@ def _public_view(value):
             continue
         relevant = str(b.get('date') or '') >= day or (b.get('needsConfirm') and (b.get('createdAt') or 0) >= since_ms)
         items.append(_public_booking(b) if relevant else None)
-    _pub.update(src=value, day=day, items=items)
+    if not small:
+        _pub.update(src=value, day=day, items=items)
     return items
 
 

@@ -1819,11 +1819,29 @@ async function syncSend(key) {
   }
 }
 
+// Сервер надсилає довгі списки змінами: { $delta: нові й змінені елементи, $gone: id видалених } — вклеюємо за id.
+function mergeDelta(key, d) {
+  let cur;
+  try { cur = JSON.parse(sync.base.get(key) ?? localStorage.getItem(`carcar.${key}`) ?? '[]'); } catch { cur = []; }
+  if (!Array.isArray(cur)) cur = [];
+  const gone = new Set((d.$gone ?? []).map((id) => JSON.stringify(id)));
+  const upd = new Map((d.$delta ?? []).map((x) => [JSON.stringify(x?.id), x]));
+  const out = [];
+  for (const x of cur) {
+    const k = JSON.stringify(x?.id);
+    if (gone.has(k)) continue;
+    if (upd.has(k)) { out.push(upd.get(k)); upd.delete(k); } else out.push(x);
+  }
+  return [...out, ...upd.values()];
+}
+
 function syncApply(data) {
-  for (const [key, value] of Object.entries(data)) {
+  for (const [key, value0] of Object.entries(data)) {
     if (!shared(key)) continue;
-    // Наша зміна ще не пішла — вона зіллється з цією на сервері (base лишається тим, від чого ми рахували зміни).
+    // Наша зміна ще не пішла — вона зіллється з цією на сервері (base лишається тим, від чого ми рахували зміни),
+    // а відповідь сервера на нашу зміну принесе список цілком.
     if (sync.timers.has(key) || sync.busy.has(key)) continue;
+    const value = value0 && typeof value0 === 'object' && !Array.isArray(value0) && '$delta' in value0 ? mergeDelta(key, value0) : value0;
     const raw = JSON.stringify(value);
     sync.base.set(key, raw);
     if (localStorage.getItem(`carcar.${key}`) === raw) continue;
@@ -1838,7 +1856,7 @@ async function syncPoll(gen) {
     sync.poll = ctrl;
     try {
       const token = authToken();
-      const res = await fetch(`api/state?since=${sync.ver}&wait=1`, { cache: 'no-store', signal: ctrl.signal, headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      const res = await fetch(`api/state?since=${sync.ver}&wait=1&delta=1`, { cache: 'no-store', signal: ctrl.signal, headers: token ? { Authorization: `Bearer ${token}` } : {} });
       if (!res.ok) throw new Error(String(res.status));
       const j = await res.json();
       if (gen !== sync.gen) return;
