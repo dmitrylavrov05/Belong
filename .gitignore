@@ -3,3 +3,6 @@ site/dist/
 site/test-results/
 site/playwright-report/
 __pycache__/
+
+# Тимчасові перевірки (QA)
+autoservice/tests/zz*
