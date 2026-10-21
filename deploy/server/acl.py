@@ -771,6 +771,7 @@ POLICIES = {
     'admin.settings':  ('raw', read_all, write_admin),
     'admin.server':    ('raw', read_all, write_admin),
     'admin.pauseLift': ('raw', read_all, write_admin),
+    'admin.pauses':    ('raw', read_all, write_admin),
     'admin.fraud':     ('raw', read_admin, write_admin),
     'admin.campaignDemo': ('raw', read_admin, write_admin),
     'seq.booking':     ('raw', read_all, write_any_auth),

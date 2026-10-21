@@ -2195,7 +2195,8 @@ const REFERRAL = {
 
 // Відповідальність мийки за записи з застосунку (за останні days днів, якщо заявок не менше minRequests):
 // частка відмов (свої відмови й мовчання) понад warnRate — мийка нижче в пошуку;
-// від pauseRate — онлайн-запис на паузі pauseHours годин після останньої відмови.
+// від pauseRate — адміністрації пропонується поставити онлайн-запис на паузу (на pauseHours годин); сама пауза діє
+// лише після її рішення (admin.pauses), автоматично мийку не зупиняємо.
 // Запропонований інший час відмовою не вважається.
 const DECLINE_RULES = { days: 30, minRequests: 5, warnRate: 0.3, pauseRate: 0.5, pauseHours: 24 };
 
@@ -3216,7 +3217,20 @@ const calm = () => typeof matchMedia === 'function' && matchMedia('(prefers-redu
 let userAt = 0;
 if (typeof window !== 'undefined') {
   for (const ev of ['scroll', 'touchstart', 'touchmove', 'pointerdown', 'wheel', 'keydown']) window.addEventListener(ev, () => { userAt = performance.now(); }, { passive: true, capture: true });
+  document.addEventListener('selectionchange', () => { userAt = performance.now(); });
+  // Людина виділила текст у картці-посиланні чи кнопці-картці — відпускання не вважаємо натисканням (інакше замість
+  // копіювання відкривалась картка й виділення зникало).
+  document.addEventListener('click', (e) => {
+    const sel = window.getSelection?.();
+    if (!sel || sel.isCollapsed || !sel.toString().trim()) return;
+    const card = e.target.closest?.('a[href], [data-action]');
+    if (!card || card.matches('input, select, textarea, label') || !sel.containsNode(card, true)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }, true);
 }
+// Виділено текст (людина копіює) — фонове перемальовування його б скинуло, тож чекаємо.
+const selecting = () => { const sel = window.getSelection?.(); return !!sel && !sel.isCollapsed && !!sel.toString().trim(); };
 function calmRedraw(fn) {
   const st = (calmRedraw.st ??= new Map()).get(fn) ?? { last: 0, timer: 0 };
   calmRedraw.st.set(fn, st);
@@ -3224,7 +3238,7 @@ function calmRedraw(fn) {
   const run = () => {
     if (document.hidden) { document.addEventListener('visibilitychange', run, { once: true }); return; }
     const now = performance.now();
-    const wait = Math.max(600 - (now - userAt), 1200 - (now - st.last));
+    const wait = Math.max(600 - (now - userAt), 1200 - (now - st.last), selecting() ? 1000 : 0);
     if (wait > 0) { st.timer = setTimeout(run, wait); return; }
     st.last = now;
     fn();
@@ -3512,14 +3526,29 @@ function responseStats(placeId, bookings, now = Date.now()) {
 }
 
 // Пауза онлайн-запису: часті відмови — на pauseHours після останньої. Адмін може зняти паузу.
+// Пауза онлайн-запису діє лише після рішення адміністрації (admin.pauses): часті відмови лише пропонують її
+// в адмінці (pauseSuggestion), самі по собі мийку не зупиняють.
 function pauseOf(placeId, bookings, now = Date.now()) {
+  const p = store.peek('admin.pauses', {})[placeId];
+  return p && now < p.until ? { until: p.until, rate: p.rate ?? null, note: p.note ?? '' } : null;
+}
+// Пропозиція паузи для адміністрації: багато відмов за останні дні й адміністрація ще не вирішила щодо останньої.
+function pauseSuggestion(placeId, bookings, now = Date.now()) {
+  if (pauseOf(placeId, bookings, now)) return null;
   const s = responseStats(placeId, bookings, now);
   if (!s.enough || s.rate < DECLINE_RULES.pauseRate || !s.lastDecline) return null;
   if ((store.peek('admin.pauseLift', {})[placeId] ?? 0) >= s.lastDecline) return null;
-  const until = s.lastDecline + DECLINE_RULES.pauseHours * HOUR;
-  return now < until ? { until, rate: s.rate } : null;
+  return { rate: s.rate, lastDecline: s.lastDecline, hours: DECLINE_RULES.pauseHours };
 }
+function setPause(placeId, hours, rate = null, note = '') {
+  const now = Date.now();
+  store.set('admin.pauses', { ...store.get('admin.pauses', {}), [placeId]: { from: now, until: now + hours * HOUR, rate, note } });
+}
+// Зняти паузу чи відхилити пропозицію: до наступної нової відмови мийку більше не пропонуємо зупинити.
 function liftPause(placeId) {
+  const all = { ...store.get('admin.pauses', {}) };
+  delete all[placeId];
+  store.set('admin.pauses', all);
   store.set('admin.pauseLift', { ...store.get('admin.pauseLift', {}), [placeId]: Date.now() });
 }
 const ratePct = (k) => `${Math.round(k * 100)}%`;
@@ -4534,7 +4563,7 @@ function viewPlaces() {
         const last = pt.history.at(-1);
         return `<tr class="link-row" data-href="#/places/${p.id}"><td><a class="row-link" href="#/places/${p.id}">${esc(p.name)}</a><small>${isDemoPlace(p.id) ? `${demoPlacesOn() ? 'Демо' : 'Демо, приховано від клієнтів'} · ` : ''}${esc(p.district)}, ${esc(p.address)}</small></td>
           <td>${pt.company ? `${ENTITY[pt.company.type]} ${esc(pt.company.name)}<small>${pt.company.type === 'fop' ? 'РНОКПП' : 'ЄДРПОУ'} ${esc(pt.company.code)}</small>` : '<span class="muted">не вказано</span>'}</td>
-          <td>${statusPill(pt.status)}${pt.demo ? ' <span class="pill">демо</span>' : ''}${pauseOf(p.id, bookings) ? ' <span class="pill bad">Запис на паузі</span>' : responseStats(p.id, bookings).lowered ? ' <span class="pill warn">Нижче в пошуку</span>' : ''}</td>
+          <td>${statusPill(pt.status)}${pt.demo ? ' <span class="pill">демо</span>' : ''}${pauseOf(p.id, bookings) ? ' <span class="pill bad">Запис на паузі</span>' : pauseSuggestion(p.id, bookings) ? ' <span class="pill warn">Пропонуємо паузу</span>' : responseStats(p.id, bookings).lowered ? ' <span class="pill warn">Нижче в пошуку</span>' : ''}</td>
           ${relCells(p.id)}
           <td>${todo.length ? todo.map((x) => `<span class="pill warn">${x}</span>`).join(' ') : '—'}</td>
           <td>${last ? fmtTime(last.at) : '—'}</td></tr>`;
@@ -4551,6 +4580,7 @@ function relCells(placeId) {
 function relPanel(id) {
   const s = responseStats(id, bookings);
   const pause = pauseOf(id, bookings);
+  const sug = pauseSuggestion(id, bookings);
   return `<section class="panel stack" aria-labelledby="h-rel" style="gap:10px;margin-top:16px">
     <h2 id="h-rel">Підтвердження записів</h2>
     <dl class="kv">
@@ -4561,7 +4591,19 @@ function relPanel(id) {
       <dt>Стан</dt><dd>${pause ? `<span class="pill bad">Онлайн-запис на паузі до ${fmtTime(pause.until)}</span>` : s.lowered ? '<span class="pill warn">Нижче в пошуку</span>' : '<span class="pill ok">Звичайний</span>'}</dd>
     </dl>
     ${pause ? `<button class="btn" data-action="lift-pause" data-id="${id}" style="align-self:flex-start">Зняти паузу</button>
-      <p class="fine">Наприклад, якщо мийка пояснила відмови (поломка обладнання). Наступна відмова знову поставить запис на паузу, поки частка відмов висока.</p>` : ''}
+      <p class="fine">Паузу поставила адміністрація${pause.note ? `: ${esc(pause.note)}` : ''}. Сама по собі вона не поновлюється.</p>` : ''}
+    ${sug ? `<div class="notice warn stack" style="gap:8px"><b>Мийка відмовляє в ${ratePct(sug.rate)} заявок</b>
+      <span>Пропонуємо поставити онлайн-запис на паузу на ${sug.hours} год. Без вашого рішення пауза не діє — мийка й далі приймає записи.</span>
+      <form class="row" id="pause-form" data-id="${id}" style="gap:8px;flex-wrap:wrap">
+        <label class="field" style="min-width:120px"><span>Годин</span><input name="hours" type="number" min="1" max="720" value="${sug.hours}"></label>
+        <label class="field" style="flex:1;min-width:180px"><span>Причина (бачить мийка)</span><input name="note" maxlength="200" value="Часті відмови клієнтам"></label>
+        <button class="btn primary" type="submit">Поставити паузу</button>
+        <button class="btn" type="button" data-action="lift-pause" data-id="${id}">Не ставити</button>
+      </form></div>` : !pause ? `<details class="fold"><summary>Поставити паузу вручну</summary>
+      <form class="row" id="pause-form" data-id="${id}" style="gap:8px;flex-wrap:wrap;margin-top:8px">
+        <label class="field" style="min-width:120px"><span>Годин</span><input name="hours" type="number" min="1" max="720" value="24"></label>
+        <label class="field" style="flex:1;min-width:180px"><span>Причина (бачить мийка)</span><input name="note" maxlength="200" required></label>
+        <button class="btn primary" type="submit">Поставити паузу</button></form></details>` : ''}
   </section>`;
 }
 
@@ -5795,7 +5837,7 @@ document.addEventListener('click', (e) => {
     toast(list.find((x) => x.code === id).active ? `Промокод ${id} увімкнено` : `Промокод ${id} вимкнено`);
   }
   else if (action === 'place-filter') { ui.places = el.dataset.f; rerender(); }
-  else if (action === 'lift-pause') { liftPause(el.dataset.id); rerender(); toast('Паузу знято — мийка знову приймає онлайн-записи'); }
+  else if (action === 'lift-pause') { const was = !!pauseOf(el.dataset.id, bookings); liftPause(el.dataset.id); rerender(); toast(was ? 'Паузу знято — мийка знову приймає онлайн-записи' : 'Паузу не ставимо — мийка приймає записи'); }
   else if (action === 'support-filter') { ui.support = el.dataset.f; rerender(); }
   else if (action === 'fraud-filter') { ui.fraud = el.dataset.f; rerender(); }
   else if (action === 'fraud-demo') { fraudDemo(); rerender(); toast('Додано вигадані підозрілі відгуки, скасування й заявку точки-двійника'); }
@@ -5864,6 +5906,13 @@ document.addEventListener('submit', async (e) => {
   const f = e.target;
   e.preventDefault();
   const d = new FormData(f);
+  if (f.id === 'pause-form') {
+    const hours = Math.max(1, Math.min(720, Number(d.get('hours')) || 24));
+    setPause(f.dataset.id, hours, responseStats(f.dataset.id, bookings).rate, String(d.get('note') ?? '').trim());
+    rerender();
+    toast(`Онлайн-запис на паузі ${hours} год`);
+    return;
+  }
   if (f.id === 'place-find') {
     const q = String(d.get('q') ?? '').trim();
     if (q) placeFind(q);

@@ -5,7 +5,7 @@ import { CATEGORIES, PLACES, PAYMENT, CITIES } from './data.js';
 import {
   store, icon, esc, uah, pad, isoDate, parseDate, plural, dayLabel, rating, fmtTime, fmtDate, catById, WEEKDAYS, bookingStart, HOUR,
   PARTNER_STATUS, partnerOf, savePartner, commissionFor, isCarcar, price, placeShare, isFrozen,
-  responseStats, pauseOf, liftPause, ratePct, msText, realOrder,
+  responseStats, pauseOf, pauseSuggestion, setPause, liftPause, ratePct, msText, realOrder,
   ratingFor, visibleReviews, ACTIVE, chargedOf, resolveDispute, resolveLate, settleAll, applyOverrides, promosAll, savePromos, promoUses, promoText,
   TICKET_TOPICS, TICKET_STATUS, ticketsAll, ticketReply, setTicket, ticketOverdue, slaHours, fraudState, saveFraud, staffOf, phoneKey,
   addCustomPlace, uid, hash,
@@ -215,7 +215,7 @@ function viewPlaces() {
         const last = pt.history.at(-1);
         return `<tr class="link-row" data-href="#/places/${p.id}"><td><a class="row-link" href="#/places/${p.id}">${esc(p.name)}</a><small>${isDemoPlace(p.id) ? `${demoPlacesOn() ? 'Демо' : 'Демо, приховано від клієнтів'} · ` : ''}${esc(p.district)}, ${esc(p.address)}</small></td>
           <td>${pt.company ? `${ENTITY[pt.company.type]} ${esc(pt.company.name)}<small>${pt.company.type === 'fop' ? 'РНОКПП' : 'ЄДРПОУ'} ${esc(pt.company.code)}</small>` : '<span class="muted">не вказано</span>'}</td>
-          <td>${statusPill(pt.status)}${pt.demo ? ' <span class="pill">демо</span>' : ''}${pauseOf(p.id, bookings) ? ' <span class="pill bad">Запис на паузі</span>' : responseStats(p.id, bookings).lowered ? ' <span class="pill warn">Нижче в пошуку</span>' : ''}</td>
+          <td>${statusPill(pt.status)}${pt.demo ? ' <span class="pill">демо</span>' : ''}${pauseOf(p.id, bookings) ? ' <span class="pill bad">Запис на паузі</span>' : pauseSuggestion(p.id, bookings) ? ' <span class="pill warn">Пропонуємо паузу</span>' : responseStats(p.id, bookings).lowered ? ' <span class="pill warn">Нижче в пошуку</span>' : ''}</td>
           ${relCells(p.id)}
           <td>${todo.length ? todo.map((x) => `<span class="pill warn">${x}</span>`).join(' ') : '—'}</td>
           <td>${last ? fmtTime(last.at) : '—'}</td></tr>`;
@@ -232,6 +232,7 @@ function relCells(placeId) {
 function relPanel(id) {
   const s = responseStats(id, bookings);
   const pause = pauseOf(id, bookings);
+  const sug = pauseSuggestion(id, bookings);
   return `<section class="panel stack" aria-labelledby="h-rel" style="gap:10px;margin-top:16px">
     <h2 id="h-rel">Підтвердження записів</h2>
     <dl class="kv">
@@ -242,7 +243,19 @@ function relPanel(id) {
       <dt>Стан</dt><dd>${pause ? `<span class="pill bad">Онлайн-запис на паузі до ${fmtTime(pause.until)}</span>` : s.lowered ? '<span class="pill warn">Нижче в пошуку</span>' : '<span class="pill ok">Звичайний</span>'}</dd>
     </dl>
     ${pause ? `<button class="btn" data-action="lift-pause" data-id="${id}" style="align-self:flex-start">Зняти паузу</button>
-      <p class="fine">Наприклад, якщо мийка пояснила відмови (поломка обладнання). Наступна відмова знову поставить запис на паузу, поки частка відмов висока.</p>` : ''}
+      <p class="fine">Паузу поставила адміністрація${pause.note ? `: ${esc(pause.note)}` : ''}. Сама по собі вона не поновлюється.</p>` : ''}
+    ${sug ? `<div class="notice warn stack" style="gap:8px"><b>Мийка відмовляє в ${ratePct(sug.rate)} заявок</b>
+      <span>Пропонуємо поставити онлайн-запис на паузу на ${sug.hours} год. Без вашого рішення пауза не діє — мийка й далі приймає записи.</span>
+      <form class="row" id="pause-form" data-id="${id}" style="gap:8px;flex-wrap:wrap">
+        <label class="field" style="min-width:120px"><span>Годин</span><input name="hours" type="number" min="1" max="720" value="${sug.hours}"></label>
+        <label class="field" style="flex:1;min-width:180px"><span>Причина (бачить мийка)</span><input name="note" maxlength="200" value="Часті відмови клієнтам"></label>
+        <button class="btn primary" type="submit">Поставити паузу</button>
+        <button class="btn" type="button" data-action="lift-pause" data-id="${id}">Не ставити</button>
+      </form></div>` : !pause ? `<details class="fold"><summary>Поставити паузу вручну</summary>
+      <form class="row" id="pause-form" data-id="${id}" style="gap:8px;flex-wrap:wrap;margin-top:8px">
+        <label class="field" style="min-width:120px"><span>Годин</span><input name="hours" type="number" min="1" max="720" value="24"></label>
+        <label class="field" style="flex:1;min-width:180px"><span>Причина (бачить мийка)</span><input name="note" maxlength="200" required></label>
+        <button class="btn primary" type="submit">Поставити паузу</button></form></details>` : ''}
   </section>`;
 }
 
@@ -1476,7 +1489,7 @@ document.addEventListener('click', (e) => {
     toast(list.find((x) => x.code === id).active ? `Промокод ${id} увімкнено` : `Промокод ${id} вимкнено`);
   }
   else if (action === 'place-filter') { ui.places = el.dataset.f; rerender(); }
-  else if (action === 'lift-pause') { liftPause(el.dataset.id); rerender(); toast('Паузу знято — мийка знову приймає онлайн-записи'); }
+  else if (action === 'lift-pause') { const was = !!pauseOf(el.dataset.id, bookings); liftPause(el.dataset.id); rerender(); toast(was ? 'Паузу знято — мийка знову приймає онлайн-записи' : 'Паузу не ставимо — мийка приймає записи'); }
   else if (action === 'support-filter') { ui.support = el.dataset.f; rerender(); }
   else if (action === 'fraud-filter') { ui.fraud = el.dataset.f; rerender(); }
   else if (action === 'fraud-demo') { fraudDemo(); rerender(); toast('Додано вигадані підозрілі відгуки, скасування й заявку точки-двійника'); }
@@ -1545,6 +1558,13 @@ document.addEventListener('submit', async (e) => {
   const f = e.target;
   e.preventDefault();
   const d = new FormData(f);
+  if (f.id === 'pause-form') {
+    const hours = Math.max(1, Math.min(720, Number(d.get('hours')) || 24));
+    setPause(f.dataset.id, hours, responseStats(f.dataset.id, bookings).rate, String(d.get('note') ?? '').trim());
+    rerender();
+    toast(`Онлайн-запис на паузі ${hours} год`);
+    return;
+  }
   if (f.id === 'place-find') {
     const q = String(d.get('q') ?? '').trim();
     if (q) placeFind(q);

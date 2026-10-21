@@ -367,7 +367,7 @@ function reminders(marks = false) {
   const out = [];
   const pause = pauseOf(ui.place, bookings);
   if (pause) out.push(`<a class="remind warn" href="#/profile">${icon('warn', 22)}<span><b>Онлайн-запис на паузі до ${fmtTime(pause.until)}</b>
-      <small>Забагато відмов і пропущених записів. Клієнти не можуть записатися через CARCAR.</small></span>${icon('chevR', 18)}</a>`);
+      <small>Паузу поставила адміністрація CARCAR${pause.note ? `: ${esc(pause.note)}` : ''}. Клієнти не можуть записатися через CARCAR.</small></span>${icon('chevR', 18)}</a>`);
   else if (responseStats(ui.place, bookings).lowered) out.push(`<a class="remind warn" href="#/profile">${icon('warn', 22)}<span><b>Мийка нижче в пошуку через відмови</b>
       <small>Пропонуйте інший час замість відмови — це не рахується.</small></span>${icon('chevR', 18)}</a>`);
   const st = partnerOf(ui.place).status;
@@ -1211,7 +1211,7 @@ function reliabilityCard(p) {
   const s = responseStats(p.id, bookings);
   const pause = pauseOf(p.id, bookings);
   const R = DECLINE_RULES;
-  const status = pause ? `<p class="notice warn" style="margin:0"><b>Онлайн-запис на паузі до ${fmtTime(pause.until)}</b>Відмов ${ratePct(s.rate)} — більше за ${ratePct(R.pauseRate)}. Клієнти бачать мийку, але записатися через CARCAR не можуть.</p>`
+  const status = pause ? `<p class="notice warn" style="margin:0"><b>Онлайн-запис на паузі до ${fmtTime(pause.until)}</b>Паузу поставила адміністрація CARCAR${pause.note ? `: ${esc(pause.note)}` : ''}. Клієнти бачать мийку, але записатися через CARCAR не можуть. Питання — у підтримку.</p>`
     : s.lowered ? `<p class="notice warn" style="margin:0"><b>Мийка нижче в пошуку</b>Відмов ${ratePct(s.rate)} — більше за ${ratePct(R.warnRate)}. Пропонуйте інший час замість відмови, щоб повернутися вгору.</p>`
       : !s.enough ? `<p class="notice" style="margin:0">Поки мало заявок для оцінки: ${s.total} з ${R.minRequests}.</p>`
         : '<p class="notice ok" style="margin:0">Усе добре: клієнти бачать мийку у звичайному порядку.</p>';
@@ -1222,7 +1222,7 @@ function reliabilityCard(p) {
         <div><b>${msText(s.avgMs)}</b><small>середня відповідь на запис</small></div>
       </div>
       ${status}
-      <p class="fine">Відмова — це ваша відмова або мовчання ${PAYMENT.confirmMinutes} хв. Запропонований інший час відмовою не вважається. Понад ${ratePct(R.warnRate)} відмов — мийка нижче в пошуку, від ${ratePct(R.pauseRate)} — онлайн-запис на паузі ${R.pauseHours} год після останньої відмови (якщо за ${R.days} днів не менше ${R.minRequests} заявок).</p>
+      <p class="fine">Відмова — це ваша відмова або мовчання ${PAYMENT.confirmMinutes} хв. Запропонований інший час відмовою не вважається. Понад ${ratePct(R.warnRate)} відмов — мийка нижче в пошуку. Від ${ratePct(R.pauseRate)} адміністрація CARCAR може поставити онлайн-запис на паузу (рішення приймає людина, не автомат).</p>
     </section>`;
 }
 
