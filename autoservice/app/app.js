@@ -1487,8 +1487,9 @@ function confirmBooking() {
     }
   }
   save();
-  if (bonus) addBonus(-bonus, `Списано на замовлення: ${p.name}`);
-  if (fromBal) addMoney(-fromBal, `Оплата замовлення: ${p.name}`);
+  // З номером запису: сервер повертає «з балансу» й бонуси лише в межах того, що справді списали за цей запис.
+  if (bonus) addBonus(-bonus, `Списано на замовлення: ${p.name}`, b.id);
+  if (fromBal) addMoney(-fromBal, `Оплата замовлення: ${p.name}`, b.id);
   draft = null;
   location.hash = `#/bookings/${b.id}`;
   track('paid', { placeId: p.id, amount: total, deal: !!q.deal, pass: q.use?.kind ?? null, bonus: !!bonus, balance: !!fromBal, leadH: Math.round((bookingStart(b) - Date.now()) / HOUR),
@@ -1506,8 +1507,11 @@ function confirmBooking() {
 // Фото профілю клієнта — номер фото в його записах, запитах і відгуках (мийка бачить фото в чатах і записах).
 function stampAvatar(list, mineOf) {
   const av = myAvatarId(meId());
-  if (!av) return;
-  for (const x of list) if (mineOf(x) && x.clientAvatar !== av) x.clientAvatar = av;
+  for (const x of list) {
+    if (!mineOf(x)) continue;
+    if (av && x.clientAvatar !== av) x.clientAvatar = av;
+    else if (!av && x.clientAvatar) delete x.clientAvatar; // фото прибрали — і з записів
+  }
 }
 function save() {
   stampAvatar(bookings, (b) => (b.clientId ?? 'device') === meId() && !b.source);
@@ -2486,9 +2490,12 @@ function avatarPicker() {
 async function setAvatar(file) {
   const img = file ? await shrinkAvatar(file) : '';
   if (file && !img) { toast('Не вдалося відкрити фото'); return; }
+  // Нове фото — новий номер (картинка за посиланням кешується назавжди); старе прибираємо.
   const all = store.get('avatars', {});
-  const id = myAvatarId(meId()) ?? `a${uid()}${uid()}`;
-  store.set('avatars', { ...all, [id]: { by: meId(), img, at: Date.now() } });
+  const old = myAvatarId(meId());
+  const next = { ...all, ...(old ? { [old]: { by: meId(), img: '', at: Date.now() } } : {}) };
+  if (img) next[`a${uid()}${uid()}`] = { by: meId(), img, at: Date.now() };
+  store.set('avatars', next);
   save();
   saveRequests();
   route();

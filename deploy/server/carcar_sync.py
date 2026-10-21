@@ -171,6 +171,7 @@ class Store:
         self.db.execute('CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL, ver INTEGER NOT NULL)')
         self.db.execute('CREATE TABLE IF NOT EXISTS push_subs (endpoint TEXT PRIMARY KEY, role TEXT, subject TEXT, data TEXT, created INTEGER)')
         self.db.execute('CREATE TABLE IF NOT EXISTS notify_prefs (subject TEXT PRIMARY KEY, data TEXT)')
+        self.db.execute('CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT)')
         self.db.commit()
         self.lock = threading.RLock()
         self.changed = threading.Condition(self.lock)
@@ -181,6 +182,7 @@ class Store:
         self.boot_ver = self.ver
         self.dlog = {k: [] for k in DELTA_KEYS}
         self.ditems = {}
+        self.dgone = {}
         self.on_change = None  # (key, old, new) — для сповіщень
         self._seen = None  # id подій журналу
 
@@ -199,7 +201,8 @@ class Store:
                 (gone if rm else ids)[idk] = True
                 (ids if rm else gone).pop(idk, None)
             items_by = self.ditems.get(k, {})
-            changed[k] = Delta([items_by[i] for i in ids if i in items_by], [json.loads(i) for i in gone])
+            gone_by = self.dgone.get(k, {})
+            changed[k] = Delta([items_by[i] for i in ids if i in items_by], [gone_by[i] for i in gone if i in gone_by])
         return changed
 
     def _track(self, key, old, new):
@@ -219,8 +222,13 @@ class Store:
             o = om.pop(idk, None)
             if o is not x and o != x:
                 log.append((self.ver, idk, False))
-        for idk in om:
+        gone_items = self.dgone.setdefault(key, {})
+        for idk, x in om.items():
             log.append((self.ver, idk, True))
+            gone_items[idk] = x  # що саме видалили — щоб «зниклі» отримали лише ті, кому це було видно
+        if len(gone_items) > DELTA_LOG:
+            for k in list(gone_items)[:len(gone_items) - DELTA_LOG]:
+                del gone_items[k]
         self.ditems[key] = by
         if len(log) > DELTA_LOG:
             del log[:len(log) - DELTA_LOG]
@@ -336,6 +344,30 @@ def booking_events(old, new):
             elif m.get('from') == 'biz':
                 out.append((client, 'Повідомлення від мийки', (m.get('text') or 'Фото')[:120], f"index.html#/chat/{b.get('id')}"))
     return out
+
+
+def init_hash_secret(store):
+    """Секрет для відбитків номерів: створюємо раз і зберігаємо в базі. При першому створенні переносимо давні
+    нотатки мийок про клієнтів CARCAR (вони записані під старими відбитками без секрету) на нові."""
+    row = store.db.execute("SELECT v FROM meta WHERE k = 'hash_secret'").fetchone()
+    if row:
+        acl.HASH_SECRET = bytes.fromhex(row[0])
+        return
+    secret = secrets.token_bytes(32)
+    store.db.execute("INSERT INTO meta (k, v) VALUES ('hash_secret', ?)", (secret.hex(),))
+    store.db.commit()
+    acl.HASH_SECRET = secret
+    phones = set()
+    for key in ('bookings', 'requests'):
+        for x in store.get(key) or []:
+            if isinstance(x, dict) and isinstance(x.get('clientId'), str) and x['clientId'].startswith('tel:'):
+                phones.add(x['clientId'])
+    old_to_new = {acl.legacy_phone_hash(p): acl.phone_hash(p) for p in phones}
+    notes = store.get('biz.clientNotes')
+    if isinstance(notes, dict) and old_to_new:
+        moved = {pid: {old_to_new.get(k, k): v for k, v in (m or {}).items()} if isinstance(m, dict) else m for pid, m in notes.items()}
+        if moved != notes:
+            store.update('biz.clientNotes', lambda _: moved)
 
 
 def referral_rewards(store, old, new):
@@ -626,6 +658,28 @@ class Server(ThreadingHTTPServer):
     request_queue_size = 1024  # черга нових зʼєднань (типово 5 — під навантаженням зʼєднання відкидались би)
 
 
+EVENTS_PER_PUT = 500   # подій журналу в одному запиті
+EVENTS_PER_MIN = 300   # нових подій журналу за хвилину з одного користувача
+
+
+class EventBudget:
+    """Скільки подій журналу ще можна прийняти від користувача цієї хвилини (вже відомі id не рахуються тут —
+    повторні надсилання того самого журналу відкине add_events)."""
+
+    def __init__(self, per_minute):
+        self.per, self.used, self.lock = per_minute, {}, threading.Lock()
+
+    def room(self, who, n):
+        now = time.time()
+        with self.lock:
+            t0, used = self.used.get(who, (now, 0))
+            if now - t0 >= 60:
+                t0, used = now, 0
+            take = max(0, min(n, self.per - used))
+            self.used[who] = (t0, used + take)
+            return take
+
+
 class Limiter:
     """Не більше N спроб входу за хвилину з однієї адреси — щоб не підбирали паролі."""
 
@@ -647,6 +701,8 @@ def make_handler(app):
     store, cfg, sessions = app['store'], app['cfg'], app['sessions']
     static_dir = app['static']
     limiter = Limiter()
+    ev_limiter = EventBudget(EVENTS_PER_MIN)
+    hash_limiter = Limiter(40)  # перевірок «чи це клієнт CARCAR» на хвилину з одного кабінету — перебором номер не підібрати
     veh_limiter = Limiter(30)  # перевірок номерів на хвилину з одного акаунта — щоб реєстр не вивантажували
 
     def setting(name):
@@ -748,10 +804,13 @@ def make_handler(app):
                     out = {}
                     for k, v in data.items():
                         if isinstance(v, Delta):
-                            # Лише змінене, з урахуванням прав; те, що цьому користувачу більше не видно, — у «зниклі».
+                            # Лише змінене, з урахуванням прав. «Зниклі» — лише те, що цьому користувачу було видно:
+                            # видалене, яке він бачив, і (для записів) те, що перестало бути видимим. Чужих id не шлемо.
                             vis = acl.read(w, k, v.items, store.get) or []
                             seen = {json.dumps(x.get('id')) for x in vis if isinstance(x, dict)}
-                            gone = v.gone + [x['id'] for x in v.items if json.dumps(x['id']) not in seen]
+                            gone = [x['id'] for x in (acl.read(w, k, v.gone, store.get) or []) if isinstance(x, dict)]
+                            if k == 'bookings':
+                                gone += [x['id'] for x in v.items if json.dumps(x['id']) not in seen]
                             if vis or gone:
                                 out[k] = {'$delta': vis, '$gone': gone}
                             continue
@@ -791,6 +850,16 @@ def make_handler(app):
                     return self.send_json(502, {'error': 'Google не прийняв ключ або вичерпано ліміт' if e.code in (401, 403, 429) else f'Сервіс карт відповів помилкою {e.code}'})
                 except Exception:
                     return self.send_json(502, {'error': 'Сервіс карт зараз недоступний'})
+            if p == '/api/phone-hash':
+                # Мийка вводить номер клієнта, який дзвонить, — чи це клієнт CARCAR (відбиток рахує лише сервер, із секретом).
+                w = self.who()
+                if w.role != 'place':
+                    return self.send_json(401, {'error': 'Потрібен вхід мийки'})
+                lk = w.login or 'demo'
+                if not hash_limiter.ok(lk):
+                    return self.send_json(429, {'error': 'Забагато перевірок. Зачекайте хвилину.'})
+                hash_limiter.fail(lk)
+                return self.send_json(200, {'hash': acl.phone_hash((q.get('phone') or [''])[0])})
             if p == '/api/vehicle':
                 w = self.who()
                 if w.role == 'anon':
@@ -924,7 +993,14 @@ def make_handler(app):
             if key == 'analytics' and w.role == 'anon':
                 return self.send_json(403, {'error': 'login required'})
             if key == 'analytics' and isinstance(body.get('value'), list):
-                return self.send_json(200, {'ver': store.add_events(body['value']), 'value': store.get('analytics') if w.admin else None})
+                # Журнал подій: з одного пристрою — не більше EVENTS_PER_MIN нових подій за хвилину, кожна невелика,
+                # щоб ніхто не засмічував і не витісняв справжню статистику.
+                events = [x for x in body['value'][-EVENTS_PER_PUT:] if isinstance(x, dict) and len(json.dumps(x, ensure_ascii=False)) <= 600]
+                subj = w.cid or w.login or ('admin' if w.admin else 'demo')
+                allowed = 10**9 if w.admin else ev_limiter.room(subj, len(events))
+                if allowed < len(events):
+                    events = events[len(events) - allowed:] if allowed else []
+                return self.send_json(200, {'ver': store.add_events(events), 'value': store.get('analytics') if w.admin else None})
             ver, value, ok = store.put(w, key, body.get('value'), body.get('base'), 'base' in body)
             self.send_json(200 if ok else 403, {'ver': ver, 'value': value})
 
@@ -1074,6 +1150,7 @@ def main():
     mimetypes.add_type('application/manifest+json', '.webmanifest')
     cfg = load_config(a.config)
     store = Store(a.db)
+    init_hash_secret(store)
     sessions = Sessions(store.db, store.lock)
     webpush = WebPush(os.path.dirname(os.path.abspath(a.db)))
     app = {'store': store, 'cfg': cfg, 'sessions': sessions, 'static': a.static and os.path.abspath(a.static),

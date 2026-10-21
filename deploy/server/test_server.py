@@ -477,7 +477,7 @@ class Server(unittest.TestCase):
         self.assertEqual(code, 200)
         # Власник бачить своє фото повністю, інші — лише позначку, без номера власника.
         self.assertEqual(self.state(ira)['avatars']['aIraPhoto01']['img'], img)
-        self.assertEqual(self.state(oleh)['avatars']['aIraPhoto01'], {'at': 5})
+        self.assertNotIn('aIraPhoto01', self.state(oleh).get('avatars', {}))  # перелік чужих фото не віддається
         # Картинка — за посиланням, без входу (як <img>), з довгим кешем.
         with urllib.request.urlopen(self.base + '/api/avatar/aIraPhoto01?v=5') as r:
             self.assertEqual(r.headers['Content-Type'], 'image/png')
@@ -493,7 +493,6 @@ class Server(unittest.TestCase):
         self.assertNotIn('aOlehPhoto2', av)
         # Прибрала фото — посилання більше не віддає картинку.
         self.put('avatars', {'aIraPhoto01': {'by': ira_id, 'img': '', 'at': 7}}, ira)
-        self.assertNotIn('aIraPhoto01', self.state(oleh)['avatars'])
         with self.assertRaises(urllib.error.HTTPError):
             urllib.request.urlopen(self.base + '/api/avatar/aIraPhoto01?v=7')
 
@@ -561,6 +560,40 @@ class Server(unittest.TestCase):
         st = next(x for x in self.state(c)['bookings'] if x['id'] == 'r1')['state']
         self.assertEqual(st, 'completed')
         self.assertEqual(w.get('bonus'), 150)
+
+    def test_22_attacks_from_security_review(self):
+        import acl
+        x, x_id = self.login_client('093 404 04 04')
+        bk = {'id': 'atk1', 'placeId': 'blysk', 'clientId': x_id, 'date': '2099-12-05', 'time': '10:00', 'minutes': 30, 'state': 'unpaid', 'paid': 0, 'fromBalance': 500, 'no': 7}
+        cur = self.state(x).get('bookings', [])
+        self.put('bookings', cur + [bk], x)
+        mine = next(b for b in self.state(x)['bookings'] if b['id'] == 'atk1')
+        self.assertNotEqual(mine['no'], 7)  # свій номер запису не призначити
+        cur = self.state(x)['bookings']
+        self.put('bookings', [dict(b, state='cancelled', payFailed='x') if b['id'] == 'atk1' else b for b in cur], x)
+        # «Повернення» вигаданого fromBalance — без списання з гаманця грошей не дає.
+        self.put(f'wallet.{x_id}', {'history': [{'amount': 500, 'kind': 'money', 'bookingId': 'atk1', 'text': 'r', 'at': 1}]}, x)
+        self.assertEqual((self.state(x).get(f'wallet.{x_id}') or {}).get('money', 0), 0)
+        # Вигаданий код запрошення — без бонусу.
+        y, y_id = self.login_client('093 505 05 05')
+        self.put(f'wallet.{y_id}', {'history': [{'amount': 150, 'ref': 'CARZZZZZ', 'text': 'x', 'at': 1}]}, y)
+        self.assertEqual((self.state(y).get(f'wallet.{y_id}') or {}).get('bonus', 0), 0)
+        # Демо-кабінет не може приписати собі мийку, додану адміністрацією без акаунта.
+        adm = self.call('POST', '/api/auth/admin', {'password': 'secret-admin'})[1]['token']
+        self.put('places.custom', (self.state(adm).get('places.custom') or []) + [{'id': 'p_orphan', 'name': 'Сирота', 'custom': True}], adm)
+        self.put('biz.clientNotes', {**(self.state(adm).get('biz.clientNotes') or {}), 'p_orphan': {'h:1': {'text': 'секрет', 'tags': []}}}, adm)
+        demo = self.call('POST', '/api/auth/biz', {'demo': True})[1]['token']
+        self.put('biz.demoPlaces', ['p_orphan'], demo)
+        self.assertNotIn('p_orphan', self.state(demo).get('biz.clientNotes') or {})
+        # Перелік чужих фото не віддається; відбиток номера — із секретом сервера (не FNV, який рахується будь-ким).
+        code, j = self.call('GET', '/api/phone-hash?phone=0934040404', token=demo)
+        self.assertEqual(code, 200)
+        self.assertNotEqual(j['hash'], acl.legacy_phone_hash(x_id))
+        self.assertEqual(self.call('GET', '/api/phone-hash?phone=0934040404', token=x)[0], 401)
+        # Журнал подій: з одного користувача — не більше ліміту за хвилину.
+        self.put('analytics', [{'id': f'atk-e{i}', 't': 'x', 'at': i} for i in range(2000)], x)
+        n = sum(1 for e in self.state(adm).get('analytics') or [] if str(e.get('id', '')).startswith('atk-e'))
+        self.assertLessEqual(n, 300)
 
     def test_99_login_rate_limit(self):
         codes = [self.call('POST', '/api/auth/admin', {'password': 'x'})[0] for _ in range(12)]

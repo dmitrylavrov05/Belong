@@ -425,9 +425,27 @@ export const walletKey = (id = 'device') => (id === 'device' ? 'wallet' : `walle
 
 // Відбиток номера (FNV-1a, як phone_hash на сервері): сервер віддає мийці його замість номера клієнта CARCAR,
 // а мийка може впізнати постійного клієнта, коли вводить номер сама.
+// Із сервером відбиток рахує лише сервер (із секретом — інакше номер підібрали б перебором), тож беремо його
+// звідти й кешуємо; поки не прийшов — '' (збігу немає), а коли прийде — подія 'carcar:hash' (перемалювати підказку).
+const hashCache = new Map();
+const hashWait = new Map();
+export function ensurePhoneHash(phone) {
+  const key = phoneKey(phone);
+  if (!key || !hasServer()) return Promise.resolve(phoneHash(phone));
+  if (hashCache.has(key)) return Promise.resolve(hashCache.get(key));
+  if (!hashWait.has(key)) {
+    hashWait.set(key, api(`phone-hash?phone=${encodeURIComponent(key)}`).then((r) => {
+      hashWait.delete(key);
+      if (r.ok && r.data.hash) { hashCache.set(key, r.data.hash); window.dispatchEvent(new Event('carcar:hash')); }
+      return hashCache.get(key) ?? '';
+    }));
+  }
+  return hashWait.get(key);
+}
 export function phoneHash(phone) {
   const key = phoneKey(phone);
   if (!key) return '';
+  if (hasServer()) { if (!hashCache.has(key)) ensurePhoneHash(phone); return hashCache.get(key) ?? ''; }
   let h = 0x811c9dc5;
   for (const b of new TextEncoder().encode(`carcar:${key}`)) h = Math.imul(h ^ b, 0x01000193) >>> 0;
   return `h:${h.toString(16).padStart(8, '0')}`;
@@ -474,12 +492,16 @@ export async function shrinkPhoto(file) {
 // У записах, запитах і відгуках — лише цей номер (clientAvatar): фото видно мийці в чатах і записах, а у відгуках — усім,
 // і номер телефону з нього не дізнатися. Із сервером саме фото й «by» отримує лише власник, решта — позначку { at },
 // а картинку браузер бере за посиланням api/avatar/<номер> (з кешем), щоб синхронізація не возила фото всім.
+// Чуже фото сервер не перелічує: беремо його за посиланням (номер фото — новий після кожної зміни, тож кеш не застаріває).
 export const avatarSrc = (id) => {
-  const v = id && store.peek('avatars', {})[id];
+  if (!id) return '';
+  const v = store.peek('avatars', {})[id];
   if (typeof v?.img === 'string' && v.img.startsWith('data:image/')) return v.img;
-  return v?.at && v.img !== '' && hasServer() ? `api/avatar/${encodeURIComponent(id)}?v=${v.at}` : '';
+  if (v && v.img === '') return '';
+  return hasServer() ? `api/avatar/${encodeURIComponent(id)}` : '';
 };
-export const myAvatarId = (owner) => Object.entries(store.peek('avatars', {})).find(([, v]) => v?.by === owner)?.[0] ?? null;
+// Поточне фото власника (прибране — з порожнім img — не рахується).
+export const myAvatarId = (owner) => Object.entries(store.peek('avatars', {})).filter(([, v]) => v?.by === owner && v.img).sort((a, b) => (b[1].at ?? 0) - (a[1].at ?? 0))[0]?.[0] ?? null;
 // Квадрат 256×256 з центру фото — щоб аватарки були легкими.
 export async function shrinkAvatar(file) {
   try {

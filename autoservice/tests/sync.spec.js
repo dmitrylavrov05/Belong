@@ -171,7 +171,7 @@ test('фото профілю клієнта доходить до мийки ч
   const pro = await wash(browser);
   await pro.goto('/pro.html#/');
   const img = pro.locator('.convo', { hasText: 'Марта' }).locator('.avatar img');
-  await expect(img).toHaveAttribute('src', /^api\/avatar\/a\w+\?v=\d+$/, { timeout: 15000 });
+  await expect(img).toHaveAttribute('src', /^api\/avatar\/a\w+$/, { timeout: 15000 });
   await expect.poll(() => img.evaluate((el) => el.complete && el.naturalWidth)).toBe(256);
   // Самого фото й номера власника мийка в даних не має.
   const av = await pro.evaluate(() => localStorage.getItem('carcar.avatars'));

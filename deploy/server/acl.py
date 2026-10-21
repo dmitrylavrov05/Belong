@@ -28,8 +28,13 @@ def phone_key(phone):
     return 'tel:' + d
 
 
-def phone_hash(phone):
-    """Номер замість самого номера (FNV-1a), як phoneHash у core.js: мийка може впізнати клієнта, не бачачи номер."""
+# Секрет сервера для відбитків номерів (ставить carcar_sync.py при запуску; зберігається в базі).
+# Без секрету відбиток можна було б порахувати самому й перебором номерів дізнатися телефон клієнта CARCAR.
+HASH_SECRET = b''
+
+
+def legacy_phone_hash(phone):
+    """Старий відбиток (FNV-1a без секрету) — лише щоб перенести давні нотатки на новий."""
     key = phone_key(phone)
     if not key:
         return ''
@@ -38,6 +43,17 @@ def phone_hash(phone):
         h ^= ch
         h = (h * 0x01000193) & 0xFFFFFFFF
     return 'h:%08x' % h
+
+
+def phone_hash(phone):
+    """Відбиток номера замість самого номера: мийка впізнає свого клієнта, не бачачи номер (HMAC із секретом сервера)."""
+    key = phone_key(phone)
+    if not key:
+        return ''
+    if not HASH_SECRET:
+        return legacy_phone_hash(phone)
+    import hmac as _hmac
+    return 'h:' + _hmac.new(HASH_SECRET, key.encode(), 'sha256').hexdigest()[:16]
 
 
 def hidden_phone(v):
@@ -167,8 +183,10 @@ def account_places(store_get, who):
         owned.update([a.get('placeId')] + list(a.get('places') or []))
     owned.discard(None)
     if who.demo:
-        # Демо-мийки з data.js серверу невідомі на імʼя — демо-кабінет керує всім, що не належить справжнім акаунтам.
-        return (DEMO_IDS | set(store_get('biz.demoPlaces') or [])) - owned
+        # Демо-кабінет: вигадані мийки з data.js і ті, які він сам додав (позначка by='demo' на сервері).
+        # Чужу мийку без акаунта (напр. додану адміністрацією) приписати собі не можна.
+        mine = {x.get('id') for x in store_get('places.custom') or [] if isinstance(x, dict) and x.get('by') == 'demo'}
+        return (DEMO_IDS | (set(store_get('biz.demoPlaces') or []) & mine)) - owned
     acc = next((a for a in accounts if a.get('login') == who.login), None)
     if not acc:
         return set()
@@ -494,14 +512,18 @@ def _num(v):
         return 0.0
 
 
-def _wallet_caps(b):
-    """Скільки за цей запис можна повернути на баланс і бонусами."""
+def _wallet_caps(b, spent=None):
+    """Скільки за цей запис можна повернути на баланс і бонусами. Частина «з балансу» (fromBalance) — не більше,
+    ніж справді списали з гаманця за цей запис (spent): інакше вигадане fromBalance перетворювалось би на гроші."""
     money = 0.0
+    from_bal = _num(b.get('fromBalance'))
+    if spent is not None:
+        from_bal = min(from_bal, spent.get(b.get('id'), 0.0))
     if b.get('state') in ('cancelled', 'refunded'):
         refund = _num(b.get('refund'))
-        money = refund if b.get('refundTo') == 'balance' else min(_num(b.get('fromBalance')), refund)
+        money = refund if b.get('refundTo') == 'balance' else min(from_bal, refund)
     if b.get('payFailed'):
-        money = max(money, _num(b.get('fromBalance')))
+        money = max(money, from_bal)
     bonus = _num(b.get('bonus')) if b.get('state') in ('cancelled', 'refunded') or b.get('payFailed') else 0.0
     return money, bonus
 
@@ -516,6 +538,17 @@ def sanitize_wallet(who, cur, new, get):
     money, bonus = _num(cur.get('money')), _num(cur.get('bonus'))
     owner = who.role == 'client'
     books = {b.get('id'): b for b in get('bookings') or [] if isinstance(b, dict)}
+    # Скільки списано за кожен запис (мінус у вже прийнятій історії з bookingId): гроші з балансу й бонуси окремо —
+    # межа повернення «з балансу» і бонусів (поля fromBalance/bonus у записі задає клієнт, їм не віримо).
+    spent, spent_bonus = {}, {}
+    for h in old_hist:
+        try:
+            a = float(h.get('amount') or 0)
+        except (TypeError, ValueError):
+            continue
+        if a < 0 and h.get('bookingId'):
+            d = spent if h.get('kind') == 'money' else spent_bonus
+            d[h['bookingId']] = d.get(h['bookingId'], 0.0) - a
     credited = {}
     for h in old_hist:
         if (h.get('amount') or 0) > 0 and h.get('bookingId'):
@@ -537,6 +570,10 @@ def sanitize_wallet(who, cur, new, get):
             if not owner or abs(amount - REFERRAL_BONUS) > 0.001 or not re.match(r'^CAR[A-Z0-9]{5}$', code) or code == ref_code(who.cid) \
                     or any(x.get('ref') for x in old_hist) or any(who.is_client(b.get('clientId')) for b in books.values()):
                 continue
+            # Код має належати справжньому клієнту CARCAR (який уже записувався), а не бути вигаданим.
+            known = {b.get('clientId') for b in books.values() if isinstance(b.get('clientId'), str) and b['clientId'].startswith('tel:')}
+            if not any(ref_code(c) == code for c in known):
+                continue
         elif amount > 0:
             b = books.get(h.get('bookingId'))
             if not b:
@@ -545,7 +582,7 @@ def sanitize_wallet(who, cur, new, get):
                 continue
             if who.role == 'place' and not owns(who, b.get('placeId'), get):
                 continue
-            cap = _wallet_caps(b)[0 if is_money else 1]
+            cap = _wallet_caps(b, spent)[0] if is_money else min(_wallet_caps(b)[1], spent_bonus.get(b.get('id'), 0.0))
             k = (h['bookingId'], is_money)
             if credited.get(k, 0) + amount > cap + 0.001:
                 continue
@@ -594,10 +631,10 @@ def read_avatars(who, value, get):
     for k, v in (value or {}).items():
         if not isinstance(v, dict):
             continue
+        # Лише власнику: іншим перелік номерів фото не віддаємо — номер фото вони бачать лише в тому, що їм і так
+        # видно (запис, запит, відгук), а картинку беруть за посиланням /api/avatar/<номер>.
         if who.is_client(v.get('by')):
             out[k] = v
-        elif v.get('img'):
-            out[k] = {'at': v.get('at') or 0}
     return out
 
 
@@ -918,7 +955,8 @@ def _guard_bookings(who, cur, merged, get):
             elif who.role == 'place':
                 b = _place_booking(who, b, old)
             # Уже виданий номер не змінюється; повтор (з давніх часів, коли номери видавали пристрої) — отримує новий.
-            no = old.get('no') if old is not None and isinstance(old.get('no'), int) else b.get('no')
+            # Новому запису номер дає лише сервер (свій номер клієнт чи мийка не призначить).
+            no = old.get('no') if old is not None and isinstance(old.get('no'), int) else None if old is None else b.get('no')
             if not isinstance(no, int) or no in taken:
                 no, nxt = nxt, nxt + 1
             if b.get('no') != no:
@@ -1083,6 +1121,19 @@ def sanitize(who, key, cur, merged, get=None):
                     pt['payout'] = {**pt['payout'], 'verified': bool(old_pay.get('verified')) and same}
             out[pid] = pt
         return out
+    if key == 'places.custom' and isinstance(merged, list):
+        # Хто створив мийку — ставить сервер і не змінює: від цього залежить, хто може приписати її собі.
+        cmap = {x.get('id'): x for x in cur or [] if isinstance(x, dict)}
+        author = 'demo' if who.demo else who.login or who.cid or who.role
+        out = []
+        for x in merged:
+            if isinstance(x, dict):
+                old = cmap.get(x.get('id'))
+                x = {**x, 'by': old.get('by')} if old is not None else {**x, 'by': author}
+                if x.get('by') is None:
+                    x.pop('by')
+            out.append(x)
+        merged = out
     if key == 'biz.accounts' and who.role == 'place':
         cmap = {a.get('login'): a for a in cur or []}
         out = []
@@ -1091,7 +1142,8 @@ def sanitize(who, key, cur, merged, get=None):
             if old is not None and a.get('login') == who.login:
                 # Додати можна лише власну нову мийку, яку ще не має жоден акаунт.
                 taken = {x for o in cur or [] for x in [o.get('placeId')] + list(o.get('places') or []) if x}
-                created = {x.get('id') for x in (get('places.custom') if get else None) or [] if isinstance(x, dict)}
+                # …і саме цей акаунт її створив (позначка by на сервері): мийку адміністрації чи іншого кабінету — ні.
+                created = {x.get('id') for x in (get('places.custom') if get else None) or [] if isinstance(x, dict) and x.get('by') == who.login}
                 extra = [p for p in a.get('places') or [] if p and p not in taken and p in created]
                 a = {**old, 'places': list(dict.fromkeys((old.get('places') or []) + extra))}
             elif old is not None:

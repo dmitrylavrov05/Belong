@@ -10,7 +10,7 @@ import {
   confirmBy, offerBy, responseStats, pauseOf, ratePct, msText, accountPlaces, addAccountPlace,
   ticketsAll, openTicket, ticketReply, setTicket, TICKET_TOPICS, TICKET_STATUS, PLACE_TOPICS, ticketPhotos,
   payoutReady, maskIban, hidePhones, themePicker, setTheme, samePhone, hasServer, api, authToken, setAuthToken, serverConfig, demoWashOn, notifySync, pushForget, telegramNotify, fitChatScreen, keepChatOnKeyboard, commissionFor, savePartner, staffOf, checkBizLogin, numberBookings, bookingNo, POWER, powerOf, setPower,
-  keepUi, calmRedraw, validPhone,
+  keepUi, calmRedraw, validPhone, ensurePhoneHash,
 } from './core.js';
 import {
   openStarts, chatPost, chatTimeline, readMessages, msgPreview, touchPresence, BIZ_QUICK, sendMessages, checkWaitlist,
@@ -960,6 +960,8 @@ function sendInvite() {
   toast('Пропозицію надіслано — клієнт оплатить у застосунку');
 }
 
+// Прийшов відбиток номера з сервера — оновлюємо підказку «це клієнт CARCAR».
+window.addEventListener('carcar:hash', () => nbHint());
 // Постійний клієнт: за телефоном підтягуємо імʼя й авто з минулих записів.
 function nbHint() {
   const hint = $('#nb-hint');
@@ -979,7 +981,9 @@ function nbHint() {
   hint.textContent = `Постійний клієнт: ${past.length} ${plural(past.length, 'візит', 'візити', 'візитів')}, останній — ${dayLabel(past[0].date, { day: 'numeric', month: 'long' })}`;
 }
 
-function nbSubmit() {
+async function nbSubmit() {
+  // Чи це клієнт CARCAR (комісія) — відбиток номера дає сервер; дочекаймося його, перш ніж записати.
+  if (hasServer() && validPhone(nb.phone)) await ensurePhoneHash(nb.phone);
   const p = place();
   const chosen = nbChosen();
   if (!chosen.length || !nb.time) return;
