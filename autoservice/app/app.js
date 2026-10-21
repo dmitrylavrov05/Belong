@@ -1354,7 +1354,14 @@ function renderBook() {
       </div>
     </section>`;
   }
+  // Перемальовуємо крок, але прокрутка сторінки й стрічки днів лишаються на місці (інакше обраний день «відскакував»
+  // на початок стрічки, а сторінка — вгору). Переходи між кроками самі гортають угору після цього.
+  const keepY = window.scrollY;
+  const keepDays = $('#book .days')?.scrollLeft ?? 0;
   $('#book').innerHTML = html;
+  const days = $('#book .days');
+  if (days) days.scrollLeft = keepDays;
+  if (Math.abs(window.scrollY - keepY) > 1) window.scrollTo({ top: keepY, behavior: 'instant' });
   $('#book').dataset.step = step;
   // Заголовок сторінки — назва кроку; на кроках часу й оплати назад веде кнопка в самому кроці.
   const h1 = $('#view > h1');

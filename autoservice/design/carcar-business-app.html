@@ -721,7 +721,7 @@ label.item { cursor: pointer; padding: 10px 14px; }
 
   /* Перехід між вкладками — без анімації: проявлення з прозорого давало білий спалах, ніби сторінка перезавантажується */
 
-  .btn:active:not(:disabled), .chip:active, .slot:active:not(:disabled), .day:active:not(:disabled) { transform: scale(.96); }
+  .btn:active:not(:disabled), .chip:active { transform: scale(.96); }
   .sheet { animation: cc-sheet .34s var(--ease) both; }
   .sheet-dim, .drawer-dim { animation: cc-fade .22s both; }
   .drawer { animation: cc-drawer .3s var(--ease) both; }

@@ -622,3 +622,23 @@ test.describe('без зайвого руху', () => {
     expect(await page.evaluate(() => window.__anim)).toEqual([]);
   });
 });
+
+test('запис: дата й час не «стрибають» — стрічка днів і сторінка лишаються на місці після натискання', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/#/book/blysk');
+  await page.getByLabel(/Експрес-мийка кузова/).check();
+  await page.locator('[data-action="to-time"]').click();
+  await page.locator('.days').evaluate((el) => { el.scrollLeft = 300; });
+  await page.evaluate(() => window.scrollTo(0, 200));
+  const day = page.locator('.days [data-action="day"]').nth(5);
+  const x = (await day.boundingBox()).x;
+  await day.evaluate((el) => el.click()); // як дотик пальцем: без прокручування з боку тесту
+  await expect(page.locator('.days [data-action="day"]').nth(5)).toHaveAttribute('aria-pressed', 'true');
+  expect(Math.round((await page.locator('.days [data-action="day"]').nth(5).boundingBox()).x)).toBe(Math.round(x));
+  expect(await page.locator('.days').evaluate((el) => el.scrollLeft)).toBe(300);
+  const slot = page.locator('.slot:not([disabled])').nth(3);
+  const y = (await slot.boundingBox()).y;
+  await slot.evaluate((el) => el.click());
+  expect(Math.round((await page.locator('.slot:not([disabled])').nth(3).boundingBox()).y)).toBe(Math.round(y));
+  expect(await page.evaluate(() => scrollY)).toBe(200);
+});
