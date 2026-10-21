@@ -1054,7 +1054,7 @@ body.in-auth #view { padding: 0; max-width: none; }
 .auth-bubble.b4 { width: 24px; height: 24px; left: 22%; top: 62%; }
 .auth-bubble.b5 { width: 42px; height: 42px; left: 52%; top: 70%; }
 .auth-shine { position: absolute; inset: 0; background: linear-gradient(115deg, transparent 35%, rgb(255 255 255 / 22%) 50%, transparent 65%); }
-.auth-card { position: relative; z-index: 3; display: grid; gap: 14px; padding: 28px 20px calc(24px + env(safe-area-inset-bottom)); border-radius: 28px 28px 0 0; background: var(--bg); box-shadow: 0 -10px 40px rgb(0 0 0 / 18%); max-width: 520px; width: 100%; margin: 0 auto; }
+.auth-card { position: relative; z-index: 3; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 28px 20px calc(24px + env(safe-area-inset-bottom)); border-radius: 28px 28px 0 0; background: var(--bg); box-shadow: 0 -10px 40px rgb(0 0 0 / 18%); max-width: 520px; width: 100%; margin: 0 auto; }
 .auth-card h1 { margin: 0; font-size: 28px; }
 .auth-card p { margin: 0; color: var(--muted); }
 .auth-phone { display: flex; align-items: center; gap: 10px; height: 60px; padding: 0 16px; border: 1.5px solid var(--line); border-radius: 16px; background: var(--soft); font-size: 20px; font-weight: 600; }
@@ -1298,3 +1298,6 @@ body.karych-on main { padding-bottom: 84px; }
 /* Швидкість на телефоні: картки за межами екрана браузер не розкладає й не малює, доки до них не догорнули */
 #list > article, .list > .item, .review, .bk, .convo, .car-card, .log-item, .done-item { content-visibility: auto; contain-intrinsic-size: auto 120px; }
 #list > article { contain-intrinsic-size: auto 330px; }
+
+/* У чаті сповіщення про відповідь мийки — під шапкою чату (назад і дзвінок лишаються доступні) */
+body.in-chat .answer-banner { top: calc(68px + env(safe-area-inset-top)); }

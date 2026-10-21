@@ -1065,7 +1065,7 @@ body.in-auth #view { padding: 0; max-width: none; }
 .auth-bubble.b4 { width: 24px; height: 24px; left: 22%; top: 62%; }
 .auth-bubble.b5 { width: 42px; height: 42px; left: 52%; top: 70%; }
 .auth-shine { position: absolute; inset: 0; background: linear-gradient(115deg, transparent 35%, rgb(255 255 255 / 22%) 50%, transparent 65%); }
-.auth-card { position: relative; z-index: 3; display: grid; gap: 14px; padding: 28px 20px calc(24px + env(safe-area-inset-bottom)); border-radius: 28px 28px 0 0; background: var(--bg); box-shadow: 0 -10px 40px rgb(0 0 0 / 18%); max-width: 520px; width: 100%; margin: 0 auto; }
+.auth-card { position: relative; z-index: 3; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 28px 20px calc(24px + env(safe-area-inset-bottom)); border-radius: 28px 28px 0 0; background: var(--bg); box-shadow: 0 -10px 40px rgb(0 0 0 / 18%); max-width: 520px; width: 100%; margin: 0 auto; }
 .auth-card h1 { margin: 0; font-size: 28px; }
 .auth-card p { margin: 0; color: var(--muted); }
 .auth-phone { display: flex; align-items: center; gap: 10px; height: 60px; padding: 0 16px; border: 1.5px solid var(--line); border-radius: 16px; background: var(--soft); font-size: 20px; font-weight: 600; }
@@ -1309,6 +1309,9 @@ body.karych-on main { padding-bottom: 84px; }
 /* Швидкість на телефоні: картки за межами екрана браузер не розкладає й не малює, доки до них не догорнули */
 #list > article, .list > .item, .review, .bk, .convo, .car-card, .log-item, .done-item { content-visibility: auto; contain-intrinsic-size: auto 120px; }
 #list > article { contain-intrinsic-size: auto 330px; }
+
+/* У чаті сповіщення про відповідь мийки — під шапкою чату (назад і дзвінок лишаються доступні) */
+body.in-chat .answer-banner { top: calc(68px + env(safe-area-inset-top)); }
 </style>
   <style>
     /* Заставка під час запуску: піна, бульбашки, логотип із відблиском і розкриття застосунку колом.
@@ -1792,8 +1795,12 @@ function syncPush(key) {
   sync.timers.set(key, setTimeout(() => { sync.timers.delete(key); syncSend(key); }, PUSH_DELAY[key] ?? 150));
 }
 
+// Гаманець і абонементи сервер перевіряє за записами (повернення — лише за вже скасований запис),
+// тож вони йдуть на сервер після записів: інакше повернення на баланс відкидалось би.
+const AFTER_BOOKINGS = (key) => key.startsWith('wallet') || key === 'biz.passes';
 async function syncSend(key) {
   if (sync.busy.has(key)) { syncPush(key); return; }
+  if (AFTER_BOOKINGS(key) && (sync.timers.has('bookings') || sync.busy.has('bookings'))) { syncPush(key); return; }
   sync.busy.add(key);
   const gen = sync.gen;
   const raw = localStorage.getItem(`carcar.${key}`);
@@ -2064,6 +2071,15 @@ const hoursText = (place, iso = isoDate(new Date())) => rangeText(hoursFor(place
 // Клієнт CARCAR — його номер телефону (tel:380…). 'device' — без номера (демо й тести на одному пристрої).
 const clientIdOf = (phone) => phoneKey(phone) ?? 'device';
 // Гаманець (баланс CARCAR і бонуси) — свій у кожного клієнта.
+// Код запрошення з номера (як ref_code на сервері): сервер знаходить за ним, хто запросив, а номер із коду не дізнатися.
+function refCode(cid) {
+  let h = 0x811c9dc5;
+  for (const ch of new TextEncoder().encode(`carcar-ref:${cid}`)) { h ^= ch; h = Math.imul(h, 0x01000193) >>> 0; }
+  const abc = '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  let out = '';
+  for (let i = 0; i < 5; i++) { out += abc[h % abc.length]; h = Math.floor(h / abc.length); }
+  return `CAR${out}`;
+}
 const walletKey = (id = 'device') => (id === 'device' ? 'wallet' : `wallet.${id}`);
 
 // Відбиток номера (FNV-1a, як phone_hash на сервері): сервер віддає мийці його замість номера клієнта CARCAR,
@@ -3797,6 +3813,8 @@ async function lookupPlateOnline(raw, api) {
   if (local.error) return local;
   const r = await api(`vehicle?plate=${encodeURIComponent(local.plate)}`);
   if (!r.ok) return { ...local, car: null, failed: r.data.error || 'Не вдалося перевірити номер' };
+  // Реєстру на сервері ще немає (чи номер не знайдено) — демо-номери все одно підставляються.
+  if (!r.data.car && local.car) return { ...local, online: false };
   return { ...local, car: r.data.car ?? null, registry: !!r.data.registry, online: true, failed: r.data.error ?? null };
 }
 
@@ -4162,7 +4180,7 @@ function mood(name) {
   if (name) el.classList.add(name);
 }
 
-function open(html, { auto = false, moodName = 'wave' } = {}) {
+function open(html, { auto = false, moodName = 'wave', ms = 9000 } = {}) {
   const el = root();
   const b = el.querySelector('#k-bubble');
   b.innerHTML = `<button class="k-close" type="button" data-k="close" aria-label="Закрити підказку">×</button>
@@ -4174,7 +4192,7 @@ function open(html, { auto = false, moodName = 'wave' } = {}) {
   talk(b.textContent.length * 35);
   clearTimeout(state.hideTimer);
   // Підказка, що зʼявилась сама, ховається сама; відкриту вручну закриває клієнт.
-  if (auto) state.hideTimer = setTimeout(close, 9000);
+  if (auto) state.hideTimer = setTimeout(close, ms);
 }
 
 function close() {
@@ -4269,7 +4287,8 @@ function karychSay(text, moodName = 'cheer') {
   if (!karychOn()) return;
   state.away = false;
   render();
-  open(`<p class="k-text">${esc(text)}</p>`, { auto: true, moodName });
+  // Коротко: після оплати під бульбашкою кнопки картки запису — не тримаємо їх закритими довго.
+  open(`<p class="k-text">${esc(text)}</p>`, { auto: true, moodName, ms: 5000 });
 }
 
 function initKarych({ faq, onOff }) {
@@ -4298,6 +4317,8 @@ let wallet = { bonus: 0, money: 0, history: [], ...store.get(walletKey(meId()), 
 // Запити до точок: «не знайшов послугу» — листування з точкою.
 let requests = store.get('requests', []);
 let referral = store.get('referral', null) ?? { code: newRefCode(), friends: [] };
+// Із сервером код — з номера: так сервер нарахує бонус тому, хто запросив, коли друг завершить перше замовлення.
+const syncRefCode = () => { if (hasServer() && meId() !== 'device' && referral.code !== refCode(meId())) referral = { ...referral, code: refCode(meId()) }; };
 store.set('referral', referral);
 
 function newRefCode() {
@@ -4544,7 +4565,7 @@ function viewWallet() {
 const walletLink = () => `<a class="card link-card wallet-link" href="#/wallet">${icon('card', 24)}<span>Гаманець
     <small>Баланс ${uah(wallet.money)}${wallet.bonus ? ` · бонуси ${uah(wallet.bonus)}` : ''}</small></span>${icon('chevR', 18)}</a>`;
 
-const inviteLink = () => `${location.origin}${location.pathname}?ref=${referral.code}`;
+const inviteLink = () => { syncRefCode(); return `${location.origin}${location.pathname}?ref=${referral.code}`; };
 
 // Скільки бонусу можна списати із замовлення на суму total.
 // Скільки бонусу можна списати: замовлення (без абонемента) від мінімальної суми, не більше залишку до сплати.
@@ -4569,16 +4590,24 @@ const campaignNow = () => {
 };
 
 function acceptInvite() {
-  const code = new URLSearchParams(location.search).get('ref');
+  let code = new URLSearchParams(location.search).get('ref');
+  if (code) history.replaceState(null, '', location.pathname + location.hash);
+  try { code = code ?? sessionStorage.getItem('carcar.pendingRef'); } catch { /* приватний режим */ }
   if (!code) return;
-  history.replaceState(null, '', location.pathname + location.hash);
+  // Друг ще не ввійшов — запамʼятовуємо запрошення до входу (бонус має потрапити в його гаманець, а не телефону).
+  if (!isAuthed() || (hasServer() && meId() === 'device')) { try { sessionStorage.setItem('carcar.pendingRef', code); } catch { /* */ } return; }
+  try { sessionStorage.removeItem('carcar.pendingRef'); } catch { /* */ }
   const c = code.trim().toUpperCase();
   if (!/^CAR[A-Z0-9]{5}$/.test(c)) { toast('Посилання-запрошення недійсне'); return; }
+  syncRefCode();
   if (c === referral.code) { toast('Це ваше посилання — надішліть його другу'); return; }
   if (referral.invitedBy) { toast('Ви вже отримали бонус за запрошенням'); return; }
   if (mine().length) { toast('Бонус за запрошенням діє лише для нових користувачів'); return; }
   referral.invitedBy = c;
-  addBonus(REFERRAL.bonus, 'Бонус за запрошенням друга');
+  // ref — сервер перевіряє: один раз і лише новому клієнту.
+  wallet.bonus += REFERRAL.bonus;
+  wallet.history.unshift({ amount: REFERRAL.bonus, text: 'Бонус за запрошенням друга', at: Date.now(), ref: c });
+  saveReferral();
   route();
   toast(`Вам нараховано ${uah(REFERRAL.bonus)} на перше замовлення`);
 }
@@ -4587,6 +4616,9 @@ const inviteCard = () => `<a class="card link-card invite-card" href="#/invite">
     <small>${wallet.bonus ? `На бонусному рахунку: ${uah(wallet.bonus)}` : 'Бонус на наступне замовлення'}</small></span>${icon('chevR', 18)}</a>`;
 
 function viewInvite() {
+  syncRefCode();
+  // Із сервером бонуси за друзів нараховує сервер — показуємо їх із гаманця.
+  const friends = hasServer() ? wallet.history.filter((h) => h.refFrom) : referral.friends;
   return `<h1>Приведи друга</h1>
     <div class="invite-hero">
       <span class="invite-ic">${icon('gift', 30)}</span>
@@ -4616,11 +4648,11 @@ function viewInvite() {
         <b class="${h.amount > 0 ? 'plus' : ''}">${h.amount > 0 ? '+' : '−'}${uah(Math.abs(h.amount))}</b></li>`).join('')}</ul>` : ''}
     </section>
     <h2>Запрошені друзі</h2>
-    ${referral.friends.length
-      ? `<ul class="ledger card">${referral.friends.map((f, i) => `<li><span>Друг ${i + 1}<small>Завершив перше замовлення · ${fmtTime(f.at)}</small></span><b class="plus">+${uah(REFERRAL.bonus)}</b></li>`).join('')}</ul>`
+    ${friends.length
+      ? `<ul class="ledger card">${friends.map((f, i) => `<li><span>Друг ${i + 1}<small>Завершив перше замовлення · ${fmtTime(f.at)}</small></span><b class="plus">+${uah(REFERRAL.bonus)}</b></li>`).join('')}</ul>`
       : '<p class="muted">Поки нікого. Бонус зʼявиться, щойно друг завершить перше замовлення.</p>'}
-    <button class="btn" data-action="demo-friend" style="margin-top:12px">Демо: друг завершив перше замовлення</button>
-    <p class="note">Демо: у справжньому сервісі бонус нарахує сервер, коли друг завершить замовлення на своєму телефоні.</p>`;
+    ${hasServer() ? '' : `<button class="btn" data-action="demo-friend" style="margin-top:12px">Демо: друг завершив перше замовлення</button>
+    <p class="note">Демо: у справжньому сервісі бонус нарахує сервер, коли друг завершить замовлення на своєму телефоні.</p>`}`;
 }
 
 // ---------- каталог ----------
@@ -6743,7 +6775,7 @@ async function setAvatar(file) {
   toast(img ? 'Фото профілю збережено' : 'Фото профілю прибрано');
 }
 
-// Вихід з акаунта: наступного разу знову вхід за номером. Записи й авто на цьому телефоні лишаються.
+// Вихід з акаунта: наступного разу знову вхід за номером. Особисте з телефону прибирається (див. action logout).
 const logoutBlock = () => {
   const a = store.get('auth', null) ?? login.session;
   return `<div class="logout-row"><span class="small muted">${a?.phone ? `Ви увійшли як ${esc(a.phone)}` : 'Ви увійшли в CARCAR'}</span>
@@ -7242,6 +7274,7 @@ function renderRoute() {
   enterView(view, changed);
   ui.lastView = `${page}/${arg ?? ''}`;
   if (page !== 'book') karychRoute(page || 'catalog', karychTip(page || 'catalog'));
+  if (changed) { try { if (sessionStorage.getItem('carcar.pendingRef')) setTimeout(acceptInvite, 0); } catch { /* */ } }
   // Той самий екран перемалювався (дані оновились) — лишаємо прокрутку як була; згори — лише новий екран.
   if (!changed) return;
   const target = arg && page === 'bookings' ? $(`#b-${arg}`) : page === 'garage' && arg === 'add' ? $('#add-car') : null;
@@ -7458,8 +7491,13 @@ document.addEventListener('click', (e) => {
     store.set('auth', null);
     login.session = null;
     Object.assign(login, { step: 'phone', phone: '', error: '' });
+    // Особисте цього користувача на телефоні (імʼя, гараж, обране, запрошення) — прибираємо: наступний, хто ввійде
+    // на цьому телефоні, не має бачити чужих даних. Записи й гаманець повернуться з сервера після входу.
+    for (const k of ['profile', 'cars', 'carId', 'referral', 'subscriptions', 'favs', 'seenStates', 'campaign', 'karych']) {
+      try { localStorage.removeItem(`carcar.${k}`); } catch { /* */ }
+    }
     location.hash = '#/';
-    route();
+    location.reload();
   } else if (action === 'pay-card') {
     const b = bookings.find((x) => x.id === id);
     if (b?.state === 'unpaid') payCard(b);
@@ -7896,16 +7934,21 @@ window.addEventListener('storage', (e) => {
   if (!e.key?.startsWith('carcar.') || QUIET_KEYS.has(e.key)) return;
   // Мийка відкрила чи закрила панель — оновлюємо лише «у мережі», без перемальовування.
   if (e.key === `carcar.${PRESENCE_KEY}`) { refreshPresence(); return; }
-  // Кілька ключів приходять разом — перемальовуємо один раз і не під пальцем (calmRedraw).
+  // Дані в памʼяті оновлюємо одразу (інакше наступна дія збереже застаріле поверх чужої зміни — напр. повідомлення
+  // з іншої вкладки), а перемальовуємо один раз і не під пальцем (calmRedraw).
+  reloadData();
   calmRedraw(applyRemote);
 });
-function applyRemote() {
+function reloadData() {
   bookings = store.get('bookings', []);
   payouts = store.get('payouts', []);
   reviews = store.get('reviews', []);
   requests = store.get('requests', []);
   profile = { name: '', phone: '', optIn: false, ...store.get('profile', {}) };
   wallet = { bonus: 0, money: 0, history: [], ...store.get(walletKey(meId()), {}) };
+}
+function applyRemote() {
+  reloadData();
   applyOverrides();
   if (!draft?.paying) route();
 }

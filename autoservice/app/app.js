@@ -7,6 +7,7 @@ import {
   powerOf, worksInBlackout, TICKET_TOPICS, CLIENT_TOPICS, TICKET_STATUS, ticketsAll, openTicket, ticketReply, setTicket, isBlocked, mobileOn, spanOf, laneCap, sameLane, MOBILE_ROAD, promosAll, promoCheck,
   enterView, keepUi, calmRedraw, fitChatScreen, keepChatOnKeyboard, themePicker, setTheme, bizApps, saveBizApps, APP_STATUS, numberBookings, bookingNo, findByNo, ticketPhotos,
   hasServer, api, authToken, setAuthToken, serverConfig, notifySync, pushForget, telegramNotify, demoLoginOn,
+  refCode,
 } from './core.js';
 import {
   inboxFor, markRead, sendMessages, dealsOf, dealsOn, weeklyDealsOf, daysText, dealAt, dealPrice, dealCovers, hotDeals,
@@ -36,6 +37,8 @@ let wallet = { bonus: 0, money: 0, history: [], ...store.get(walletKey(meId()), 
 // Запити до точок: «не знайшов послугу» — листування з точкою.
 let requests = store.get('requests', []);
 let referral = store.get('referral', null) ?? { code: newRefCode(), friends: [] };
+// Із сервером код — з номера: так сервер нарахує бонус тому, хто запросив, коли друг завершить перше замовлення.
+const syncRefCode = () => { if (hasServer() && meId() !== 'device' && referral.code !== refCode(meId())) referral = { ...referral, code: refCode(meId()) }; };
 store.set('referral', referral);
 
 function newRefCode() {
@@ -282,7 +285,7 @@ function viewWallet() {
 const walletLink = () => `<a class="card link-card wallet-link" href="#/wallet">${icon('card', 24)}<span>Гаманець
     <small>Баланс ${uah(wallet.money)}${wallet.bonus ? ` · бонуси ${uah(wallet.bonus)}` : ''}</small></span>${icon('chevR', 18)}</a>`;
 
-const inviteLink = () => `${location.origin}${location.pathname}?ref=${referral.code}`;
+const inviteLink = () => { syncRefCode(); return `${location.origin}${location.pathname}?ref=${referral.code}`; };
 
 // Скільки бонусу можна списати із замовлення на суму total.
 // Скільки бонусу можна списати: замовлення (без абонемента) від мінімальної суми, не більше залишку до сплати.
@@ -307,16 +310,24 @@ const campaignNow = () => {
 };
 
 function acceptInvite() {
-  const code = new URLSearchParams(location.search).get('ref');
+  let code = new URLSearchParams(location.search).get('ref');
+  if (code) history.replaceState(null, '', location.pathname + location.hash);
+  try { code = code ?? sessionStorage.getItem('carcar.pendingRef'); } catch { /* приватний режим */ }
   if (!code) return;
-  history.replaceState(null, '', location.pathname + location.hash);
+  // Друг ще не ввійшов — запамʼятовуємо запрошення до входу (бонус має потрапити в його гаманець, а не телефону).
+  if (!isAuthed() || (hasServer() && meId() === 'device')) { try { sessionStorage.setItem('carcar.pendingRef', code); } catch { /* */ } return; }
+  try { sessionStorage.removeItem('carcar.pendingRef'); } catch { /* */ }
   const c = code.trim().toUpperCase();
   if (!/^CAR[A-Z0-9]{5}$/.test(c)) { toast('Посилання-запрошення недійсне'); return; }
+  syncRefCode();
   if (c === referral.code) { toast('Це ваше посилання — надішліть його другу'); return; }
   if (referral.invitedBy) { toast('Ви вже отримали бонус за запрошенням'); return; }
   if (mine().length) { toast('Бонус за запрошенням діє лише для нових користувачів'); return; }
   referral.invitedBy = c;
-  addBonus(REFERRAL.bonus, 'Бонус за запрошенням друга');
+  // ref — сервер перевіряє: один раз і лише новому клієнту.
+  wallet.bonus += REFERRAL.bonus;
+  wallet.history.unshift({ amount: REFERRAL.bonus, text: 'Бонус за запрошенням друга', at: Date.now(), ref: c });
+  saveReferral();
   route();
   toast(`Вам нараховано ${uah(REFERRAL.bonus)} на перше замовлення`);
 }
@@ -325,6 +336,9 @@ const inviteCard = () => `<a class="card link-card invite-card" href="#/invite">
     <small>${wallet.bonus ? `На бонусному рахунку: ${uah(wallet.bonus)}` : 'Бонус на наступне замовлення'}</small></span>${icon('chevR', 18)}</a>`;
 
 function viewInvite() {
+  syncRefCode();
+  // Із сервером бонуси за друзів нараховує сервер — показуємо їх із гаманця.
+  const friends = hasServer() ? wallet.history.filter((h) => h.refFrom) : referral.friends;
   return `<h1>Приведи друга</h1>
     <div class="invite-hero">
       <span class="invite-ic">${icon('gift', 30)}</span>
@@ -354,11 +368,11 @@ function viewInvite() {
         <b class="${h.amount > 0 ? 'plus' : ''}">${h.amount > 0 ? '+' : '−'}${uah(Math.abs(h.amount))}</b></li>`).join('')}</ul>` : ''}
     </section>
     <h2>Запрошені друзі</h2>
-    ${referral.friends.length
-      ? `<ul class="ledger card">${referral.friends.map((f, i) => `<li><span>Друг ${i + 1}<small>Завершив перше замовлення · ${fmtTime(f.at)}</small></span><b class="plus">+${uah(REFERRAL.bonus)}</b></li>`).join('')}</ul>`
+    ${friends.length
+      ? `<ul class="ledger card">${friends.map((f, i) => `<li><span>Друг ${i + 1}<small>Завершив перше замовлення · ${fmtTime(f.at)}</small></span><b class="plus">+${uah(REFERRAL.bonus)}</b></li>`).join('')}</ul>`
       : '<p class="muted">Поки нікого. Бонус зʼявиться, щойно друг завершить перше замовлення.</p>'}
-    <button class="btn" data-action="demo-friend" style="margin-top:12px">Демо: друг завершив перше замовлення</button>
-    <p class="note">Демо: у справжньому сервісі бонус нарахує сервер, коли друг завершить замовлення на своєму телефоні.</p>`;
+    ${hasServer() ? '' : `<button class="btn" data-action="demo-friend" style="margin-top:12px">Демо: друг завершив перше замовлення</button>
+    <p class="note">Демо: у справжньому сервісі бонус нарахує сервер, коли друг завершить замовлення на своєму телефоні.</p>`}`;
 }
 
 // ---------- каталог ----------
@@ -2481,7 +2495,7 @@ async function setAvatar(file) {
   toast(img ? 'Фото профілю збережено' : 'Фото профілю прибрано');
 }
 
-// Вихід з акаунта: наступного разу знову вхід за номером. Записи й авто на цьому телефоні лишаються.
+// Вихід з акаунта: наступного разу знову вхід за номером. Особисте з телефону прибирається (див. action logout).
 const logoutBlock = () => {
   const a = store.get('auth', null) ?? login.session;
   return `<div class="logout-row"><span class="small muted">${a?.phone ? `Ви увійшли як ${esc(a.phone)}` : 'Ви увійшли в CARCAR'}</span>
@@ -2980,6 +2994,7 @@ function renderRoute() {
   enterView(view, changed);
   ui.lastView = `${page}/${arg ?? ''}`;
   if (page !== 'book') karychRoute(page || 'catalog', karychTip(page || 'catalog'));
+  if (changed) { try { if (sessionStorage.getItem('carcar.pendingRef')) setTimeout(acceptInvite, 0); } catch { /* */ } }
   // Той самий екран перемалювався (дані оновились) — лишаємо прокрутку як була; згори — лише новий екран.
   if (!changed) return;
   const target = arg && page === 'bookings' ? $(`#b-${arg}`) : page === 'garage' && arg === 'add' ? $('#add-car') : null;
@@ -3196,8 +3211,13 @@ document.addEventListener('click', (e) => {
     store.set('auth', null);
     login.session = null;
     Object.assign(login, { step: 'phone', phone: '', error: '' });
+    // Особисте цього користувача на телефоні (імʼя, гараж, обране, запрошення) — прибираємо: наступний, хто ввійде
+    // на цьому телефоні, не має бачити чужих даних. Записи й гаманець повернуться з сервера після входу.
+    for (const k of ['profile', 'cars', 'carId', 'referral', 'subscriptions', 'favs', 'seenStates', 'campaign', 'karych']) {
+      try { localStorage.removeItem(`carcar.${k}`); } catch { /* */ }
+    }
     location.hash = '#/';
-    route();
+    location.reload();
   } else if (action === 'pay-card') {
     const b = bookings.find((x) => x.id === id);
     if (b?.state === 'unpaid') payCard(b);
@@ -3634,16 +3654,21 @@ window.addEventListener('storage', (e) => {
   if (!e.key?.startsWith('carcar.') || QUIET_KEYS.has(e.key)) return;
   // Мийка відкрила чи закрила панель — оновлюємо лише «у мережі», без перемальовування.
   if (e.key === `carcar.${PRESENCE_KEY}`) { refreshPresence(); return; }
-  // Кілька ключів приходять разом — перемальовуємо один раз і не під пальцем (calmRedraw).
+  // Дані в памʼяті оновлюємо одразу (інакше наступна дія збереже застаріле поверх чужої зміни — напр. повідомлення
+  // з іншої вкладки), а перемальовуємо один раз і не під пальцем (calmRedraw).
+  reloadData();
   calmRedraw(applyRemote);
 });
-function applyRemote() {
+function reloadData() {
   bookings = store.get('bookings', []);
   payouts = store.get('payouts', []);
   reviews = store.get('reviews', []);
   requests = store.get('requests', []);
   profile = { name: '', phone: '', optIn: false, ...store.get('profile', {}) };
   wallet = { bonus: 0, money: 0, history: [], ...store.get(walletKey(meId()), {}) };
+}
+function applyRemote() {
+  reloadData();
   applyOverrides();
   if (!draft?.paying) route();
 }

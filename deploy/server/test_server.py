@@ -523,6 +523,45 @@ class Server(unittest.TestCase):
         full = self.call('GET', f'/api/state?since={ver}', token=oleh)[1]['data']['bookings']
         self.assertIsInstance(full, list)
 
+    def test_21_numbers_promo_referral(self):
+        import time as _t
+        a, a_id = self.login_client('063 101 01 01')
+        b, b_id = self.login_client('063 202 02 02')
+        mk = lambda i, cid, **x: {'id': i, 'placeId': 'blysk', 'clientId': cid, 'date': '2099-12-01', 'time': '10:00', 'minutes': 30,
+                                  'state': 'pending', 'paid': 0, 'total': 250, 'no': 100001, **x}
+        # Кожен пристрій пропонує «100001» — сервер видає різні номери.
+        self.put('bookings', self.state(a).get('bookings', []) + [mk('n1', a_id)], a)
+        self.put('bookings', self.state(b).get('bookings', []) + [mk('n2', b_id)], b)
+        nos = {x['id']: x.get('no') for x in self.call('GET', '/api/state?since=0', token=self.call('POST', '/api/auth/biz', {'demo': True})[1]['token'])[1]['data']['bookings'] if x['id'] in ('n1', 'n2')}
+        self.assertEqual(len(set(nos.values())), 2, nos)
+        # Мийка відмовила — промокод повертається клієнту.
+        wash = self.call('POST', '/api/auth/biz', {'demo': True})[1]['token']
+        self.put('bookings', self.state(a).get('bookings', []) + [mk('p1', a_id, promo={'code': 'PERSHA30', 'amount': 75})], a)
+        wl = self.state(wash)['bookings']
+        self.put('bookings', [dict(x, state='cancelled', declined='place') if x['id'] == 'p1' else x for x in wl], wash)
+        mine = next(x for x in self.state(a)['bookings'] if x['id'] == 'p1')
+        self.assertTrue(mine['promo'].get('returned'))
+        # Запрошення: новий клієнт отримує 150 ₴ один раз; той, хто запросив, — коли друг завершить перше замовлення.
+        import acl
+        c, c_id = self.login_client('063 303 03 03')
+        code = acl.ref_code(a_id)
+        h = [{'amount': 150, 'text': 'Бонус за запрошенням друга', 'at': 1, 'ref': code}]
+        self.put(f'wallet.{c_id}', {'bonus': 150, 'money': 0, 'history': h}, c)
+        self.assertEqual(self.state(c)[f'wallet.{c_id}']['bonus'], 150)
+        self.put(f'wallet.{c_id}', {'bonus': 300, 'money': 0, 'history': h + [{'amount': 150, 'text': 'ще', 'at': 2, 'ref': code}]}, c)
+        self.assertEqual(self.state(c)[f'wallet.{c_id}']['bonus'], 150)  # вдруге — ні
+        self.put('bookings', self.state(c).get('bookings', []) + [mk('r1', c_id, state='paid')], c)
+        wl = self.state(wash)['bookings']
+        self.put('bookings', [dict(x, state='completed') if x['id'] == 'r1' else x for x in wl], wash)
+        for _ in range(30):
+            w = self.state(a).get(f'wallet.{a_id}') or {}
+            if w.get('bonus'):
+                break
+            _t.sleep(0.1)
+        st = next(x for x in self.state(c)['bookings'] if x['id'] == 'r1')['state']
+        self.assertEqual(st, 'completed')
+        self.assertEqual(w.get('bonus'), 150)
+
     def test_99_login_rate_limit(self):
         codes = [self.call('POST', '/api/auth/admin', {'password': 'x'})[0] for _ in range(12)]
         self.assertIn(429, codes)

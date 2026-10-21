@@ -338,6 +338,34 @@ def booking_events(old, new):
     return out
 
 
+def referral_rewards(store, old, new):
+    """Друг, який прийшов за запрошенням, завершив перше замовлення — бонус тому, хто запросив (один раз)."""
+    om = {b.get('id'): b for b in old or [] if isinstance(b, dict)}
+    for b in new or []:
+        if not isinstance(b, dict) or b.get('state') != 'completed' or (om.get(b.get('id')) or {}).get('state') == 'completed':
+            continue
+        cid = b.get('clientId')
+        if not isinstance(cid, str) or not cid.startswith('tel:'):
+            continue
+        w = store.get(f'wallet.{cid}') or {}
+        code = next((h.get('ref') for h in w.get('history') or [] if isinstance(h, dict) and h.get('ref')), None)
+        if not code or w.get('refDone'):
+            continue
+        clients = {k[len('wallet.'):] for k in list(store.cache) if k.startswith('wallet.tel:')}
+        clients |= {x.get('clientId') for x in new if isinstance(x, dict) and isinstance(x.get('clientId'), str)}
+        inviter = next((c for c in clients if c != cid and acl.ref_code(c) == code), None)
+        store.update(f'wallet.{cid}', lambda v: {**(v or {}), 'refDone': True})
+        if not inviter:
+            continue
+        def credit(v):
+            v = dict(v or {})
+            v['bonus'] = round(float(v.get('bonus') or 0) + acl.REFERRAL_BONUS, 2)
+            v['history'] = [{'amount': acl.REFERRAL_BONUS, 'text': 'Друг завершив перше замовлення', 'at': int(time.time() * 1000), 'refFrom': True}] + list(v.get('history') or [])
+            v.setdefault('money', 0)
+            return v
+        store.update(f'wallet.{inviter}', credit)
+
+
 def request_events(old, new):
     om = {x.get('id'): x for x in old or [] if isinstance(x, dict)}
     out = []
@@ -542,6 +570,11 @@ class Notifier:
         return json.loads(row[0]) if row else None
 
     def on_change(self, key, old, new):
+        if key == 'bookings':
+            try:
+                referral_rewards(self.store, old, new)
+            except Exception as e:  # нарахування не має ламати збереження
+                print('referral error', repr(e), file=sys.stderr, flush=True)
         try:
             events = {'bookings': booking_events, 'requests': request_events, 'calls': call_events}.get(key, lambda a, b: [])(old, new)
             for (kind, who), title, text, url in events:

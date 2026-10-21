@@ -69,7 +69,7 @@ function mood(name) {
   if (name) el.classList.add(name);
 }
 
-function open(html, { auto = false, moodName = 'wave' } = {}) {
+function open(html, { auto = false, moodName = 'wave', ms = 9000 } = {}) {
   const el = root();
   const b = el.querySelector('#k-bubble');
   b.innerHTML = `<button class="k-close" type="button" data-k="close" aria-label="Закрити підказку">×</button>
@@ -81,7 +81,7 @@ function open(html, { auto = false, moodName = 'wave' } = {}) {
   talk(b.textContent.length * 35);
   clearTimeout(state.hideTimer);
   // Підказка, що зʼявилась сама, ховається сама; відкриту вручну закриває клієнт.
-  if (auto) state.hideTimer = setTimeout(close, 9000);
+  if (auto) state.hideTimer = setTimeout(close, ms);
 }
 
 function close() {
@@ -176,7 +176,8 @@ export function karychSay(text, moodName = 'cheer') {
   if (!karychOn()) return;
   state.away = false;
   render();
-  open(`<p class="k-text">${esc(text)}</p>`, { auto: true, moodName });
+  // Коротко: після оплати під бульбашкою кнопки картки запису — не тримаємо їх закритими довго.
+  open(`<p class="k-text">${esc(text)}</p>`, { auto: true, moodName, ms: 5000 });
 }
 
 export function initKarych({ faq, onOff }) {

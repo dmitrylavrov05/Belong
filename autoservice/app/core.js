@@ -136,8 +136,12 @@ function syncPush(key) {
   sync.timers.set(key, setTimeout(() => { sync.timers.delete(key); syncSend(key); }, PUSH_DELAY[key] ?? 150));
 }
 
+// Гаманець і абонементи сервер перевіряє за записами (повернення — лише за вже скасований запис),
+// тож вони йдуть на сервер після записів: інакше повернення на баланс відкидалось би.
+const AFTER_BOOKINGS = (key) => key.startsWith('wallet') || key === 'biz.passes';
 async function syncSend(key) {
   if (sync.busy.has(key)) { syncPush(key); return; }
+  if (AFTER_BOOKINGS(key) && (sync.timers.has('bookings') || sync.busy.has('bookings'))) { syncPush(key); return; }
   sync.busy.add(key);
   const gen = sync.gen;
   const raw = localStorage.getItem(`carcar.${key}`);
@@ -408,6 +412,15 @@ export const hoursText = (place, iso = isoDate(new Date())) => rangeText(hoursFo
 // Клієнт CARCAR — його номер телефону (tel:380…). 'device' — без номера (демо й тести на одному пристрої).
 export const clientIdOf = (phone) => phoneKey(phone) ?? 'device';
 // Гаманець (баланс CARCAR і бонуси) — свій у кожного клієнта.
+// Код запрошення з номера (як ref_code на сервері): сервер знаходить за ним, хто запросив, а номер із коду не дізнатися.
+export function refCode(cid) {
+  let h = 0x811c9dc5;
+  for (const ch of new TextEncoder().encode(`carcar-ref:${cid}`)) { h ^= ch; h = Math.imul(h, 0x01000193) >>> 0; }
+  const abc = '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  let out = '';
+  for (let i = 0; i < 5; i++) { out += abc[h % abc.length]; h = Math.floor(h / abc.length); }
+  return `CAR${out}`;
+}
 export const walletKey = (id = 'device') => (id === 'device' ? 'wallet' : `wallet.${id}`);
 
 // Відбиток номера (FNV-1a, як phone_hash на сервері): сервер віддає мийці його замість номера клієнта CARCAR,

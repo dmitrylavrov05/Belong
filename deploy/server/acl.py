@@ -531,6 +531,12 @@ def sanitize_wallet(who, cur, new, get):
         if amount < 0:
             if not owner or (money if is_money else bonus) + amount < 0:
                 continue
+        elif amount > 0 and h.get('ref') and not is_money:
+            # Бонус за запрошенням: один раз, лише новому клієнту (без записів), рівно REFERRAL_BONUS, не за свій код.
+            code = str(h.get('ref') or '').upper()
+            if not owner or abs(amount - REFERRAL_BONUS) > 0.001 or not re.match(r'^CAR[A-Z0-9]{5}$', code) or code == ref_code(who.cid) \
+                    or any(x.get('ref') for x in old_hist) or any(who.is_client(b.get('clientId')) for b in books.values()):
+                continue
         elif amount > 0:
             b = books.get(h.get('bookingId'))
             if not b:
@@ -551,9 +557,28 @@ def sanitize_wallet(who, cur, new, get):
         else:
             bonus += amount
         ok.append({'amount': amount, 'text': str(h.get('text') or '')[:200], 'at': h.get('at'), **({'kind': 'money'} if is_money else {}),
-                   **({'bookingId': h['bookingId']} if h.get('bookingId') else {})})
+                   **({'bookingId': h['bookingId']} if h.get('bookingId') else {}), **({'ref': str(h['ref']).upper()} if h.get('ref') else {})})
     return {**{k: v for k, v in cur.items() if k not in ('money', 'bonus', 'history')}, 'money': round(money, 2), 'bonus': round(bonus, 2),
             'history': (ok + old_hist)[:500]}
+
+
+# ---------- «Приведи друга» ----------
+REFERRAL_BONUS = 150  # як REFERRAL.bonus у data.js: другу одразу, тому, хто запросив, — коли друг завершить перше замовлення
+
+
+def ref_code(cid):
+    """Код запрошення клієнта (як refCode у core.js): з номера, але номер із коду не дізнатися."""
+    if not cid:
+        return ''
+    h = 0x811C9DC5
+    for ch in ('carcar-ref:' + str(cid)).encode():
+        h ^= ch
+        h = (h * 0x01000193) & 0xFFFFFFFF
+    alphabet, out = '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ', ''
+    for _ in range(5):
+        out += alphabet[h % len(alphabet)]
+        h //= len(alphabet)
+    return 'CAR' + out
 
 
 # ---------- фото профілю клієнтів ----------
@@ -872,11 +897,18 @@ def _place_booking(who, b, old):
     charged = _num(old.get('paid'))
     if _num(out.get('refund')) > charged:
         out['refund'] = charged
+    # Мийка скасувала чи відмовила — клієнт не отримав послугу, промокод (напр. «Перша мийка −30%») повертається йому.
+    if out.get('state') == 'cancelled' and old.get('state') != 'cancelled' and isinstance(old.get('promo'), dict):
+        out['promo'] = {**old['promo'], 'returned': True}
     return out
 
 
 def _guard_bookings(who, cur, merged, get):
     cmap = {b.get('id'): b for b in cur or [] if isinstance(b, dict)}
+    # Номери записів видає сервер: у кожного пристрою свій лічильник, тож без цього номери повторювались.
+    used = {b.get('no') for b in cur or [] if isinstance(b, dict) and isinstance(b.get('no'), int)}
+    nxt = max([n for n in used if n] + [100000]) + 1
+    taken = set()
     out = []
     for b in merged:
         if isinstance(b, dict):
@@ -885,6 +917,14 @@ def _guard_bookings(who, cur, merged, get):
                 b = _client_booking(who, b, old, get)
             elif who.role == 'place':
                 b = _place_booking(who, b, old)
+            # Уже виданий номер не змінюється; повтор (з давніх часів, коли номери видавали пристрої) — отримує новий.
+            no = old.get('no') if old is not None and isinstance(old.get('no'), int) else b.get('no')
+            if not isinstance(no, int) or no in taken:
+                no, nxt = nxt, nxt + 1
+            if b.get('no') != no:
+                b = {**b, 'no': no}
+            taken.add(no)
+            nxt = max(nxt, no + 1)
         out.append(b)
     return out
 
@@ -1008,7 +1048,7 @@ def sanitize(who, key, cur, merged, get=None):
             n = int(merged)
         except (TypeError, ValueError):
             return cur
-        return n if old_n < n <= old_n + 1000 else cur
+        return n if old_n < n <= max(old_n, 100000) + 1000 else cur
     if key == 'biz.applications' and isinstance(merged, list):
         # Не більше трьох заявок на розгляді від одного клієнта.
         cur_ids = {a.get('id') for a in cur or [] if isinstance(a, dict)}

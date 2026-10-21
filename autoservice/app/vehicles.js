@@ -35,6 +35,8 @@ export async function lookupPlateOnline(raw, api) {
   if (local.error) return local;
   const r = await api(`vehicle?plate=${encodeURIComponent(local.plate)}`);
   if (!r.ok) return { ...local, car: null, failed: r.data.error || 'Не вдалося перевірити номер' };
+  // Реєстру на сервері ще немає (чи номер не знайдено) — демо-номери все одно підставляються.
+  if (!r.data.car && local.car) return { ...local, online: false };
   return { ...local, car: r.data.car ?? null, registry: !!r.data.registry, online: true, failed: r.data.error ?? null };
 }
 

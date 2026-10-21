@@ -179,3 +179,55 @@ test('фото профілю клієнта доходить до мийки ч
   expect(av).not.toContain('380675555555');
   for (const p of [ira, pro]) expect(p.errors).toEqual([]);
 });
+
+test('безкоштовне скасування: повернення на баланс доходить до сервера й лишається після перезавантаження', async ({ browser }) => {
+  // Справжній час (як на сервері): інакше для сервера «завтра» тестового годинника — уже минуле й скасування пізнє.
+  const phone = '+380 67 888 88 88';
+  const t = await token('demo', { phone });
+  const ctx = await browser.newContext({ baseURL: base, locale: 'uk-UA', reducedMotion: 'reduce' });
+  await ctx.addInitScript(([p, tk]) => {
+    sessionStorage.setItem('carcar.splash', '1');
+    localStorage.getItem('carcar.auth') ?? localStorage.setItem('carcar.auth', JSON.stringify({ phone: p, at: 1 }));
+    localStorage.getItem('carcar.profile') ?? localStorage.setItem('carcar.profile', JSON.stringify({ name: 'Ярина', phone: p }));
+    localStorage.getItem('carcar.auth.token') ?? localStorage.setItem('carcar.auth.token', JSON.stringify(tk));
+    localStorage.getItem('carcar.admin.promos') ?? localStorage.setItem('carcar.admin.promos', '[]');
+  }, [phone, t]);
+  const ira = await ctx.newPage();
+  await payStep(ira);
+  ira.errors = [];
+  ira.on('pageerror', (e) => ira.errors.push(e.message));
+  await ira.goto('/#/book/blysk');
+  await ira.getByLabel(/Експрес-мийка кузова/).check();
+  await ira.locator('[data-action="to-time"]').click();
+  await ira.getByRole('button', { name: /Завтра/ }).click();
+  await ira.locator('.slot:not([disabled])').first().click();
+  await ira.locator('[data-action="confirm"]').click();
+  await ira.getByRole('button', { name: /^Оплатити/ }).click();
+  await expect(ira.locator('#toast')).toContainText('Оплачено');
+  // Мийка приймає запис (через API кабінету).
+  const bt = await token('biz', { demo: true });
+  await expect.poll(async () => {
+    const st = await (await fetch(`${base}/api/state?since=0`, { headers: { Authorization: `Bearer ${bt}` } })).json();
+    const list = st.data.bookings ?? [];
+    const b = list.find((x) => x.clientName === 'Ярина' && x.state === 'pending');
+    if (!b) return list.some((x) => x.clientName === 'Ярина' && x.state === 'paid');
+    await fetch(`${base}/api/state/bookings`, { method: 'PUT', headers: { Authorization: `Bearer ${bt}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: list.map((x) => (x === b ? { ...x, state: 'paid', confirmedAt: Date.now() } : x)), base: list }) });
+    return false;
+  }, { timeout: 15000 }).toBe(true);
+  await expect(ira.locator('.answer-banner')).toContainText('Запис підтверджено', { timeout: 15000 });
+  await ira.goto('/#/bookings');
+  ira.once('dialog', (d) => d.accept());
+  await ira.locator('article.bk').first().getByRole('button', { name: 'Скасувати', exact: true }).click();
+  await expect(ira.locator('#toast')).toContainText('на баланс CARCAR');
+  // На сервері гаманець отримав повернення (гаманець іде на сервер після скасування запису).
+  await expect.poll(async () => {
+    const st = await (await fetch(`${base}/api/state?since=0`, { headers: { Authorization: `Bearer ${t}` } })).json();
+    return st.data['wallet.tel:380678888888']?.money ?? 0;
+  }, { timeout: 15000 }).toBeGreaterThan(0);
+  await ira.reload();
+  await ira.goto('/#/wallet');
+  await expect(ira.locator('.balance-card .bonus-sum').first()).not.toHaveText(/^0\s?₴$/);
+  expect(ira.errors).toEqual([]);
+  await ctx.close();
+});
