@@ -10,7 +10,7 @@ import {
   confirmBy, offerBy, responseStats, pauseOf, ratePct, msText, accountPlaces, addAccountPlace,
   ticketsAll, openTicket, ticketReply, setTicket, TICKET_TOPICS, TICKET_STATUS, PLACE_TOPICS, ticketPhotos,
   payoutReady, maskIban, hidePhones, themePicker, setTheme, samePhone, hasServer, api, authToken, setAuthToken, serverConfig, demoWashOn, notifySync, pushForget, telegramNotify, fitChatScreen, keepChatOnKeyboard, commissionFor, savePartner, staffOf, checkBizLogin, numberBookings, bookingNo, POWER, powerOf, setPower,
-  keepUi, calmRedraw, validPhone, ensurePhoneHash,
+  keepUi, calmRedraw, validPhone, ensurePhoneHash, fmtWith,
 } from './core.js';
 import {
   openStarts, chatPost, chatTimeline, readMessages, msgPreview, touchPresence, BIZ_QUICK, sendMessages, checkWaitlist,
@@ -67,8 +67,8 @@ const isPast = (b) => bookingStart(b).getTime() + b.minutes * 60000 <= Date.now(
 const pctText = (r) => `${String(Math.round(r * 1000) / 10).replace('.', ',')}%`;
 const who = (b) => (isCarcar(b) ? hidePhones(b.clientName || '') : b.clientName) || 'Клієнт CARCAR';
 const telHref = (phone) => `tel:${String(phone).replace(/[^+\d]/g, '')}`;
-const clock = (at) => new Date(at).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
-const whenShort = (at) => (isoDate(new Date(at)) === todayIso() ? clock(at) : new Date(at).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' }));
+const clock = (at) => fmtWith({ hour: '2-digit', minute: '2-digit' }).format(new Date(at));
+const whenShort = (at) => (isoDate(new Date(at)) === todayIso() ? clock(at) : fmtWith({ day: 'numeric', month: 'short' }).format(new Date(at)));
 // Аватарка клієнта: його фото профілю (якщо додав) або перша літера імені.
 const clientAva = (id, name, cls = '') => {
   const src = avatarSrc(id);
@@ -438,12 +438,12 @@ function viewMessages() {
     ${pendingBlock()}
     ${reminders()}
     <div class="chips" role="group" aria-label="Які повідомлення показати">${MSG_FILTERS.map(([f, label]) => `<button class="chip" type="button" data-action="msg-filter" data-f="${f}" aria-pressed="${ui.filter === f}">${label}${count(f) ? ` · ${count(f)}` : ''}</button>`).join('')}</div>
-    ${list.length ? `<ul class="convos pro-convos">${list.map((t) => (t.kind === 'call' ? callRow(t) : `<li><a class="convo${t.unread ? ' unread' : ''}${t.live ? '' : ' over'}" href="#/chat/${t.id}">
+    ${list.length ? `<ul class="convos pro-convos">${list.slice(0, ui.msgPage ?? 80).map((t) => (t.kind === 'call' ? callRow(t) : `<li><a class="convo${t.unread ? ' unread' : ''}${t.live ? '' : ' over'}" href="#/chat/${t.id}">
       ${clientAva(t.ava, t.name, t.kind === 'request' ? ' req' : '')}
       <span class="convo-body"><span class="convo-top"><b>${esc(t.name)}</b><time>${whenShort(t.at)}</time></span>
         <span class="convo-text">${esc(t.text.length > 80 ? `${t.text.slice(0, 80).trimEnd()}…` : t.text)}</span>
         <span class="convo-meta"><span class="pill ${t.cls}">${t.label}</span><small>${esc(t.sub)}</small></span></span>
-      ${t.unread ? '<span class="dot" aria-label="Нове повідомлення"></span>' : ''}</a></li>`)).join('')}</ul>`
+      ${t.unread ? '<span class="dot" aria-label="Нове повідомлення"></span>' : ''}</a></li>`)).join('')}</ul>${list.length > (ui.msgPage ?? 80) ? `<button class="btn soft block" type="button" data-action="msg-more">Показати ще (${list.length - (ui.msgPage ?? 80)})</button>` : ''}`
       : `<div class="pro-empty">${icon('chat', 32)}<b>${all.length ? 'Тут порожньо' : 'Повідомлень ще немає'}</b>
         <span>Клієнти пишуть сюди про оплачені записи й питають про послуги зі сторінки мийки.</span></div>`}`;
 }
@@ -2133,6 +2133,7 @@ document.addEventListener('click', async (e) => {
     toast(`Запис прийнято: ${who(b)}, ${dayWord(b.date).toLowerCase()} о ${b.time}`);
     return;
   }
+  if (action === 'msg-more') { ui.msgPage = (ui.msgPage ?? 80) + 160; rerender(); return; }
   if (action === 'washer') { washerSheet(id, 'assign'); return; }
   if (action === 'call') {
     if (el.matches('.call-row')) markCallsRead('place', (x) => x.placeId === (el.dataset.place ?? ui.place));

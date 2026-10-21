@@ -595,6 +595,16 @@ class Server(unittest.TestCase):
         n = sum(1 for e in self.state(adm).get('analytics') or [] if str(e.get('id', '')).startswith('atk-e'))
         self.assertLessEqual(n, 300)
 
+    def test_23_support_numbers_unique(self):
+        nos = []
+        for phone in ('093 606 06 01', '093 606 06 02', '093 606 06 03'):
+            t, cid = self.login_client(phone)
+            cur = self.state(t).get('support', [])
+            tid = 's' + phone[-2:]
+            self.put('support', cur + [{'id': tid, 'no': 1001, 'from': 'client', 'clientKey': cid, 'topic': 'other', 'messages': [{'from': 'client', 'text': 'x', 'at': 1}]}], t)
+            nos.append(next(x['no'] for x in self.state(t)['support'] if x['id'] == tid))
+        self.assertEqual(len(set(nos)), 3, nos)
+
     def test_99_login_rate_limit(self):
         codes = [self.call('POST', '/api/auth/admin', {'password': 'x'})[0] for _ in range(12)]
         self.assertIn(429, codes)

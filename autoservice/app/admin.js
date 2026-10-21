@@ -892,7 +892,12 @@ const mSettings = () => ({ ordersPerYear: 6, ...store.get('admin.settings', {}) 
 
 function campaignStats(c) {
   const rate = store.get('admin.settings', {}).commission ?? PAYMENT.commission;
-  const real = bookings.filter((b) => isCarcar(b) && !b.source && (b.campaign === c.id || (c.code && b.promo?.code === c.code && !b.promo.returned))
+  // Запис рахується лише в одній кампанії: тій, за посиланням якої прийшов клієнт (b.campaign); без посилання —
+  // в останній кампанії з цим промокодом (кілька кампаній з однаковим кодом не множать замовлення й знижки).
+  const sameCode = (store.get('admin.campaigns', []) ?? []).filter((x) => x.code && x.code === c.code);
+  const owner = sameCode.sort((x, y) => (y.createdAt ?? 0) - (x.createdAt ?? 0))[0];
+  const real = bookings.filter((b) => isCarcar(b) && !b.source
+    && (b.campaign ? b.campaign === c.id : !!c.code && b.promo?.code === c.code && !b.promo.returned && owner?.id === c.id)
     && realOrder(b))
     .map((b) => ({ amount: price(b), promo: b.promo && !b.promo.returned ? b.promo.amount : 0, newClient: !!b.firstOrder, done: b.state === 'completed' }));
   const rows = [...real, ...store.get('admin.campaignDemo', []).filter((x) => x.c === c.id)];
@@ -1118,6 +1123,9 @@ function viewStats() {
   const ev = evIn(events(), range);
   const prevEv = evIn(events(), rangeOf(n, 1));
   const app = bookings.filter((b) => isCarcar(b) && inRange(b, range));
+  // Скасування рахуємо за днем, коли скасували (як і оплати — за днем оплати), а не за датою візиту.
+  const closedIn = (b) => { const d = b.closedAt ? isoDate(new Date(b.closedAt)) : b.date; return d >= range[0] && d <= range[1]; };
+  const cancelled = bookings.filter((b) => isCarcar(b) && b.state === 'cancelled' && closedIn(b));
   const paidN = count(ev, 'paid');
   const sessions = count(ev, 'session');
   const funnel = [['Переглянули точку', count(ev, 'view_place')], ['Відкрили запис', count(ev, 'open_book')], ['Перейшли до оплати', count(ev, 'open_pay')], ['Оплатили', paidN]];
@@ -1212,7 +1220,7 @@ function viewStats() {
       <div class="kpi"><span class="label">Оплачених записів</span><span class="value">${paidN}</span>${delta(paidN, count(prevEv, 'paid'))}</div>
       <div class="kpi"><span class="label">Конверсія сеансу в запис</span><span class="value">${share(paidN, sessions)}</span></div>
       <div class="kpi"><span class="label">Повертаються</span><span class="value">${share(repeat.length, clients.length)}</span><span class="kpi-note">${repeat.length} з ${clients.length} клієнтів · ${gaps.length ? `між візитами ≈ ${Math.round(gaps.reduce((a, x) => a + x, 0) / gaps.length)} ${daysWord(Math.round(gaps.reduce((a, x) => a + x, 0) / gaps.length))}` : ''}</span></div>
-      <div class="kpi"><span class="label">Скасовано клієнтами</span><span class="value">${app.filter((b) => b.state === 'cancelled' && b.cancelBy === 'client' && !b.declined).length}</span><span class="kpi-note">вчасно ${app.filter((b) => b.state === 'cancelled' && b.cancelBy === 'client' && !b.declined && !b.placeAmount).length} · пізно ${app.filter((b) => b.state === 'cancelled' && b.placeAmount).length} · відмов мийок ${app.filter((b) => b.declined === 'place' || b.declined === 'timeout').length}</span></div>
+      <div class="kpi"><span class="label">Скасовано клієнтами</span><span class="value">${cancelled.filter((b) => b.cancelBy === 'client' && !b.declined).length}</span><span class="kpi-note">вчасно ${cancelled.filter((b) => b.cancelBy === 'client' && !b.declined && !b.placeAmount).length} · пізно ${cancelled.filter((b) => b.placeAmount).length} · відмов мийок ${cancelled.filter((b) => b.declined === 'place' || b.declined === 'timeout').length}</span></div>
       <div class="kpi"><span class="label">Неявки</span><span class="value">${share(app.filter((b) => b.state === 'noshow').length, app.length)}</span></div>
     </section>
     <div class="grid-2" style="margin-top:16px">
@@ -1319,11 +1327,19 @@ function viewApplications() {
   return `<h1>Заявки бізнесу</h1><p class="page-sub">Перевірте дані мийки. Після схвалення мийка отримає логін і пароль до кабінету, перевірить профіль і сама опублікується в каталозі.</p>
     ${list.length ? `<div class="stack" style="gap:12px">${list.map((a) => {
       const [label, cls] = APP_STATUS[a.status];
+      // Перед схваленням: чи немає вже такої мийки (назва, код, телефон) і чи правильний код юрособи.
+      const norm = (v) => String(v ?? '').toLowerCase().replace(/[^a-zа-яіїєґ0-9]/gi, '');
+      const same = a.status === 'new' ? [...list.filter((x) => x !== a && x.status !== 'rejected'), ...PLACES.map((p) => ({ name: p.name, address: p.address, place: true }))]
+        .filter((x) => (norm(x.name) && norm(x.name) === norm(a.name) && norm(x.address) === norm(a.address)) || (x.code && x.code === a.code) || (x.phone && phoneKey(x.phone) === phoneKey(a.phone))) : [];
+      const badCode = a.status === 'new' && !codeValid(a.type === 'tov' ? 'tov' : 'fop', a.code ?? '');
+      const warn = [same.length ? `Схожа мийка вже є: ${same.slice(0, 3).map((x) => `«${esc(x.name)}»${x.place ? ' (у каталозі)' : ' (інша заявка)'}`).join(', ')} — перевірте, чи це не дубль` : '',
+        badCode ? `${a.type === 'tov' ? 'ЄДРПОУ' : 'ІПН'} ${esc(a.code)} має неправильну контрольну суму — перевірте документи` : ''].filter(Boolean);
       return `<article class="panel stack" style="gap:10px" aria-label="Заявка ${esc(a.name)}">
         <div class="head"><div><b>${esc(a.name)}</b><small class="muted" style="display:block">${esc(a.city ?? '')} · ${esc(a.address)} · ${a.boxes} ${plural(Number(a.boxes), 'бокс', 'бокси', 'боксів')}</small></div>
           <span class="pill ${cls}">${label}</span></div>
         <dl class="kv"><dt>Контакт</dt><dd>${esc(a.contact)} · <a href="tel:${esc(a.phone.replace(/[^+\d]/g, ''))}">${esc(a.phone)}</a>${a.email ? ` · ${esc(a.email)}` : ''}</dd>
           <dt>Бізнес</dt><dd>${a.type === 'tov' ? 'ТОВ, ЄДРПОУ' : 'ФОП, ІПН'} ${esc(a.code)}</dd><dt>Подано</dt><dd>${fmtTime(a.at)}</dd></dl>
+        ${warn.length ? `<div class="notice warn" role="note">${warn.map((w) => `<p style="margin:0">${w}</p>`).join('')}</div>` : ''}
         ${a.status === 'new' ? `<div class="row"><button class="btn primary" data-action="app-approve" data-id="${a.id}">Схвалити й видати доступ</button>
           <button class="btn" data-action="app-reject" data-id="${a.id}">Відхилити</button></div>` : ''}
         ${a.status === 'approved' ? `<div class="notice ok"><b>Доступ до кабінету видано</b>Логін <b class="code">${esc(a.issued.login)}</b>, пароль <b class="code">${esc(a.issued.password)}</b>.
@@ -1420,7 +1436,10 @@ document.addEventListener('click', (e) => {
   if (action === 'place-use') { placeUse(Number(el.dataset.i)); return; }
   if (action === 'place-another') { ui.newPlace = null; ui.placeCreated = null; ui.placeFound = null; ui.placeQ = ''; rerender(); return; }
   if (action === 'demo-all-off') {
-    if (!confirm('Вимкнути все демо? Клієнти бачитимуть лише справжні мийки.')) return;
+    // Активні записи клієнтів у демо-мийках лишаться без кабінету, який їх обслуговує, — попереджаємо.
+    const left = bookings.filter((b) => isCarcar(b) && !b.source && ['pending', 'paid', 'offer', 'dispute'].includes(b.state)
+      && PLACES.some((p) => p.id === b.placeId && !p.custom)).length;
+    if (!confirm(`Вимкнути все демо? Клієнти бачитимуть лише справжні мийки.${left ? `\n\nУвага: ${left} ${plural(left, 'активний запис', 'активні записи', 'активних записів')} клієнтів у демо-мийках — їх ніхто не обслуговуватиме. Скасуйте їх із поверненням грошей (Точки → мийка → записи) або попередьте клієнтів.` : ''}`)) return;
     saveDemo({ demoPlaces: false, demoWash: false, ...(srv?.telegramBot ? { demoLogin: false } : {}) });
     return;
   }
@@ -1508,7 +1527,10 @@ document.addEventListener('click', (e) => {
   }
   else if (action === 'review-filter') { ui.reviews = el.dataset.f; rerender(); }
   else if (action === 'review-restore') {
-    delete reviews.find((r) => r.id === id).hidden;
+    const r = reviews.find((x) => x.id === id);
+    delete r.hidden;
+    // Повернули відгук — скаргу мийки вважаємо відхиленою (інакше висіло «прийнято» й мийка не могла поскаржитись знову).
+    if (r.report) r.report = { ...r.report, status: 'rejected', at: Date.now() };
     save();
     rerender();
     toast('Відгук знову видно клієнтам');

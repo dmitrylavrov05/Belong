@@ -1054,8 +1054,30 @@ def _client_passes(who, cur, merged, get_bookings):
     return out
 
 
+def _server_numbers(cur, merged, first):
+    """Номери (no) видає сервер: виданий не змінюється, новому чи повтору — наступний вільний. Кожен пристрій бачить
+    лише частину списку (свої звернення), тож рахувати номери на пристрої не можна."""
+    cmap = {x.get('id'): x for x in cur or [] if isinstance(x, dict)}
+    nxt = max([x.get('no') for x in cur or [] if isinstance(x, dict) and isinstance(x.get('no'), int)] + [first - 1]) + 1
+    taken, out = set(), []
+    for x in merged:
+        if isinstance(x, dict):
+            old = cmap.get(x.get('id'))
+            no = old.get('no') if old is not None and isinstance(old.get('no'), int) else None
+            if no is None or no in taken:
+                no, nxt = nxt, nxt + 1
+            if x.get('no') != no:
+                x = {**x, 'no': no}
+            taken.add(no)
+            nxt = max(nxt, no + 1)
+        out.append(x)
+    return out
+
+
 def sanitize(who, key, cur, merged, get=None):
     """Поля, які роль не може змінити навіть у своєму: статус перевірки мийки, пароль, вміст відгуку тощо."""
+    if key == 'support' and isinstance(merged, list):
+        merged = _server_numbers(cur, merged, 1001)
     if who.admin or merged is None:
         return merged
     if who.role == 'place' and key in MASKED_KEYS and get is not None:

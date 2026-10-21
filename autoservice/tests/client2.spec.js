@@ -559,3 +559,44 @@ test('фонові оновлення не перемальовують екра
   await expect(page.locator('#view h1[data-old]')).toHaveCount(1); // під пальцем — не чіпаємо
   await expect(page.locator('#view h1[data-old]')).toHaveCount(0, { timeout: 4000 }); // пауза — оновили
 });
+
+test.describe('київський час (зміна часу 25 жовтня)', () => {
+  test.use({ timezoneId: 'Europe/Kyiv' });
+test('час: підготовка через північ, «Назад» по кроках запису, строк підтвердження без перерви й у день зміни часу', async ({ page }) => {
+  // 23:50 у цілодобовій мийці: на 00:00 (за 10 хв) записатися не можна — мийці потрібно щонайменше lead хвилин.
+  await page.clock.setFixedTime(new Date('2026-10-04T23:50:00+03:00'));
+  await page.goto('/#/book/aqua24');
+  await page.getByLabel(/Експрес/).first().check();
+  await page.locator('[data-action="to-time"]').click();
+  await page.getByRole('button', { name: /Завтра/ }).click();
+  await expect(page.locator('.slot[data-time="00:00"]')).toBeDisabled();
+  // «Назад» телефона: з оплати — до часу, з часу — до послуг (а не одразу зі сторінки запису).
+  await page.locator('.slot:not([disabled])').first().click();
+  await page.locator('[data-action="confirm"]').click();
+  await expect(page.locator('#book')).toHaveAttribute('data-step', 'pay');
+  await page.goBack();
+  await expect(page.locator('#book')).toHaveAttribute('data-step', 'time');
+  await page.goBack();
+  await expect(page.locator('#book')).toHaveAttribute('data-step', 'svc');
+  await expect(page).toHaveURL(/#\/book\/aqua24$/);
+  // Строк підтвердження: 5 хв робочого часу, перерва не рахується; у день переходу на зимовий час — від відкриття.
+  const r = await page.evaluate(async () => {
+    const core = await import('./core.js');
+    const P = core.placeById('blysk');
+    const brk = core.scheduleOf(P).brk;
+    const out = {};
+    if (brk) {
+      const d = new Date(2026, 9, 6); d.setHours(Math.floor(brk[0] / 60), brk[0] % 60 - 2, 0, 0);
+      const by = new Date(core.confirmBy({ placeId: 'blysk', createdAt: d.getTime(), date: '2026-10-08', time: '12:00' }));
+      out.afterBreak = by.getHours() * 60 + by.getMinutes() >= brk[1];
+    }
+    const dst = new Date(2026, 9, 24, 22, 30).getTime();
+    const by2 = new Date(core.confirmBy({ placeId: 'blysk', createdAt: dst, date: '2026-10-25', time: '14:00' }));
+    const h = core.hoursFor(P, '2026-10-25');
+    out.dst = by2.getHours() * 60 + by2.getMinutes() - h[0];
+    return out;
+  });
+  if ('afterBreak' in r) expect(r.afterBreak).toBe(true);
+  expect(r.dst).toBe(5);
+});
+});

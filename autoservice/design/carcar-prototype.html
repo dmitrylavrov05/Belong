@@ -1312,6 +1312,19 @@ body.karych-on main { padding-bottom: 84px; }
 
 /* У чаті сповіщення про відповідь мийки — під шапкою чату (назад і дзвінок лишаються доступні) */
 body.in-chat .answer-banner { top: calc(68px + env(safe-area-inset-top)); }
+
+/* Вузькі екрани (320 px): шапка й рядок «авто + сортування» вміщаються, нічого не обрізається */
+.toolbar { flex-wrap: wrap; row-gap: 8px; }
+.toolbar .row { flex-wrap: wrap; min-width: 0; }
+.car-pick { min-width: 0; max-width: 100%; }
+.car-pick select { max-width: 62vw; text-overflow: ellipsis; }
+@media (max-width: 360px) {
+  .city-pick select { max-width: 30vw; font-size: 15px; }
+  .brand { font-size: 20px; }
+}
+/* Фокус з клавіатури на послугах і позначках видно */
+.svc-card:focus-within, label.item:focus-within { outline: 3px solid var(--accent); outline-offset: 2px; }
+.check:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 </style>
   <style>
     /* Заставка під час запуску: піна, бульбашки, логотип із відблиском і розкриття застосунку колом.
@@ -1812,6 +1825,13 @@ async function syncSend(key) {
     if (!r.ok && r.status !== 403) throw new Error(String(r.status));
     // 403 — змінювати це не можна: показуємо те, що є на сервері.
     const merged = JSON.stringify(r.data.value ?? null);
+    // Сервер не прийняв наш новий запис (напр. час щойно зайняли) — кажемо застосунку, а не прибираємо мовчки.
+    if (key === 'bookings' && Array.isArray(body.value) && Array.isArray(r.data.value)) {
+      const kept = new Set(r.data.value.map((x) => x?.id));
+      const had = new Set((base !== undefined ? JSON.parse(base) : []).map((x) => x?.id));
+      const lost = body.value.filter((x) => x?.id && !kept.has(x.id) && !had.has(x.id));
+      if (lost.length) window.dispatchEvent(new CustomEvent('carcar:rejected', { detail: lost }));
+    }
     sync.base.set(key, merged);
     // Поки відправляли, хтось інший змінив той самий ключ — показуємо злите значення (якщо ми не змінили його знову).
     if (!sync.timers.has(key) && merged !== localStorage.getItem(`carcar.${key}`)) {
@@ -1978,8 +1998,14 @@ const plural = (n, one, few, many) => {
   return many;
 };
 const duration = (min) => (min < 60 ? `${min} хв` : `${Math.floor(min / 60)} год${min % 60 ? ` ${min % 60} хв` : ''}`);
-const dayLabel = (s, opts = { weekday: 'short', day: 'numeric', month: 'long' }) =>
-  parseDate(s).toLocaleDateString('uk-UA', opts);
+// Форматери дат — створюємо один раз на набір опцій (toLocale… на кожен рядок довгих списків дуже повільний).
+const FMT = new Map();
+const fmtWith = (opts) => {
+  const k = JSON.stringify(opts);
+  if (!FMT.has(k)) FMT.set(k, new Intl.DateTimeFormat('uk-UA', opts));
+  return FMT.get(k);
+};
+const dayLabel = (s, opts = { weekday: 'short', day: 'numeric', month: 'long' }) => fmtWith(opts).format(parseDate(s));
 const rating = (r) => r.toLocaleString('uk-UA', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const tel = (p) => `tel:${p.phone.replace(/[^+\d]/g, '')}`;
 function hash(str) {
@@ -2314,7 +2340,8 @@ function resolveDispute(b, placePart, note = '', to = null) {
 function resolveLate(b, confirmed, note = '') {
   if (b?.state !== 'dispute' || !b.lateClaim) return false;
   b.lateClaim = { ...b.lateClaim, decided: confirmed ? 'confirmed' : 'rejected', at: Date.now() };
-  if (!confirmed) { resolveDispute(b, 0, note); return true; }
+  // Не підтвердили запізнення — усе клієнту (і за записом на 0 ₴, оплаченим абонементом, — повертаємо візит).
+  if (!confirmed) { resolveDispute(b, 0, note, 'client'); return true; }
   Object.assign(b, { state: 'noshow', lateForfeit: true, placeAmount: price(b), refund: 0, closedAt: Date.now(), unfreezeAt: Date.now(),
     resolution: { placePart: price(b), note, at: Date.now() } });
   return true;
@@ -2472,7 +2499,7 @@ function promoCheck(pr, { place, items, mine, all }) {
   if (pr.firstOnly && mine.some((b) => realOrder(b) && PLACES.find((x) => x.id === b.placeId)?.cats.some(inCats))) {
     return { ok: false, why: 'Промокод діє лише на перше замовлення' };
   }
-  const amount = pr.kind === 'pct' ? Math.min(pr.max || Infinity, Math.round((base * pr.value) / 100)) : Math.min(pr.value, base);
+  const amount = pr.kind === 'pct' ? Math.min(pr.max || Infinity, Math.round((base * pr.value) / 100)) : Math.min(pr.value, Math.floor(base * 0.9)); // фіксована знижка — як і відсоткова, не більше 90% замовлення
   return { ok: true, amount };
 }
 
@@ -2912,27 +2939,44 @@ async function checkBizLogin(login, pass) {
 // ---------- підтвердження записів і відповідальність мийки ----------
 
 // Звідки рахується час на відповідь: від заявки, а якщо мийка зачинена — від відкриття.
+// Момент дня за годинником мийки (setHours — правильно і в день переходу на зимовий/літній час).
+const atMin = (iso, min) => { const d = parseDate(iso); d.setHours(Math.floor(min / 60), min % 60, 0, 0); return d.getTime(); };
+// Робочі проміжки дня в хвилинах: години роботи без обідньої перерви.
+function workSpans(p, iso) {
+  const h = hoursFor(p, iso);
+  if (!h) return [];
+  const b = scheduleOf(p).brk;
+  if (!b || b[1] <= h[0] || b[0] >= h[1]) return [h];
+  return [[h[0], b[0]], [b[1], h[1]]].filter(([x, y]) => y > x);
+}
+// Коли мийка почала «бачити» заявку: перша робоча хвилина від створення (уночі чи на обідній перерві — з відкриття).
 function confirmStart(b) {
+  return workDeadline(b, 0);
+}
+// Мить, коли мине `minutes` робочих хвилин мийки від створення заявки (перерва й неробочий час не рахуються).
+function workDeadline(b, minutes) {
   const p = PLACES.find((x) => x.id === b.placeId);
-  let t = b.createdAt ?? Date.now();
-  for (let i = 0; p && i < 8; i++) {
-    const d = new Date(t);
-    const iso = isoDate(d);
-    const h = hoursFor(p, iso);
-    const m = d.getHours() * 60 + d.getMinutes();
-    if (h && m < h[1]) {
-      if (m < h[0]) t = parseDate(iso).getTime() + h[0] * 60000;
-      break;
+  const t0 = b.createdAt ?? Date.now();
+  if (!p) return t0 + minutes * 60000;
+  let left = minutes;
+  let iso = isoDate(new Date(t0));
+  for (let i = 0; i < 14; i++) {
+    for (const [from, to] of workSpans(p, iso)) {
+      const start = Math.max(atMin(iso, from), t0);
+      const end = atMin(iso, to);
+      if (start >= end) continue;
+      if ((end - start) / 60000 >= left) return start + left * 60000;
+      left -= (end - start) / 60000;
     }
     const next = parseDate(iso);
     next.setDate(next.getDate() + 1);
-    t = next.getTime();
+    iso = isoDate(next);
   }
-  return t;
+  return t0 + minutes * 60000;
 }
 
 // До коли мийка має відповісти: confirmMinutes робочого часу, але не пізніше за початок візиту.
-const confirmBy = (b) => Math.min(confirmStart(b) + PAYMENT.confirmMinutes * 60000, bookingStart(b).getTime());
+const confirmBy = (b) => Math.min(workDeadline(b, PAYMENT.confirmMinutes), bookingStart(b).getTime());
 // До коли клієнт може погодитися на запропонований час.
 const offerBy = (b) => Math.min((b.offer?.at ?? Date.now()) + PAYMENT.offerMinutes * 60000, bookingStart(b).getTime());
 
@@ -4440,9 +4484,9 @@ function slotsFor(place, date, minutes, { skip = null, mobile = false } = {}) {
   if (!hours) return [];
   const [open, close] = hours;
   const { lead } = scheduleOf(place);
-  const now = new Date();
-  const today = date === isoDate(now);
-  const nowMin = now.getHours() * 60 + now.getMinutes();
+  // Мінімум часу до візиту рахуємо від «зараз» до справжнього моменту слота — і через північ (о 23:50 на 00:00 — ні).
+  const earliest = Date.now() + lead * 60000;
+  const slotAt = (t) => { const d = parseDate(date); d.setHours(Math.floor(t / 60), t % 60, 0, 0); return d.getTime(); };
   const atPlace = bookings.filter((b) => b.placeId === place.id && b.date === date && b !== skip);
   const own = atPlace.filter((b) => !b.source && ACTIVE.includes(b.state)).map((b) => [toMin(b.time), toMin(b.time) + b.minutes]);
   const all = atPlace.filter((b) => BLOCKING.includes(b.state) && sameLane(b, mobile)).map(spanOf);
@@ -4451,7 +4495,7 @@ function slotsFor(place, date, minutes, { skip = null, mobile = false } = {}) {
   for (let t = open; t + minutes <= close; t += 30) {
     const overlaps = (list, len) => list.filter(([s, e]) => t < e && t + len > s).length;
     const busy =
-      (today && t < nowMin + lead) ||
+      slotAt(t) < earliest ||
       inBreak(place, t, minutes) ||
       overlaps(own, minutes) > 0 ||
       overlaps(all, need) >= laneCap(place, mobile);
@@ -4467,7 +4511,9 @@ function nextDays(n = 7) {
 
 // Дні, на які можна записатися, — на стільки вперед, скільки дозволяє точка.
 const bookingDays = (p) => nextDays(scheduleOf(p).horizon);
-const firstOpenDay = (p) => bookingDays(p).find((d) => hoursFor(p, d)) ?? bookingDays(p)[0];
+// Перший день, коли ще можна записатися (сьогодні ввечері вільного часу вже немає — одразу завтра).
+const firstOpenDay = (p) => bookingDays(p).find((d) => hoursFor(p, d) && slotsFor(p, d, 30).some((x) => !x.busy))
+  ?? bookingDays(p).find((d) => hoursFor(p, d)) ?? bookingDays(p)[0];
 
 // Ключі, за якими точка знає цього клієнта: телефон із профілю й авто з гаража.
 // 'device' — сповіщення самого застосунку (нагадування, відповіді на відгуки) навіть без телефону в профілі.
@@ -5569,7 +5615,7 @@ function renderBook() {
     </div>
     <p class="load-legend" aria-hidden="true"><span><i class="load low"></i>мало</span><span><i class="load mid"></i>середньо</span><span><i class="load high"></i>багато</span></p>
     <h2 class="date-h">${dayLabel(draft.date, { weekday: 'long', day: 'numeric', month: 'long' })}</h2>
-    ${hoursFor(p, draft.date) ? `<p class="small muted" style="margin:0">Працюємо ${rangeText(hoursFor(p, draft.date))}${scheduleOf(p).brk ? `, перерва ${rangeText(scheduleOf(p).brk)}` : ''}</p>` : ''}
+    ${hoursFor(p, draft.date) ? `<p class="small muted" style="margin:0">Працюємо ${rangeText(hoursFor(p, draft.date))}${scheduleOf(p).brk && scheduleOf(p).brk[0] < hoursFor(p, draft.date)[1] && scheduleOf(p).brk[1] > hoursFor(p, draft.date)[0] ? `, перерва ${rangeText(scheduleOf(p).brk)}` : ''}</p>` : ''}
     ${dayDealsBar(p, draft.date)}
     ${free.length
       ? PARTS_OF_DAY.map(([name, from, to]) => {
@@ -5724,6 +5770,8 @@ function updateWhere(p) {
 }
 
 function confirmBooking() {
+  // Із сервером записуємося лише онлайн: без мережі час міг уже зайняти інший клієнт, а «Оплачено» було б неправдою.
+  if (hasServer() && navigator.onLine === false) { toast('Немає інтернету — запис і оплата можливі лише онлайн. Перевірте зʼєднання'); return; }
   const p = placeById(draft.placeId);
   const car = cars.find((c) => c.id === draft.carId);
   // Імʼя й телефон з форми оплати зберігаємо в профіль, щоб наступного разу не вводити.
@@ -6107,7 +6155,7 @@ const avatar = (name, on = false, img = null) => `<span class="avatar${on ? ' on
 const shortTime = (at) => {
   const d = new Date(at);
   const today = isoDate(new Date());
-  return isoDate(d) === today ? d.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' });
+  return isoDate(d) === today ? fmtWith({ hour: '2-digit', minute: '2-digit' }).format(d) : fmtWith({ day: 'numeric', month: 'short' }).format(d);
 };
 const dayName = (iso) => {
   const t = new Date();
@@ -6385,6 +6433,7 @@ function staleNote(m) {
 }
 
 // Список переписок у «Повідомленнях»: чати за записами, запити до мийок і підтримка — новіші зверху.
+const CONVO_PAGE = 60;
 function conversations() {
   const rows = [
     ...mine().filter((b) => b.chat?.length).map((b) => {
@@ -6424,10 +6473,13 @@ function conversations() {
   // Завершені записи й закриті запити — окремо й згорнуто, щоб не змішувались з актуальними.
   const live = rows.filter((r) => !r.over);
   const over = rows.filter((r) => r.over);
+  // Довгий список — порціями (сотні переписок одразу малюються повільно на телефоні).
+  const more = (list, key) => (list.length > (ui[key] ?? CONVO_PAGE) ? `<button class="btn soft block" type="button" data-action="convo-more" data-key="${key}">Показати ще (${list.length - (ui[key] ?? CONVO_PAGE)})</button>` : '');
+  const page = (list, key) => list.slice(0, ui[key] ?? CONVO_PAGE).map(item).join('');
   return `<h2>Чати й дзвінки</h2>
-    ${live.length ? `<ul class="convos">${live.map(item).join('')}</ul>` : '<p class="small muted">Активних переписок немає.</p>'}
-    ${over.length ? `<details class="fold convo-archive"><summary>${icon('checkCircle', 20)}Завершені<span class="fold-note">${over.length}</span></summary>
-      <ul class="convos">${over.map(item).join('')}</ul></details>` : ''}`;
+    ${live.length ? `<ul class="convos">${page(live, 'convoLive')}</ul>${more(live, 'convoLive')}` : '<p class="small muted">Активних переписок немає.</p>'}
+    ${over.length ? `<details class="fold convo-archive" id="convo-archive"><summary>${icon('checkCircle', 20)}Завершені<span class="fold-note">${over.length}</span></summary>
+      <ul class="convos">${page(over, 'convoOver')}</ul>${more(over, 'convoOver')}</details>` : ''}`;
 }
 
 // ---------- підтримка CARCAR ----------
@@ -7355,11 +7407,16 @@ document.addEventListener('click', (e) => {
     el.setAttribute('aria-label', el.getAttribute('aria-label').replace(/^(Прибрати з обраного|В обране)/, on ? 'Прибрати з обраного' : 'В обране'));
     if (ui.favOnly && $('#list')) renderList();
     toast(on ? 'Додано в обране' : 'Прибрано з обраного');
+  } else if ((action === 'step-back' || action === 'unpay') && history.state?.bookStep) {
+    history.back(); // крок назад — через історію (обробляє popstate), щоб «Назад» телефона й кнопка в кроці збігались
   } else if (action === 'to-time' || action === 'step-back') {
     draft.step = action === 'to-time' ? 'time' : 'svc';
     draft.paying = false;
+    // Крок запису — запис в історії браузера: кнопка «Назад» телефона повертає на попередній крок, а не з запису.
+    if (action === 'to-time') history.pushState({ bookStep: 'time' }, '', location.hash);
     renderBook();
     window.scrollTo(0, 0);
+    $('#book h2, #book [data-action="day"][aria-pressed="true"], #book .slot:not([disabled])')?.focus({ preventScroll: true });
   } else if (action === 'day') {
     draft.date = el.dataset.date;
     draft.paying = false;
@@ -7368,7 +7425,9 @@ document.addEventListener('click', (e) => {
     draft.time = el.dataset.time;
     draft.paying = false;
     renderBook();
+    $(`#book .slot[data-time="${draft.time}"]`)?.focus({ preventScroll: true }); // клавіатура лишається на обраному часі
   } else if (action === 'confirm' || action === 'unpay') {
+    if (action === 'confirm' && !draft.paying) history.pushState({ bookStep: 'pay' }, '', location.hash);
     draft.paying = action === 'confirm';
     draft.payReady = false;
     if (draft.paying) track('open_pay', { placeId: draft.placeId });
@@ -7441,6 +7500,9 @@ document.addEventListener('click', (e) => {
     Object.assign(draft, { paying: false, step: 'svc' });
     track('svc_click', { placeId: p.id });
     location.hash = `#/book/${p.id}`;
+  } else if (action === 'convo-more') {
+    ui[el.dataset.key] = (ui[el.dataset.key] ?? CONVO_PAGE) + CONVO_PAGE * 2;
+    route();
   } else if (action === 'avatar-off') {
     setAvatar(null);
   } else if (action === 'call') {
@@ -7959,6 +8021,19 @@ setInterval(() => {
 // Ключі, зміни яких не стосуються екрана клієнта: журнал подій, дзвінки (їх показує call.js), чужі службові дані.
 const QUIET_KEYS = new Set(['carcar.seenStates', 'carcar.analytics', 'carcar.calls', 'carcar.callLog', 'carcar.biz.shifts', 'carcar.biz.stock',
   'carcar.biz.clientNotes', 'carcar.biz.accounts', 'carcar.admin.fraud', 'carcar.karych']);
+// «Назад» на кроках запису: з оплати — до часу, з часу — до послуг (кроки ми додали в історію).
+window.addEventListener('popstate', () => {
+  if (!draft || !location.hash.startsWith(`#/book/${draft.placeId}`) || !$('#book')) return;
+  if (draft.paying) { draft.paying = false; draft.payReady = false; draft.step = 'time'; } else if (draft.step === 'time') draft.step = 'svc';
+  renderBook();
+  window.scrollTo({ top: 0, behavior: 'instant' });
+});
+// Сервер не прийняв новий запис (час щойно зайняв інший клієнт) — кажемо прямо, а не мовчки прибираємо.
+window.addEventListener('carcar:rejected', (e) => {
+  const b = e.detail?.[0];
+  const p = b && placeById(b.placeId);
+  toast(`Не вдалося записатися${p ? ` у «${p.name}»` : ''}${b ? ` на ${b.time}` : ''}: цей час щойно зайняли. Гроші не списано — оберіть інший час`);
+});
 window.addEventListener('storage', (e) => {
   if (!e.key?.startsWith('carcar.') || QUIET_KEYS.has(e.key)) return;
   // Мийка відкрила чи закрила панель — оновлюємо лише «у мережі», без перемальовування.

@@ -1312,6 +1312,19 @@ body.karych-on main { padding-bottom: 84px; }
 
 /* У чаті сповіщення про відповідь мийки — під шапкою чату (назад і дзвінок лишаються доступні) */
 body.in-chat .answer-banner { top: calc(68px + env(safe-area-inset-top)); }
+
+/* Вузькі екрани (320 px): шапка й рядок «авто + сортування» вміщаються, нічого не обрізається */
+.toolbar { flex-wrap: wrap; row-gap: 8px; }
+.toolbar .row { flex-wrap: wrap; min-width: 0; }
+.car-pick { min-width: 0; max-width: 100%; }
+.car-pick select { max-width: 62vw; text-overflow: ellipsis; }
+@media (max-width: 360px) {
+  .city-pick select { max-width: 30vw; font-size: 15px; }
+  .brand { font-size: 20px; }
+}
+/* Фокус з клавіатури на послугах і позначках видно */
+.svc-card:focus-within, label.item:focus-within { outline: 3px solid var(--accent); outline-offset: 2px; }
+.check:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 </style>
   <style>
 /* CarCar Business — застосунок мийки для телефона. Базові кнопки, поля, чат і шторки — зі styles.css. */
@@ -1671,6 +1684,13 @@ body.pro.locked .pro-tabs { display: none; }
 body.sheet-open .toast { top: calc(env(safe-area-inset-top) + 12px); bottom: auto; transform: translate(-50%, -20px); }
 body.sheet-open .toast.show { transform: translate(-50%, 0); }
 .day-step { display: flex; align-items: center; gap: 4px; }
+
+/* Вузькі екрани (від 320 px): довгі імена клієнтів і чипи не розпирають сторінку вбік */
+.day-list > li, .bk-row { min-width: 0; }
+.bk-main b { overflow-wrap: anywhere; }
+.bk-side .pill { white-space: normal; text-align: right; }
+#view .chips { flex-wrap: wrap; }
+#view .chips .chip { white-space: normal; text-align: left; }
 </style>
   <script>
     // Тема з налаштувань — до малювання сторінки, щоб не блимала.
@@ -2082,6 +2102,13 @@ async function syncSend(key) {
     if (!r.ok && r.status !== 403) throw new Error(String(r.status));
     // 403 — змінювати це не можна: показуємо те, що є на сервері.
     const merged = JSON.stringify(r.data.value ?? null);
+    // Сервер не прийняв наш новий запис (напр. час щойно зайняли) — кажемо застосунку, а не прибираємо мовчки.
+    if (key === 'bookings' && Array.isArray(body.value) && Array.isArray(r.data.value)) {
+      const kept = new Set(r.data.value.map((x) => x?.id));
+      const had = new Set((base !== undefined ? JSON.parse(base) : []).map((x) => x?.id));
+      const lost = body.value.filter((x) => x?.id && !kept.has(x.id) && !had.has(x.id));
+      if (lost.length) window.dispatchEvent(new CustomEvent('carcar:rejected', { detail: lost }));
+    }
     sync.base.set(key, merged);
     // Поки відправляли, хтось інший змінив той самий ключ — показуємо злите значення (якщо ми не змінили його знову).
     if (!sync.timers.has(key) && merged !== localStorage.getItem(`carcar.${key}`)) {
@@ -2248,8 +2275,14 @@ const plural = (n, one, few, many) => {
   return many;
 };
 const duration = (min) => (min < 60 ? `${min} хв` : `${Math.floor(min / 60)} год${min % 60 ? ` ${min % 60} хв` : ''}`);
-const dayLabel = (s, opts = { weekday: 'short', day: 'numeric', month: 'long' }) =>
-  parseDate(s).toLocaleDateString('uk-UA', opts);
+// Форматери дат — створюємо один раз на набір опцій (toLocale… на кожен рядок довгих списків дуже повільний).
+const FMT = new Map();
+const fmtWith = (opts) => {
+  const k = JSON.stringify(opts);
+  if (!FMT.has(k)) FMT.set(k, new Intl.DateTimeFormat('uk-UA', opts));
+  return FMT.get(k);
+};
+const dayLabel = (s, opts = { weekday: 'short', day: 'numeric', month: 'long' }) => fmtWith(opts).format(parseDate(s));
 const rating = (r) => r.toLocaleString('uk-UA', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const tel = (p) => `tel:${p.phone.replace(/[^+\d]/g, '')}`;
 function hash(str) {
@@ -2584,7 +2617,8 @@ function resolveDispute(b, placePart, note = '', to = null) {
 function resolveLate(b, confirmed, note = '') {
   if (b?.state !== 'dispute' || !b.lateClaim) return false;
   b.lateClaim = { ...b.lateClaim, decided: confirmed ? 'confirmed' : 'rejected', at: Date.now() };
-  if (!confirmed) { resolveDispute(b, 0, note); return true; }
+  // Не підтвердили запізнення — усе клієнту (і за записом на 0 ₴, оплаченим абонементом, — повертаємо візит).
+  if (!confirmed) { resolveDispute(b, 0, note, 'client'); return true; }
   Object.assign(b, { state: 'noshow', lateForfeit: true, placeAmount: price(b), refund: 0, closedAt: Date.now(), unfreezeAt: Date.now(),
     resolution: { placePart: price(b), note, at: Date.now() } });
   return true;
@@ -2742,7 +2776,7 @@ function promoCheck(pr, { place, items, mine, all }) {
   if (pr.firstOnly && mine.some((b) => realOrder(b) && PLACES.find((x) => x.id === b.placeId)?.cats.some(inCats))) {
     return { ok: false, why: 'Промокод діє лише на перше замовлення' };
   }
-  const amount = pr.kind === 'pct' ? Math.min(pr.max || Infinity, Math.round((base * pr.value) / 100)) : Math.min(pr.value, base);
+  const amount = pr.kind === 'pct' ? Math.min(pr.max || Infinity, Math.round((base * pr.value) / 100)) : Math.min(pr.value, Math.floor(base * 0.9)); // фіксована знижка — як і відсоткова, не більше 90% замовлення
   return { ok: true, amount };
 }
 
@@ -3182,27 +3216,44 @@ async function checkBizLogin(login, pass) {
 // ---------- підтвердження записів і відповідальність мийки ----------
 
 // Звідки рахується час на відповідь: від заявки, а якщо мийка зачинена — від відкриття.
+// Момент дня за годинником мийки (setHours — правильно і в день переходу на зимовий/літній час).
+const atMin = (iso, min) => { const d = parseDate(iso); d.setHours(Math.floor(min / 60), min % 60, 0, 0); return d.getTime(); };
+// Робочі проміжки дня в хвилинах: години роботи без обідньої перерви.
+function workSpans(p, iso) {
+  const h = hoursFor(p, iso);
+  if (!h) return [];
+  const b = scheduleOf(p).brk;
+  if (!b || b[1] <= h[0] || b[0] >= h[1]) return [h];
+  return [[h[0], b[0]], [b[1], h[1]]].filter(([x, y]) => y > x);
+}
+// Коли мийка почала «бачити» заявку: перша робоча хвилина від створення (уночі чи на обідній перерві — з відкриття).
 function confirmStart(b) {
+  return workDeadline(b, 0);
+}
+// Мить, коли мине `minutes` робочих хвилин мийки від створення заявки (перерва й неробочий час не рахуються).
+function workDeadline(b, minutes) {
   const p = PLACES.find((x) => x.id === b.placeId);
-  let t = b.createdAt ?? Date.now();
-  for (let i = 0; p && i < 8; i++) {
-    const d = new Date(t);
-    const iso = isoDate(d);
-    const h = hoursFor(p, iso);
-    const m = d.getHours() * 60 + d.getMinutes();
-    if (h && m < h[1]) {
-      if (m < h[0]) t = parseDate(iso).getTime() + h[0] * 60000;
-      break;
+  const t0 = b.createdAt ?? Date.now();
+  if (!p) return t0 + minutes * 60000;
+  let left = minutes;
+  let iso = isoDate(new Date(t0));
+  for (let i = 0; i < 14; i++) {
+    for (const [from, to] of workSpans(p, iso)) {
+      const start = Math.max(atMin(iso, from), t0);
+      const end = atMin(iso, to);
+      if (start >= end) continue;
+      if ((end - start) / 60000 >= left) return start + left * 60000;
+      left -= (end - start) / 60000;
     }
     const next = parseDate(iso);
     next.setDate(next.getDate() + 1);
-    t = next.getTime();
+    iso = isoDate(next);
   }
-  return t;
+  return t0 + minutes * 60000;
 }
 
 // До коли мийка має відповісти: confirmMinutes робочого часу, але не пізніше за початок візиту.
-const confirmBy = (b) => Math.min(confirmStart(b) + PAYMENT.confirmMinutes * 60000, bookingStart(b).getTime());
+const confirmBy = (b) => Math.min(workDeadline(b, PAYMENT.confirmMinutes), bookingStart(b).getTime());
 // До коли клієнт може погодитися на запропонований час.
 const offerBy = (b) => Math.min((b.offer?.at ?? Date.now()) + PAYMENT.offerMinutes * 60000, bookingStart(b).getTime());
 
@@ -4251,8 +4302,8 @@ const isPast = (b) => bookingStart(b).getTime() + b.minutes * 60000 <= Date.now(
 const pctText = (r) => `${String(Math.round(r * 1000) / 10).replace('.', ',')}%`;
 const who = (b) => (isCarcar(b) ? hidePhones(b.clientName || '') : b.clientName) || 'Клієнт CARCAR';
 const telHref = (phone) => `tel:${String(phone).replace(/[^+\d]/g, '')}`;
-const clock = (at) => new Date(at).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
-const whenShort = (at) => (isoDate(new Date(at)) === todayIso() ? clock(at) : new Date(at).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' }));
+const clock = (at) => fmtWith({ hour: '2-digit', minute: '2-digit' }).format(new Date(at));
+const whenShort = (at) => (isoDate(new Date(at)) === todayIso() ? clock(at) : fmtWith({ day: 'numeric', month: 'short' }).format(new Date(at)));
 // Аватарка клієнта: його фото профілю (якщо додав) або перша літера імені.
 const clientAva = (id, name, cls = '') => {
   const src = avatarSrc(id);
@@ -4622,12 +4673,12 @@ function viewMessages() {
     ${pendingBlock()}
     ${reminders()}
     <div class="chips" role="group" aria-label="Які повідомлення показати">${MSG_FILTERS.map(([f, label]) => `<button class="chip" type="button" data-action="msg-filter" data-f="${f}" aria-pressed="${ui.filter === f}">${label}${count(f) ? ` · ${count(f)}` : ''}</button>`).join('')}</div>
-    ${list.length ? `<ul class="convos pro-convos">${list.map((t) => (t.kind === 'call' ? callRow(t) : `<li><a class="convo${t.unread ? ' unread' : ''}${t.live ? '' : ' over'}" href="#/chat/${t.id}">
+    ${list.length ? `<ul class="convos pro-convos">${list.slice(0, ui.msgPage ?? 80).map((t) => (t.kind === 'call' ? callRow(t) : `<li><a class="convo${t.unread ? ' unread' : ''}${t.live ? '' : ' over'}" href="#/chat/${t.id}">
       ${clientAva(t.ava, t.name, t.kind === 'request' ? ' req' : '')}
       <span class="convo-body"><span class="convo-top"><b>${esc(t.name)}</b><time>${whenShort(t.at)}</time></span>
         <span class="convo-text">${esc(t.text.length > 80 ? `${t.text.slice(0, 80).trimEnd()}…` : t.text)}</span>
         <span class="convo-meta"><span class="pill ${t.cls}">${t.label}</span><small>${esc(t.sub)}</small></span></span>
-      ${t.unread ? '<span class="dot" aria-label="Нове повідомлення"></span>' : ''}</a></li>`)).join('')}</ul>`
+      ${t.unread ? '<span class="dot" aria-label="Нове повідомлення"></span>' : ''}</a></li>`)).join('')}</ul>${list.length > (ui.msgPage ?? 80) ? `<button class="btn soft block" type="button" data-action="msg-more">Показати ще (${list.length - (ui.msgPage ?? 80)})</button>` : ''}`
       : `<div class="pro-empty">${icon('chat', 32)}<b>${all.length ? 'Тут порожньо' : 'Повідомлень ще немає'}</b>
         <span>Клієнти пишуть сюди про оплачені записи й питають про послуги зі сторінки мийки.</span></div>`}`;
 }
@@ -6317,6 +6368,7 @@ document.addEventListener('click', async (e) => {
     toast(`Запис прийнято: ${who(b)}, ${dayWord(b.date).toLowerCase()} о ${b.time}`);
     return;
   }
+  if (action === 'msg-more') { ui.msgPage = (ui.msgPage ?? 80) + 160; rerender(); return; }
   if (action === 'washer') { washerSheet(id, 'assign'); return; }
   if (action === 'call') {
     if (el.matches('.call-row')) markCallsRead('place', (x) => x.placeId === (el.dataset.place ?? ui.place));

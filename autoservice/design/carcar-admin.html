@@ -1311,6 +1311,19 @@ body.karych-on main { padding-bottom: 84px; }
 
 /* У чаті сповіщення про відповідь мийки — під шапкою чату (назад і дзвінок лишаються доступні) */
 body.in-chat .answer-banner { top: calc(68px + env(safe-area-inset-top)); }
+
+/* Вузькі екрани (320 px): шапка й рядок «авто + сортування» вміщаються, нічого не обрізається */
+.toolbar { flex-wrap: wrap; row-gap: 8px; }
+.toolbar .row { flex-wrap: wrap; min-width: 0; }
+.car-pick { min-width: 0; max-width: 100%; }
+.car-pick select { max-width: 62vw; text-overflow: ellipsis; }
+@media (max-width: 360px) {
+  .city-pick select { max-width: 30vw; font-size: 15px; }
+  .brand { font-size: 20px; }
+}
+/* Фокус з клавіатури на послугах і позначках видно */
+.svc-card:focus-within, label.item:focus-within { outline: 3px solid var(--accent); outline-offset: 2px; }
+.check:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 </style>
   <style>
 /* Панель для бізнесу CARCAR: десктоп-перший макет поверх токенів і компонентів styles.css. */
@@ -1886,6 +1899,13 @@ body.locked #view { padding: 0; }
 @media (pointer: coarse) {
   input, select, textarea { font-size: 16px !important; }
 }
+
+/* Вузькі екрани (390 px): перемикачі переносяться, таблиці й картки не ширші за екран */
+.seg { flex-wrap: wrap; max-width: 100%; }
+.grid-2 > *, .panel { min-width: 0; }
+.heat { max-width: 100%; }
+.kv dd { overflow-wrap: anywhere; min-width: 0; }
+@media (max-width: 480px) { .kv { grid-template-columns: minmax(0, 1fr); gap: 2px 0; } .kv dd { margin-bottom: 6px; } }
 </style>
 </head>
 <body class="biz admin">
@@ -2306,6 +2326,13 @@ async function syncSend(key) {
     if (!r.ok && r.status !== 403) throw new Error(String(r.status));
     // 403 — змінювати це не можна: показуємо те, що є на сервері.
     const merged = JSON.stringify(r.data.value ?? null);
+    // Сервер не прийняв наш новий запис (напр. час щойно зайняли) — кажемо застосунку, а не прибираємо мовчки.
+    if (key === 'bookings' && Array.isArray(body.value) && Array.isArray(r.data.value)) {
+      const kept = new Set(r.data.value.map((x) => x?.id));
+      const had = new Set((base !== undefined ? JSON.parse(base) : []).map((x) => x?.id));
+      const lost = body.value.filter((x) => x?.id && !kept.has(x.id) && !had.has(x.id));
+      if (lost.length) window.dispatchEvent(new CustomEvent('carcar:rejected', { detail: lost }));
+    }
     sync.base.set(key, merged);
     // Поки відправляли, хтось інший змінив той самий ключ — показуємо злите значення (якщо ми не змінили його знову).
     if (!sync.timers.has(key) && merged !== localStorage.getItem(`carcar.${key}`)) {
@@ -2472,8 +2499,14 @@ const plural = (n, one, few, many) => {
   return many;
 };
 const duration = (min) => (min < 60 ? `${min} хв` : `${Math.floor(min / 60)} год${min % 60 ? ` ${min % 60} хв` : ''}`);
-const dayLabel = (s, opts = { weekday: 'short', day: 'numeric', month: 'long' }) =>
-  parseDate(s).toLocaleDateString('uk-UA', opts);
+// Форматери дат — створюємо один раз на набір опцій (toLocale… на кожен рядок довгих списків дуже повільний).
+const FMT = new Map();
+const fmtWith = (opts) => {
+  const k = JSON.stringify(opts);
+  if (!FMT.has(k)) FMT.set(k, new Intl.DateTimeFormat('uk-UA', opts));
+  return FMT.get(k);
+};
+const dayLabel = (s, opts = { weekday: 'short', day: 'numeric', month: 'long' }) => fmtWith(opts).format(parseDate(s));
 const rating = (r) => r.toLocaleString('uk-UA', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const tel = (p) => `tel:${p.phone.replace(/[^+\d]/g, '')}`;
 function hash(str) {
@@ -2808,7 +2841,8 @@ function resolveDispute(b, placePart, note = '', to = null) {
 function resolveLate(b, confirmed, note = '') {
   if (b?.state !== 'dispute' || !b.lateClaim) return false;
   b.lateClaim = { ...b.lateClaim, decided: confirmed ? 'confirmed' : 'rejected', at: Date.now() };
-  if (!confirmed) { resolveDispute(b, 0, note); return true; }
+  // Не підтвердили запізнення — усе клієнту (і за записом на 0 ₴, оплаченим абонементом, — повертаємо візит).
+  if (!confirmed) { resolveDispute(b, 0, note, 'client'); return true; }
   Object.assign(b, { state: 'noshow', lateForfeit: true, placeAmount: price(b), refund: 0, closedAt: Date.now(), unfreezeAt: Date.now(),
     resolution: { placePart: price(b), note, at: Date.now() } });
   return true;
@@ -2966,7 +3000,7 @@ function promoCheck(pr, { place, items, mine, all }) {
   if (pr.firstOnly && mine.some((b) => realOrder(b) && PLACES.find((x) => x.id === b.placeId)?.cats.some(inCats))) {
     return { ok: false, why: 'Промокод діє лише на перше замовлення' };
   }
-  const amount = pr.kind === 'pct' ? Math.min(pr.max || Infinity, Math.round((base * pr.value) / 100)) : Math.min(pr.value, base);
+  const amount = pr.kind === 'pct' ? Math.min(pr.max || Infinity, Math.round((base * pr.value) / 100)) : Math.min(pr.value, Math.floor(base * 0.9)); // фіксована знижка — як і відсоткова, не більше 90% замовлення
   return { ok: true, amount };
 }
 
@@ -3406,27 +3440,44 @@ async function checkBizLogin(login, pass) {
 // ---------- підтвердження записів і відповідальність мийки ----------
 
 // Звідки рахується час на відповідь: від заявки, а якщо мийка зачинена — від відкриття.
+// Момент дня за годинником мийки (setHours — правильно і в день переходу на зимовий/літній час).
+const atMin = (iso, min) => { const d = parseDate(iso); d.setHours(Math.floor(min / 60), min % 60, 0, 0); return d.getTime(); };
+// Робочі проміжки дня в хвилинах: години роботи без обідньої перерви.
+function workSpans(p, iso) {
+  const h = hoursFor(p, iso);
+  if (!h) return [];
+  const b = scheduleOf(p).brk;
+  if (!b || b[1] <= h[0] || b[0] >= h[1]) return [h];
+  return [[h[0], b[0]], [b[1], h[1]]].filter(([x, y]) => y > x);
+}
+// Коли мийка почала «бачити» заявку: перша робоча хвилина від створення (уночі чи на обідній перерві — з відкриття).
 function confirmStart(b) {
+  return workDeadline(b, 0);
+}
+// Мить, коли мине `minutes` робочих хвилин мийки від створення заявки (перерва й неробочий час не рахуються).
+function workDeadline(b, minutes) {
   const p = PLACES.find((x) => x.id === b.placeId);
-  let t = b.createdAt ?? Date.now();
-  for (let i = 0; p && i < 8; i++) {
-    const d = new Date(t);
-    const iso = isoDate(d);
-    const h = hoursFor(p, iso);
-    const m = d.getHours() * 60 + d.getMinutes();
-    if (h && m < h[1]) {
-      if (m < h[0]) t = parseDate(iso).getTime() + h[0] * 60000;
-      break;
+  const t0 = b.createdAt ?? Date.now();
+  if (!p) return t0 + minutes * 60000;
+  let left = minutes;
+  let iso = isoDate(new Date(t0));
+  for (let i = 0; i < 14; i++) {
+    for (const [from, to] of workSpans(p, iso)) {
+      const start = Math.max(atMin(iso, from), t0);
+      const end = atMin(iso, to);
+      if (start >= end) continue;
+      if ((end - start) / 60000 >= left) return start + left * 60000;
+      left -= (end - start) / 60000;
     }
     const next = parseDate(iso);
     next.setDate(next.getDate() + 1);
-    t = next.getTime();
+    iso = isoDate(next);
   }
-  return t;
+  return t0 + minutes * 60000;
 }
 
 // До коли мийка має відповісти: confirmMinutes робочого часу, але не пізніше за початок візиту.
-const confirmBy = (b) => Math.min(confirmStart(b) + PAYMENT.confirmMinutes * 60000, bookingStart(b).getTime());
+const confirmBy = (b) => Math.min(workDeadline(b, PAYMENT.confirmMinutes), bookingStart(b).getTime());
 // До коли клієнт може погодитися на запропонований час.
 const offerBy = (b) => Math.min((b.offer?.at ?? Date.now()) + PAYMENT.offerMinutes * 60000, bookingStart(b).getTime());
 
@@ -5149,7 +5200,12 @@ const mSettings = () => ({ ordersPerYear: 6, ...store.get('admin.settings', {}) 
 
 function campaignStats(c) {
   const rate = store.get('admin.settings', {}).commission ?? PAYMENT.commission;
-  const real = bookings.filter((b) => isCarcar(b) && !b.source && (b.campaign === c.id || (c.code && b.promo?.code === c.code && !b.promo.returned))
+  // Запис рахується лише в одній кампанії: тій, за посиланням якої прийшов клієнт (b.campaign); без посилання —
+  // в останній кампанії з цим промокодом (кілька кампаній з однаковим кодом не множать замовлення й знижки).
+  const sameCode = (store.get('admin.campaigns', []) ?? []).filter((x) => x.code && x.code === c.code);
+  const owner = sameCode.sort((x, y) => (y.createdAt ?? 0) - (x.createdAt ?? 0))[0];
+  const real = bookings.filter((b) => isCarcar(b) && !b.source
+    && (b.campaign ? b.campaign === c.id : !!c.code && b.promo?.code === c.code && !b.promo.returned && owner?.id === c.id)
     && realOrder(b))
     .map((b) => ({ amount: price(b), promo: b.promo && !b.promo.returned ? b.promo.amount : 0, newClient: !!b.firstOrder, done: b.state === 'completed' }));
   const rows = [...real, ...store.get('admin.campaignDemo', []).filter((x) => x.c === c.id)];
@@ -5375,6 +5431,9 @@ function viewStats() {
   const ev = evIn(events(), range);
   const prevEv = evIn(events(), rangeOf(n, 1));
   const app = bookings.filter((b) => isCarcar(b) && inRange(b, range));
+  // Скасування рахуємо за днем, коли скасували (як і оплати — за днем оплати), а не за датою візиту.
+  const closedIn = (b) => { const d = b.closedAt ? isoDate(new Date(b.closedAt)) : b.date; return d >= range[0] && d <= range[1]; };
+  const cancelled = bookings.filter((b) => isCarcar(b) && b.state === 'cancelled' && closedIn(b));
   const paidN = count(ev, 'paid');
   const sessions = count(ev, 'session');
   const funnel = [['Переглянули точку', count(ev, 'view_place')], ['Відкрили запис', count(ev, 'open_book')], ['Перейшли до оплати', count(ev, 'open_pay')], ['Оплатили', paidN]];
@@ -5469,7 +5528,7 @@ function viewStats() {
       <div class="kpi"><span class="label">Оплачених записів</span><span class="value">${paidN}</span>${delta(paidN, count(prevEv, 'paid'))}</div>
       <div class="kpi"><span class="label">Конверсія сеансу в запис</span><span class="value">${share(paidN, sessions)}</span></div>
       <div class="kpi"><span class="label">Повертаються</span><span class="value">${share(repeat.length, clients.length)}</span><span class="kpi-note">${repeat.length} з ${clients.length} клієнтів · ${gaps.length ? `між візитами ≈ ${Math.round(gaps.reduce((a, x) => a + x, 0) / gaps.length)} ${daysWord(Math.round(gaps.reduce((a, x) => a + x, 0) / gaps.length))}` : ''}</span></div>
-      <div class="kpi"><span class="label">Скасовано клієнтами</span><span class="value">${app.filter((b) => b.state === 'cancelled' && b.cancelBy === 'client' && !b.declined).length}</span><span class="kpi-note">вчасно ${app.filter((b) => b.state === 'cancelled' && b.cancelBy === 'client' && !b.declined && !b.placeAmount).length} · пізно ${app.filter((b) => b.state === 'cancelled' && b.placeAmount).length} · відмов мийок ${app.filter((b) => b.declined === 'place' || b.declined === 'timeout').length}</span></div>
+      <div class="kpi"><span class="label">Скасовано клієнтами</span><span class="value">${cancelled.filter((b) => b.cancelBy === 'client' && !b.declined).length}</span><span class="kpi-note">вчасно ${cancelled.filter((b) => b.cancelBy === 'client' && !b.declined && !b.placeAmount).length} · пізно ${cancelled.filter((b) => b.placeAmount).length} · відмов мийок ${cancelled.filter((b) => b.declined === 'place' || b.declined === 'timeout').length}</span></div>
       <div class="kpi"><span class="label">Неявки</span><span class="value">${share(app.filter((b) => b.state === 'noshow').length, app.length)}</span></div>
     </section>
     <div class="grid-2" style="margin-top:16px">
@@ -5576,11 +5635,19 @@ function viewApplications() {
   return `<h1>Заявки бізнесу</h1><p class="page-sub">Перевірте дані мийки. Після схвалення мийка отримає логін і пароль до кабінету, перевірить профіль і сама опублікується в каталозі.</p>
     ${list.length ? `<div class="stack" style="gap:12px">${list.map((a) => {
       const [label, cls] = APP_STATUS[a.status];
+      // Перед схваленням: чи немає вже такої мийки (назва, код, телефон) і чи правильний код юрособи.
+      const norm = (v) => String(v ?? '').toLowerCase().replace(/[^a-zа-яіїєґ0-9]/gi, '');
+      const same = a.status === 'new' ? [...list.filter((x) => x !== a && x.status !== 'rejected'), ...PLACES.map((p) => ({ name: p.name, address: p.address, place: true }))]
+        .filter((x) => (norm(x.name) && norm(x.name) === norm(a.name) && norm(x.address) === norm(a.address)) || (x.code && x.code === a.code) || (x.phone && phoneKey(x.phone) === phoneKey(a.phone))) : [];
+      const badCode = a.status === 'new' && !codeValid(a.type === 'tov' ? 'tov' : 'fop', a.code ?? '');
+      const warn = [same.length ? `Схожа мийка вже є: ${same.slice(0, 3).map((x) => `«${esc(x.name)}»${x.place ? ' (у каталозі)' : ' (інша заявка)'}`).join(', ')} — перевірте, чи це не дубль` : '',
+        badCode ? `${a.type === 'tov' ? 'ЄДРПОУ' : 'ІПН'} ${esc(a.code)} має неправильну контрольну суму — перевірте документи` : ''].filter(Boolean);
       return `<article class="panel stack" style="gap:10px" aria-label="Заявка ${esc(a.name)}">
         <div class="head"><div><b>${esc(a.name)}</b><small class="muted" style="display:block">${esc(a.city ?? '')} · ${esc(a.address)} · ${a.boxes} ${plural(Number(a.boxes), 'бокс', 'бокси', 'боксів')}</small></div>
           <span class="pill ${cls}">${label}</span></div>
         <dl class="kv"><dt>Контакт</dt><dd>${esc(a.contact)} · <a href="tel:${esc(a.phone.replace(/[^+\d]/g, ''))}">${esc(a.phone)}</a>${a.email ? ` · ${esc(a.email)}` : ''}</dd>
           <dt>Бізнес</dt><dd>${a.type === 'tov' ? 'ТОВ, ЄДРПОУ' : 'ФОП, ІПН'} ${esc(a.code)}</dd><dt>Подано</dt><dd>${fmtTime(a.at)}</dd></dl>
+        ${warn.length ? `<div class="notice warn" role="note">${warn.map((w) => `<p style="margin:0">${w}</p>`).join('')}</div>` : ''}
         ${a.status === 'new' ? `<div class="row"><button class="btn primary" data-action="app-approve" data-id="${a.id}">Схвалити й видати доступ</button>
           <button class="btn" data-action="app-reject" data-id="${a.id}">Відхилити</button></div>` : ''}
         ${a.status === 'approved' ? `<div class="notice ok"><b>Доступ до кабінету видано</b>Логін <b class="code">${esc(a.issued.login)}</b>, пароль <b class="code">${esc(a.issued.password)}</b>.
@@ -5677,7 +5744,10 @@ document.addEventListener('click', (e) => {
   if (action === 'place-use') { placeUse(Number(el.dataset.i)); return; }
   if (action === 'place-another') { ui.newPlace = null; ui.placeCreated = null; ui.placeFound = null; ui.placeQ = ''; rerender(); return; }
   if (action === 'demo-all-off') {
-    if (!confirm('Вимкнути все демо? Клієнти бачитимуть лише справжні мийки.')) return;
+    // Активні записи клієнтів у демо-мийках лишаться без кабінету, який їх обслуговує, — попереджаємо.
+    const left = bookings.filter((b) => isCarcar(b) && !b.source && ['pending', 'paid', 'offer', 'dispute'].includes(b.state)
+      && PLACES.some((p) => p.id === b.placeId && !p.custom)).length;
+    if (!confirm(`Вимкнути все демо? Клієнти бачитимуть лише справжні мийки.${left ? `\n\nУвага: ${left} ${plural(left, 'активний запис', 'активні записи', 'активних записів')} клієнтів у демо-мийках — їх ніхто не обслуговуватиме. Скасуйте їх із поверненням грошей (Точки → мийка → записи) або попередьте клієнтів.` : ''}`)) return;
     saveDemo({ demoPlaces: false, demoWash: false, ...(srv?.telegramBot ? { demoLogin: false } : {}) });
     return;
   }
@@ -5765,7 +5835,10 @@ document.addEventListener('click', (e) => {
   }
   else if (action === 'review-filter') { ui.reviews = el.dataset.f; rerender(); }
   else if (action === 'review-restore') {
-    delete reviews.find((r) => r.id === id).hidden;
+    const r = reviews.find((x) => x.id === id);
+    delete r.hidden;
+    // Повернули відгук — скаргу мийки вважаємо відхиленою (інакше висіло «прийнято» й мийка не могла поскаржитись знову).
+    if (r.report) r.report = { ...r.report, status: 'rejected', at: Date.now() };
     save();
     rerender();
     toast('Відгук знову видно клієнтам');

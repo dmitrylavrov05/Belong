@@ -355,3 +355,10 @@ body.pro.locked .pro-tabs { display: none; }
 body.sheet-open .toast { top: calc(env(safe-area-inset-top) + 12px); bottom: auto; transform: translate(-50%, -20px); }
 body.sheet-open .toast.show { transform: translate(-50%, 0); }
 .day-step { display: flex; align-items: center; gap: 4px; }
+
+/* Вузькі екрани (від 320 px): довгі імена клієнтів і чипи не розпирають сторінку вбік */
+.day-list > li, .bk-row { min-width: 0; }
+.bk-main b { overflow-wrap: anywhere; }
+.bk-side .pill { white-space: normal; text-align: right; }
+#view .chips { flex-wrap: wrap; }
+#view .chips .chip { white-space: normal; text-align: left; }

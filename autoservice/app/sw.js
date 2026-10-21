@@ -1,6 +1,6 @@
 // Кеш для роботи без мережі: застосунок відкривається, навіть якщо зник інтернет
 // (зокрема під час відключень світла).
-const CACHE = 'carcar-v88';
+const CACHE = 'carcar-v89';
 const FILES = [
   './', 'index.html', 'styles.css', 'app.js', 'core.js', 'data.js', 'icon.svg', 'manifest.webmanifest',
   'business.html', 'admin.css', 'charts.js', 'partners.js', 'ops.js', 'map.js', 'vehicles.js', 'admin.html', 'admin.js',
@@ -22,7 +22,9 @@ self.addEventListener('activate', (e) => {
 
 // Спочатку мережа (щоб свіжі ціни приходили одразу), у разі помилки — кеш.
 self.addEventListener('fetch', (e) => {
-  if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
+  const url = new URL(e.request.url);
+  // Відповіді сервера (/api/…) — лише з мережі й не в кеш: це особисті дані, вони не мають лишатися на пристрої.
+  if (e.request.method !== 'GET' || url.origin !== location.origin || url.pathname.includes('/api/')) return;
   e.respondWith(
     fetch(e.request)
       .then((res) => {

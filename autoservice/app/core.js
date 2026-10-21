@@ -153,6 +153,13 @@ async function syncSend(key) {
     if (!r.ok && r.status !== 403) throw new Error(String(r.status));
     // 403 — змінювати це не можна: показуємо те, що є на сервері.
     const merged = JSON.stringify(r.data.value ?? null);
+    // Сервер не прийняв наш новий запис (напр. час щойно зайняли) — кажемо застосунку, а не прибираємо мовчки.
+    if (key === 'bookings' && Array.isArray(body.value) && Array.isArray(r.data.value)) {
+      const kept = new Set(r.data.value.map((x) => x?.id));
+      const had = new Set((base !== undefined ? JSON.parse(base) : []).map((x) => x?.id));
+      const lost = body.value.filter((x) => x?.id && !kept.has(x.id) && !had.has(x.id));
+      if (lost.length) window.dispatchEvent(new CustomEvent('carcar:rejected', { detail: lost }));
+    }
     sync.base.set(key, merged);
     // Поки відправляли, хтось інший змінив той самий ключ — показуємо злите значення (якщо ми не змінили його знову).
     if (!sync.timers.has(key) && merged !== localStorage.getItem(`carcar.${key}`)) {
@@ -319,8 +326,14 @@ export const plural = (n, one, few, many) => {
   return many;
 };
 export const duration = (min) => (min < 60 ? `${min} хв` : `${Math.floor(min / 60)} год${min % 60 ? ` ${min % 60} хв` : ''}`);
-export const dayLabel = (s, opts = { weekday: 'short', day: 'numeric', month: 'long' }) =>
-  parseDate(s).toLocaleDateString('uk-UA', opts);
+// Форматери дат — створюємо один раз на набір опцій (toLocale… на кожен рядок довгих списків дуже повільний).
+const FMT = new Map();
+export const fmtWith = (opts) => {
+  const k = JSON.stringify(opts);
+  if (!FMT.has(k)) FMT.set(k, new Intl.DateTimeFormat('uk-UA', opts));
+  return FMT.get(k);
+};
+export const dayLabel = (s, opts = { weekday: 'short', day: 'numeric', month: 'long' }) => fmtWith(opts).format(parseDate(s));
 export const rating = (r) => r.toLocaleString('uk-UA', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 export const tel = (p) => `tel:${p.phone.replace(/[^+\d]/g, '')}`;
 export function hash(str) {
@@ -655,7 +668,8 @@ export function resolveDispute(b, placePart, note = '', to = null) {
 export function resolveLate(b, confirmed, note = '') {
   if (b?.state !== 'dispute' || !b.lateClaim) return false;
   b.lateClaim = { ...b.lateClaim, decided: confirmed ? 'confirmed' : 'rejected', at: Date.now() };
-  if (!confirmed) { resolveDispute(b, 0, note); return true; }
+  // Не підтвердили запізнення — усе клієнту (і за записом на 0 ₴, оплаченим абонементом, — повертаємо візит).
+  if (!confirmed) { resolveDispute(b, 0, note, 'client'); return true; }
   Object.assign(b, { state: 'noshow', lateForfeit: true, placeAmount: price(b), refund: 0, closedAt: Date.now(), unfreezeAt: Date.now(),
     resolution: { placePart: price(b), note, at: Date.now() } });
   return true;
@@ -813,7 +827,7 @@ export function promoCheck(pr, { place, items, mine, all }) {
   if (pr.firstOnly && mine.some((b) => realOrder(b) && PLACES.find((x) => x.id === b.placeId)?.cats.some(inCats))) {
     return { ok: false, why: 'Промокод діє лише на перше замовлення' };
   }
-  const amount = pr.kind === 'pct' ? Math.min(pr.max || Infinity, Math.round((base * pr.value) / 100)) : Math.min(pr.value, base);
+  const amount = pr.kind === 'pct' ? Math.min(pr.max || Infinity, Math.round((base * pr.value) / 100)) : Math.min(pr.value, Math.floor(base * 0.9)); // фіксована знижка — як і відсоткова, не більше 90% замовлення
   return { ok: true, amount };
 }
 
@@ -1253,27 +1267,44 @@ export async function checkBizLogin(login, pass) {
 // ---------- підтвердження записів і відповідальність мийки ----------
 
 // Звідки рахується час на відповідь: від заявки, а якщо мийка зачинена — від відкриття.
+// Момент дня за годинником мийки (setHours — правильно і в день переходу на зимовий/літній час).
+const atMin = (iso, min) => { const d = parseDate(iso); d.setHours(Math.floor(min / 60), min % 60, 0, 0); return d.getTime(); };
+// Робочі проміжки дня в хвилинах: години роботи без обідньої перерви.
+function workSpans(p, iso) {
+  const h = hoursFor(p, iso);
+  if (!h) return [];
+  const b = scheduleOf(p).brk;
+  if (!b || b[1] <= h[0] || b[0] >= h[1]) return [h];
+  return [[h[0], b[0]], [b[1], h[1]]].filter(([x, y]) => y > x);
+}
+// Коли мийка почала «бачити» заявку: перша робоча хвилина від створення (уночі чи на обідній перерві — з відкриття).
 export function confirmStart(b) {
+  return workDeadline(b, 0);
+}
+// Мить, коли мине `minutes` робочих хвилин мийки від створення заявки (перерва й неробочий час не рахуються).
+function workDeadline(b, minutes) {
   const p = PLACES.find((x) => x.id === b.placeId);
-  let t = b.createdAt ?? Date.now();
-  for (let i = 0; p && i < 8; i++) {
-    const d = new Date(t);
-    const iso = isoDate(d);
-    const h = hoursFor(p, iso);
-    const m = d.getHours() * 60 + d.getMinutes();
-    if (h && m < h[1]) {
-      if (m < h[0]) t = parseDate(iso).getTime() + h[0] * 60000;
-      break;
+  const t0 = b.createdAt ?? Date.now();
+  if (!p) return t0 + minutes * 60000;
+  let left = minutes;
+  let iso = isoDate(new Date(t0));
+  for (let i = 0; i < 14; i++) {
+    for (const [from, to] of workSpans(p, iso)) {
+      const start = Math.max(atMin(iso, from), t0);
+      const end = atMin(iso, to);
+      if (start >= end) continue;
+      if ((end - start) / 60000 >= left) return start + left * 60000;
+      left -= (end - start) / 60000;
     }
     const next = parseDate(iso);
     next.setDate(next.getDate() + 1);
-    t = next.getTime();
+    iso = isoDate(next);
   }
-  return t;
+  return t0 + minutes * 60000;
 }
 
 // До коли мийка має відповісти: confirmMinutes робочого часу, але не пізніше за початок візиту.
-export const confirmBy = (b) => Math.min(confirmStart(b) + PAYMENT.confirmMinutes * 60000, bookingStart(b).getTime());
+export const confirmBy = (b) => Math.min(workDeadline(b, PAYMENT.confirmMinutes), bookingStart(b).getTime());
 // До коли клієнт може погодитися на запропонований час.
 export const offerBy = (b) => Math.min((b.offer?.at ?? Date.now()) + PAYMENT.offerMinutes * 60000, bookingStart(b).getTime());
 

@@ -571,3 +571,10 @@ body.locked #view { padding: 0; }
 @media (pointer: coarse) {
   input, select, textarea { font-size: 16px !important; }
 }
+
+/* Вузькі екрани (390 px): перемикачі переносяться, таблиці й картки не ширші за екран */
+.seg { flex-wrap: wrap; max-width: 100%; }
+.grid-2 > *, .panel { min-width: 0; }
+.heat { max-width: 100%; }
+.kv dd { overflow-wrap: anywhere; min-width: 0; }
+@media (max-width: 480px) { .kv { grid-template-columns: minmax(0, 1fr); gap: 2px 0; } .kv dd { margin-bottom: 6px; } }
