@@ -429,6 +429,8 @@ export function phoneKey(phone) {
   if (d.length === 9) d = `380${d}`;
   return `tel:${d}`;
 }
+// Схоже на справжній український номер: +380 і 9 цифр (або 0XX…).
+export const validPhone = (v) => /^tel:380\d{9}$/.test(phoneKey(v) ?? '');
 export const bookingStart = (b) => { const d = parseDate(b.date); d.setMinutes(toMin(b.time)); return d; };
 export const fmtTime = (ms) => new Date(ms).toLocaleString('uk-UA', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
 export const fmtDate = (s) => parseDate(s).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -825,9 +827,12 @@ export function balanceFor(placeId, bookings, payouts) {
   const leadFees = bookings.filter((b) => b.placeId === placeId).reduce((a, b) => a + leadFee(b), 0);
   // Комісія під час виведення — з виручки через CARCAR, ще не виведеної (а не з суми, зменшеної на комісію за «своїх» клієнтів CARCAR).
   const feeBase = Math.max(0, earned + passEarned - payouts.filter((x) => x.placeId === placeId).reduce((a, x) => a + (x.base ?? x.gross), 0));
-  const available = earned + passEarned - withdrawn - leadFees;
-  const fee = Math.min(Math.max(0, available), Math.round(feeBase * commissionFor(placeId)));
-  return { available, frozen: frozen + passFrozen, next, withdrawn, leadFees, feeBase, fee };
+  // Комісія за клієнтів CARCAR, записаних напряму, може бути більшою за гроші в CARCAR — тоді вивести 0, а решта — борг,
+  // який спишеться з наступних надходжень (мінуса «можна вивести» не буває).
+  const rest = earned + passEarned - withdrawn - leadFees;
+  const available = Math.max(0, rest);
+  const fee = Math.min(available, Math.round(feeBase * commissionFor(placeId)));
+  return { available, debt: Math.max(0, -rest), frozen: frozen + passFrozen, next, withdrawn, leadFees, feeBase, fee };
 }
 
 // Номер запису: шість цифр по порядку, однаковий у клієнта, мийки й підтримки — його називають,

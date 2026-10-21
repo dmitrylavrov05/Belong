@@ -453,15 +453,21 @@ export function loyaltyState(placeId, myBookings) {
 
 // ---------- каса й зміни ----------
 // День мийки: виконані записи — готівка й картка на місці (свої клієнти), через CARCAR, продані абонементи.
+// Гроші мийки із запису: виконаний — оплачене; запис CARCAR без візиту (неявка, пізнє скасування) чи після
+// рішення спору — частка, яку CARCAR перерахує мийці. Одне правило для каси, «Мийки», аналітики й графіка.
+export function moneyOf(b) {
+  if (b.state === 'completed') return isCarcar(b) ? price(b) : Number(b.paid) || 0;
+  if (isCarcar(b) && ['cancelled', 'noshow', 'refunded'].includes(b.state)) return Number(b.placeAmount) || 0;
+  return 0;
+}
+// Каса дня — за днем візиту (позначити «Виконано» можна й пізніше — гроші лишаються в дні, коли мили).
 export function cashDay(bookings, placeId, date) {
-  // Гроші — того дня, коли запис виконали (а не на який записувались).
-  const doneDay = (b) => (b.completedAt ? isoDate(new Date(b.completedAt)) : b.date);
-  const list = bookings.filter((b) => b.placeId === placeId && doneDay(b) === date && b.state === 'completed');
-  const out = { date, cars: list.length, cash: 0, card: 0, carcar: 0, passes: 0, passCash: 0, passCard: 0, list };
+  const list = bookings.filter((b) => b.placeId === placeId && b.date === date && (b.state === 'completed' || moneyOf(b) > 0));
+  const out = { date, cars: list.filter((b) => b.state === 'completed').length, cash: 0, card: 0, carcar: 0, passes: 0, passCash: 0, passCard: 0, list };
   for (const b of list) {
-    if (isCarcar(b)) out.carcar += price(b);
-    else if (b.payment === 'cash') out.cash += Number(b.paid) || 0;
-    else out.card += Number(b.paid) || 0;
+    if (isCarcar(b)) out.carcar += moneyOf(b);
+    else if (b.payment === 'cash') out.cash += moneyOf(b);
+    else out.card += moneyOf(b);
   }
   for (const x of passesOf(placeId).sold) {
     if (x.buyer !== 'place' || isoDate(new Date(x.soldAt)) !== date) continue;
@@ -486,8 +492,8 @@ export function closeShift(placeId, day, counted, note) {
 // ---------- зарплата мийників ----------
 // Відсоток від вартості послуг і/або фіксована сума за авто — з виконаних записів, де призначено цього мийника.
 export function salaryFor(w, bookings, placeId, from, to) {
-  const day = (b) => (b.completedAt ? isoDate(new Date(b.completedAt)) : b.date);
-  const list = bookings.filter((b) => b.placeId === placeId && b.masterId === w.id && b.state === 'completed' && day(b) >= from && day(b) <= to);
+  // За днем візиту — як і каса.
+  const list = bookings.filter((b) => b.placeId === placeId && b.masterId === w.id && b.state === 'completed' && b.date >= from && b.date <= to);
   // Робота за абонементом чи безкоштовна мийка за карткою лояльності — теж робота мийника.
   const revenue = list.reduce((a, b) => a + (isCarcar(b) ? price(b) : Number(b.paid) || 0) + (b.covered || 0) + (b.loyalty?.amount || 0), 0);
   const pay = Math.round((revenue * (Number(w.pct) || 0)) / 100 + list.length * (Number(w.perCar) || 0));
@@ -522,8 +528,13 @@ export function useStock(b) {
 // ---------- нотатки й мітки про клієнтів ----------
 // Бачить лише мийка (на сервері — тільки її акаунт). Клієнт CARCAR — за хешем номера, свій — за номером.
 export const NOTE_TAGS = ['VIP', 'Постійний', 'Любить віск', 'Без поспіху', 'Проблемний'];
+// Хто це: за номером CARCAR чи телефоном; без телефону — за справжнім імʼям, а «Клієнт з вулиці» без імені й телефону —
+// за авто (інакше всі такі клієнти злилися б в одного, з однією нотаткою на всіх), або окремо за записом.
+const NO_NAME = new Set(['клієнт', 'клієнт з вулиці', 'клієнт carcar']);
 export const clientNoteKey = (b) => (b.clientId && b.clientId !== 'device' ? b.clientId
-  : b.clientPhone ? phoneKey(b.clientPhone) ?? b.clientPhone : b.clientName ? `name:${b.clientName.toLowerCase()}` : null);
+  : b.clientPhone ? phoneKey(b.clientPhone) ?? b.clientPhone
+    : b.clientName && !NO_NAME.has(b.clientName.trim().toLowerCase()) ? `name:${b.clientName.toLowerCase()}`
+      : b.car ? `car:${String(b.car).toLowerCase().replace(/\s+/g, ' ').trim()}` : b.id ? `b:${b.id}` : null);
 export const clientNotesOf = (placeId) => store.peek('biz.clientNotes', {})[placeId] ?? {};
 export function saveClientNote(placeId, key, note) {
   const all = store.get('biz.clientNotes', {});

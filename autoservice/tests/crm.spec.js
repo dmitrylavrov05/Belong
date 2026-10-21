@@ -192,3 +192,46 @@ test('нотатки й мітки про клієнта: видно в спис
   await page.goto(`${PRO}#/booking/c1`);
   await expect(page.getByRole('dialog')).toContainText('VIPЗавжди просить віск');
 });
+
+test('гроші сходяться: каса, «Мийка» й аналітика однакові; клієнти з вулиці окремо; номер і горизонт записів', async ({ page }) => {
+  await seed(page, {
+    bookings: [
+      // Учорашній візит позначили виконаним лише сьогодні — гроші лишаються у вчорашньому дні.
+      own({ id: 'y1', date: '2026-10-03', time: '12:00', clientName: 'Олег', clientPhone: '+380 67 000 11 22', total: 300, paid: 300, state: 'completed', payment: 'cash', completedAt: at(9) }),
+      viaCarcar({ id: 't1', time: '08:00', clientName: 'Ірина', total: 550, paid: 550, state: 'completed' }),
+      // Неявка клієнта CARCAR: мийка отримує частку — і в касі, і в «Мийці».
+      viaCarcar({ id: 't2', time: '09:00', clientName: 'Марта', total: 300, paid: 300, state: 'noshow', placeAmount: 300 }),
+      own({ id: 'w1', time: '08:20', clientName: 'Клієнт з вулиці', car: 'Golf AA1111', total: 200, paid: 200, state: 'completed', payment: 'cash', channel: 'walkin' }),
+      own({ id: 'w2', time: '08:40', clientName: 'Клієнт з вулиці', car: 'Lanos BB2222', total: 200, paid: 200, state: 'completed', payment: 'cash', channel: 'walkin' }),
+      viaCarcar({ id: 'f1', date: '2026-10-24', time: '10:00', clientName: 'Андрій', total: 250, paid: 250, state: 'paid' }),
+    ],
+    'biz.places': { blysk: { schedule: { horizon: 30 } } },
+  });
+  await page.goto(`${PRO}#/cash`);
+  await expect(page.locator('.tile.hero b')).toHaveText('1 250 ₴'.replace(' ', ' '));
+  await page.goto(`${PRO}#/cash/2026-10-03`);
+  await expect(page.locator('.tile.hero b')).toHaveText('300 ₴');
+  await page.goto(`${PRO}#/wash`);
+  await expect(page.locator('main')).toContainText('1 250 ₴');
+  // Двоє «з вулиці» з різними авто — два клієнти, а не один.
+  await page.goto(`${PRO}#/clients`);
+  await expect(page.locator('.client-list li', { hasText: 'Клієнт з вулиці' })).toHaveCount(2);
+  // Майбутній запис — не «востаннє».
+  await expect(page.locator('.client-list li', { hasText: 'Андрій' })).toContainText('запис на 24 жовт.');
+  await expect(page.locator('.client-list li', { hasText: 'Андрій' })).not.toContainText('востаннє');
+  // Смужка днів — на весь горизонт запису (30 днів), минулі дні — стрілкою.
+  await page.goto(`${PRO}#/bookings`);
+  await expect(page.locator('.day-strip a[href="#/bookings/2026-10-24"]')).toHaveCount(1);
+  await page.getByRole('link', { name: 'Попередній день' }).click();
+  await expect(page.locator('.day-head h2')).toContainText('Вчора');
+  await expect(page.locator('.day-head')).toContainText('1 запис');
+  // Номер «12» — не телефон.
+  await page.goto(`${PRO}#/bookings`);
+  await page.getByRole('button', { name: 'Новий запис' }).click();
+  await page.getByLabel('Телефон', { exact: true }).fill('12');
+  await page.getByRole('dialog').getByRole('button', { name: /Експрес-мийка кузова/ }).click();
+  await page.getByRole('group', { name: 'День' }).getByRole('button', { name: 'Завтра' }).click();
+  await page.getByRole('group', { name: 'Вільний час' }).getByRole('button', { name: '10:00' }).click();
+  await page.getByRole('button', { name: 'Записати на 10:00', exact: true }).click();
+  await expect(page.locator('.toast')).toContainText('Перевірте номер');
+});

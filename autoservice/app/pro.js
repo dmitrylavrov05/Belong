@@ -10,12 +10,12 @@ import {
   confirmBy, offerBy, responseStats, pauseOf, ratePct, msText, accountPlaces, addAccountPlace,
   ticketsAll, openTicket, ticketReply, setTicket, TICKET_TOPICS, TICKET_STATUS, PLACE_TOPICS, ticketPhotos,
   payoutReady, maskIban, hidePhones, themePicker, setTheme, samePhone, hasServer, api, authToken, setAuthToken, serverConfig, demoWashOn, notifySync, pushForget, telegramNotify, fitChatScreen, keepChatOnKeyboard, commissionFor, savePartner, staffOf, checkBizLogin, numberBookings, bookingNo, POWER, powerOf, setPower,
-  keepUi, calmRedraw,
+  keepUi, calmRedraw, validPhone,
 } from './core.js';
 import {
   openStarts, chatPost, chatTimeline, readMessages, msgPreview, touchPresence, BIZ_QUICK, sendMessages, checkWaitlist,
   acceptBooking, declineBooking, expirePending, autoConfirmOf, setAutoConfirm, proposeTime, weeklyDealsOf, daysText, markNoShow, noShowFrom,
-  passesOf, savePasses, sellPass, passActive, passLeft, loyaltyOf, cashDay, shiftsOf, shiftOn, closeShift, salaryFor,
+  passesOf, savePasses, sellPass, passActive, passLeft, loyaltyOf, cashDay, moneyOf, shiftsOf, shiftOn, closeShift, salaryFor,
   stockOf, saveStock, stockLow, useStock, NOTE_TAGS, clientNoteKey, clientNotesOf, saveClientNote,
 } from './ops.js';
 import { ibanValid, normIban, formatIban, codeValid } from './partners.js';
@@ -112,6 +112,8 @@ function stateOf(b) {
 }
 // Сума запису для мийки: через CARCAR — повна ціна, з журналу — оплата на місці.
 const sumOf = (b) => (isCarcar(b) ? price(b) : b.paid);
+// Візит за абонементом, проданим мийкою: гроші за нього мийка отримала, коли продала абонемент.
+const passLine = (b) => (b.passUse || b.covered ? `<dt>Абонемент</dt><dd>Візит за абонементом${b.covered ? ` на ${uah(b.covered)}` : ''} — гроші ви отримали під час продажу${b.paid > 0 ? `, доплата ${uah(b.paid)} через CARCAR` : ''}</dd>` : '');
 // ---------- мийники ----------
 
 // Мийники точки (у сховищі персоналу з роллю «майстер»). Звільнені лишаються в історії записів.
@@ -139,7 +141,8 @@ const unmarked = () => own().filter((b) => (b.state === 'paid' || b.state === 'b
 // Записи всіх мийок акаунта: нові заявки приходять і тоді, коли відкрита інша мийка.
 const allMine = () => { const ids = accountPlaces(session()); return bookings.filter((b) => ids.includes(b.placeId)); };
 const pendingList = () => allMine().filter((b) => b.state === 'pending').sort((a, b) => confirmBy(a) - confirmBy(b));
-const unreadCount = () => own().filter((b) => b.chatUnreadBiz && b.state !== 'pending').length + pendingList().length + ownRequests().filter((r) => r.unreadBiz).length
+// Лічильник на вкладці — по всіх мийках акаунта (повідомлення про іншу мийку теж не мають губитися).
+const unreadCount = () => allMine().filter((b) => b.chatUnreadBiz && b.state !== 'pending').length + pendingList().length + requests.filter((r) => r.unreadBiz && accountPlaces(session()).includes(r.placeId)).length
   + callHistory().filter((x) => !callLinked(x) && x.placeId === ui.place && callMissed(x, 'place')).length;
 const washLabel = (b) => (b.placeId !== ui.place ? `<span class="pill">${esc(placeById(b.placeId)?.name ?? '')}</span>` : '');
 // Візит почався: тільки тоді можна «Машина готова»; неявку — через lateMinutes після початку.
@@ -273,7 +276,8 @@ function alertSheet(b) {
         <dt>Клієнт</dt><dd><b>${esc(who(b))}</b> · дзвінок через CARCAR</dd>
         <dt>Авто</dt><dd>${esc(b.car || '—')}</dd>
         <dt>Послуги</dt><dd>${esc(b.services.join(', '))}</dd>
-        <dt>Оплачено</dt><dd><b>${uah(sumOf(b))}</b> через CARCAR</dd>
+        ${b.covered && !(sumOf(b) - b.covered > 0) ? '' : `<dt>Оплачено</dt><dd><b>${uah(b.covered ? sumOf(b) - b.covered : sumOf(b))}</b> через CARCAR</dd>`}
+        ${passLine(b)}
         ${b.mobile ? `<dt>Виїзд</dt><dd>${esc(b.mobile.address)}</dd>` : ''}
         ${b.placeId !== ui.place ? `<dt>Мийка</dt><dd><b>${esc(p.name)}</b></dd>` : ''}
         ${b.mobile ? '' : `<dt>Бокси</dt><dd>${Math.max(0, p.boxes - bookings.filter((x) => x !== b && x.placeId === b.placeId && x.date === b.date && !x.mobile && BLOCKING.includes(x.state) && toMin(b.time) < toMin(x.time) + x.minutes && toMin(b.time) + b.minutes > toMin(x.time)).length)} з ${p.boxes} вільні в цей час</dd>`}
@@ -554,15 +558,18 @@ function bookingRow(b) {
 
 function viewBookings(day) {
   const t = todayIso();
-  if (!/^\d{4}-\d\d-\d\d$/.test(day ?? '') || day < t) day = t;
+  if (!/^\d{4}-\d\d-\d\d$/.test(day ?? '')) day = t;
   const p = place();
-  const days = Array.from({ length: DAYS_AHEAD }, (_, i) => shiftDay(t, i));
-  const live = (d) => own().filter((b) => b.date === d && BLOCKING.includes(b.state)).length;
+  // Смужка днів — від сьогодні на весь горизонт запису мийки (клієнти можуть записатися аж туди); минулі дні — стрілкою.
+  const days = Array.from({ length: Math.max(DAYS_AHEAD, scheduleOf(p).horizon ?? DAYS_AHEAD) }, (_, i) => shiftDay(t, i));
+  // Скільки записів у дні — разом із уже виконаними (вони теж були в цей день).
+  const counts = (b) => BLOCKING.includes(b.state) || b.state === 'completed';
+  const live = (d) => own().filter((b) => b.date === d && counts(b)).length;
   const list = own().filter((b) => b.date === day).sort((a, b) => a.time.localeCompare(b.time));
   const h = hoursFor(p, day);
   // Розбивка по годинах: у кожній годині — записи, що в ній починаються, і скільки боксів вільно.
   const hourly = hourRows(day, list, h);
-  const busy = list.filter((b) => BLOCKING.includes(b.state)).length;
+  const busy = list.filter(counts).length;
   const special = day in scheduleOf(p).special;
   return `<h1>Записи</h1>
     ${pendingBlock()}
@@ -572,7 +579,7 @@ function viewBookings(day) {
       const closed = !hoursFor(p, d);
       return `<a href="#/bookings/${d}" class="${closed ? 'closed' : ''}" ${d === day ? 'aria-current="date"' : ''}><small>${d === t ? 'Сьогодні' : WEEKDAYS[(parseDate(d).getDay() + 6) % 7]}</small><b>${parseDate(d).getDate()}</b><span class="n">${closed ? 'вихідний' : n ? `${n} ${plural(n, 'запис', 'записи', 'записів')}` : 'вільно'}</span></a>`;
     }).join('')}</nav>
-    <div class="day-head"><div><h2>${dayWord(day, true)}</h2>
+    <div class="day-head"><div><h2 class="day-step"><a class="icon-btn" href="#/bookings/${shiftDay(day, -1)}" aria-label="Попередній день">${icon('chevL', 20)}</a>${dayWord(day, true)}<a class="icon-btn" href="#/bookings/${shiftDay(day, 1)}" aria-label="Наступний день">${icon('chevR', 20)}</a></h2>
       <p class="small muted">${h ? `${rangeText(h)}${special ? ' (змінено на цей день)' : ''} · ${p.boxes} ${plural(p.boxes, 'бокс', 'бокси', 'боксів')} · ${busy} ${plural(busy, 'запис', 'записи', 'записів')}` : `Вихідний${special ? ' (закрито на цей день)' : ' за графіком'}`}</p></div>
       <div class="row">${h ? `<button class="btn soft" type="button" data-action="day-hours" data-date="${day}">Години</button><button class="btn soft" type="button" data-action="day-close" data-date="${day}">Закрити день</button>`
         : `<button class="btn navy" type="button" data-action="day-hours" data-date="${day}">Відкрити день</button>`}</div></div>
@@ -722,12 +729,15 @@ function bookingSheet(id) {
       <dt>Авто</dt><dd>${esc((isCarcar(b) ? hidePhones(b.car || '') : b.car) || '—')}</dd>
       ${ACTIVE.includes(b.state) || b.state === 'booked' || b.masterId ? `<dt>Мийник</dt><dd class="washer-dd">${b.masterId && washerName(b.masterId) ? `<b>${esc(washerName(b.masterId))}</b>` : '<span class="muted">не призначено</span>'}
         ${(ACTIVE.includes(b.state) || b.state === 'booked') && b.state !== 'pending' ? `<button class="btn soft" type="button" data-action="washer" data-id="${b.id}">${b.masterId ? 'Змінити' : 'Обрати'}</button>` : ''}</dd>` : ''}
-      <dt>Сума</dt><dd>${uah(sumOf(b))}${isCarcar(b) ? ' · оплачено в CARCAR' : b.payment ? ` · ${b.payment === 'cash' ? 'готівка' : 'картка'}` : ' · оплата на місці'}</dd>
+      <dt>Сума</dt><dd>${isCarcar(b) && ['refunded', 'noshow', 'cancelled'].includes(b.state)
+        ? `${uah(sumOf(b))} · ви отримаєте <b>${uah(moneyOf(b))}</b>${b.state === 'refunded' ? ' за рішенням спору' : b.state === 'noshow' ? ' за неявку' : ' за пізнє скасування'}`
+        : `${uah(sumOf(b))}${isCarcar(b) ? (b.covered ? '' : ' · оплачено в CARCAR') : b.payment ? ` · ${b.payment === 'cash' ? 'готівка' : 'картка'}` : ' · оплата на місці'}`}</dd>
+      ${passLine(b)}
       ${b.note && !isCarcar(b) ? `<dt>Коментар</dt><dd>${esc(b.note)}</dd>` : ''}
       ${b.mobile ? `<dt>Виїзд</dt><dd>${esc(b.mobile.address)} · ${String(b.mobile.km).replace('.', ',')} км · виїзд ${uah(b.mobile.fee)}
         <a href="https://www.openstreetmap.org/?mlat=${b.mobile.lat.toFixed(5)}&amp;mlon=${b.mobile.lng.toFixed(5)}#map=17/${b.mobile.lat.toFixed(5)}/${b.mobile.lng.toFixed(5)}" target="_blank" rel="noopener">Точка на карті</a></dd>` : ''}
       ${b.moves?.length ? `<dt>Перенесено</dt><dd>${b.moves.map((m) => `з ${dayLabel(m.date, { day: 'numeric', month: 'short' })}, ${m.time}`).join('; ')}</dd>` : ''}
-      ${b.promo && !b.promo.returned ? `<dt>Промокод</dt><dd>${esc(b.promo.code)}: −${uah(b.promo.amount)} для клієнта, доплачує CARCAR — ви отримаєте повну суму</dd>` : ''}
+      ${b.promo && !b.promo.returned ? `<dt>Промокод</dt><dd>${esc(b.promo.code)}: −${uah(b.promo.amount)} для клієнта, доплачує CARCAR${b.resolution || ['refunded', 'noshow', 'cancelled'].includes(b.state) ? '' : ' — ви отримаєте повну суму'}</dd>` : ''}
       ${b.installments ? `<dt>Оплата</dt><dd>Частинами · ${b.installments.n} платежі. Ви отримуєте всю суму одразу</dd>` : ''}
       ${b.loyalty ? `<dt>Лояльність</dt><dd>${b.loyalty.every}-та мийка: −${uah(b.loyalty.amount)} для клієнта (ваша знижка)</dd>` : ''}
       ${clientNoteKey(b) ? `<dt>Нотатка</dt><dd class="washer-dd"><span>${noteLine(clientNoteKey(b)) || '<span class="muted">немає</span>'}</span><button class="btn soft" type="button" data-action="note-open" data-key="${esc(clientNoteKey(b))}" data-name="${esc(who(b))}">${clientNotesOf(ui.place)[clientNoteKey(b)] ? 'Змінити' : 'Додати'}</button></dd>` : ''}
@@ -974,7 +984,7 @@ function nbSubmit() {
   const chosen = nbChosen();
   if (!chosen.length || !nb.time) return;
   if (nb.invite) { sendInvite(); return; }
-  if (nb.channel === 'phone' && !phoneKey(nb.phone)) { toast('Вкажіть телефон клієнта'); $('#nb-form [name="phone"]').focus(); return; }
+  if ((nb.channel === 'phone' && !phoneKey(nb.phone)) || (nb.phone.trim() && !validPhone(nb.phone))) { toast(nb.phone.trim() ? 'Перевірте номер: +380 і 9 цифр' : 'Вкажіть телефон клієнта'); $('#nb-form [name="phone"]').focus(); return; }
   // Форму могли тримати відкритою довго: минулий час уже не записуємо.
   if (nb.date < todayIso() || (nb.date === todayIso() && toMin(nb.time) < minuteNow() - 5)) { toast('Цей час уже минув — оберіть інший'); nbRender(); return; }
   if (nb.channel === 'walkin' && nb.date !== todayIso()) { toast('«Приїхав сам» — лише на сьогодні'); return; }
@@ -1000,18 +1010,20 @@ function nbSubmit() {
 
 // ---------- мийка: гроші й показники ----------
 
-function revenue(b) {
-  if (b.state === 'completed') return isCarcar(b) ? price(b) : b.paid;
-  if (isCarcar(b) && ['cancelled', 'noshow', 'refunded'].includes(b.state)) return b.placeAmount ?? 0;
-  return 0;
-}
+// Виручка за дні — сумою кас цих днів (записи за днем візиту, частки CARCAR, абонементи, продані на місці),
+// тож «Мийка», аналітика, графік і каса показують однакові гроші.
+const moneyDays = (from, to) => {
+  let sum = 0;
+  for (let d = from; d <= to; d = shiftDay(d, 1)) sum += cashDay(bookings, ui.place, d).total;
+  return sum;
+};
 
 function periodStats(days) {
   const to = todayIso();
   const from = shiftDay(to, -(days - 1));
   const list = own().filter((b) => b.date >= from && b.date <= to);
   const done = list.filter((b) => b.state === 'completed');
-  const money = list.reduce((a, b) => a + revenue(b), 0);
+  const money = moneyDays(from, to);
   return { money, orders: done.length, avg: done.length ? Math.round(done.reduce((a, b) => a + sumOf(b), 0) / done.length) : 0 };
 }
 
@@ -1051,6 +1063,7 @@ function viewWash() {
       <div class="money-row"><span>Можна вивести</span><b>${uah(bal.available)}</b></div>
       <div class="money-row"><span>Заморожено до підтвердження</span><b>${uah(bal.frozen)}</b></div>
       ${bal.leadFees ? `<div class="money-row"><span>Комісія за клієнтів CARCAR, записаних напряму</span><b>−${uah(bal.leadFees)}</b></div>` : ''}
+      ${bal.debt ? `<p class="notice warn" style="margin:0">Комісія більша за гроші в CARCAR на ${uah(bal.debt)} — її спишемо з наступних оплат клієнтів через CARCAR.</p>` : ''}
       ${payoutReady(p.id)
         ? `<button class="btn primary block" type="button" data-action="payout" ${bal.available > 0 ? '' : 'disabled'}>${bal.available > 0 ? `Вивести ${uah(bal.available - fee)} на ${maskIban(partnerOf(p.id).payout.iban)}` : 'Немає коштів для виведення'}</button>`
         : `<a class="btn block" href="#/payout">${partnerOf(p.id).payout?.iban ? 'Рахунок на перевірці CARCAR' : 'Вказати рахунок для виплат'}</a>`}
@@ -1069,7 +1082,9 @@ function washSwitch() {
       const x = placeById(id);
       const st = partnerOf(id).status;
       const wait = pendingList().filter((b) => b.placeId === id).length;
-      return `<button class="wash-chip" type="button" data-action="wash-pick" data-id="${id}" aria-pressed="${id === ui.place}"><b>${esc(x.name)}${wait ? ` <span class="pill warn">${wait} ${plural(wait, 'новий запис', 'нові записи', 'нових записів')}</span>` : ''}</b><small>${esc(x.city ?? 'Київ')}, ${esc(x.address)}${st === 'approved' ? '' : ` · ${PARTNER_STATUS[st][0].toLowerCase()}`}</small></button>`;
+      // Непрочитані повідомлення клієнтів цієї мийки — видно, навіть коли відкрита інша.
+      const msgs = id === ui.place ? 0 : allMine().filter((b) => b.placeId === id && b.chatUnreadBiz && b.state !== 'pending').length + requests.filter((r) => r.placeId === id && r.unreadBiz).length;
+      return `<button class="wash-chip" type="button" data-action="wash-pick" data-id="${id}" aria-pressed="${id === ui.place}"><b>${esc(x.name)}${wait ? ` <span class="pill warn">${wait} ${plural(wait, 'новий запис', 'нові записи', 'нових записів')}</span>` : ''}${msgs ? ` <span class="pill carcar">${msgs} ${plural(msgs, 'повідомлення', 'повідомлення', 'повідомлень')}</span>` : ''}</b><small>${esc(x.city ?? 'Київ')}, ${esc(x.address)}${st === 'approved' ? '' : ` · ${PARTNER_STATUS[st][0].toLowerCase()}`}</small></button>`;
     }).join('')}
     <button class="wash-chip add" type="button" data-action="wash-add">${icon('plus', 18)}<b>Додати мийку</b></button>
   </div>`;
@@ -1356,10 +1371,13 @@ function clientsList() {
     if (b.car) c.cars.add(b.car);
     if (b.state === 'completed') { c.visits += 1; c.spent += sumOf(b); }
     if (b.clientAvatar) c.ava = b.clientAvatar;
-    if (b.date > c.last) { c.last = b.date; c.name = b.clientName || c.name; c.car = b.car || c.car; c.cls = b.cls ?? c.cls; }
+    // «Востаннє» — лише візит, що вже був (сьогодні чи раніше); майбутній запис — окремо, «запис на …».
+    if (b.date <= todayIso() && !['cancelled', 'refunded'].includes(b.state)) { if (b.date > c.last) c.last = b.date; }
+    else if (b.date > todayIso() && BLOCKING.includes(b.state) && (!c.next || b.date < c.next)) c.next = b.date;
+    if (b.date >= (c.seen ?? '')) { c.seen = b.date; c.name = b.clientName || c.name; c.car = b.car || c.car; c.cls = b.cls ?? c.cls; }
     map.set(key, c);
   }
-  return [...map.values()].sort((a, b) => b.last.localeCompare(a.last));
+  return [...map.values()].sort((a, b) => (b.last || b.next || '').localeCompare(a.last || a.next || ''));
 }
 
 function viewClients() {
@@ -1375,7 +1393,7 @@ function viewClients() {
     ${list.length ? `<ul class="client-list">${list.slice(0, 100).map((c) => `<li>
       ${clientAva(c.ava, c.name)}
       <span class="cl-main"><b>${esc(c.name)}</b><small>${esc([...c.cars].join(', ') || '—')}</small>
-        <small>${c.visits} ${plural(c.visits, 'візит', 'візити', 'візитів')}${c.spent ? ` · ${uah(c.spent)}` : ''} · востаннє ${dayLabel(c.last, { day: 'numeric', month: 'short' })}</small>${noteLine(c.key)}</span>
+        <small>${c.visits} ${plural(c.visits, 'візит', 'візити', 'візитів')}${c.spent ? ` · ${uah(c.spent)}` : ''}${c.last ? ` · востаннє ${dayLabel(c.last, { day: 'numeric', month: 'short' })}` : ''}${c.next ? ` · запис на ${dayLabel(c.next, { day: 'numeric', month: 'short' })}` : ''}</small>${noteLine(c.key)}</span>
       <span class="row"><button class="icon-btn" type="button" data-action="note-open" data-key="${esc(c.key)}" data-name="${esc(c.name)}" aria-label="Нотатка: ${esc(c.name)}">${icon('list', 20)}</button>${c.phone ? `<a class="icon-btn" href="${telHref(c.phone)}" aria-label="Подзвонити: ${esc(c.name)}">${icon('phone', 20)}</a>` : ''}
         <button class="btn soft" type="button" data-action="nb-client" data-key="${esc(c.key)}">Записати</button></span>
     </li>`).join('')}</ul>` : `<div class="pro-empty">${icon('users', 32)}<b>${all.length ? 'Нікого не знайдено' : 'Клієнтів ще немає'}</b><span>Тут зʼявляться всі, хто записувався через CARCAR, по телефону чи приїжджав сам.</span></div>`}`;
@@ -1548,7 +1566,7 @@ function suggestCard(compact = false) {
 function revenueBars(days) {
   const t = todayIso();
   const list = Array.from({ length: days }, (_, i) => shiftDay(t, -(days - 1 - i)));
-  const vals = list.map((d) => own().filter((b) => b.date === d).reduce((a, b) => a + revenue(b), 0));
+  const vals = list.map((d) => moneyDays(d, d));
   const max = Math.max(1, ...vals);
   return `<div class="rev-bars" role="img" aria-label="Виручка по днях: найбільше ${uah(Math.max(...vals))}">${list.map((d, i) => `<span class="rev-bar" style="height:${Math.max(2, (vals[i] / max) * 100)}%" title="${dayLabel(d, { day: 'numeric', month: 'short' })}: ${uah(vals[i])}"></span>`).join('')}</div>
     <div class="rev-axis"><span>${dayLabel(list[0], { day: 'numeric', month: 'short' })}</span><span>максимум ${uah(Math.max(...vals))}</span><span>сьогодні</span></div>`;
@@ -1577,7 +1595,7 @@ function viewAnalytics() {
   const from = shiftDay(t, -(n - 1));
   const list = own().filter((b) => b.date >= from && b.date <= t);
   const done = list.filter((b) => b.state === 'completed');
-  const money = list.reduce((a, b) => a + revenue(b), 0);
+  const money = moneyDays(from, t);
   const lost = list.filter((b) => ['cancelled', 'noshow'].includes(b.state) && !b.declined).length;
   const past = list.filter((b) => b.state !== 'pending' && bookingStart(b) <= new Date()).length;
   const key = (b) => clientNoteKey(b);
@@ -1726,13 +1744,14 @@ function viewCash(arg) {
     <section class="pro-card" aria-labelledby="h-cash-list"><h2 id="h-cash-list">Виконані записи</h2>
       ${day.list.length ? `<ul class="plain-list cash-list">${day.list.sort((a, b) => a.time.localeCompare(b.time)).map((b) => `<li>
         <span>${b.time} · ${esc(who(b))}<br><small>${esc(b.services.join(', '))}${b.masterId && washerName(b.masterId) ? ` · ${esc(washerName(b.masterId))}` : ''}</small></span>
-        <span style="text-align:right"><b>${uah(sumOf(b))}</b><br><small>${isCarcar(b) ? 'CARCAR' : PAY_WORD[b.payment] ?? 'картка'}</small></span></li>`).join('')}</ul>`
+        <span style="text-align:right"><b>${uah(b.state === 'completed' ? sumOf(b) : moneyOf(b))}</b><br><small>${b.state === 'noshow' ? 'неявка · CARCAR' : b.state === 'refunded' ? 'за рішенням спору' : b.state === 'cancelled' ? 'пізнє скасування' : isCarcar(b) ? 'CARCAR' : PAY_WORD[b.payment] ?? 'картка'}</small></span></li>`).join('')}</ul>`
         : '<p class="small muted" style="margin:0">За цей день виконаних записів немає.</p>'}
       ${day.passes ? `<div class="money-row"><span>Продано абонементів на місці</span><b>${uah(day.passes)}</b></div>` : ''}
     </section>
     ${pay.length ? `<section class="pro-card" aria-labelledby="h-cash-pay"><h2 id="h-cash-pay">Зарплата мийників за день</h2>
       <ul class="plain-list">${pay.map((x) => `<li><span>${esc(x.w.name)} · ${x.cars} авто</span><b>${uah(x.pay)}</b></li>`).join('')}</ul></section>` : ''}
     ${shift && !reopen ? `<section class="pro-card" aria-labelledby="h-shift"><h2 id="h-shift">Зміну закрито о ${clock(shift.closedAt)}</h2>
+        ${shift.total !== day.total || shift.drawer !== day.drawer ? `<p class="notice warn" style="margin:0">Після закриття суми змінились: тоді було ${uah(shift.total)}, зараз ${uah(day.total)}. Закрийте зміну ще раз, щоб звіт зійшовся.</p>` : ''}
         <div class="money-row"><span>Має бути готівки</span><b>${uah(shift.drawer)}</b></div>
         ${shift.counted !== null ? `<div class="money-row"><span>Перелічили</span><b>${uah(shift.counted)}</b></div>
         <div class="money-row"><span>Розбіжність</span><b>${shift.diff === 0 ? 'немає' : `${shift.diff > 0 ? '+' : '−'}${uah(Math.abs(shift.diff))}`}</b></div>` : ''}
@@ -1908,6 +1927,11 @@ function route() {
   if (expirePending(bookings)) save();
   checkWaitlist(bookings);
   const [, page = '', arg, id] = location.hash.replace(/^#/, '').split('/');
+  // Посилання на чат зі сповіщення може бути про іншу мийку акаунта — перемикаємося на неї.
+  if (page === 'chat' && /^[br]-/.test(arg ?? '')) {
+    const x = arg.startsWith('b-') ? bookings.find((b) => b.id === arg.slice(2)) : requests.find((r) => r.id === arg.slice(2));
+    if (x && x.placeId !== ui.place && accountPlaces(s).includes(x.placeId)) pickWash(x.placeId);
+  }
   // Пряме посилання на запис (зі сповіщення): відкриваємо день запису й картку.
   if (page === 'booking') {
     const b = bookings.find((x) => x.id === arg);
@@ -2197,6 +2221,10 @@ document.addEventListener('click', async (e) => {
   if (action === 'move-day') { moveSheet(id, el.dataset.date); return; }
   if (action === 'move-to') {
     if (!openStarts(place(), el.dataset.date, b.minutes, bookings, { lead: 0, skip: b, mobile: !!b.mobile }).includes(el.dataset.time)) { toast('Цей час щойно зайняли — оберіть інший'); moveSheet(id, el.dataset.date); return; }
+    // Мийник у новий час уже зайнятий іншим записом — не ставимо його на два авто одночасно.
+    const clash = b.masterId && washerBusy(b.masterId, { ...b, date: el.dataset.date, time: el.dataset.time });
+    if (clash && !confirm(`${washerName(b.masterId) ?? 'Мийник'} у цей час уже має запис о ${clash.time}. Перенести без мийника? Потім призначте іншого.`)) return;
+    if (clash) delete b.masterId;
     b.moves = [...(b.moves ?? []), { date: b.date, time: b.time, at: Date.now(), by: 'place' }];
     const from = `${dayWord(b.date).toLowerCase()}, ${b.time}`;
     Object.assign(b, { date: el.dataset.date, time: el.dataset.time });
