@@ -93,12 +93,15 @@ export const msgPreview = (m) => m.text || (m.photo ? 'Фото' : '');
 // Панель точки відкрита — раз на 30 с записуємо час. «У мережі» — якщо відмітка свіжіша за 2 хв.
 // У робочій версії це робить сервер; тут — спільний localStorage вкладок одного браузера.
 export const PRESENCE_KEY = 'presence';
+// Пишемо не частіше ніж раз на 45 с: «у мережі» — це відмітка за 2 хв, а кожен запис будить усі пристрої.
 export function touchPresence(placeId) {
   if (!placeId) return;
-  store.set(PRESENCE_KEY, { ...store.get(PRESENCE_KEY, {}), [placeId]: Date.now() });
+  const all = store.peek(PRESENCE_KEY, {});
+  if (Date.now() - (all[placeId] ?? 0) < 45000) return;
+  store.set(PRESENCE_KEY, { ...all, [placeId]: Date.now() });
 }
 export function presenceOf(placeId) {
-  const at = store.get(PRESENCE_KEY, {})[placeId] ?? null;
+  const at = store.peek(PRESENCE_KEY, {})[placeId] ?? null;
   return { at, online: !!at && Date.now() - at < 2 * 60000 };
 }
 

@@ -5,7 +5,7 @@ import {
   confirmBy, offerBy, pauseOf, responseStats, msText, AWAITING, staffOf, chargedOf, realOrder, hidePhones, clientIdOf, walletKey,
   applyOverrides, isListed, visibleReviews, ACTIVE, BLOCKING, HOUR, price, isFrozen, settleAll, ratingFor,
   powerOf, worksInBlackout, TICKET_TOPICS, CLIENT_TOPICS, TICKET_STATUS, ticketsAll, openTicket, ticketReply, setTicket, isBlocked, mobileOn, spanOf, laneCap, sameLane, MOBILE_ROAD, promosAll, promoCheck,
-  enterView, keepUi, fitChatScreen, keepChatOnKeyboard, themePicker, setTheme, bizApps, saveBizApps, APP_STATUS, numberBookings, bookingNo, findByNo, ticketPhotos,
+  enterView, keepUi, calmRedraw, fitChatScreen, keepChatOnKeyboard, themePicker, setTheme, bizApps, saveBizApps, APP_STATUS, numberBookings, bookingNo, findByNo, ticketPhotos,
   hasServer, api, authToken, setAuthToken, serverConfig, notifySync, pushForget, telegramNotify, demoLoginOn,
 } from './core.js';
 import {
@@ -522,12 +522,24 @@ function promoBanner() {
 // ---------- анонімна статистика ----------
 
 // Події для зведеної статистики CARCAR: без імен і телефонів, лише що відкривали й що натискали.
-// Зберігаємо останні 5000 подій на пристрої; у робочій версії їх приймає сервер.
+// На пристрої — останні 1500 подій (на сервері вони накопичуються). Записуємо пачкою раз на 2 с або при згортанні:
+// перечитувати й переписувати весь журнал на кожен дотик — відчутне гальмування на телефоні.
+let trackQueue = [];
+let trackTimer = 0;
 function track(type, data = {}) {
-  const all = store.get('analytics', []);
-  all.push({ id: uid(), t: type, at: Date.now(), ...data });
-  store.set('analytics', all.slice(-5000));
+  trackQueue.push({ id: uid(), t: type, at: Date.now(), ...data });
+  clearTimeout(trackTimer);
+  trackTimer = setTimeout(flushTrack, 2000);
 }
+function flushTrack() {
+  clearTimeout(trackTimer);
+  if (!trackQueue.length) return;
+  const add = trackQueue;
+  trackQueue = [];
+  store.set('analytics', [...store.get('analytics', []), ...add].slice(-1500));
+}
+addEventListener('pagehide', flushTrack);
+document.addEventListener('visibilitychange', () => { if (document.hidden) flushTrack(); });
 
 // ---------- карта ----------
 
@@ -3618,14 +3630,12 @@ setInterval(() => {
 // Ключі, зміни яких не стосуються екрана клієнта: журнал подій, дзвінки (їх показує call.js), чужі службові дані.
 const QUIET_KEYS = new Set(['carcar.seenStates', 'carcar.analytics', 'carcar.calls', 'carcar.callLog', 'carcar.biz.shifts', 'carcar.biz.stock',
   'carcar.biz.clientNotes', 'carcar.biz.accounts', 'carcar.admin.fraud', 'carcar.karych']);
-let remoteTimer = 0;
 window.addEventListener('storage', (e) => {
   if (!e.key?.startsWith('carcar.') || QUIET_KEYS.has(e.key)) return;
   // Мийка відкрила чи закрила панель — оновлюємо лише «у мережі», без перемальовування.
   if (e.key === `carcar.${PRESENCE_KEY}`) { refreshPresence(); return; }
-  // Кілька ключів приходять разом — перемальовуємо один раз.
-  clearTimeout(remoteTimer);
-  remoteTimer = setTimeout(applyRemote, 60);
+  // Кілька ключів приходять разом — перемальовуємо один раз і не під пальцем (calmRedraw).
+  calmRedraw(applyRemote);
 });
 function applyRemote() {
   bookings = store.get('bookings', []);

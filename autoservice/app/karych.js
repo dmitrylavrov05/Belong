@@ -157,7 +157,8 @@ export function karychRoute(screen, tip, { away = false } = {}) {
   state.tipFor = () => tip;
   state.away = away;
   render();
-  place();
+  // Міряємо панелі перед наступним кадром — разом із розкладкою, яку браузер робить і так (без зайвого перерахунку).
+  requestAnimationFrame(place);
   // Той самий екран перемалювався (обрали послугу, слот) — не закриваємо підказку й не показуємо знову.
   if (screen === state.screen) return;
   state.screen = screen;

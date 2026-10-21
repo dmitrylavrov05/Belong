@@ -10,7 +10,7 @@ import {
   confirmBy, offerBy, responseStats, pauseOf, ratePct, msText, accountPlaces, addAccountPlace,
   ticketsAll, openTicket, ticketReply, setTicket, TICKET_TOPICS, TICKET_STATUS, PLACE_TOPICS, ticketPhotos,
   payoutReady, maskIban, hidePhones, themePicker, setTheme, samePhone, hasServer, api, authToken, setAuthToken, serverConfig, demoWashOn, notifySync, pushForget, telegramNotify, fitChatScreen, keepChatOnKeyboard, commissionFor, savePartner, staffOf, checkBizLogin, numberBookings, bookingNo, POWER, powerOf, setPower,
-  keepUi,
+  keepUi, calmRedraw,
 } from './core.js';
 import {
   openStarts, chatPost, chatTimeline, readMessages, msgPreview, touchPresence, BIZ_QUICK, sendMessages, checkWaitlist,
@@ -2694,15 +2694,18 @@ document.addEventListener('keydown', (e) => {
 // Інша вкладка (застосунок клієнта, повна панель) змінила дані — підтягуємо, не збиваючи введення.
 window.addEventListener('storage', (e) => {
   if (!e.key?.startsWith('carcar.')) return;
+  // Присутність, журнал подій і дзвінки (їх показує call.js) екран не змінюють — навіть не перечитуємо дані.
+  if (['carcar.presence', 'carcar.analytics', 'carcar.calls'].includes(e.key)) return;
   load();
   checkSheet();
   if (nb || document.body.classList.contains('sheet-open')) { renderChrome(location.hash.split('/')[1] ?? ''); alertPending(); return; }
-  // Присутність, журнал подій і дзвінки (їх показує call.js) екран не змінюють.
-  if (['carcar.presence', 'carcar.analytics', 'carcar.calls'].includes(e.key)) return;
+  calmRedraw(remoteRedraw);
+});
+function remoteRedraw() {
   const input = $('#pro-chat [name="text"]');
   if (document.activeElement?.matches('input, textarea, select') && document.activeElement !== input) { renderChrome(location.hash.split('/')[1] ?? ''); alertPending(); return; }
   rerender();
-});
+}
 
 // Перехід між екранами закриває шторки — крім сповіщення про новий запис: воно чекає відповіді.
 window.addEventListener('hashchange', () => { if (nb || ($('#sheet-root').innerHTML && !$('.pro-sheet.alert'))) closeSheet(); route(); });

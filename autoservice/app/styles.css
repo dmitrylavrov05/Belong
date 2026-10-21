@@ -1294,3 +1294,7 @@ button.item.svc-go .price svg { color: var(--muted); }
 
 /* Кар Карич сидить у правому нижньому куті — останні кнопки сторінки мають догортатися вище за нього */
 body.karych-on main { padding-bottom: 84px; }
+
+/* Швидкість на телефоні: картки за межами екрана браузер не розкладає й не малює, доки до них не догорнули */
+#list > article, .list > .item, .review, .bk, .convo, .car-card, .log-item, .done-item { content-visibility: auto; contain-intrinsic-size: auto 120px; }
+#list > article { contain-intrinsic-size: auto 330px; }

@@ -32,7 +32,10 @@ export const store = {
   },
   set(key, value) {
     try {
-      localStorage.setItem(`carcar.${key}`, JSON.stringify(value));
+      const raw = JSON.stringify(value);
+      // Те саме, що вже збережено, — не пишемо й не відправляємо на сервер (запис і мережа — найдорожче на телефоні).
+      if (raw !== undefined && localStorage.getItem(`carcar.${key}`) === raw) return true;
+      localStorage.setItem(`carcar.${key}`, raw);
       if (sync.on && shared(key)) syncPush(key);
       return true;
     } catch {
@@ -935,6 +938,27 @@ export const isBlocked = (keys) => keys.some((k) => k && fraudState().blocked[k]
 // Поява сторінки й «набігання» чисел у показниках — лише при переході на інший екран
 // і якщо людина не просила зменшити анімацію.
 const calm = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Фонові зміни (з сервера, з іншої вкладки) перемальовують екран не під пальцем: поки людина гортає чи натискає —
+// чекаємо паузи, не частіше ніж раз на 1,2 с, а в згорнутому застосунку — коли його відкриють.
+let userAt = 0;
+if (typeof window !== 'undefined') {
+  for (const ev of ['scroll', 'touchstart', 'touchmove', 'pointerdown', 'wheel', 'keydown']) window.addEventListener(ev, () => { userAt = performance.now(); }, { passive: true, capture: true });
+}
+export function calmRedraw(fn) {
+  const st = (calmRedraw.st ??= new Map()).get(fn) ?? { last: 0, timer: 0 };
+  calmRedraw.st.set(fn, st);
+  clearTimeout(st.timer);
+  const run = () => {
+    if (document.hidden) { document.addEventListener('visibilitychange', run, { once: true }); return; }
+    const now = performance.now();
+    const wait = Math.max(600 - (now - userAt), 1200 - (now - st.last));
+    if (wait > 0) { st.timer = setTimeout(run, wait); return; }
+    st.last = now;
+    fn();
+  };
+  st.timer = setTimeout(run, 60);
+}
+
 // Перемальовування екрана (прийшли зміни з сервера, спрацював таймер, людина змінила щось в іншій картці) не має
 // збивати людину: прокрутка (і всередині стрічок та галерей), набраний чи підставлений текст, обрані файли, курсор,
 // розгорнуті блоки й результати пошуку ([data-keep]) лишаються як були. Поля щойно надісланої форми не відновлюємо —
@@ -946,6 +970,8 @@ if (typeof document !== 'undefined') {
   document.addEventListener('submit', (e) => { lastSubmit = { form: e.target, at: Date.now() }; }, true);
 }
 const FIELDS = 'input, textarea, select';
+// Контейнери з власною прокруткою (стрічки, галереї, ряди кнопок, таблиці) — лише їх і перевіряємо, не весь екран.
+const SCROLLERS = '.chips, .days, .hot-row, .pc-slides, .chat-msgs, .quick, .car-choice, .chat-actions, .day-strip, .sheet-body, .wash-switch, .heat-wrap, .table-wrap, .sched, .drawer-body, .svc-pick, .heat, .search-res, .today-kpis, .slots';
 const fieldKey = (el) => `${el.closest('form[id], [data-id], [id]:not(input):not(textarea):not(select)')?.getAttribute('id') ?? ''}|${el.closest('[data-id]')?.dataset.id ?? ''}|${el.id || el.name}|${['checkbox', 'radio'].includes(el.type) ? el.value : ''}`;
 const changedField = (el) => {
   if (['checkbox', 'radio'].includes(el.type)) return el.checked !== el.defaultChecked;
@@ -973,8 +999,8 @@ export function keepUi(fn, same = () => true) {
   const focus = a?.matches?.(FIELDS) && (a.id || a.name) ? { key: fieldKey(a), from: a.selectionStart, to: a.selectionEnd } : null;
   const open = new Set([...document.querySelectorAll('details[open]')].map(sig));
   const scrolled = new Map();
-  for (const el of document.querySelectorAll('main *, .sheet *')) {
-    if ((el.scrollLeft > 0 || el.scrollTop > 0) && !el.matches(FIELDS)) scrolled.set(sig(el), [el.scrollLeft, el.scrollTop, el.scrollHeight - el.scrollTop - el.clientHeight < 40]);
+  for (const el of document.querySelectorAll(SCROLLERS)) {
+    if (el.scrollLeft > 0 || el.scrollTop > 0) scrolled.set(sig(el), [el.scrollLeft, el.scrollTop, el.scrollHeight - el.scrollTop - el.clientHeight < 40]);
   }
   const kept = new Map([...document.querySelectorAll('[data-keep][id]')].map((el) => [el.id, { html: el.innerHTML, data: { ...el.dataset } }]));
   fn();
@@ -1000,8 +1026,7 @@ export function keepUi(fn, same = () => true) {
     }
   }
   for (const d of document.querySelectorAll('details')) if (open.has(sig(d))) d.open = true;
-  for (const el of scrolled.size ? document.querySelectorAll('main *, .sheet *') : []) {
-    if (el.scrollWidth <= el.clientWidth && el.scrollHeight <= el.clientHeight) continue;
+  for (const el of scrolled.size ? document.querySelectorAll(SCROLLERS) : []) {
     const s = scrolled.get(sig(el));
     if (!s) continue;
     el.scrollLeft = s[0];
@@ -1019,8 +1044,8 @@ export function keepUi(fn, same = () => true) {
 
 export function enterView(view, changed) {
   if (!changed || calm()) return;
-  view.classList.remove('view-enter');
-  void view.offsetWidth; // перезапуск анімації
+  // Перезапуск анімації вимагає перерахунку розкладки — лише якщо попередня ще йде (швидкі переходи).
+  if (view.classList.contains('view-enter')) { view.classList.remove('view-enter'); void view.offsetWidth; }
   view.classList.add('view-enter');
   clearTimeout(enterView.t);
   enterView.t = setTimeout(() => view.classList.remove('view-enter'), 900);

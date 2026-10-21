@@ -544,3 +544,18 @@ test('перемальовування не губить підставлене 
   await page.waitForTimeout(300);
   expect(await list.evaluate((el) => el.scrollTop)).toBe(100);
 });
+
+test('фонові оновлення не перемальовують екран, поки людина гортає, і застосовуються після паузи', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/#/place/blysk');
+  await expect(page.locator('#view h1')).toBeVisible();
+  await page.evaluate(() => { document.querySelector('#view h1').dataset.old = '1'; });
+  // Гортає: кілька подій прокрутки, і саме тоді приходять зміни з сервера.
+  for (let i = 0; i < 4; i++) {
+    await page.mouse.wheel(0, 120);
+    if (i === 1) await page.evaluate(() => window.dispatchEvent(new StorageEvent('storage', { key: 'carcar.bookings' })));
+    await page.waitForTimeout(150);
+  }
+  await expect(page.locator('#view h1[data-old]')).toHaveCount(1); // під пальцем — не чіпаємо
+  await expect(page.locator('#view h1[data-old]')).toHaveCount(0, { timeout: 4000 }); // пауза — оновили
+});
