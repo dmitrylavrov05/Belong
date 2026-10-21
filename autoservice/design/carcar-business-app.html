@@ -719,8 +719,7 @@ label.item { cursor: pointer; padding: 10px 14px; }
   @keyframes cc-drop { from { transform: translateY(-14px); opacity: 0; } }
   @keyframes cc-shimmer { from { background-position: -200% 0; } to { background-position: 200% 0; } }
 
-  /* Перехід між вкладками — лише коротке проявлення: «виїзд» блоків по черзі виглядав так, ніби сторінка перезавантажується */
-  .view-enter { animation: cc-fade .15s ease-out both; }
+  /* Перехід між вкладками — без анімації: проявлення з прозорого давало білий спалах, ніби сторінка перезавантажується */
 
   .btn:active:not(:disabled), .chip:active, .slot:active:not(:disabled), .day:active:not(:disabled) { transform: scale(.96); }
   .slot[aria-pressed="true"], .day[aria-pressed="true"], .chip[aria-pressed="true"] { animation: cc-pop .3s var(--ease); }
@@ -1319,6 +1318,40 @@ body.in-chat .answer-banner { top: calc(68px + env(safe-area-inset-top)); }
 /* Фокус з клавіатури на послугах і позначках видно */
 .svc-card:focus-within, label.item:focus-within { outline: 3px solid var(--accent); outline-offset: 2px; }
 .check:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* Навчання з Кар Каричем (tour.js): затемнення з «віконцем» на цілі й картка з вороном */
+.tour { position: fixed; inset: 0; z-index: 90; animation: k-pop-fade .25s ease-out; }
+.tour.closing { opacity: 0; transition: opacity .2s; }
+.tour-hole { position: fixed; border-radius: 16px; box-shadow: 0 0 0 9999px rgb(10 14 24 / 62%), 0 0 0 3px var(--accent); transition: all .35s cubic-bezier(.2, .8, .2, 1); pointer-events: none; }
+.tour.centered .tour-hole { left: 50%; top: 50%; width: 0; height: 0; box-shadow: 0 0 0 9999px rgb(10 14 24 / 62%); }
+.tour-card { position: fixed; left: 12px; right: 12px; max-width: 420px; margin: 0 auto; display: flex; gap: 10px; align-items: flex-start;
+  padding: 16px 16px 14px; border-radius: 20px; background: var(--bg); color: var(--text); box-shadow: 0 18px 50px rgb(0 0 0 / 30%); transition: top .35s, bottom .35s; }
+.tour.centered .tour-card { top: 50%; transform: translateY(-50%); }
+.tour-card.pop { animation: tour-pop .32s cubic-bezier(.2, 1.2, .3, 1); }
+.tour.centered .tour-card.pop { animation: tour-pop-c .32s cubic-bezier(.2, 1.2, .3, 1); }
+.tour-bird { flex: none; width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 50% 40%, #fff, #e8eef8); box-shadow: 0 0 0 2px var(--line); }
+.tour-bird .k-bird { width: 64px; height: 64px; }
+.tour-card.talking .k-beak-low { animation: k-talk .22s ease-in-out infinite alternate; }
+.tour-card.wave .k-wing { animation: k-wave .45s ease-in-out 2; }
+.tour-card.pop .k-body { animation: k-hop .55s ease-out 1, k-bob 3.2s ease-in-out .55s infinite; }
+.tour-body { flex: 1; min-width: 0; display: grid; gap: 6px; }
+.tour-body h2 { margin: 0; font-size: 17px; }
+.tour-text { margin: 0; font-size: 15px; line-height: 1.45; }
+.tour-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.tour-dots { display: flex; gap: 5px; }
+.tour-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--line); transition: background .2s, transform .2s; }
+.tour-dots i.was { background: var(--muted); }
+.tour-dots i.on { background: var(--accent); transform: scale(1.3); }
+.tour-btns { display: flex; gap: 6px; margin-left: auto; }
+.tour-btns .btn { min-height: 40px; padding: 0 14px; }
+body.touring .karych { display: none; }
+@keyframes tour-pop { from { opacity: 0; transform: translateY(12px) scale(.96); } }
+@keyframes tour-pop-c { from { opacity: 0; transform: translateY(calc(-50% + 12px)) scale(.96); } }
+@keyframes k-pop-fade { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .tour, .tour-card.pop, .tour-card .k-body, .tour-card .k-wing, .tour-card .k-beak-low { animation: none !important; }
+  .tour-hole, .tour-card { transition: none; }
+}
 </style>
   <style>
 /* CarCar Business — застосунок мийки для телефона. Базові кнопки, поля, чат і шторки — зі styles.css. */
@@ -1995,7 +2028,7 @@ const store = {
 // клієнту — свої записи, мийці — записи своїх мийок, адмінці — усе (див. deploy/server/acl.py).
 // Без сервера (файл з диска, тести) — лише цей пристрій. Особисте лишається на пристрої.
 const LOCAL_KEYS = new Set(['auth', 'profile', 'cars', 'carId', 'theme', 'biz.theme', 'notify', 'biz.notify', 'biz.session', 'partner',
-  'seenStates', 'cls', 'city', 'favs', 'view', 'mapLayer', 'campaign', 'referral', 'subscriptions', 'auth.token', 'biz.token', 'admin.token', 'pushSub', 'srv.demoPlaces', 'karych']);
+  'seenStates', 'cls', 'city', 'favs', 'view', 'mapLayer', 'campaign', 'referral', 'subscriptions', 'auth.token', 'biz.token', 'admin.token', 'pushSub', 'srv.demoPlaces', 'karych', 'biz.tour']);
 const shared = (key) => !LOCAL_KEYS.has(key);
 // Журнал подій великий і пишеться часто — відправляємо рідше.
 // Абонементи — трохи пізніше за записи: повернення візиту сервер перевіряє за вже скасованим записом.
@@ -2202,6 +2235,7 @@ const ICONS = {
   chevL: '<path d="m15 5-7 7 7 7"/>',
   chevD: '<path d="m5 9 7 7 7-7"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4 4.5-6 8-6s6.5 2 8 6"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6"/><circle cx="12" cy="17" r=".6"/>',
   search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/>',
   drop: '<path d="M12 3.5s6 6.4 6 10.5a6 6 0 0 1-12 0c0-4.1 6-10.5 6-10.5z"/>',
   wheel: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5"/>',
@@ -4228,6 +4262,304 @@ function markCallsRead(side, pick) {
   store.set('callLog', log.map((x) => (x[key] && pick(x) ? { ...x, [key]: false } : x)));
 }
 
+// Кар Карич — мультяшний ворон-помічник у застосунку клієнта. Сидить у кутку екрана, підказує, що робити
+// на поточному екрані (раз на екран), відповідає на часті питання й радіє, коли запис зроблено.
+// Підказки — заздалегідь написані правила, без ШІ. Вимикається в налаштуваннях.
+
+const KEY = 'karych'; // { off, seen: { екран: true } } — лише на цьому телефоні
+
+// Ворон у кепці автомийника: тіло, крило з губкою, очі з повіками, дзьоб із рухомою нижньою частиною.
+const KARYCH_SVG = `<svg class="k-bird" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
+  <g class="k-bubbles"><circle cx="18" cy="40" r="5"/><circle cx="12" cy="58" r="3.5"/><circle cx="104" cy="30" r="4"/></g>
+  <g class="k-body">
+    <ellipse class="k-shadow" cx="62" cy="113" rx="26" ry="4"/>
+    <path class="k-legs" d="M54 98v10m-5 0h10M70 98v10m-5 0h10"/>
+    <path class="k-tail" d="M40 88 22 100l6-16z"/>
+    <ellipse class="k-torso" cx="62" cy="78" rx="27" ry="24"/>
+    <ellipse class="k-belly" cx="66" cy="84" rx="15" ry="14"/>
+    <g class="k-wing"><path d="M42 70c-10 6-14 18-10 28 10-2 18-10 20-22z"/><rect class="k-sponge" x="22" y="90" width="15" height="10" rx="3"/></g>
+    <circle class="k-head" cx="66" cy="44" r="23"/>
+    <path class="k-cap" d="M44 38c2-14 13-21 24-21s21 7 22 19z"/>
+    <path class="k-visor" d="M84 34c8 0 15 2 18 5-6 2-13 2-20 1z"/>
+    <text class="k-cap-text" x="66" y="32" text-anchor="middle">CC</text>
+    <g class="k-eyes">
+      <ellipse cx="60" cy="46" rx="7" ry="8"/><ellipse cx="77" cy="46" rx="7" ry="8"/>
+      <circle class="k-pupil" cx="62" cy="47" r="3.3"/><circle class="k-pupil" cx="79" cy="47" r="3.3"/>
+      <circle class="k-glint" cx="63.4" cy="45.4" r="1.1"/><circle class="k-glint" cx="80.4" cy="45.4" r="1.1"/>
+      <g class="k-lids"><rect x="52" y="37" width="16" height="18" rx="8"/><rect x="69" y="37" width="16" height="18" rx="8"/></g>
+    </g>
+    <path class="k-beak-up" d="M80 54c8 0 16 2 20 6-7 2-14 2-21 0z"/>
+    <path class="k-beak-low" d="M80 58c6 1 12 2 16 3-5 3-11 3-16 1z"/>
+    <circle class="k-cheek" cx="54" cy="56" r="3.5"/>
+  </g>
+</svg>`;
+
+const state = { away: false, screen: null, tipFor: null, faq: [], opts: {}, hideTimer: 0, talkTimer: 0 };
+const prefs = () => ({ off: false, seen: {}, ...store.get(KEY, {}) });
+const savePrefs = (p) => store.set(KEY, p);
+const karychOn = () => !prefs().off;
+function setKarych(on) {
+  savePrefs({ ...prefs(), off: !on });
+  render();
+}
+
+function root() {
+  let el = document.getElementById('karych');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'karych';
+    el.className = 'karych';
+    el.innerHTML = `<div class="k-bubble" id="k-bubble" role="dialog" aria-label="Кар Карич підказує" hidden></div>
+      <button class="k-btn" type="button" data-k="toggle" aria-label="Кар Карич — помічник" aria-expanded="false" aria-controls="k-bubble">${KARYCH_SVG}</button>`;
+    document.body.append(el);
+    el.addEventListener('click', onClick);
+  }
+  return el;
+}
+
+// Ворон «говорить»: дзьоб рухається, поки читаєте фразу (недовго).
+function talk(ms) {
+  const el = root();
+  el.classList.add('talking');
+  clearTimeout(state.talkTimer);
+  state.talkTimer = setTimeout(() => el.classList.remove('talking'), Math.min(2600, Math.max(700, ms)));
+}
+
+function mood(name) {
+  const el = root();
+  el.classList.remove('wave', 'cheer');
+  void el.offsetWidth; // перезапуск анімації
+  if (name) el.classList.add(name);
+}
+
+function open(html, { auto = false, moodName = 'wave', ms = 9000 } = {}) {
+  const el = root();
+  const b = el.querySelector('#k-bubble');
+  b.innerHTML = `<button class="k-close" type="button" data-k="close" aria-label="Закрити підказку">×</button>
+    <b class="k-name">Кар Карич</b>${html}`;
+  b.hidden = false;
+  el.classList.add('open');
+  el.querySelector('.k-btn').setAttribute('aria-expanded', 'true');
+  mood(moodName);
+  talk(b.textContent.length * 35);
+  clearTimeout(state.hideTimer);
+  // Підказка, що зʼявилась сама, ховається сама; відкриту вручну закриває клієнт.
+  if (auto) state.hideTimer = setTimeout(close, ms);
+}
+
+function close() {
+  const el = document.getElementById('karych');
+  if (!el) return;
+  el.querySelector('#k-bubble').hidden = true;
+  el.classList.remove('open', 'talking');
+  el.querySelector('.k-btn').setAttribute('aria-expanded', 'false');
+  clearTimeout(state.hideTimer);
+}
+
+const tipHtml = (tip) => `<p class="k-text">${esc(tip.text)}</p>`;
+
+function menuHtml() {
+  const tip = state.tipFor?.();
+  return `${tip ? tipHtml(tip) : '<p class="k-text">Кар! Я Кар Карич. Підкажу, як усе працює. Що цікавить?</p>'}
+    <div class="k-chips">${state.faq.map((q, i) => `<button class="chip" type="button" data-k="faq" data-i="${i}">${esc(q.q)}</button>`).join('')}</div>
+    <button class="k-off link-btn" type="button" data-k="off">Не показувати помічника</button>`;
+}
+
+function onClick(e) {
+  const t = e.target.closest('[data-k]');
+  if (!t) return;
+  const k = t.dataset.k;
+  if (k === 'toggle') {
+    // Підказка зʼявилась сама — дотик відкриває питання; відкриті питання — закриває.
+    if (root().classList.contains('open') && root().querySelector('.k-chips')) close(); else open(menuHtml());
+  } else if (k === 'close') {
+    close();
+  } else if (k === 'faq') {
+    const q = state.faq[Number(t.dataset.i)];
+    open(`<p class="k-q">${esc(q.q)}</p><p class="k-text">${esc(q.a)}</p>
+      ${q.href ? `<a class="btn soft" href="${q.href}" data-k="close">${esc(q.link ?? 'Відкрити')}</a>` : ''}
+      <button class="link-btn" type="button" data-k="menu">← Інші питання</button>`, { moodName: null });
+  } else if (k === 'menu') {
+    open(menuHtml(), { moodName: null });
+  } else if (k === 'off') {
+    setKarych(false);
+    state.opts.onOff?.();
+  }
+}
+
+// Підняти ворона над нижніми панелями (меню, кнопка «Записатися», оплата), щоб не закривав кнопки.
+// Беремо висоту панелей (offsetHeight не залежить від анімації появи), тож ворон одразу стає на місце й не стрибає.
+const shown = (el) => el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+let watched = null;
+const resize = 'ResizeObserver' in window ? new ResizeObserver(() => place()) : null;
+function place() {
+  const el = document.getElementById('karych');
+  if (!el) return;
+  const tabs = document.querySelector('.tabs');
+  const dock = [...document.querySelectorAll('.dock')].find(shown);
+  const h = (shown(tabs) ? tabs.offsetHeight : 0) + (dock ? dock.offsetHeight : 0);
+  el.style.setProperty('--k-bottom', `${h + 12}px`);
+  // Висота панелі змінюється (знижка, промокод) — переставляємо ворона.
+  if (resize && dock !== watched) {
+    resize.disconnect();
+    if (dock) resize.observe(dock);
+    watched = dock ?? null;
+  }
+}
+
+function render() {
+  const el = root();
+  el.hidden = !karychOn() || state.away;
+  document.body.classList.toggle('karych-on', !el.hidden);
+  if (el.hidden) close();
+}
+
+// Після кожного переходу між екранами: перша підказка на новому екрані зʼявляється сама.
+// away — ворон ховається (оформлення запису: там важлива кожна кнопка, нічого не має заважати).
+function karychRoute(screen, tip, { away = false } = {}) {
+  state.tipFor = () => tip;
+  state.away = away;
+  render();
+  // Міряємо панелі перед наступним кадром — разом із розкладкою, яку браузер робить і так (без зайвого перерахунку).
+  requestAnimationFrame(place);
+  // Той самий екран перемалювався (обрали послугу, слот) — не закриваємо підказку й не показуємо знову.
+  if (screen === state.screen) return;
+  state.screen = screen;
+  close();
+  if (!karychOn() || !tip || !screen) return;
+  const p = prefs();
+  if (p.seen[screen]) return;
+  p.seen[screen] = true;
+  savePrefs(p);
+  setTimeout(() => { if (state.screen === screen && karychOn()) open(tipHtml(tip), { auto: true }); }, 700);
+}
+
+// Подія: радіє (запис зроблено) чи щось пояснює.
+function karychSay(text, moodName = 'cheer') {
+  if (!karychOn()) return;
+  state.away = false;
+  render();
+  // Коротко: після оплати під бульбашкою кнопки картки запису — не тримаємо їх закритими довго.
+  open(`<p class="k-text">${esc(text)}</p>`, { auto: true, moodName, ms: 5000 });
+}
+
+function initKarych({ faq, onOff }) {
+  state.faq = faq;
+  state.opts = { onOff };
+  render();
+  window.addEventListener('resize', place);
+}
+
+// Навчання з Кар Каричем: покрокові спливні підказки поверх справжнього екрана. Кожен крок підсвічує частину
+// інтерфейсу (вкладку, кнопку), ворон пояснює, що там. Показується раз (позначка на пристрої), повторити — з меню.
+
+let cur = null; // { steps, i, opts, el, onKey, onResize }
+
+const tourSeen = (key) => !!store.get(key, false);
+
+function startTour(steps, opts = {}) {
+  stopTour(false);
+  const el = document.createElement('div');
+  el.className = 'tour';
+  el.innerHTML = `<div class="tour-hole" aria-hidden="true"></div>
+    <section class="tour-card" role="dialog" aria-modal="true" aria-labelledby="tour-h">
+      <div class="tour-bird">${KARYCH_SVG}</div>
+      <div class="tour-body"><h2 id="tour-h"></h2><p class="tour-text"></p>
+        <div class="tour-foot"><span class="tour-dots" aria-hidden="true"></span><span class="tour-count sr-only"></span>
+          <span class="tour-btns"><button class="btn link-btn" type="button" data-tour="skip">Пропустити</button>
+          <button class="btn" type="button" data-tour="prev">Назад</button>
+          <button class="btn primary" type="button" data-tour="next">Далі</button></span></div></div>
+    </section>`;
+  document.body.append(el);
+  document.body.classList.add('touring');
+  const opener = document.activeElement;
+  cur = { steps, i: 0, opts, el, opener };
+  el.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-tour]');
+    if (b?.dataset.tour === 'next') go(1);
+    else if (b?.dataset.tour === 'prev') go(-1);
+    else if (b?.dataset.tour === 'skip') stopTour(true);
+  });
+  cur.onKey = (e) => {
+    if (e.key === 'Escape') stopTour(true);
+    else if (e.key === 'ArrowRight') go(1);
+    else if (e.key === 'ArrowLeft') go(-1);
+    else if (e.key === 'Tab') { // фокус лишається в діалозі
+      const f = [...el.querySelectorAll('button:not([hidden])')];
+      const k = f.indexOf(document.activeElement);
+      if (e.shiftKey && k <= 0) { e.preventDefault(); f.at(-1).focus(); } else if (!e.shiftKey && k === f.length - 1) { e.preventDefault(); f[0].focus(); }
+    }
+  };
+  cur.onResize = () => place();
+  document.addEventListener('keydown', cur.onKey);
+  window.addEventListener('resize', cur.onResize);
+  show();
+}
+
+function go(d) {
+  if (!cur) return;
+  const n = cur.i + d;
+  if (n >= cur.steps.length) { stopTour(true); return; }
+  if (n < 0) return;
+  cur.i = n;
+  show();
+}
+
+function show() {
+  const { steps, i, el } = cur;
+  const s = steps[i];
+  el.querySelector('#tour-h').textContent = s.title;
+  el.querySelector('.tour-text').textContent = s.text;
+  el.querySelector('.tour-dots').innerHTML = steps.map((_, k) => `<i class="${k === i ? 'on' : k < i ? 'was' : ''}"></i>`).join('');
+  el.querySelector('.tour-count').textContent = `Крок ${i + 1} з ${steps.length}`;
+  el.querySelector('[data-tour="prev"]').hidden = i === 0;
+  el.querySelector('[data-tour="next"]').textContent = i === steps.length - 1 ? (cur.opts.finish ?? 'Почати роботу') : 'Далі';
+  el.querySelector('[data-tour="skip"]').hidden = i === steps.length - 1;
+  // Ворон «говорить» і махає на кожному кроці; картка зʼявляється заново.
+  const card = el.querySelector('.tour-card');
+  card.classList.remove('pop', 'talking', 'wave');
+  void card.offsetWidth;
+  card.classList.add('pop', 'talking', 'wave');
+  clearTimeout(cur.talk);
+  cur.talk = setTimeout(() => card.classList.remove('talking'), Math.min(2600, 600 + s.text.length * 25));
+  s.before?.();
+  place();
+  el.querySelector('[data-tour="next"]').focus({ preventScroll: true });
+}
+
+// Підсвічуємо ціль (якщо видна) й ставимо картку над нею чи під нею; без цілі — по центру.
+function place() {
+  if (!cur) return;
+  const { el } = cur;
+  const s = cur.steps[cur.i];
+  const target = s.target ? document.querySelector(s.target) : null;
+  const r = target && target.getClientRects().length ? target.getBoundingClientRect() : null;
+  const hole = el.querySelector('.tour-hole');
+  const card = el.querySelector('.tour-card');
+  el.classList.toggle('centered', !r);
+  if (!r) { hole.style.cssText = ''; card.style.top = ''; card.style.bottom = ''; return; }
+  const pad = 6;
+  hole.style.cssText = `left:${r.left - pad}px;top:${r.top - pad}px;width:${r.width + pad * 2}px;height:${r.height + pad * 2}px`;
+  const below = r.top + r.height / 2 < window.innerHeight / 2;
+  card.style.top = below ? `${Math.min(window.innerHeight - 40, r.bottom + 16)}px` : '';
+  card.style.bottom = below ? '' : `${Math.max(12, window.innerHeight - r.top + 16)}px`;
+}
+
+function stopTour(done = true) {
+  if (!cur) return;
+  const { el, opts, opener } = cur;
+  document.removeEventListener('keydown', cur.onKey);
+  window.removeEventListener('resize', cur.onResize);
+  clearTimeout(cur.talk);
+  cur = null;
+  el.classList.add('closing');
+  setTimeout(() => el.remove(), 200);
+  document.body.classList.remove('touring');
+  if (done && opts.key) store.set(opts.key, true);
+  if (done) opts.onDone?.();
+  opener?.focus?.({ preventScroll: true });
+}
+
 // CarCar Business — окремий застосунок мийки для телефона.
 // Головне під пальцем: повідомлення клієнтів, записи по днях, показники мийки й профіль, який бачать клієнти.
 // Дані спільні із застосунком клієнта (на цьому пристрої — localStorage): запис, внесений тут, одразу
@@ -5508,7 +5840,8 @@ function viewMore() {
       <div><span class="lbl">Тема</span>${themePicker(store.get('biz.theme', 'system'))}</div>
       <p class="small muted" style="margin:0"><a href="legal/partner-offer.html" target="_blank">Договір для мийок</a> · <a href="legal/privacy.html" target="_blank">Конфіденційність</a></p>
     </section>
-    <div class="stack" style="gap:8px;margin-top:12px">${links.map(([href, ic, title, sub, n]) => `<a class="pro-link" href="${href}">${icon(ic, 22)}<span><b>${title}</b><small>${sub}</small></span>${n ? `<span class="count-dot" aria-hidden="true">${n}</span>` : ''}${icon('chevR', 18)}</a>`).join('')}</div>
+    <div class="stack" style="gap:8px;margin-top:12px">${links.map(([href, ic, title, sub, n]) => `<a class="pro-link" href="${href}">${icon(ic, 22)}<span><b>${title}</b><small>${sub}</small></span>${n ? `<span class="count-dot" aria-hidden="true">${n}</span>` : ''}${icon('chevR', 18)}</a>`).join('')}
+      <button class="pro-link block-btn" type="button" data-action="tour-again">${icon('help', 22)}<span><b>Навчання з Кар Каричем</b><small>Коротко покаже, де що в кабінеті</small></span>${icon('chevR', 18)}</button></div>
     ${s?.demo ? `<button class="btn block" type="button" data-action="demo-seed" style="margin-top:16px">Заповнити прикладом: історія, записи й повідомлення</button>` : ''}
     <p class="fine" style="margin-top:16px">Щоб CarCar Business був під рукою, додайте його на головний екран: меню браузера → «Встановити застосунок» або «На екран “Додому”».</p>
     <button class="btn line-danger block" type="button" data-action="logout" style="margin-top:8px">${s?.demo ? 'Вийти з демо' : `Вийти${s?.login ? ` (${esc(s.login)})` : ''}`}</button>`;
@@ -6100,6 +6433,20 @@ const noteLine = (key) => {
 
 // ---------- оболонка ----------
 
+// Навчання для мийки при першому вході: Кар Карич показує вкладки й головні дії (tour.js).
+const TOUR_KEY = 'biz.tour';
+const BIZ_TOUR = [
+  { title: 'Кар! Я Кар Карич', text: 'Ласкаво просимо в CarCar Business. За хвилину покажу, де що: записи клієнтів, повідомлення, гроші й налаштування мийки.' },
+  { target: '#tabbar a[href="#/"]', title: 'Повідомлення', text: 'Тут нові записи, чати з клієнтами й дзвінки. Новий запис треба прийняти або запропонувати інший час — на це є 5 хвилин робочого часу.' },
+  { target: '#tabbar a[href="#/bookings"]', title: 'Записи', text: 'Розклад по днях і годинах. Натисніть запис — побачите картку: послуги, авто, мийника. Тут же переносите чи позначаєте «Машина готова».' },
+  { target: '#fab', title: 'Записати самому', text: 'Клієнт подзвонив чи приїхав без запису? Кнопка «Запис» — і час одразу зайнятий, щоб його не продали двічі.' },
+  { target: '#tabbar a[href="#/wash"]', title: 'Мийка й гроші', text: 'Виручка за день, тиждень і місяць, гроші від CARCAR і виведення на рахунок. Звідси ж — аналітика й завантаження по годинах.' },
+  { target: '#tabbar a[href="#/profile"]', title: 'Профіль мийки', text: 'Фото, опис, ціни, графік і бокси. Це бачать клієнти в каталозі — заповніть, щоб записувались частіше.' },
+  { target: '#tabbar a[href="#/more"]', title: 'Ще', text: 'Каса й зміни, мийники та зарплата, витратні матеріали, абонементи, клієнти з нотатками, відгуки й підтримка CARCAR.' },
+  { title: 'Номери клієнтів приховані', text: 'Клієнти CARCAR пишуть і дзвонять через застосунок — номери телефонів не показуються. Так записи не губляться, а оплата захищена.' },
+  { title: 'Готово!', text: 'Кар-р! Можна працювати. Забудете щось — «Ще» → «Навчання з Кар Каричем».' },
+];
+
 const TABS = [['', 'Повідомлення', 'chat'], ['bookings', 'Записи', 'calendar'], ['wash', 'Мийка', 'chart'], ['profile', 'Профіль', 'car'], ['more', 'Ще', 'list']];
 
 function renderChrome(page) {
@@ -6191,6 +6538,12 @@ function route() {
     }
   }
   alertPending();
+  // Перший вхід у кабінет на цьому пристрої — навчання з Кар Каричем (на екрані «Повідомлення», де видно всі вкладки).
+  if (!tourSeen(TOUR_KEY) && !ui.tourStarted && !$('#sheet-root').innerHTML) {
+    ui.tourStarted = true;
+    if (page !== '') location.hash = '#/';
+    setTimeout(() => startTour(BIZ_TOUR, { key: TOUR_KEY }), 500);
+  }
   const key = `${page}/${page === 'chat' ? arg : ''}`;
   // Новий екран — згори; повернулися з чату до списку — туди, де були.
   if (key !== ui.lastView && page !== 'chat') window.scrollTo({ top: ui.lastView?.startsWith('chat/') ? ui.scrollMem?.[key] ?? 0 : 0, behavior: 'instant' });
@@ -6345,6 +6698,7 @@ document.addEventListener('click', async (e) => {
     toast(`Запис прийнято: ${who(b)}, ${dayWord(b.date).toLowerCase()} о ${b.time}`);
     return;
   }
+  if (action === 'tour-again') { location.hash = '#/'; setTimeout(() => startTour(BIZ_TOUR, { key: TOUR_KEY }), 250); return; }
   if (action === 'msg-more') { ui.msgPage = (ui.msgPage ?? 80) + 160; rerender(); return; }
   if (action === 'washer') { washerSheet(id, 'assign'); return; }
   if (action === 'call') {

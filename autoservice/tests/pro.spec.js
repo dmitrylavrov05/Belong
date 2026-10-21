@@ -1000,3 +1000,40 @@ test('профіль мийки: дія в одній картці не стир
   await page.evaluate(() => window.dispatchEvent(new StorageEvent('storage', { key: 'carcar.bookings' })));
   await expect(about).toHaveValue('Миємо швидко й акуратно');
 });
+
+test('навчання з Кар Каричем: при першому вході — кроки з підсвіткою вкладок; повторити можна з «Ще»', async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'uk-UA' });
+  await ctx.addInitScript(() => {
+    localStorage.getItem('carcar.biz.session') ?? localStorage.setItem('carcar.biz.session', '{"demo":true}');
+    localStorage.getItem('carcar.partner') ?? localStorage.setItem('carcar.partner', '"blysk"');
+  });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto(`${PRO}#/bookings`);
+  const tour = page.getByRole('dialog', { name: 'Кар! Я Кар Карич' });
+  await expect(tour).toBeVisible();
+  await expect(page).toHaveURL(/pro\.html#\/$/);
+  await expect(tour.locator('.k-bird')).toBeVisible();
+  await page.getByRole('button', { name: 'Далі' }).click();
+  await expect(page.getByRole('dialog', { name: 'Повідомлення' })).toBeVisible();
+  // Підсвічено саме вкладку «Повідомлення».
+  const hole = await page.locator('.tour-hole').boundingBox();
+  const tab = await page.locator('#tabbar a[href="#/"]').boundingBox();
+  expect(Math.abs(hole.x + hole.width / 2 - (tab.x + tab.width / 2))).toBeLessThan(4);
+  await page.getByRole('button', { name: 'Назад' }).click();
+  await expect(page.getByRole('dialog', { name: 'Кар! Я Кар Карич' })).toBeVisible();
+  for (let i = 0; i < 9; i++) await page.getByRole('button', { name: /^(Далі|Почати роботу)$/ }).click();
+  await expect(page.locator('.tour')).toHaveCount(0);
+  // Вдруге сам не показується; з «Ще» — так.
+  await page.reload();
+  await page.waitForTimeout(800);
+  await expect(page.locator('.tour')).toHaveCount(0);
+  await page.goto(`${PRO}#/more`);
+  await page.getByRole('button', { name: /Навчання з Кар Каричем/ }).click();
+  await expect(page.getByRole('dialog', { name: 'Кар! Я Кар Карич' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.tour')).toHaveCount(0);
+  expect(errors).toEqual([]);
+  await ctx.close();
+});

@@ -708,8 +708,7 @@ label.item { cursor: pointer; padding: 10px 14px; }
   @keyframes cc-drop { from { transform: translateY(-14px); opacity: 0; } }
   @keyframes cc-shimmer { from { background-position: -200% 0; } to { background-position: 200% 0; } }
 
-  /* Перехід між вкладками — лише коротке проявлення: «виїзд» блоків по черзі виглядав так, ніби сторінка перезавантажується */
-  .view-enter { animation: cc-fade .15s ease-out both; }
+  /* Перехід між вкладками — без анімації: проявлення з прозорого давало білий спалах, ніби сторінка перезавантажується */
 
   .btn:active:not(:disabled), .chip:active, .slot:active:not(:disabled), .day:active:not(:disabled) { transform: scale(.96); }
   .slot[aria-pressed="true"], .day[aria-pressed="true"], .chip[aria-pressed="true"] { animation: cc-pop .3s var(--ease); }
@@ -1308,3 +1307,37 @@ body.in-chat .answer-banner { top: calc(68px + env(safe-area-inset-top)); }
 /* Фокус з клавіатури на послугах і позначках видно */
 .svc-card:focus-within, label.item:focus-within { outline: 3px solid var(--accent); outline-offset: 2px; }
 .check:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* Навчання з Кар Каричем (tour.js): затемнення з «віконцем» на цілі й картка з вороном */
+.tour { position: fixed; inset: 0; z-index: 90; animation: k-pop-fade .25s ease-out; }
+.tour.closing { opacity: 0; transition: opacity .2s; }
+.tour-hole { position: fixed; border-radius: 16px; box-shadow: 0 0 0 9999px rgb(10 14 24 / 62%), 0 0 0 3px var(--accent); transition: all .35s cubic-bezier(.2, .8, .2, 1); pointer-events: none; }
+.tour.centered .tour-hole { left: 50%; top: 50%; width: 0; height: 0; box-shadow: 0 0 0 9999px rgb(10 14 24 / 62%); }
+.tour-card { position: fixed; left: 12px; right: 12px; max-width: 420px; margin: 0 auto; display: flex; gap: 10px; align-items: flex-start;
+  padding: 16px 16px 14px; border-radius: 20px; background: var(--bg); color: var(--text); box-shadow: 0 18px 50px rgb(0 0 0 / 30%); transition: top .35s, bottom .35s; }
+.tour.centered .tour-card { top: 50%; transform: translateY(-50%); }
+.tour-card.pop { animation: tour-pop .32s cubic-bezier(.2, 1.2, .3, 1); }
+.tour.centered .tour-card.pop { animation: tour-pop-c .32s cubic-bezier(.2, 1.2, .3, 1); }
+.tour-bird { flex: none; width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 50% 40%, #fff, #e8eef8); box-shadow: 0 0 0 2px var(--line); }
+.tour-bird .k-bird { width: 64px; height: 64px; }
+.tour-card.talking .k-beak-low { animation: k-talk .22s ease-in-out infinite alternate; }
+.tour-card.wave .k-wing { animation: k-wave .45s ease-in-out 2; }
+.tour-card.pop .k-body { animation: k-hop .55s ease-out 1, k-bob 3.2s ease-in-out .55s infinite; }
+.tour-body { flex: 1; min-width: 0; display: grid; gap: 6px; }
+.tour-body h2 { margin: 0; font-size: 17px; }
+.tour-text { margin: 0; font-size: 15px; line-height: 1.45; }
+.tour-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.tour-dots { display: flex; gap: 5px; }
+.tour-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--line); transition: background .2s, transform .2s; }
+.tour-dots i.was { background: var(--muted); }
+.tour-dots i.on { background: var(--accent); transform: scale(1.3); }
+.tour-btns { display: flex; gap: 6px; margin-left: auto; }
+.tour-btns .btn { min-height: 40px; padding: 0 14px; }
+body.touring .karych { display: none; }
+@keyframes tour-pop { from { opacity: 0; transform: translateY(12px) scale(.96); } }
+@keyframes tour-pop-c { from { opacity: 0; transform: translateY(calc(-50% + 12px)) scale(.96); } }
+@keyframes k-pop-fade { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .tour, .tour-card.pop, .tour-card .k-body, .tour-card .k-wing, .tour-card .k-beak-low { animation: none !important; }
+  .tour-hole, .tour-card { transition: none; }
+}

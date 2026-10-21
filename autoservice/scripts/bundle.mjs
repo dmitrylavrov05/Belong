@@ -43,5 +43,5 @@ function bundle({ html, script, out, modules = [] }) {
 }
 
 bundle({ html: 'index.html', script: 'app.js', out: 'carcar-prototype.html', modules: ['ops.js', 'map.js', 'vehicles.js', 'call.js', 'karych.js'] });
-bundle({ html: 'pro.html', script: 'pro.js', out: 'carcar-business-app.html', modules: ['ops.js', 'partners.js', 'call.js'] });
+bundle({ html: 'pro.html', script: 'pro.js', out: 'carcar-business-app.html', modules: ['ops.js', 'partners.js', 'call.js', 'karych.js', 'tour.js'] });
 bundle({ html: 'admin.html', script: 'admin.js', out: 'carcar-admin.html', modules: ['ops.js', 'charts.js', 'partners.js'] });

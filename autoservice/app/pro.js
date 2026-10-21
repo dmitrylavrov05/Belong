@@ -19,6 +19,7 @@ import {
   stockOf, saveStock, stockLow, useStock, NOTE_TAGS, clientNoteKey, clientNotesOf, saveClientNote,
 } from './ops.js';
 import { ibanValid, normIban, formatIban, codeValid } from './partners.js';
+import { startTour, tourSeen } from './tour.js';
 import { initCalls, startCall, logCall, callHistory, callRowText, callMissed, markCallsRead, callLinked, callLine } from './call.js';
 
 // ---------- дані ----------
@@ -1296,7 +1297,8 @@ function viewMore() {
       <div><span class="lbl">Тема</span>${themePicker(store.get('biz.theme', 'system'))}</div>
       <p class="small muted" style="margin:0"><a href="legal/partner-offer.html" target="_blank">Договір для мийок</a> · <a href="legal/privacy.html" target="_blank">Конфіденційність</a></p>
     </section>
-    <div class="stack" style="gap:8px;margin-top:12px">${links.map(([href, ic, title, sub, n]) => `<a class="pro-link" href="${href}">${icon(ic, 22)}<span><b>${title}</b><small>${sub}</small></span>${n ? `<span class="count-dot" aria-hidden="true">${n}</span>` : ''}${icon('chevR', 18)}</a>`).join('')}</div>
+    <div class="stack" style="gap:8px;margin-top:12px">${links.map(([href, ic, title, sub, n]) => `<a class="pro-link" href="${href}">${icon(ic, 22)}<span><b>${title}</b><small>${sub}</small></span>${n ? `<span class="count-dot" aria-hidden="true">${n}</span>` : ''}${icon('chevR', 18)}</a>`).join('')}
+      <button class="pro-link block-btn" type="button" data-action="tour-again">${icon('help', 22)}<span><b>Навчання з Кар Каричем</b><small>Коротко покаже, де що в кабінеті</small></span>${icon('chevR', 18)}</button></div>
     ${s?.demo ? `<button class="btn block" type="button" data-action="demo-seed" style="margin-top:16px">Заповнити прикладом: історія, записи й повідомлення</button>` : ''}
     <p class="fine" style="margin-top:16px">Щоб CarCar Business був під рукою, додайте його на головний екран: меню браузера → «Встановити застосунок» або «На екран “Додому”».</p>
     <button class="btn line-danger block" type="button" data-action="logout" style="margin-top:8px">${s?.demo ? 'Вийти з демо' : `Вийти${s?.login ? ` (${esc(s.login)})` : ''}`}</button>`;
@@ -1888,6 +1890,20 @@ const noteLine = (key) => {
 
 // ---------- оболонка ----------
 
+// Навчання для мийки при першому вході: Кар Карич показує вкладки й головні дії (tour.js).
+const TOUR_KEY = 'biz.tour';
+const BIZ_TOUR = [
+  { title: 'Кар! Я Кар Карич', text: 'Ласкаво просимо в CarCar Business. За хвилину покажу, де що: записи клієнтів, повідомлення, гроші й налаштування мийки.' },
+  { target: '#tabbar a[href="#/"]', title: 'Повідомлення', text: 'Тут нові записи, чати з клієнтами й дзвінки. Новий запис треба прийняти або запропонувати інший час — на це є 5 хвилин робочого часу.' },
+  { target: '#tabbar a[href="#/bookings"]', title: 'Записи', text: 'Розклад по днях і годинах. Натисніть запис — побачите картку: послуги, авто, мийника. Тут же переносите чи позначаєте «Машина готова».' },
+  { target: '#fab', title: 'Записати самому', text: 'Клієнт подзвонив чи приїхав без запису? Кнопка «Запис» — і час одразу зайнятий, щоб його не продали двічі.' },
+  { target: '#tabbar a[href="#/wash"]', title: 'Мийка й гроші', text: 'Виручка за день, тиждень і місяць, гроші від CARCAR і виведення на рахунок. Звідси ж — аналітика й завантаження по годинах.' },
+  { target: '#tabbar a[href="#/profile"]', title: 'Профіль мийки', text: 'Фото, опис, ціни, графік і бокси. Це бачать клієнти в каталозі — заповніть, щоб записувались частіше.' },
+  { target: '#tabbar a[href="#/more"]', title: 'Ще', text: 'Каса й зміни, мийники та зарплата, витратні матеріали, абонементи, клієнти з нотатками, відгуки й підтримка CARCAR.' },
+  { title: 'Номери клієнтів приховані', text: 'Клієнти CARCAR пишуть і дзвонять через застосунок — номери телефонів не показуються. Так записи не губляться, а оплата захищена.' },
+  { title: 'Готово!', text: 'Кар-р! Можна працювати. Забудете щось — «Ще» → «Навчання з Кар Каричем».' },
+];
+
 const TABS = [['', 'Повідомлення', 'chat'], ['bookings', 'Записи', 'calendar'], ['wash', 'Мийка', 'chart'], ['profile', 'Профіль', 'car'], ['more', 'Ще', 'list']];
 
 function renderChrome(page) {
@@ -1979,6 +1995,12 @@ function route() {
     }
   }
   alertPending();
+  // Перший вхід у кабінет на цьому пристрої — навчання з Кар Каричем (на екрані «Повідомлення», де видно всі вкладки).
+  if (!tourSeen(TOUR_KEY) && !ui.tourStarted && !$('#sheet-root').innerHTML) {
+    ui.tourStarted = true;
+    if (page !== '') location.hash = '#/';
+    setTimeout(() => startTour(BIZ_TOUR, { key: TOUR_KEY }), 500);
+  }
   const key = `${page}/${page === 'chat' ? arg : ''}`;
   // Новий екран — згори; повернулися з чату до списку — туди, де були.
   if (key !== ui.lastView && page !== 'chat') window.scrollTo({ top: ui.lastView?.startsWith('chat/') ? ui.scrollMem?.[key] ?? 0 : 0, behavior: 'instant' });
@@ -2133,6 +2155,7 @@ document.addEventListener('click', async (e) => {
     toast(`Запис прийнято: ${who(b)}, ${dayWord(b.date).toLowerCase()} о ${b.time}`);
     return;
   }
+  if (action === 'tour-again') { location.hash = '#/'; setTimeout(() => startTour(BIZ_TOUR, { key: TOUR_KEY }), 250); return; }
   if (action === 'msg-more') { ui.msgPage = (ui.msgPage ?? 80) + 160; rerender(); return; }
   if (action === 'washer') { washerSheet(id, 'assign'); return; }
   if (action === 'call') {
