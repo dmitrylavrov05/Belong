@@ -2989,7 +2989,11 @@ function renderRoute() {
   // Той самий екран перемалювався (дані оновились) — лишаємо прокрутку як була; згори — лише новий екран.
   if (!changed) return;
   const target = arg && page === 'bookings' ? $(`#b-${arg}`) : page === 'garage' && arg === 'add' ? $('#add-car') : null;
-  if (target) target.scrollIntoView({ block: 'center' });
+  // Відкрили запис (після оплати чи з посилання): екран згори; лише якщо запису не видно — до нього, верхнім краєм (не в середину).
+  if (target) {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    if (target.getBoundingClientRect().bottom > window.innerHeight - 120) target.scrollIntoView({ block: 'start', behavior: 'instant' });
+  }
   // Повернулися з чату до списку — туди, де були; інший екран — згори.
   else window.scrollTo({ top: fromChat ? ui.scrollMem?.[ui.lastView] ?? 0 : 0, behavior: 'instant' });
 }

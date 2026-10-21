@@ -595,3 +595,30 @@ test('час: підготовка через північ, «Назад» по 
   expect(r.dst).toBe(5);
 });
 });
+
+test.describe('без зайвого руху', () => {
+  test.use({ contextOptions: { reducedMotion: 'no-preference' } });
+  test('після оплати екран запису не гортається в середину; у CarCar Business кнопки й вкладки не «підстрибують»', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/book/blysk');
+    await page.getByLabel(/Експрес-мийка кузова/).check();
+    await page.locator('[data-action="to-time"]').click();
+    await page.getByRole('button', { name: /Завтра/ }).click();
+    await page.locator('.slot[data-time="10:00"]').click();
+    await page.locator('[data-action="confirm"]').click();
+    await page.getByRole('button', { name: /^Оплатити/ }).click();
+    await expect(page).toHaveURL(/#\/bookings\//);
+    await page.waitForTimeout(800);
+    expect(await page.evaluate(() => scrollY)).toBeLessThan(80);
+    // CarCar Business: оновлення даних перемальовує меню й фільтри — без анімацій «натиснутого» й значків.
+    await page.goto('/pro.html#/');
+    await page.waitForTimeout(800);
+    await page.evaluate(() => {
+      window.__anim = [];
+      document.addEventListener('animationstart', (e) => { if (e.target.closest?.('#tabbar, .chips, .btn')) window.__anim.push(e.animationName); }, true);
+      window.dispatchEvent(new StorageEvent('storage', { key: 'carcar.bookings' }));
+    });
+    await page.waitForTimeout(2000);
+    expect(await page.evaluate(() => window.__anim)).toEqual([]);
+  });
+});

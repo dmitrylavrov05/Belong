@@ -722,12 +722,11 @@ label.item { cursor: pointer; padding: 10px 14px; }
   /* Перехід між вкладками — без анімації: проявлення з прозорого давало білий спалах, ніби сторінка перезавантажується */
 
   .btn:active:not(:disabled), .chip:active, .slot:active:not(:disabled), .day:active:not(:disabled) { transform: scale(.96); }
-  .slot[aria-pressed="true"], .day[aria-pressed="true"], .chip[aria-pressed="true"] { animation: cc-pop .3s var(--ease); }
   .sheet { animation: cc-sheet .34s var(--ease) both; }
   .sheet-dim, .drawer-dim { animation: cc-fade .22s both; }
   .drawer { animation: cc-drawer .3s var(--ease) both; }
-  .tab-count:not([hidden]), .count, .tabs a[data-badge] .tab-ic::after { animation: cc-pop .4s var(--ease) both; }
-  .tabs a[aria-current="page"] .tab-ic { animation: cc-bounce .45s var(--ease); }
+  /* Кнопки, вкладки й лічильники не «підстрибують»: меню й фільтри перемальовуються з кожним оновленням даних,
+     і анімація натиснутого стану чи значка програвалась би знову й знову. */
   .bk.hl { animation: cc-glow 1.2s var(--ease) 2; }
   .hbars .fill, .mini-funnel .fill, .bars .bar span, .track .fill { transform-origin: left; animation: cc-grow-x .7s var(--ease) both; }
   svg .s1, svg .s2 { transform-box: fill-box; transform-origin: bottom; animation: cc-grow-y .6s var(--ease) both; }
@@ -1352,6 +1351,10 @@ body.touring .karych { display: none; }
   .tour, .tour-card.pop, .tour-card .k-body, .tour-card .k-wing, .tour-card .k-beak-low { animation: none !important; }
   .tour-hole, .tour-card { transition: none; }
 }
+
+/* Зворотний відлік (мийці на відповідь, клієнту на рішення): цифри однакової ширини — рядок і кнопки під ним не стрибають щосекунди */
+.countdown, [data-due] { font-variant-numeric: tabular-nums; display: inline-block; min-width: 4.2ch; }
+.bk { scroll-margin-top: 72px; }
 </style>
   <style>
 /* CarCar Business — застосунок мийки для телефона. Базові кнопки, поля, чат і шторки — зі styles.css. */
