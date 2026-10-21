@@ -719,14 +719,8 @@ label.item { cursor: pointer; padding: 10px 14px; }
   @keyframes cc-drop { from { transform: translateY(-14px); opacity: 0; } }
   @keyframes cc-shimmer { from { background-position: -200% 0; } to { background-position: 200% 0; } }
 
-  .view-enter { animation: cc-view .3s var(--ease) both; }
-  .view-enter > *, .view-enter .stack > *, .view-enter .kpis > *, .view-enter .grid-2 > * { animation: cc-rise .42s var(--ease) both; }
-  .view-enter > :nth-child(2), .view-enter .stack > :nth-child(2), .view-enter .kpis > :nth-child(2), .view-enter .grid-2 > :nth-child(2) { animation-delay: 40ms; }
-  .view-enter > :nth-child(3), .view-enter .stack > :nth-child(3), .view-enter .kpis > :nth-child(3) { animation-delay: 80ms; }
-  .view-enter > :nth-child(4), .view-enter .stack > :nth-child(4), .view-enter .kpis > :nth-child(4) { animation-delay: 120ms; }
-  .view-enter > :nth-child(5), .view-enter .stack > :nth-child(5) { animation-delay: 160ms; }
-  .view-enter > :nth-child(6), .view-enter .stack > :nth-child(6) { animation-delay: 200ms; }
-  .view-enter > :nth-child(n+7), .view-enter .stack > :nth-child(n+7) { animation-delay: 240ms; }
+  /* Перехід між вкладками — лише коротке проявлення: «виїзд» блоків по черзі виглядав так, ніби сторінка перезавантажується */
+  .view-enter { animation: cc-fade .15s ease-out both; }
 
   .btn:active:not(:disabled), .chip:active, .slot:active:not(:disabled), .day:active:not(:disabled) { transform: scale(.96); }
   .slot[aria-pressed="true"], .day[aria-pressed="true"], .chip[aria-pressed="true"] { animation: cc-pop .3s var(--ease); }
@@ -2793,26 +2787,9 @@ function enterView(view, changed) {
   view.classList.add('view-enter');
   clearTimeout(enterView.t);
   enterView.t = setTimeout(() => view.classList.remove('view-enter'), 900);
-  for (const el of view.querySelectorAll('.kpi .value, .tile b, .sheet-total b')) countUp(el);
+  // Числа не «відлічуємо» з нуля на кожному переході — це теж виглядало як перезавантаження.
 }
 
-function countUp(el) {
-  const text = el.textContent;
-  const m = text.match(/\d[\d\s  ]*(?:,\d+)?/);
-  if (!m) return;
-  const dec = m[0].includes(',') ? m[0].split(',')[1].length : 0;
-  const to = parseFloat(m[0].replace(/[\s  ]/g, '').replace(',', '.'));
-  if (!(to > 0)) return;
-  const start = performance.now();
-  const step = (now) => {
-    if (!el.isConnected) return;
-    const k = Math.min(1, (now - start) / 650);
-    const v = to * (1 - (1 - k) ** 3);
-    el.textContent = k < 1 ? text.replace(m[0], v.toLocaleString('uk-UA', { minimumFractionDigits: dec, maximumFractionDigits: dec })) : text;
-    if (k < 1) requestAnimationFrame(step);
-  };
-  requestAnimationFrame(step);
-}
 
 // ---------- заявки бізнесу й доступ до кабінету ----------
 

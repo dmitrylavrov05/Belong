@@ -1121,26 +1121,9 @@ export function enterView(view, changed) {
   view.classList.add('view-enter');
   clearTimeout(enterView.t);
   enterView.t = setTimeout(() => view.classList.remove('view-enter'), 900);
-  for (const el of view.querySelectorAll('.kpi .value, .tile b, .sheet-total b')) countUp(el);
+  // Числа не «відлічуємо» з нуля на кожному переході — це теж виглядало як перезавантаження.
 }
 
-function countUp(el) {
-  const text = el.textContent;
-  const m = text.match(/\d[\d\s  ]*(?:,\d+)?/);
-  if (!m) return;
-  const dec = m[0].includes(',') ? m[0].split(',')[1].length : 0;
-  const to = parseFloat(m[0].replace(/[\s  ]/g, '').replace(',', '.'));
-  if (!(to > 0)) return;
-  const start = performance.now();
-  const step = (now) => {
-    if (!el.isConnected) return;
-    const k = Math.min(1, (now - start) / 650);
-    const v = to * (1 - (1 - k) ** 3);
-    el.textContent = k < 1 ? text.replace(m[0], v.toLocaleString('uk-UA', { minimumFractionDigits: dec, maximumFractionDigits: dec })) : text;
-    if (k < 1) requestAnimationFrame(step);
-  };
-  requestAnimationFrame(step);
-}
 
 // ---------- заявки бізнесу й доступ до кабінету ----------
 
