@@ -35,6 +35,11 @@ body.sheet-open .pro-fab { display: none; }
 .pill { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 999px; background: var(--soft); color: var(--text); white-space: nowrap; }
 .pill.ok { background: var(--ok-soft); color: var(--ok); }
 .pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.bad { background: var(--danger-soft, #fdecea); color: var(--danger); }
+.payout-list li { align-items: flex-start; padding: 6px 0; border-top: 1px solid var(--line); }
+.payout-list li > span:first-child { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+.payout-list small { display: block; width: 100%; }
+.payout-list .pill + small { width: auto; }
 .pill.muted { color: var(--muted); }
 .pill.carcar { background: color-mix(in srgb, var(--navy) 14%, var(--bg)); color: var(--navy); }
 .pill.cash { background: var(--soft); color: var(--text); }

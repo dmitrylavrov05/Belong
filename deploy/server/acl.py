@@ -729,6 +729,31 @@ def write_any_auth(who, item, cur, get):
     return who.role != 'anon'
 
 
+PAYOUT_FIXED = ('status', 'cancelledAt')
+
+
+def write_payout(who, item, cur, get):
+    """Виплати — заявки. Мийка створює заявку лише на свій перевірений рахунок і може скасувати її, доки CARCAR не переказав гроші.
+    «Виплачено» чи «Відхилено» ставить тільки адміністрація; суми й реквізити заявки мийка не змінює."""
+    if not owns(who, item.get('placeId'), get):
+        return False
+    if cur is not None:
+        if not owns(who, cur.get('placeId'), get):
+            return False
+        same = {k: v for k, v in item.items() if k not in PAYOUT_FIXED} == {k: v for k, v in cur.items() if k not in PAYOUT_FIXED}
+        if not same:
+            return False
+        return item.get('status') == cur.get('status') or (cur.get('status') == 'requested' and item.get('status') == 'cancelled')
+    if item.get('status') != 'requested' or any(k in item for k in ('paidAt', 'ref', 'reason', 'rejectedAt', 'cancelledAt')):
+        return False
+    pay = (((get('partners') or {}).get(item.get('placeId')) or {}).get('payout')) or {}
+    to = item.get('to') if isinstance(item.get('to'), dict) else {}
+    if not (pay.get('verified') and pay.get('iban') and to.get('iban') == pay.get('iban')):
+        return False
+    gross, fee, net = _num(item.get('gross')), _num(item.get('fee')), _num(item.get('net'))
+    return gross > 0 and 0 <= fee <= gross and abs(net - (gross - fee)) < 0.01
+
+
 def write_append_only(who, item, cur, get):
     """Журнал подій: додавати може будь-хто, змінювати чи видаляти — лише адміністрація."""
     return who.admin or cur is None
@@ -742,7 +767,7 @@ POLICIES = {
     'support':         ('list', read_tickets, write_ticket),
     'reviews':         ('list', read_reviews, write_review),
     'waitlist':        ('list', read_client_items('clientId'), write_client_items('clientId')),
-    'payouts':         ('list', lambda w, v, g: [x for x in v or [] if owns(w, x.get('placeId'), g)], lambda w, i, c, g: owns(w, i.get('placeId'), g) and (c is None or owns(w, c.get('placeId'), g))),
+    'payouts':         ('list', lambda w, v, g: [x for x in v or [] if owns(w, x.get('placeId'), g)], write_payout),
     'callLog':         ('list', read_calllog, write_calllog),
     'biz.applications': ('list', read_apps, write_app),
     'biz.accounts':    ('list', read_accounts, write_account),
@@ -820,8 +845,8 @@ def allowed_change(who, key, base, cur, new, get):
             if can(who, x, c, get):
                 ok_new.append(restore_phone(x, c) if restore else x)
         ok_base = [x for x in (base or []) if isinstance(x, dict) and 'id' in x and can(who, x, cmap.get(json.dumps(x['id'])), get)]
-        if key == 'analytics' or (key == 'reviews' and who.role == 'place'):
-            ok_base = []  # журнал і відгуки (для мийки): видаляти не можна, лише додавати чи відповідати
+        if key in ('analytics', 'payouts') or (key == 'reviews' and who.role == 'place'):
+            ok_base = []  # журнал, виплати й відгуки (для мийки): видаляти не можна, лише додавати чи відповідати
         return ok_base, ok_new, True
     if kind == 'dict':
         if not isinstance(new, dict):

@@ -172,6 +172,7 @@ h2.big { font-size: 20px; }
 .btn.text-danger:hover { background: var(--soft); color: var(--danger); }
 .btn.line-danger { border-color: var(--line); color: var(--danger); min-height: 52px; border-radius: 14px; font-size: 16px; }
 .btn.block { width: 100%; }
+.btn.small, .btn.primary.small { min-height: 36px; padding: 6px 12px; border-radius: 10px; font-size: 13px; }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 
 .back { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; margin-left: -6px; font-size: 15px; font-weight: 500; color: var(--navy); }

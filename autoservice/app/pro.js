@@ -9,7 +9,7 @@ import {
   ACTIVE, BLOCKING, isCarcar, price, complete, isFrozen, balanceFor, settleAll, ratingFor, partnerOf, PARTNER_STATUS,
   confirmBy, offerBy, responseStats, pauseOf, ratePct, msText, accountPlaces, addAccountPlace,
   ticketsAll, openTicket, ticketReply, setTicket, TICKET_TOPICS, TICKET_STATUS, PLACE_TOPICS, ticketPhotos,
-  payoutReady, maskIban, hidePhones, themePicker, setTheme, samePhone, hasServer, api, authToken, setAuthToken, serverConfig, demoWashOn, notifySync, pushForget, telegramNotify, fitChatScreen, keepChatOnKeyboard, commissionFor, savePartner, staffOf, checkBizLogin, numberBookings, bookingNo, POWER, powerOf, setPower,
+  payoutReady, maskIban, PAYOUT_STATUS, payoutStatus, payoutNo, hidePhones, themePicker, setTheme, samePhone, hasServer, api, authToken, setAuthToken, serverConfig, demoWashOn, notifySync, pushForget, telegramNotify, fitChatScreen, keepChatOnKeyboard, commissionFor, savePartner, staffOf, checkBizLogin, numberBookings, bookingNo, POWER, powerOf, setPower,
   keepUi, calmRedraw, validPhone, ensurePhoneHash, fmtWith,
 } from './core.js';
 import {
@@ -1073,7 +1073,8 @@ function viewWash() {
         ? `<button class="btn primary block" type="button" data-action="payout" ${bal.available > 0 ? '' : 'disabled'}>${bal.available > 0 ? `Вивести ${uah(bal.available - fee)} на ${maskIban(partnerOf(p.id).payout.iban)}` : 'Немає коштів для виведення'}</button>`
         : `<a class="btn block" href="#/payout">${partnerOf(p.id).payout?.iban ? 'Рахунок на перевірці CARCAR' : 'Вказати рахунок для виплат'}</a>`}
       <p class="fine">Комісія CARCAR ${pctText(commissionFor(p.id))} утримується під час виведення — з записів через CARCAR. Оплати на місці від ваших власних клієнтів не обкладаються; клієнти CARCAR, яких ви записали напряму, — з комісією.</p>
-      ${mine.length ? `<ul class="plain-list">${mine.map((x) => `<li><span>${fmtTime(x.at)}</span><b>${uah(x.net)}</b></li>`).join('')}</ul>` : ''}
+      ${mine.length ? payoutList(mine) : ''}
+      ${payouts.some((x) => x.placeId === p.id) ? '<a class="small" href="#/payout">Усі виплати й рахунок</a>' : ''}
     </section>
     ${suggestCard(true)}
     <a class="pro-link" href="#/analytics">${icon('chart', 22)}<span><b>Аналітика</b><small>Виручка по днях, завантаження по годинах, послуги й клієнти</small></span>${icon('chevR', 18)}</a>`;
@@ -1405,6 +1406,17 @@ function viewClients() {
     </li>`).join('')}</ul>` : `<div class="pro-empty">${icon('users', 32)}<b>${all.length ? 'Нікого не знайдено' : 'Клієнтів ще немає'}</b><span>Тут зʼявляться всі, хто записувався через CARCAR, по телефону чи приїжджав сам.</span></div>`}`;
 }
 
+// Заявки на виплату зі статусом; заявку, яку CARCAR ще не виплатив, можна скасувати.
+function payoutList(list) {
+  return `<ul class="plain-list payout-list">${list.map((x) => {
+    const st = payoutStatus(x);
+    const [label, cls] = PAYOUT_STATUS[st];
+    const note = st === 'paid' && x.paidAt ? `виплачено ${fmtTime(x.paidAt)}${x.ref ? ` · платіжка ${esc(x.ref)}` : ''}` : st === 'rejected' && x.reason ? esc(x.reason) : st === 'requested' ? 'до 2 робочих днів' : '';
+    return `<li><span><small>${fmtTime(x.at)} · № ${payoutNo(x)}</small> <span class="pill ${cls}">${label}</span>${note ? `<small class="muted"> ${note}</small>` : ''}</span>
+      <span class="row" style="gap:8px"><b>${uah(x.net)}</b>${st === 'requested' ? `<button class="btn small" type="button" data-action="payout-cancel" data-id="${x.id}">Скасувати</button>` : ''}</span></li>`;
+  }).join('')}</ul>`;
+}
+
 // Рахунок для виплат: IBAN ФОП чи ТОВ. Нові реквізити перевіряє CARCAR, до того виведення недоступне.
 function viewPayout() {
   const pt = partnerOf(ui.place);
@@ -1418,7 +1430,9 @@ function viewPayout() {
       <label class="field"><span>РНОКПП (ФОП) чи ЄДРПОУ (ТОВ)</span><input name="code" required inputmode="numeric" maxlength="10" autocomplete="off" value="${esc(pay.code ?? '')}"></label>
       <button class="btn primary" type="submit">Надіслати на перевірку</button>
       <p class="fine">Після зміни рахунку виведення зупиняється, доки CARCAR не перевірить, що рахунок належить вашій мийці.</p>
-    </form>`;
+    </form>
+    ${(() => { const all = payouts.filter((x) => x.placeId === ui.place).sort((a, b) => b.at - a.at);
+      return all.length ? `<section class="pro-card" aria-labelledby="h-payouts"><h2 id="h-payouts">Виплати</h2>${payoutList(all.slice(0, 50))}</section>` : ''; })()}`;
 }
 
 // Підтримка CARCAR для мийки: звернення з номером запису й фото.
@@ -2368,12 +2382,23 @@ document.addEventListener('click', async (e) => {
   if (action === 'payout') {
     const { available, fee, feeBase } = balanceFor(ui.place, bookings, payouts);
     if (available <= 0) return;
-    const iban = maskIban(partnerOf(ui.place).payout.iban);
-    if (!confirm(`Вивести ${uah(available)}? Комісія ${uah(fee)}, на рахунок ${iban} надійде ${uah(available - fee)}.`)) return;
-    payouts.push({ id: uid(), placeId: ui.place, gross: available, base: feeBase, fee, net: available - fee, at: Date.now(), iban });
+    const pay = partnerOf(ui.place).payout;
+    const iban = maskIban(pay.iban);
+    if (!confirm(`Вивести ${uah(available)}? Комісія ${uah(fee)}, на рахунок ${iban} надійде ${uah(available - fee)}. CARCAR переказує гроші протягом 2 робочих днів.`)) return;
+    payouts.push({ id: uid(), placeId: ui.place, gross: available, base: feeBase, fee, net: available - fee, at: Date.now(), iban,
+      status: 'requested', to: { iban: pay.iban, holder: pay.holder ?? '', code: pay.code ?? '' } });
     save();
     rerender();
-    toast(`Виплату відправлено на рахунок ${iban}`);
+    toast(`Заявку на виплату створено: ${uah(available - fee)} надійде на ${iban} протягом 2 робочих днів`);
+    return;
+  }
+  if (action === 'payout-cancel') {
+    const x = payouts.find((y) => y.id === el.dataset.id);
+    if (!x || payoutStatus(x) !== 'requested' || !confirm('Скасувати заявку на виплату? Гроші повернуться на баланс.')) return;
+    Object.assign(x, { status: 'cancelled', cancelledAt: Date.now() });
+    save();
+    rerender();
+    toast('Заявку скасовано, гроші знову можна вивести');
     return;
   }
   if (action === 'demo-seed') demoSeed();

@@ -413,6 +413,26 @@ def request_events(old, new):
     return out
 
 
+def payout_events(old, new):
+    """CARCAR переказав гроші чи відхилив заявку — мийка дізнається одразу."""
+    om = {x.get('id'): x for x in old or [] if isinstance(x, dict)}
+    out = []
+    for x in new or []:
+        if not isinstance(x, dict):
+            continue
+        o = om.get(x.get('id'))
+        st, ost = x.get('status'), (o or {}).get('status')
+        if o is None or st == ost or ost != 'requested':
+            continue
+        net = f"{round(float(x.get('net') or 0)):,}".replace(',', ' ')
+        iban = str((x.get('to') or {}).get('iban') or x.get('iban') or '')
+        if st == 'paid':
+            out.append((('place', x.get('placeId')), 'Виплату відправлено', f"{net} ₴ на рахунок UA…{iban[-4:]}", 'pro.html#/payout'))
+        elif st == 'rejected':
+            out.append((('place', x.get('placeId')), 'Заявку на виплату відхилено', (x.get('reason') or 'Гроші повернулися на баланс')[:120], 'pro.html#/payout'))
+    return out
+
+
 def call_events(old, new):
     out = []
     for cid, c in (new or {}).items():
@@ -608,7 +628,7 @@ class Notifier:
             except Exception as e:  # нарахування не має ламати збереження
                 print('referral error', repr(e), file=sys.stderr, flush=True)
         try:
-            events = {'bookings': booking_events, 'requests': request_events, 'calls': call_events}.get(key, lambda a, b: [])(old, new)
+            events = {'bookings': booking_events, 'requests': request_events, 'calls': call_events, 'payouts': payout_events}.get(key, lambda a, b: [])(old, new)
             for (kind, who), title, text, url in events:
                 if who:
                     self.send(kind, who, title, text, url)

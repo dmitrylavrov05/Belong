@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { payStep } from './pay-step.js';
 import AxeBuilder from '@axe-core/playwright';
+import { readFileSync } from 'node:fs';
 import { PRO, washReady, proWash } from './helpers.js';
 
 // Той самий фіксований час, що й в інших тестах: неділя, 4 жовтня 2026, 10:00.
@@ -175,7 +176,7 @@ test('рахунок для виплат: CARCAR перевіряє IBAN, змі
   await page.goto(`${PRO}#/wash`);
   page.once('dialog', (dl) => dl.accept());
   await page.getByRole('button', { name: /^Вивести .* на UA…7890$/ }).click();
-  await expect(page.locator('#toast')).toHaveText('Виплату відправлено на рахунок UA…7890');
+  await expect(page.locator('#toast')).toHaveText(/^Заявку на виплату створено: .* надійде на UA…7890 протягом 2 робочих днів$/);
   await expect(page.locator('.plain-list')).toBeVisible();
 
   // Новий IBAN: виплати зупинені, доки CARCAR не перевірить; мийка лишається в каталозі.
@@ -312,13 +313,80 @@ test('комісії: загальна й індивідуальна ставк�
     let msg = '';
     page.once('dialog', (dl) => { msg = dl.message(); dl.accept(); });
     await btn.click();
-    await expect(page.locator('#toast')).toHaveText('Виплату відправлено на рахунок UA…7890');
+    await expect(page.locator('#toast')).toHaveText(/^Заявку на виплату створено: .* надійде на UA…7890 протягом 2 робочих днів$/);
     expect(msg.replace(/\s/g, '')).toContain(`Комісія${fee.toLocaleString('uk-UA').replace(/\s/g, '')}₴`);
     expect((await money.locator('.plain-list li b').first().innerText()).replace(/\s/g, '')).toBe(`${net}₴`);
   }
   await page.goto(`${ADMIN}#/commission`);
   await expect(page.getByRole('region', { name: 'Виплати точкам' })).toContainText('Автомийка «Хвиля»');
   await expect(page.getByRole('region', { name: 'Виплати точкам' })).toContainText('Аква 24');
+});
+
+test('виплата мийці: заявка → платіжки для банку → «Виплачено»; відхилена заявка повертає гроші на баланс', async ({ page }) => {
+  await page.goto(`${PRO}#/wash`);
+  await page.evaluate((iban) => {
+    const all = JSON.parse(localStorage.getItem('carcar.partners') ?? '{}');
+    all.hvylia = { ...all.hvylia, payout: { iban, holder: 'ФОП Тестенко О. П.', code: '1234567899', verified: true } };
+    localStorage.setItem('carcar.partners', JSON.stringify(all));
+  }, IBAN.replace(/\s/g, ''));
+  await demoSeed(page, 'Автомийка «Хвиля»');
+  await page.goto(`${PRO}#/wash`);
+  const money = page.getByRole('region', { name: 'Гроші через CARCAR' });
+  const available = await money.locator('.money-row', { hasText: 'Можна вивести' }).locator('b').innerText();
+  page.once('dialog', (dl) => dl.accept());
+  await money.getByRole('button', { name: /^Вивести / }).click();
+  await expect(money.locator('.payout-list')).toContainText('Очікує виплати');
+  await expect(money.getByRole('button', { name: 'Немає коштів для виведення' })).toBeDisabled();
+  const net = (await money.locator('.payout-list li b').first().innerText()).replace(/\s/g, '');
+
+  // CARCAR бачить заявку в черзі, вивантажує платіжки й після переказу позначає виплаченою.
+  await page.goto(ADMIN);
+  await expect(page.locator('.queue-row')).toContainText('1 заявка на виплату');
+  await page.goto(`${ADMIN}#/commission`);
+  const todo = page.getByRole('region', { name: 'Заявки на виплату', exact: true });
+  await expect(todo).toContainText('ФОП Тестенко О. П.');
+  await expect(todo).toContainText(IBAN);
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Завантажити платіжки (CSV)' }).click()]);
+  expect(dl.suggestedFilename()).toMatch(/^carcar-vyplaty-\d{4}-\d{2}-\d{2}\.csv$/);
+  const csv = readFileSync(await dl.path(), 'utf8');
+  const [head, row] = csv.replace(/^﻿/, '').split('\r\n');
+  expect(head).toBe('"Отримувач";"Код ЄДРПОУ/РНОКПП";"IBAN";"Сума";"Призначення платежу";"Мийка";"Заявка"');
+  expect(row).toContain(`"ФОП Тестенко О. П.";"1234567899";"${IBAN.replace(/\s/g, '')}";"${net.replace(/\D/g, '')}.00";"Перерахування коштів клієнтів CARCAR`);
+  page.once('dialog', (d) => d.accept('ПП-17'));
+  await todo.getByRole('button', { name: 'Виплачено' }).click();
+  await expect(page.locator('#toast')).toHaveText('Виплату позначено, мийка отримає сповіщення');
+  await expect(page.getByRole('region', { name: 'Заявки на виплату', exact: true })).toContainText('Нових заявок немає');
+  await expect(page.getByRole('region', { name: 'Виплати точкам' })).toContainText('платіжка ПП-17');
+
+  await page.goto(`${PRO}#/payout`);
+  await expect(page.locator('.payout-list')).toContainText('Виплачено');
+  await expect(page.locator('.payout-list')).toContainText('платіжка ПП-17');
+  await expect(page.locator('[data-action="payout-cancel"]')).toHaveCount(0);
+
+  // Ще одна заявка: мийка скасовує її, потім CARCAR відхиляє наступну — гроші щоразу повертаються на баланс.
+  await page.evaluate(() => {
+    const all = JSON.parse(localStorage.getItem('carcar.payouts'));
+    all.find((x) => x.status === 'paid').gross = 0; // звільняємо баланс для перевірки
+    localStorage.setItem('carcar.payouts', JSON.stringify(all));
+  });
+  await page.goto(`${PRO}#/wash`);
+  await page.reload();
+  await expect(money.locator('.money-row', { hasText: 'Можна вивести' })).toContainText(available);
+  page.once('dialog', (d) => d.accept());
+  await money.getByRole('button', { name: /^Вивести / }).click();
+  page.once('dialog', (d) => d.accept());
+  await money.getByRole('button', { name: 'Скасувати' }).click();
+  await expect(page.locator('#toast')).toHaveText('Заявку скасовано, гроші знову можна вивести');
+  await expect(money.locator('.payout-list')).toContainText('Скасовано');
+  page.once('dialog', (d) => d.accept());
+  await money.getByRole('button', { name: /^Вивести / }).click();
+  await page.goto(`${ADMIN}#/commission`);
+  page.once('dialog', (d) => d.accept('Рахунок закрито, вкажіть новий'));
+  await page.getByRole('region', { name: 'Заявки на виплату', exact: true }).getByRole('button', { name: 'Відхилити' }).click();
+  await expect(page.locator('#toast')).toHaveText('Заявку відхилено, гроші повернулися на баланс мийки');
+  await page.goto(`${PRO}#/wash`);
+  await expect(money.locator('.payout-list')).toContainText('Рахунок закрито, вкажіть новий');
+  await expect(money.locator('.money-row', { hasText: 'Можна вивести' })).toContainText(available);
 });
 
 test('огляд платформи рахує оборот і комісію з демо-історії', async ({ page }) => {

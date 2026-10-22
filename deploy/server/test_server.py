@@ -605,6 +605,47 @@ class Server(unittest.TestCase):
             nos.append(next(x['no'] for x in self.state(t)['support'] if x['id'] == tid))
         self.assertEqual(len(set(nos)), 3, nos)
 
+    def test_24_payout_requests(self):
+        import carcar_sync
+        adm = self.call('POST', '/api/auth/admin', {'password': 'secret-admin'})[1]['token']
+        wash = self.call('POST', '/api/auth/biz', {'demo': True})[1]['token']
+        iban = 'UA223052990000026001234567890'
+        parts = self.state(adm).get('partners') or {}
+        self.put('partners', {**parts, 'blysk': {**(parts.get('blysk') or {}), 'payout': {'iban': iban, 'holder': 'ФОП Тест', 'code': '1234567899', 'verified': True}}}, adm)
+        ids = lambda t: {x['id']: x for x in self.state(t).get('payouts') or []}
+        req = {'id': 'po1', 'placeId': 'blysk', 'gross': 1000, 'base': 1000, 'fee': 100, 'net': 900, 'at': 1, 'iban': 'UA…7890',
+               'status': 'requested', 'to': {'iban': iban, 'holder': 'ФОП Тест', 'code': '1234567899'}}
+        cur = self.state(wash).get('payouts') or []
+        # Мийка не може одразу «виплатити» собі, вказати чужий рахунок чи підробити суму до переказу.
+        self.put('payouts', cur + [dict(req, id='po-x1', status='paid', paidAt=1), dict(req, id='po-x2', to={**req['to'], 'iban': 'UA903052990000026007233566001'}),
+                                   dict(req, id='po-x3', net=1000), req], wash)
+        got = ids(wash)
+        self.assertNotIn('po-x1', got)
+        self.assertNotIn('po-x2', got)
+        self.assertNotIn('po-x3', got)
+        self.assertEqual(got['po1']['status'], 'requested')
+        # Заявку не позначити виплаченою й не змінити суму; і не видалити, щоб вивести ті самі гроші вдруге.
+        lst = self.state(wash)['payouts']
+        self.put('payouts', [dict(x, status='paid') if x['id'] == 'po1' else x for x in lst], wash)
+        self.put('payouts', [dict(x, gross=5000) if x['id'] == 'po1' else x for x in self.state(wash)['payouts']], wash)
+        self.assertEqual((ids(wash)['po1']['status'], ids(wash)['po1']['gross']), ('requested', 1000))
+        lst = self.state(wash)['payouts']
+        self.put('payouts', [x for x in lst if x['id'] != 'po1'], wash, base=lst)
+        self.assertIn('po1', ids(wash))
+        # Адміністрація позначає «Виплачено» — мийка отримує сповіщення; скасувати виплачене мийка вже не може.
+        lst = self.state(adm)['payouts']
+        self.put('payouts', [dict(x, status='paid', paidAt=2, ref='42') if x['id'] == 'po1' else x for x in lst], adm)
+        self.assertEqual(ids(wash)['po1']['status'], 'paid')
+        self.put('payouts', [dict(x, status='cancelled') if x['id'] == 'po1' else x for x in self.state(wash)['payouts']], wash)
+        self.assertEqual(ids(wash)['po1']['status'], 'paid')
+        ev = carcar_sync.payout_events([req], [dict(req, status='paid', paidAt=2)])
+        self.assertEqual(ev[0][:2], (('place', 'blysk'), 'Виплату відправлено'))
+        self.assertIn('900 ₴', ev[0][2])
+        # Нову заявку мийка може скасувати, доки її не виплачено.
+        self.put('payouts', self.state(wash)['payouts'] + [dict(req, id='po2')], wash)
+        self.put('payouts', [dict(x, status='cancelled', cancelledAt=3) if x['id'] == 'po2' else x for x in self.state(wash)['payouts']], wash)
+        self.assertEqual(ids(wash)['po2']['status'], 'cancelled')
+
     def test_99_login_rate_limit(self):
         codes = [self.call('POST', '/api/auth/admin', {'password': 'x'})[0] for _ in range(12)]
         self.assertIn(429, codes)

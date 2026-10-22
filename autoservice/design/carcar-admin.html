@@ -182,6 +182,7 @@ h2.big { font-size: 20px; }
 .btn.text-danger:hover { background: var(--soft); color: var(--danger); }
 .btn.line-danger { border-color: var(--line); color: var(--danger); min-height: 52px; border-radius: 14px; font-size: 16px; }
 .btn.block { width: 100%; }
+.btn.small, .btn.primary.small { min-height: 36px; padding: 6px 12px; border-radius: 10px; font-size: 13px; }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 
 .back { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; margin-left: -6px; font-size: 15px; font-weight: 500; color: var(--navy); }
@@ -2831,6 +2832,15 @@ const payoutReady = (placeId) => {
 };
 const maskIban = (iban) => `UA…${String(iban).slice(-4)}`;
 
+// Виплати мийкам — заявки: мийка просить, CARCAR переказує з банку й позначає «Виплачено».
+// Старі записи без статусу — уже виплачені.
+const PAYOUT_STATUS = { requested: ['Очікує виплати', 'warn'], paid: ['Виплачено', 'ok'], cancelled: ['Скасовано', ''], rejected: ['Відхилено', 'bad'] };
+const payoutStatus = (x) => x.status ?? 'paid';
+// Скасована чи відхилена заявка повертає гроші на баланс мийки.
+const payoutLive = (x) => !['cancelled', 'rejected'].includes(payoutStatus(x));
+const payoutNo = (x) => String(x.id).replace(/[^a-z0-9]/gi, '').slice(-6).toUpperCase();
+const payoutPurpose = (x) => `Перерахування коштів клієнтів CARCAR за послуги мийки, заявка № ${payoutNo(x)}`;
+
 // Комісія CARCAR: індивідуальна для точки або загальна з адмінки, інакше — з data.js.
 const commissionFor = (placeId) => partnerOf(placeId).commission ?? store.get('admin.settings', {}).commission ?? PAYMENT.commission;
 
@@ -3068,7 +3078,7 @@ function balanceFor(placeId, bookings, payouts) {
   // Демо-сигнали антифроду — не гроші мийки.
   const own = bookings.filter((b) => b.placeId === placeId && isCarcar(b) && !b.demoFraud);
   const earned = own.filter((b) => !isFrozen(b)).reduce((a, b) => a + placeShare(b), 0);
-  const withdrawn = payouts.filter((x) => x.placeId === placeId).reduce((a, x) => a + x.gross, 0);
+  const withdrawn = payouts.filter((x) => x.placeId === placeId && payoutLive(x)).reduce((a, x) => a + x.gross, 0);
   // Непідтверджений запис ще не гроші точки: якщо мийка відмовить, їх повернуть клієнту.
   const frozen = own.filter((b) => ACTIVE.includes(b.state) && !AWAITING.includes(b.state)).reduce((a, b) => a + price(b), 0)
     + own.filter(isFrozen).reduce((a, b) => a + placeShare(b), 0);
@@ -3080,7 +3090,7 @@ function balanceFor(placeId, bookings, payouts) {
   const passFrozen = sales.filter((x) => !ripe(x)).reduce((a, x) => a + x.price, 0);
   const leadFees = bookings.filter((b) => b.placeId === placeId).reduce((a, b) => a + leadFee(b), 0);
   // Комісія під час виведення — з виручки через CARCAR, ще не виведеної (а не з суми, зменшеної на комісію за «своїх» клієнтів CARCAR).
-  const feeBase = Math.max(0, earned + passEarned - payouts.filter((x) => x.placeId === placeId).reduce((a, x) => a + (x.base ?? x.gross), 0));
+  const feeBase = Math.max(0, earned + passEarned - payouts.filter((x) => x.placeId === placeId && payoutLive(x)).reduce((a, x) => a + (x.base ?? x.gross), 0));
   // Комісія за клієнтів CARCAR, записаних напряму, може бути більшою за гроші в CARCAR — тоді вивести 0, а решта — борг,
   // який спишеться з наступних надходжень (мінуса «можна вивести» не буває).
   const rest = earned + passEarned - withdrawn - leadFees;
@@ -4463,6 +4473,7 @@ function queues() {
     disputes: bookings.filter((b) => b.state === 'dispute').length,
     support: ticketsAll().filter((t) => t.unreadAdmin || t.status === 'new').length,
     fraud: fraudSignals().length,
+    payouts: payouts.filter((x) => payoutStatus(x) === 'requested').length,
   };
 }
 const inQueue = (pt) => pt.status === 'pending' || pt.update === 'pending' || (pt.payout?.iban && !pt.payout.verified && pt.status === 'approved');
@@ -4475,7 +4486,7 @@ function viewOverview() {
   const q = queues();
   const escrow = bookings.filter((b) => isCarcar(b) && (ACTIVE.includes(b.state) || isFrozen(b))).reduce((a, b) => a + price(b), 0);
   // Утримано: комісія з виплат + комісія за клієнтів CARCAR, яких мийки записали напряму.
-  const collected = payouts.filter((x) => x.at >= parseDate(range[0]).getTime()).reduce((a, x) => a + x.fee, 0)
+  const collected = payouts.filter((x) => payoutStatus(x) === 'paid' && (x.paidAt ?? x.at) >= parseDate(range[0]).getTime()).reduce((a, x) => a + x.fee, 0)
     + bookings.filter((b) => (b.completedAt ?? 0) >= parseDate(range[0]).getTime()).reduce((a, b) => a + leadFee(b), 0);
   const vis = visibleReviews(reviews);
   const avgRating = vis.length ? vis.reduce((a, r) => a + r.stars, 0) / vis.length : 0;
@@ -4499,7 +4510,8 @@ function viewOverview() {
       <div class="seg" role="group" aria-label="Період">${[7, 30, 90].map((d) => `<button data-action="period" data-n="${d}" aria-pressed="${d === n}">${d} ${daysWord(d)}</button>`).join('')}</div>
       <span class="small muted">${fmtDate(range[0])} — ${fmtDate(range[1])}</span>
     </div>
-    ${q.places + q.reviews + q.disputes ? `<div class="queue-row">
+    ${q.places + q.reviews + q.disputes + q.payouts ? `<div class="queue-row">
+      ${q.payouts ? `<a class="queue" href="#/commission">${icon('cash', 20)}<b>${q.payouts}</b> ${plural(q.payouts, 'заявка', 'заявки', 'заявок')} на виплату</a>` : ''}
       ${q.places ? `<a class="queue" href="#/places">${icon('shield', 20)}<b>${q.places}</b> ${plural(q.places, 'точка чекає', 'точки чекають', 'точок чекають')} перевірки</a>` : ''}
       ${q.disputes ? `<a class="queue" href="#/disputes">${icon('scale', 20)}<b>${q.disputes}</b> ${plural(q.disputes, 'відкритий спір', 'відкриті спори', 'відкритих спорів')}</a>` : ''}
       ${q.reviews ? `<a class="queue" href="#/reviews">${icon('star', 20)}<b>${q.reviews}</b> ${plural(q.reviews, 'скарга', 'скарги', 'скарг')} на відгуки</a>` : ''}
@@ -5383,14 +5395,58 @@ function marketingDemoClear(silent) {
 
 // ---------- комісії й виплати ----------
 
+// Заявка на виплату: що переказати і чи все сходиться (баланс мийки, рахунок не змінився).
+function payoutCheck(x) {
+  const bal = balanceFor(x.placeId, bookings, payouts.filter((y) => y.id !== x.id));
+  const pay = partnerOf(x.placeId).payout ?? {};
+  const to = x.to ?? {};
+  const warn = [];
+  if (x.gross > bal.available + 1) warn.push(`більше за баланс мийки (${uah(bal.available)})`);
+  if (!to.iban) warn.push('немає реквізитів у заявці');
+  else if (to.iban !== pay.iban || !pay.verified) warn.push('рахунок мийки змінився — уточніть реквізити');
+  if (['rejected', 'suspended'].includes(partnerOf(x.placeId).status)) warn.push('мийку призупинено чи відхилено');
+  return { to, warn };
+}
+const csvCell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+// Платіжки для імпорту в клієнт-банк: одна заявка — один рядок.
+function payoutsCsv(list) {
+  const head = ['Отримувач', 'Код ЄДРПОУ/РНОКПП', 'IBAN', 'Сума', 'Призначення платежу', 'Мийка', 'Заявка'];
+  const rows = list.map((x) => { const to = x.to ?? {}; return [to.holder, to.code, to.iban, x.net.toFixed(2), payoutPurpose(x), placeName(x.placeId), payoutNo(x)]; });
+  return '\ufeff' + [head, ...rows].map((r) => r.map(csvCell).join(';')).join('\r\n');
+}
+function download(name, text, type = 'text/csv;charset=utf-8') {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = name;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
 function viewCommission() {
   const base = store.get('admin.settings', {}).commission ?? PAYMENT.commission;
   const all = [...payouts].sort((a, b) => b.at - a.at);
+  const paidList = all.filter((x) => payoutStatus(x) === 'paid');
+  const todo = all.filter((x) => payoutStatus(x) === 'requested').sort((a, b) => a.at - b.at);
   const custom = PLACES.filter((p) => partnerOf(p.id).commission !== undefined);
   return `<h1>Комісії й виплати</h1><p class="page-sub">Комісія утримується з суми, яку точка виводить. Для клієнтів комісії немає.</p>
+    <section class="panel stack" aria-labelledby="h-todo" style="gap:12px;margin-bottom:16px">
+      <h2 id="h-todo">Заявки на виплату${todo.length ? ` · ${todo.length} на ${uah(todo.reduce((a, x) => a + x.net, 0))}` : ''}</h2>
+      ${todo.length ? `<p class="fine" style="margin:0">Завантажте платіжки, імпортуйте їх у клієнт-банк (Приват24 для бізнесу, monobank для ФОП тощо) і підпишіть. Після переказу позначте заявки виплаченими — мийка отримає сповіщення.</p>
+      <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn primary" type="button" data-action="payouts-csv">${icon('cash', 18)}Завантажити платіжки (CSV)</button>
+        <button class="btn" type="button" data-action="payouts-paid-all">Позначити всі виплаченими</button></div>
+      <div class="table-wrap" tabindex="0" role="region" aria-label="Заявки на виплату"><table class="t">
+        <thead><tr><th>Заявка</th><th>Мийка</th><th>Отримувач</th><th>IBAN</th><th class="num">Переказати</th><th class="num">Комісія</th><th></th></tr></thead>
+        <tbody>${todo.map((x) => { const { to, warn } = payoutCheck(x); return `<tr><td>№ ${payoutNo(x)}<br><small class="muted">${fmtTime(x.at)}</small></td>
+          <td>${esc(placeName(x.placeId))}${warn.length ? `<br><small class="bad-text">⚠ ${esc(warn.join('; '))}</small>` : ''}</td>
+          <td>${esc(to.holder || '—')}<br><small class="muted">${esc(to.code || '')}</small></td><td><code>${esc(to.iban ? formatIban(to.iban) : '—')}</code></td>
+          <td class="num"><b>${uah(x.net)}</b></td><td class="num">${uah(x.fee)}</td>
+          <td><div class="row" style="gap:6px"><button class="btn small primary" type="button" data-action="payout-paid" data-id="${x.id}">Виплачено</button>
+            <button class="btn small" type="button" data-action="payout-reject" data-id="${x.id}">Відхилити</button></div></td></tr>`; }).join('')}</tbody>
+      </table></div>` : '<p class="muted" style="margin:0">Нових заявок немає. Мийка створює заявку кнопкою «Вивести» в кабінеті, коли гроші розморожено.</p>'}
+    </section>
     <section class="kpis" aria-label="Комісії">
-      <div class="kpi hero"><span class="label">Утримано комісії всього</span><span class="value">${uah(all.reduce((a, x) => a + x.fee, 0) + bookings.reduce((a, b) => a + leadFee(b), 0))}</span>
-        <span class="kpi-note">${all.length} ${plural(all.length, 'виплата', 'виплати', 'виплат')} на ${uah(all.reduce((a, x) => a + x.net, 0))}${bookings.some((b) => leadFee(b)) ? ` · з них за клієнтів CARCAR, записаних напряму, ${uah(bookings.reduce((a, b) => a + leadFee(b), 0))}` : ''}</span></div>
+      <div class="kpi hero"><span class="label">Утримано комісії всього</span><span class="value">${uah(paidList.reduce((a, x) => a + x.fee, 0) + bookings.reduce((a, b) => a + leadFee(b), 0))}</span>
+        <span class="kpi-note">${paidList.length} ${plural(paidList.length, 'виплата', 'виплати', 'виплат')} на ${uah(paidList.reduce((a, x) => a + x.net, 0))}${bookings.some((b) => leadFee(b)) ? ` · з них за клієнтів CARCAR, записаних напряму, ${uah(bookings.reduce((a, b) => a + leadFee(b), 0))}` : ''}</span></div>
       <div class="kpi"><span class="label">Загальна ставка</span><span class="value">${pctText(base)}</span></div>
       <div class="kpi"><span class="label">Індивідуальні ставки</span><span class="value">${custom.length}</span></div>
     </section>
@@ -5411,9 +5467,10 @@ function viewCommission() {
     </div>
     <h2 class="biz-h2">Виплати точкам</h2>
     <div class="table-wrap" tabindex="0" role="region" aria-label="Виплати точкам"><table class="t">
-      <thead><tr><th>Дата</th><th>Точка</th><th>Рахунок</th><th class="num">Сума</th><th class="num">Комісія</th><th class="num">Виплачено</th></tr></thead>
-      <tbody>${all.length ? all.slice(0, 200).map((x) => `<tr><td>${fmtTime(x.at)}</td><td>${esc(placeName(x.placeId))}</td><td>${esc(x.iban ?? (x.demo ? 'демо' : '—'))}</td>
-        <td class="num">${uah(x.gross)}</td><td class="num">${uah(x.fee)}</td><td class="num">${uah(x.net)}</td></tr>`).join('') : '<tr><td colspan="6" class="muted">Виплат ще не було.</td></tr>'}</tbody>
+      <thead><tr><th>Дата</th><th>Точка</th><th>Рахунок</th><th>Статус</th><th class="num">Сума</th><th class="num">Комісія</th><th class="num">До переказу</th></tr></thead>
+      <tbody>${all.length ? all.slice(0, 200).map((x) => { const [label, cls] = PAYOUT_STATUS[payoutStatus(x)]; return `<tr><td>${fmtTime(x.at)}</td><td>${esc(placeName(x.placeId))}</td><td>${esc(x.iban ?? (x.demo ? 'демо' : '—'))}</td>
+        <td><span class="pill ${cls}">${label}</span>${x.ref ? `<br><small class="muted">платіжка ${esc(x.ref)}</small>` : ''}${x.reason ? `<br><small class="muted">${esc(x.reason)}</small>` : ''}</td>
+        <td class="num">${uah(x.gross)}</td><td class="num">${uah(x.fee)}</td><td class="num">${uah(x.net)}</td></tr>`; }).join('') : '<tr><td colspan="7" class="muted">Виплат ще не було.</td></tr>'}</tbody>
     </table></div>`;
 }
 
@@ -5763,7 +5820,7 @@ function route() {
   if (adminLocked()) { $('#nav').innerHTML = ''; $('#view').innerHTML = viewAdminLogin(); return; }
   const [, page = '', arg] = location.hash.replace(/^#/, '').split('/');
   const q = queues();
-  const count = { applications: bizApps().filter((a) => a.status === 'new').length, places: q.places, reviews: q.reviews, disputes: q.disputes, support: q.support, fraud: q.fraud };
+  const count = { applications: bizApps().filter((a) => a.status === 'new').length, places: q.places, reviews: q.reviews, disputes: q.disputes, support: q.support, fraud: q.fraud, commission: q.payouts };
   $('#nav').innerHTML = NAV.map(([id, label, ic]) => `<a href="#/${id}" ${page === id ? 'aria-current="page"' : ''}>${icon(ic, 20)}${label}
     ${count[id] ? `<span class="count" aria-label="чекають рішення: ${count[id]}">${count[id]}</span>` : ''}</a>`).join('');
   const view = $('#view');
@@ -5797,6 +5854,38 @@ document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-action]');
   if (!el) return;
   const { action, id } = el.dataset;
+  if (action === 'payouts-csv') {
+    const todo = payouts.filter((x) => payoutStatus(x) === 'requested');
+    download(`carcar-vyplaty-${isoDate(new Date())}.csv`, payoutsCsv(todo));
+    toast(`Платіжки: ${todo.length} на ${uah(todo.reduce((a, x) => a + x.net, 0))}`);
+    return;
+  }
+  if (action === 'payout-paid' || action === 'payouts-paid-all') {
+    const list = action === 'payout-paid' ? payouts.filter((x) => x.id === id && payoutStatus(x) === 'requested') : payouts.filter((x) => payoutStatus(x) === 'requested');
+    if (!list.length) return;
+    let ref = '';
+    if (action === 'payout-paid') {
+      ref = prompt(`Гроші ${uah(list[0].net)} переказано мийці «${placeName(list[0].placeId)}»? Номер платіжки (необовʼязково):`, '');
+      if (ref === null) return;
+    } else if (!confirm(`Позначити ${list.length} ${plural(list.length, 'заявку', 'заявки', 'заявок')} на ${uah(list.reduce((a, x) => a + x.net, 0))} виплаченими? Робіть це лише після переказу з банку.`)) return;
+    const now = Date.now();
+    list.forEach((x) => Object.assign(x, { status: 'paid', paidAt: now, ...(ref.trim() ? { ref: ref.trim().slice(0, 40) } : {}) }));
+    save();
+    rerender();
+    toast(list.length === 1 ? 'Виплату позначено, мийка отримає сповіщення' : `Позначено виплаченими: ${list.length}`);
+    return;
+  }
+  if (action === 'payout-reject') {
+    const x = payouts.find((y) => y.id === id && payoutStatus(y) === 'requested');
+    if (!x) return;
+    const reason = prompt('Причина для мийки (гроші повернуться на її баланс):', 'Уточніть реквізити рахунку');
+    if (!reason?.trim()) return;
+    Object.assign(x, { status: 'rejected', rejectedAt: Date.now(), reason: reason.trim().slice(0, 200) });
+    save();
+    rerender();
+    toast('Заявку відхилено, гроші повернулися на баланс мийки');
+    return;
+  }
   if (action === 'place-use') { placeUse(Number(el.dataset.i)); return; }
   if (action === 'place-another') { ui.newPlace = null; ui.placeCreated = null; ui.placeFound = null; ui.placeQ = ''; rerender(); return; }
   if (action === 'demo-all-off') {

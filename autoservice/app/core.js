@@ -627,6 +627,15 @@ export const payoutReady = (placeId) => {
 };
 export const maskIban = (iban) => `UA…${String(iban).slice(-4)}`;
 
+// Виплати мийкам — заявки: мийка просить, CARCAR переказує з банку й позначає «Виплачено».
+// Старі записи без статусу — уже виплачені.
+export const PAYOUT_STATUS = { requested: ['Очікує виплати', 'warn'], paid: ['Виплачено', 'ok'], cancelled: ['Скасовано', ''], rejected: ['Відхилено', 'bad'] };
+export const payoutStatus = (x) => x.status ?? 'paid';
+// Скасована чи відхилена заявка повертає гроші на баланс мийки.
+export const payoutLive = (x) => !['cancelled', 'rejected'].includes(payoutStatus(x));
+export const payoutNo = (x) => String(x.id).replace(/[^a-z0-9]/gi, '').slice(-6).toUpperCase();
+export const payoutPurpose = (x) => `Перерахування коштів клієнтів CARCAR за послуги мийки, заявка № ${payoutNo(x)}`;
+
 // Комісія CARCAR: індивідуальна для точки або загальна з адмінки, інакше — з data.js.
 export const commissionFor = (placeId) => partnerOf(placeId).commission ?? store.get('admin.settings', {}).commission ?? PAYMENT.commission;
 
@@ -864,7 +873,7 @@ export function balanceFor(placeId, bookings, payouts) {
   // Демо-сигнали антифроду — не гроші мийки.
   const own = bookings.filter((b) => b.placeId === placeId && isCarcar(b) && !b.demoFraud);
   const earned = own.filter((b) => !isFrozen(b)).reduce((a, b) => a + placeShare(b), 0);
-  const withdrawn = payouts.filter((x) => x.placeId === placeId).reduce((a, x) => a + x.gross, 0);
+  const withdrawn = payouts.filter((x) => x.placeId === placeId && payoutLive(x)).reduce((a, x) => a + x.gross, 0);
   // Непідтверджений запис ще не гроші точки: якщо мийка відмовить, їх повернуть клієнту.
   const frozen = own.filter((b) => ACTIVE.includes(b.state) && !AWAITING.includes(b.state)).reduce((a, b) => a + price(b), 0)
     + own.filter(isFrozen).reduce((a, b) => a + placeShare(b), 0);
@@ -876,7 +885,7 @@ export function balanceFor(placeId, bookings, payouts) {
   const passFrozen = sales.filter((x) => !ripe(x)).reduce((a, x) => a + x.price, 0);
   const leadFees = bookings.filter((b) => b.placeId === placeId).reduce((a, b) => a + leadFee(b), 0);
   // Комісія під час виведення — з виручки через CARCAR, ще не виведеної (а не з суми, зменшеної на комісію за «своїх» клієнтів CARCAR).
-  const feeBase = Math.max(0, earned + passEarned - payouts.filter((x) => x.placeId === placeId).reduce((a, x) => a + (x.base ?? x.gross), 0));
+  const feeBase = Math.max(0, earned + passEarned - payouts.filter((x) => x.placeId === placeId && payoutLive(x)).reduce((a, x) => a + (x.base ?? x.gross), 0));
   // Комісія за клієнтів CARCAR, записаних напряму, може бути більшою за гроші в CARCAR — тоді вивести 0, а решта — борг,
   // який спишеться з наступних надходжень (мінуса «можна вивести» не буває).
   const rest = earned + passEarned - withdrawn - leadFees;
