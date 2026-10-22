@@ -11,7 +11,7 @@ import {
   addCustomPlace, uid, hash,
   leadFee, isListed, createPlace, enterView, bizApps, APP_STATUS, approveBizApp, rejectBizApp, bookingNo, findByNo, ticketPhotos, shrinkPhoto,
   hasServer, api, authToken, setAuthToken, isDemoPlace, demoPlacesOn, demoWashOn, demoLoginOn, serverConfig,
-  keepUi, calmRedraw, balanceFor, PAYOUT_STATUS, payoutStatus, payoutNo, payoutPurpose,
+  keepUi, calmRedraw, paint, morph, balanceFor, PAYOUT_STATUS, payoutStatus, payoutNo, payoutPurpose,
 } from './core.js';
 import { ENTITY, TAX, codeValid, ibanValid, ibanBank, formatIban } from './partners.js';
 import { drawColumns, legend, tableView, hbars, hideTip } from './charts.js';
@@ -169,7 +169,7 @@ function viewOverview() {
     <div class="grid-3" style="margin-top:16px">
       <section class="panel" aria-labelledby="h-gmv">
         <h2 id="h-gmv">Оборот по днях</h2><p class="sub">Виконані замовлення й компенсації точкам</p>
-        <div class="chart" id="ch-gmv"></div>
+        <div class="chart" id="ch-gmv" data-own></div>
         ${tableView(['День', 'Оборот'], byDay.map((x) => [x.label, uah(x.values[0])]))}
       </section>
       <section class="panel" aria-labelledby="h-cat">
@@ -1294,7 +1294,7 @@ function viewStats() {
       <section class="panel" aria-labelledby="h-days">
         <h2 id="h-days">Записи по днях</h2>
         ${legend(['Через застосунок', 'У журналі точок'])}
-        <div class="chart" id="ch-days"></div>
+        <div class="chart" id="ch-days" data-own></div>
         ${tableView(['День', 'Через застосунок', 'У журналі'], byDay.map((x) => [x.label, String(x.values[0]), String(x.values[1])]))}
       </section>
     </div>
@@ -1460,22 +1460,22 @@ function route() {
   const [, page = '', arg] = location.hash.replace(/^#/, '').split('/');
   const q = queues();
   const count = { applications: bizApps().filter((a) => a.status === 'new').length, places: q.places, reviews: q.reviews, disputes: q.disputes, support: q.support, fraud: q.fraud, commission: q.payouts };
-  $('#nav').innerHTML = NAV.map(([id, label, ic]) => `<a href="#/${id}" ${page === id ? 'aria-current="page"' : ''}>${icon(ic, 20)}${label}
-    ${count[id] ? `<span class="count" aria-label="чекають рішення: ${count[id]}">${count[id]}</span>` : ''}</a>`).join('');
+  morph($('#nav'), NAV.map(([id, label, ic]) => `<a href="#/${id}" ${page === id ? 'aria-current="page"' : ''}>${icon(ic, 20)}${label}
+    ${count[id] ? `<span class="count" aria-label="чекають рішення: ${count[id]}">${count[id]}</span>` : ''}</a>`).join(''));
   const view = $('#view');
-  if (page === '') view.innerHTML = viewOverview();
-  else if (page === 'applications') view.innerHTML = viewApplications();
-  else if (page === 'places') view.innerHTML = arg === 'new' ? viewAddPlace() : arg ? viewPlace(arg) : viewPlaces();
-  else if (page === 'reviews') view.innerHTML = viewReviews();
-  else if (page === 'disputes') view.innerHTML = viewDisputes();
-  else if (page === 'commission') view.innerHTML = viewCommission();
-  else if (page === 'stats') view.innerHTML = viewStats();
-  else if (page === 'promos') view.innerHTML = viewPromos();
-  else if (page === 'support') view.innerHTML = viewSupport(arg);
-  else if (page === 'fraud') view.innerHTML = viewFraud();
-  else if (page === 'marketing') view.innerHTML = viewMarketing();
-  else if (page === 'demo') view.innerHTML = viewDemo();
-  else view.innerHTML = '<p>Сторінку не знайдено.</p>';
+  if (page === '') paint(view, viewOverview());
+  else if (page === 'applications') paint(view, viewApplications());
+  else if (page === 'places') paint(view, arg === 'new' ? viewAddPlace() : arg ? viewPlace(arg) : viewPlaces());
+  else if (page === 'reviews') paint(view, viewReviews());
+  else if (page === 'disputes') paint(view, viewDisputes());
+  else if (page === 'commission') paint(view, viewCommission());
+  else if (page === 'stats') paint(view, viewStats());
+  else if (page === 'promos') paint(view, viewPromos());
+  else if (page === 'support') paint(view, viewSupport(arg));
+  else if (page === 'fraud') paint(view, viewFraud());
+  else if (page === 'marketing') paint(view, viewMarketing());
+  else if (page === 'demo') paint(view, viewDemo());
+  else paint(view, '<p>Сторінку не знайдено.</p>');
   mountCharts();
   enterView(view, `${page}/${arg ?? ''}` !== ui.lastView);
   ui.lastView = `${page}/${arg ?? ''}`;

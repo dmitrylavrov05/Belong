@@ -10,7 +10,7 @@ import {
   confirmBy, offerBy, responseStats, pauseOf, ratePct, msText, accountPlaces, addAccountPlace,
   ticketsAll, openTicket, ticketReply, setTicket, TICKET_TOPICS, TICKET_STATUS, PLACE_TOPICS, ticketPhotos,
   payoutReady, maskIban, PAYOUT_STATUS, payoutStatus, payoutNo, hidePhones, themePicker, setTheme, samePhone, hasServer, api, authToken, setAuthToken, serverConfig, demoWashOn, notifySync, pushForget, telegramNotify, fitChatScreen, keepChatOnKeyboard, commissionFor, savePartner, staffOf, checkBizLogin, numberBookings, bookingNo, POWER, powerOf, setPower,
-  keepUi, calmRedraw, validPhone, ensurePhoneHash, fmtWith,
+  keepUi, calmRedraw, paint, morph, validPhone, ensurePhoneHash, fmtWith,
 } from './core.js';
 import {
   openStarts, chatPost, chatTimeline, readMessages, msgPreview, touchPresence, BIZ_QUICK, sendMessages, checkWaitlist,
@@ -1923,11 +1923,11 @@ const TABS = [['', 'Повідомлення', 'chat'], ['bookings', 'Запис
 function renderChrome(page) {
   const badge = { '': unreadCount(), bookings: unmarked().length };
   const tabOf = page === 'chat' ? '' : ['reviews', 'clients', 'payout', 'support', 'staff', 'cash', 'stock', 'passes'].includes(page) ? 'more' : page === 'analytics' ? 'wash' : page;
-  $('#tabbar').innerHTML = TABS.map(([id, label, ic]) => `<a href="#/${id}" ${tabOf === id ? 'aria-current="page"' : ''}>
-    <span class="tab-ic">${icon(ic, 24)}${badge[id] ? `<span class="tab-count" aria-label="${id ? 'Записи без позначки' : 'Непрочитані'}: ${badge[id]}">${badge[id]}</span>` : ''}</span>${label}</a>`).join('');
+  morph($('#tabbar'), TABS.map(([id, label, ic]) => `<a href="#/${id}" ${tabOf === id ? 'aria-current="page"' : ''}>
+    <span class="tab-ic">${icon(ic, 24)}${badge[id] ? `<span class="tab-count" aria-label="${id ? 'Записи без позначки' : 'Непрочитані'}: ${badge[id]}">${badge[id]}</span>` : ''}</span>${label}</a>`).join(''));
   const p = place();
   const pw = powerOf(p.id);
-  $('#top').innerHTML = `<a class="pro-brand" href="#/" aria-label="CarCar Business">${logo(30)}<span><b>${esc(p.name)}</b><small>CarCar Business${pw ? ` · ${POWER[pw.state][0].toLowerCase()}` : ''}</small></span></a>`;
+  morph($('#top'), `<a class="pro-brand" href="#/" aria-label="CarCar Business">${logo(30)}<span><b>${esc(p.name)}</b><small>CarCar Business${pw ? ` · ${POWER[pw.state][0].toLowerCase()}` : ''}</small></span></a>`);
   const fab = $('#fab');
   fab.hidden = !['', 'bookings', 'wash'].includes(page);
   fab.innerHTML = `${icon('plus', 22)}<span>Запис</span>`;
@@ -1984,22 +1984,22 @@ function route() {
   document.body.classList.toggle('in-chat', page === 'chat');
   renderChrome(page);
   const view = $('#view');
-  if (page === '') view.innerHTML = viewMessages();
-  else if (page === 'chat') view.innerHTML = viewThread(arg);
-  else if (page === 'bookings') view.innerHTML = viewBookings(arg);
-  else if (page === 'wash') view.innerHTML = viewWash();
-  else if (page === 'profile') view.innerHTML = viewProfile();
-  else if (page === 'more') view.innerHTML = viewMore();
-  else if (page === 'reviews') view.innerHTML = viewReviews();
-  else if (page === 'clients') view.innerHTML = viewClients();
-  else if (page === 'staff') view.innerHTML = viewStaff();
-  else if (page === 'cash') view.innerHTML = viewCash(arg);
-  else if (page === 'stock') view.innerHTML = viewStock();
-  else if (page === 'passes') view.innerHTML = viewPasses();
-  else if (page === 'payout') view.innerHTML = viewPayout();
-  else if (page === 'support') view.innerHTML = viewSupport(arg);
-  else if (page === 'analytics') view.innerHTML = viewAnalytics();
-  else view.innerHTML = notFound();
+  if (page === '') paint(view, viewMessages());
+  else if (page === 'chat') paint(view, viewThread(arg));
+  else if (page === 'bookings') paint(view, viewBookings(arg));
+  else if (page === 'wash') paint(view, viewWash());
+  else if (page === 'profile') paint(view, viewProfile());
+  else if (page === 'more') paint(view, viewMore());
+  else if (page === 'reviews') paint(view, viewReviews());
+  else if (page === 'clients') paint(view, viewClients());
+  else if (page === 'staff') paint(view, viewStaff());
+  else if (page === 'cash') paint(view, viewCash(arg));
+  else if (page === 'stock') paint(view, viewStock());
+  else if (page === 'passes') paint(view, viewPasses());
+  else if (page === 'payout') paint(view, viewPayout());
+  else if (page === 'support') paint(view, viewSupport(arg));
+  else if (page === 'analytics') paint(view, viewAnalytics());
+  else paint(view, notFound());
   if (page === 'chat') {
     fitChatScreen();
     const list = $('.chat-msgs');

@@ -1,6 +1,6 @@
 // Графіки для адмінки CARCAR: стовпчики (складені чи згруповані), горизонтальні
 // смуги, легенда, таблиця під графіком і один тултип на сторінку. Палітра — змінні --series-1/2.
-import { esc } from './core.js';
+import { esc, morph } from './core.js';
 
 export const compact = (v) => (v >= 1000 ? `${(v / 1000).toLocaleString('uk-UA', { maximumFractionDigits: 1 })} тис.` : String(Math.round(v)));
 
@@ -65,7 +65,7 @@ export function drawColumns(el, spec) {
     const aria = `${c.label}: ${spec.series.map((s, k) => `${s} ${spec.fmt(c.values[k])}`).join(', ')}`;
     hits += `<rect class="hit" role="img" tabindex="0" aria-label="${esc(aria)}" data-tip="${esc(JSON.stringify(tip))}" x="${L + band * i}" y="${T}" width="${band}" height="${H - T - B}"/>`;
   });
-  el.innerHTML = `<svg width="${W}" height="${H}" role="group" aria-label="${esc(spec.title)}">${g}${marks}${hits}</svg>`;
+  morph(el, `<svg width="${W}" height="${H}" role="group" aria-label="${esc(spec.title)}">${g}${marks}${hits}</svg>`);
 }
 
 export const legend = (names) => `<ul class="legend">${names.map((n, i) => `<li><i class="s${i + 1}"></i>${esc(n)}</li>`).join('')}</ul>`;

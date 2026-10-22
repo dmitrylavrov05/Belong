@@ -2784,6 +2784,52 @@ const sig = (el) => {
   const same = [...document.querySelectorAll(`${el.tagName}${cls ? `.${[...el.classList].map((c) => CSS.escape(c)).join('.')}` : ''}`)];
   return `${el.id || ''}#${el.dataset.id ?? ''}#${el.tagName}.${cls}#${same.indexOf(el)}`;
 };
+// Оновлення на місці: вузли, що не змінились, лишаються тими самими — анімації не перезапускаються, картинки не
+// перевантажуються, кнопки й тексти не блимають, прокрутка вкладених списків і фокус зберігаються.
+// Вміст елемента з data-own малює власний код (стрічка мийок, карта, кроки запису) — його не чіпаємо.
+const sameKind = (a, b) => a.nodeType === b.nodeType && a.nodeName === b.nodeName
+  && (a.nodeType !== 1 || (a.id === b.id && (a.nodeName !== 'INPUT' || (a.getAttribute('type') === b.getAttribute('type') && a.type !== 'file'))));
+function morphKids(a, b) {
+  let cur = a.firstChild;
+  for (const nb of [...b.childNodes]) {
+    let m = null;
+    if (nb.nodeType === 1 && nb.id) for (let x = cur; x; x = x.nextSibling) if (x.nodeType === 1 && x.id === nb.id) { m = x; break; }
+    if (!m && cur && sameKind(cur, nb)) m = cur;
+    if (m && !sameKind(m, nb)) m = null;
+    if (!m) { a.insertBefore(nb, cur); continue; }
+    if (m === cur) cur = cur.nextSibling; else a.insertBefore(m, cur);
+    morphNode(m, nb);
+  }
+  while (cur) { const n = cur.nextSibling; cur.remove(); cur = n; }
+}
+function morphNode(a, b) {
+  if (a.nodeType !== 1) { if (a.nodeValue !== b.nodeValue) a.nodeValue = b.nodeValue; return; }
+  if (a.hasAttribute('data-own') && b.hasAttribute('data-own')) return;
+  for (const at of [...a.attributes]) if (!b.hasAttributeNS(at.namespaceURI, at.localName)) a.removeAttributeNS(at.namespaceURI, at.localName);
+  for (const at of b.attributes) if (a.getAttributeNS(at.namespaceURI, at.localName) !== at.value) a.setAttributeNS(at.namespaceURI, at.name, at.value);
+  morphKids(a, b);
+  // Поля — як після звичайної перемальовки (введене зберігає keepUi).
+  if (a.nodeName === 'TEXTAREA') { if (a.value !== b.value) a.value = b.value; }
+  else if (a.nodeName === 'INPUT') {
+    if (a.type === 'checkbox' || a.type === 'radio') a.checked = b.hasAttribute('checked');
+    else if (a.value !== (b.getAttribute('value') ?? '')) a.value = b.getAttribute('value') ?? '';
+  } else if (a.nodeName === 'SELECT') {
+    const i = [...b.querySelectorAll('option')].findIndex((o) => o.hasAttribute('selected'));
+    a.selectedIndex = i < 0 ? (a.options.length ? 0 : -1) : i;
+  }
+}
+function morph(el, html) {
+  const t = document.createElement('template');
+  t.innerHTML = html;
+  morphKids(el, t.content);
+}
+// Екран: новий маршрут — малюємо з нуля (починається згори, поля чисті); той самий — оновлюємо на місці.
+function paint(el, html) {
+  if (el.paintedFor === location.hash && el.firstChild) morph(el, html);
+  else el.innerHTML = html;
+  el.paintedFor = location.hash;
+}
+
 function keepUi(fn, same = () => true) {
   const y = window.scrollY;
   const fresh = Date.now() - lastSubmit.at < 1500 ? lastSubmit.form : null;
@@ -4993,18 +5039,18 @@ function renderMap(list) {
     });
   } else mapApi.setPins(list.map(mapPin));
   if (mapState.sel && !list.some((p) => p.id === mapState.sel)) mapState.sel = null;
-  $('#map-card').innerHTML = mapCard(mapState.sel);
+  morph($('#map-card'), mapCard(mapState.sel));
 }
 
 function renderList() {
   const list = filteredPlaces();
   if (ui.view === 'map') renderMap(list);
-  else $('#list').innerHTML = list.length ? list.map(placeCard).join('')
+  else morph($('#list'), list.length ? list.map(placeCard).join('')
     : !PLACES.some((p) => isListed(p) && (p.city ?? 'Київ') === ui.city)
       ? `<div class="empty city-empty">${icon('pin', 32)}<b>У місті ${esc(ui.city)} ми ще не працюємо</b>
           <span>Мийки тут поки не підключились. Знаєте хорошу мийку? Розкажіть їм про CARCAR.</span>
           <a class="btn" href="#/business">Для власників мийок</a></div>`
-      : empty('search', 'Нічого не знайшли. Спробуйте інші фільтри.');
+      : empty('search', 'Нічого не знайшли. Спробуйте інші фільтри.'));
   const where = ui.sort !== 'near' ? '' : ui.locating ? ' · шукаємо, де ви…' : ui.pos ? ` · від ${ui.posFallback ? 'центру міста' : 'вас'}` : '';
   $('#count').textContent = `${list.length} ${plural(list.length, 'мийка', 'мийки', 'мийок')}${where}`;
 }
@@ -5066,7 +5112,7 @@ function viewCatalog() {
     ${hotBlock()}
     ${promoBanner()}
     ${wallet.bonus ? `<a class="bonus-banner" href="#/invite">${icon('gift', 20)}<span>У вас ${uah(wallet.bonus)} бонусу — спишеться під час оплати замовлення від ${uah(REFERRAL.minOrder)}</span></a>` : ''}
-    <div id="list" class="stack"></div>
+    <div id="list" class="stack" data-own></div>
     <p class="note">Демо: назви мийок, адреси й телефони вигадані.</p>`;
 }
 
@@ -5467,7 +5513,7 @@ function viewBook(id, date, time) {
   }
   return `${back(`#/place/${p.id}`, p.name)}
     <h1>Запис</h1>
-    <div id="book"></div>`;
+    <div id="book" data-own></div>`;
 }
 
 // Лист очікування: якщо зручний час зайнятий — повідомимо, щойно він звільниться.
@@ -5757,7 +5803,7 @@ function renderBook() {
   // на початок стрічки, а сторінка — вгору). Переходи між кроками самі гортають угору після цього.
   const keepY = window.scrollY;
   const keepDays = $('#book .days')?.scrollLeft ?? 0;
-  $('#book').innerHTML = html;
+  morph($('#book'), html);
   const days = $('#book .days');
   if (days) days.scrollLeft = keepDays;
   if (Math.abs(window.scrollY - keepY) > 1) window.scrollTo({ top: keepY, behavior: 'instant' });
@@ -6601,7 +6647,7 @@ function viewMove(id) {
     <a class="btn primary block" href="#/chat/${b.id}">${icon('chat', 18)}Написати мийці</a>`;
   if (move?.id !== id) move = { id, date: b.date, time: null };
   return `${head}<p class="notice ok ic-row">${icon('shield', 18)}Оплата ${uah(b.paid)} не скасовується й не списується вдруге — змінюється лише час. Ціна лишається тією самою.</p>
-    <div id="move"></div>`;
+    <div id="move" data-own></div>`;
 }
 
 function renderMove() {
@@ -6612,7 +6658,7 @@ function renderMove() {
   const slots = moveSlots(b, move.date);
   if (move.time && !slots.some((x) => x.time === move.time && !x.busy)) move.time = null;
   const same = (time) => move.date === b.date && time === b.time;
-  $('#move').innerHTML = `<h2>Новий день</h2>
+  morph($('#move'), `<h2>Новий день</h2>
     <div class="days" role="group" aria-label="День">${bookingDays(p).map((d, i) => {
       const date = parseDate(d);
       const wd = i === 0 ? 'Сьогодні' : i === 1 ? 'Завтра' : date.toLocaleDateString('uk-UA', { weekday: 'short' });
@@ -6626,7 +6672,7 @@ function renderMove() {
       : '<p class="muted">На цей день вільного часу немає. Оберіть інший день.</p>'}
     ${b.deal ? `<p class="fine">Ви записалися зі знижкою −${b.deal.pct}%, тому перенести можна на час, коли діє така сама знижка. Інший час — скасуйте запис безкоштовно й запишіться знову.</p>` : ''}
     <div class="dock-space"></div>
-    <div class="dock"><button class="btn primary block" data-action="move-confirm" ${move.time ? '' : 'disabled'}>${move.time ? `Перенести на ${dayLabel(move.date, { day: 'numeric', month: 'long' })}, ${move.time}` : 'Оберіть новий час'}</button></div>`;
+    <div class="dock"><button class="btn primary block" data-action="move-confirm" ${move.time ? '' : 'disabled'}>${move.time ? `Перенести на ${dayLabel(move.date, { day: 'numeric', month: 'long' })}, ${move.time}` : 'Оберіть новий час'}</button></div>`);
 }
 
 function moveSlots(b, date) {
@@ -7331,7 +7377,7 @@ function renderRoute() {
   if (page === 'place') track('view_place', { placeId: arg });
   else if (page === 'book' && draft?.placeId !== arg) track('open_book', { placeId: arg, from: sub ? 'link' : 'page' });
   if (page === '') {
-    view.innerHTML = viewCatalog();
+    paint(view, viewCatalog());
     renderList();
     // Один раз за запуск визначаємо місце, щоб на кожній мийці було видно відстань і час у дорозі.
     if (!ui.pos && !ui.locTried) { ui.locTried = true; locate(true); }
@@ -7339,30 +7385,30 @@ function renderRoute() {
   else if (page === 'place') {
     // Старі посилання «Напишіть точці» ведуть на окремий чат.
     if (sub === 'ask') { location.replace(`#/ask/${arg}`); return; }
-    view.innerHTML = viewPlace(arg);
+    paint(view, viewPlace(arg));
     if (!ui.pos && !ui.locTried) { ui.locTried = true; locate(true); }
   }
-  else if (page === 'book') { view.innerHTML = viewBook(arg, sub, extra); if ($('#book')) renderBook(); }
-  else if (page === 'inbox') view.innerHTML = viewInbox();
-  else if (page === 'chat') view.innerHTML = viewChat(arg);
-  else if (page === 'ask') view.innerHTML = viewAsk(arg);
+  else if (page === 'book') { paint(view, viewBook(arg, sub, extra)); if ($('#book')) renderBook(); }
+  else if (page === 'inbox') paint(view, viewInbox());
+  else if (page === 'chat') paint(view, viewChat(arg));
+  else if (page === 'ask') paint(view, viewAsk(arg));
   else if (page === 'bookings') {
     // Старі посилання на чат у записі ведуть на окремий екран чату.
     if (sub === 'chat') { location.replace(`#/chat/${arg}`); return; }
-    view.innerHTML = viewBookings(arg);
-  } else if (page === 'move') { view.innerHTML = viewMove(arg); if ($('#move')) renderMove(); }
+    paint(view, viewBookings(arg));
+  } else if (page === 'move') { paint(view, viewMove(arg)); if ($('#move')) renderMove(); }
   else if (page === 'garage') {
     // «Додати авто» з головної відкриває форму в гаражі.
     ui.addCar = arg === 'add';
     // Додали авто з екрана запису — після збереження повертаємось до запису.
     if (ui.addCar) ui.addReturn = sub === 'book' && draft ? `#/book/${draft.placeId}` : null;
-    view.innerHTML = arg && arg !== 'add' ? viewCar(arg) : viewGarage();
+    paint(view, arg && arg !== 'add' ? viewCar(arg) : viewGarage());
   }
-  else if (page === 'invite') view.innerHTML = viewInvite();
-  else if (page === 'wallet') view.innerHTML = viewWallet();
-  else if (page === 'business') view.innerHTML = viewBusiness(arg);
-  else if (page === 'support') view.innerHTML = viewSupport(arg, sub);
-  else view.innerHTML = viewNotFound();
+  else if (page === 'invite') paint(view, viewInvite());
+  else if (page === 'wallet') paint(view, viewWallet());
+  else if (page === 'business') paint(view, viewBusiness(arg));
+  else if (page === 'support') paint(view, viewSupport(arg, sub));
+  else paint(view, viewNotFound());
 
   // Клієнт відкрив чат із точкою — відповіді на його запити прочитані.
   if (page === 'ask' && requests.some((r) => r.placeId === arg && r.unreadClient)) {

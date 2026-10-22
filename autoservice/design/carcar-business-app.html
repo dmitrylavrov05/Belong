@@ -3066,6 +3066,52 @@ const sig = (el) => {
   const same = [...document.querySelectorAll(`${el.tagName}${cls ? `.${[...el.classList].map((c) => CSS.escape(c)).join('.')}` : ''}`)];
   return `${el.id || ''}#${el.dataset.id ?? ''}#${el.tagName}.${cls}#${same.indexOf(el)}`;
 };
+// Оновлення на місці: вузли, що не змінились, лишаються тими самими — анімації не перезапускаються, картинки не
+// перевантажуються, кнопки й тексти не блимають, прокрутка вкладених списків і фокус зберігаються.
+// Вміст елемента з data-own малює власний код (стрічка мийок, карта, кроки запису) — його не чіпаємо.
+const sameKind = (a, b) => a.nodeType === b.nodeType && a.nodeName === b.nodeName
+  && (a.nodeType !== 1 || (a.id === b.id && (a.nodeName !== 'INPUT' || (a.getAttribute('type') === b.getAttribute('type') && a.type !== 'file'))));
+function morphKids(a, b) {
+  let cur = a.firstChild;
+  for (const nb of [...b.childNodes]) {
+    let m = null;
+    if (nb.nodeType === 1 && nb.id) for (let x = cur; x; x = x.nextSibling) if (x.nodeType === 1 && x.id === nb.id) { m = x; break; }
+    if (!m && cur && sameKind(cur, nb)) m = cur;
+    if (m && !sameKind(m, nb)) m = null;
+    if (!m) { a.insertBefore(nb, cur); continue; }
+    if (m === cur) cur = cur.nextSibling; else a.insertBefore(m, cur);
+    morphNode(m, nb);
+  }
+  while (cur) { const n = cur.nextSibling; cur.remove(); cur = n; }
+}
+function morphNode(a, b) {
+  if (a.nodeType !== 1) { if (a.nodeValue !== b.nodeValue) a.nodeValue = b.nodeValue; return; }
+  if (a.hasAttribute('data-own') && b.hasAttribute('data-own')) return;
+  for (const at of [...a.attributes]) if (!b.hasAttributeNS(at.namespaceURI, at.localName)) a.removeAttributeNS(at.namespaceURI, at.localName);
+  for (const at of b.attributes) if (a.getAttributeNS(at.namespaceURI, at.localName) !== at.value) a.setAttributeNS(at.namespaceURI, at.name, at.value);
+  morphKids(a, b);
+  // Поля — як після звичайної перемальовки (введене зберігає keepUi).
+  if (a.nodeName === 'TEXTAREA') { if (a.value !== b.value) a.value = b.value; }
+  else if (a.nodeName === 'INPUT') {
+    if (a.type === 'checkbox' || a.type === 'radio') a.checked = b.hasAttribute('checked');
+    else if (a.value !== (b.getAttribute('value') ?? '')) a.value = b.getAttribute('value') ?? '';
+  } else if (a.nodeName === 'SELECT') {
+    const i = [...b.querySelectorAll('option')].findIndex((o) => o.hasAttribute('selected'));
+    a.selectedIndex = i < 0 ? (a.options.length ? 0 : -1) : i;
+  }
+}
+function morph(el, html) {
+  const t = document.createElement('template');
+  t.innerHTML = html;
+  morphKids(el, t.content);
+}
+// Екран: новий маршрут — малюємо з нуля (починається згори, поля чисті); той самий — оновлюємо на місці.
+function paint(el, html) {
+  if (el.paintedFor === location.hash && el.firstChild) morph(el, html);
+  else el.innerHTML = html;
+  el.paintedFor = location.hash;
+}
+
 function keepUi(fn, same = () => true) {
   const y = window.scrollY;
   const fresh = Date.now() - lastSubmit.at < 1500 ? lastSubmit.form : null;
@@ -6513,11 +6559,11 @@ const TABS = [['', 'Повідомлення', 'chat'], ['bookings', 'Запис
 function renderChrome(page) {
   const badge = { '': unreadCount(), bookings: unmarked().length };
   const tabOf = page === 'chat' ? '' : ['reviews', 'clients', 'payout', 'support', 'staff', 'cash', 'stock', 'passes'].includes(page) ? 'more' : page === 'analytics' ? 'wash' : page;
-  $('#tabbar').innerHTML = TABS.map(([id, label, ic]) => `<a href="#/${id}" ${tabOf === id ? 'aria-current="page"' : ''}>
-    <span class="tab-ic">${icon(ic, 24)}${badge[id] ? `<span class="tab-count" aria-label="${id ? 'Записи без позначки' : 'Непрочитані'}: ${badge[id]}">${badge[id]}</span>` : ''}</span>${label}</a>`).join('');
+  morph($('#tabbar'), TABS.map(([id, label, ic]) => `<a href="#/${id}" ${tabOf === id ? 'aria-current="page"' : ''}>
+    <span class="tab-ic">${icon(ic, 24)}${badge[id] ? `<span class="tab-count" aria-label="${id ? 'Записи без позначки' : 'Непрочитані'}: ${badge[id]}">${badge[id]}</span>` : ''}</span>${label}</a>`).join(''));
   const p = place();
   const pw = powerOf(p.id);
-  $('#top').innerHTML = `<a class="pro-brand" href="#/" aria-label="CarCar Business">${logo(30)}<span><b>${esc(p.name)}</b><small>CarCar Business${pw ? ` · ${POWER[pw.state][0].toLowerCase()}` : ''}</small></span></a>`;
+  morph($('#top'), `<a class="pro-brand" href="#/" aria-label="CarCar Business">${logo(30)}<span><b>${esc(p.name)}</b><small>CarCar Business${pw ? ` · ${POWER[pw.state][0].toLowerCase()}` : ''}</small></span></a>`);
   const fab = $('#fab');
   fab.hidden = !['', 'bookings', 'wash'].includes(page);
   fab.innerHTML = `${icon('plus', 22)}<span>Запис</span>`;
@@ -6574,22 +6620,22 @@ function route() {
   document.body.classList.toggle('in-chat', page === 'chat');
   renderChrome(page);
   const view = $('#view');
-  if (page === '') view.innerHTML = viewMessages();
-  else if (page === 'chat') view.innerHTML = viewThread(arg);
-  else if (page === 'bookings') view.innerHTML = viewBookings(arg);
-  else if (page === 'wash') view.innerHTML = viewWash();
-  else if (page === 'profile') view.innerHTML = viewProfile();
-  else if (page === 'more') view.innerHTML = viewMore();
-  else if (page === 'reviews') view.innerHTML = viewReviews();
-  else if (page === 'clients') view.innerHTML = viewClients();
-  else if (page === 'staff') view.innerHTML = viewStaff();
-  else if (page === 'cash') view.innerHTML = viewCash(arg);
-  else if (page === 'stock') view.innerHTML = viewStock();
-  else if (page === 'passes') view.innerHTML = viewPasses();
-  else if (page === 'payout') view.innerHTML = viewPayout();
-  else if (page === 'support') view.innerHTML = viewSupport(arg);
-  else if (page === 'analytics') view.innerHTML = viewAnalytics();
-  else view.innerHTML = notFound();
+  if (page === '') paint(view, viewMessages());
+  else if (page === 'chat') paint(view, viewThread(arg));
+  else if (page === 'bookings') paint(view, viewBookings(arg));
+  else if (page === 'wash') paint(view, viewWash());
+  else if (page === 'profile') paint(view, viewProfile());
+  else if (page === 'more') paint(view, viewMore());
+  else if (page === 'reviews') paint(view, viewReviews());
+  else if (page === 'clients') paint(view, viewClients());
+  else if (page === 'staff') paint(view, viewStaff());
+  else if (page === 'cash') paint(view, viewCash(arg));
+  else if (page === 'stock') paint(view, viewStock());
+  else if (page === 'passes') paint(view, viewPasses());
+  else if (page === 'payout') paint(view, viewPayout());
+  else if (page === 'support') paint(view, viewSupport(arg));
+  else if (page === 'analytics') paint(view, viewAnalytics());
+  else paint(view, notFound());
   if (page === 'chat') {
     fitChatScreen();
     const list = $('.chat-msgs');

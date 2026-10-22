@@ -5,7 +5,7 @@ import {
   confirmBy, offerBy, pauseOf, responseStats, msText, AWAITING, staffOf, chargedOf, realOrder, hidePhones, clientIdOf, walletKey,
   applyOverrides, isListed, visibleReviews, ACTIVE, BLOCKING, HOUR, price, isFrozen, settleAll, ratingFor,
   powerOf, worksInBlackout, TICKET_TOPICS, CLIENT_TOPICS, TICKET_STATUS, ticketsAll, openTicket, ticketReply, setTicket, isBlocked, mobileOn, spanOf, laneCap, sameLane, MOBILE_ROAD, promosAll, promoCheck,
-  enterView, keepUi, calmRedraw, fitChatScreen, keepChatOnKeyboard, themePicker, setTheme, bizApps, saveBizApps, APP_STATUS, numberBookings, bookingNo, findByNo, ticketPhotos,
+  enterView, keepUi, calmRedraw, paint, morph, fitChatScreen, keepChatOnKeyboard, themePicker, setTheme, bizApps, saveBizApps, APP_STATUS, numberBookings, bookingNo, findByNo, ticketPhotos,
   hasServer, api, authToken, setAuthToken, serverConfig, notifySync, pushForget, telegramNotify, demoLoginOn,
   refCode, fmtWith,
 } from './core.js';
@@ -594,18 +594,18 @@ function renderMap(list) {
     });
   } else mapApi.setPins(list.map(mapPin));
   if (mapState.sel && !list.some((p) => p.id === mapState.sel)) mapState.sel = null;
-  $('#map-card').innerHTML = mapCard(mapState.sel);
+  morph($('#map-card'), mapCard(mapState.sel));
 }
 
 function renderList() {
   const list = filteredPlaces();
   if (ui.view === 'map') renderMap(list);
-  else $('#list').innerHTML = list.length ? list.map(placeCard).join('')
+  else morph($('#list'), list.length ? list.map(placeCard).join('')
     : !PLACES.some((p) => isListed(p) && (p.city ?? 'Київ') === ui.city)
       ? `<div class="empty city-empty">${icon('pin', 32)}<b>У місті ${esc(ui.city)} ми ще не працюємо</b>
           <span>Мийки тут поки не підключились. Знаєте хорошу мийку? Розкажіть їм про CARCAR.</span>
           <a class="btn" href="#/business">Для власників мийок</a></div>`
-      : empty('search', 'Нічого не знайшли. Спробуйте інші фільтри.');
+      : empty('search', 'Нічого не знайшли. Спробуйте інші фільтри.'));
   const where = ui.sort !== 'near' ? '' : ui.locating ? ' · шукаємо, де ви…' : ui.pos ? ` · від ${ui.posFallback ? 'центру міста' : 'вас'}` : '';
   $('#count').textContent = `${list.length} ${plural(list.length, 'мийка', 'мийки', 'мийок')}${where}`;
 }
@@ -667,7 +667,7 @@ function viewCatalog() {
     ${hotBlock()}
     ${promoBanner()}
     ${wallet.bonus ? `<a class="bonus-banner" href="#/invite">${icon('gift', 20)}<span>У вас ${uah(wallet.bonus)} бонусу — спишеться під час оплати замовлення від ${uah(REFERRAL.minOrder)}</span></a>` : ''}
-    <div id="list" class="stack"></div>
+    <div id="list" class="stack" data-own></div>
     <p class="note">Демо: назви мийок, адреси й телефони вигадані.</p>`;
 }
 
@@ -1068,7 +1068,7 @@ function viewBook(id, date, time) {
   }
   return `${back(`#/place/${p.id}`, p.name)}
     <h1>Запис</h1>
-    <div id="book"></div>`;
+    <div id="book" data-own></div>`;
 }
 
 // Лист очікування: якщо зручний час зайнятий — повідомимо, щойно він звільниться.
@@ -1358,7 +1358,7 @@ function renderBook() {
   // на початок стрічки, а сторінка — вгору). Переходи між кроками самі гортають угору після цього.
   const keepY = window.scrollY;
   const keepDays = $('#book .days')?.scrollLeft ?? 0;
-  $('#book').innerHTML = html;
+  morph($('#book'), html);
   const days = $('#book .days');
   if (days) days.scrollLeft = keepDays;
   if (Math.abs(window.scrollY - keepY) > 1) window.scrollTo({ top: keepY, behavior: 'instant' });
@@ -2202,7 +2202,7 @@ function viewMove(id) {
     <a class="btn primary block" href="#/chat/${b.id}">${icon('chat', 18)}Написати мийці</a>`;
   if (move?.id !== id) move = { id, date: b.date, time: null };
   return `${head}<p class="notice ok ic-row">${icon('shield', 18)}Оплата ${uah(b.paid)} не скасовується й не списується вдруге — змінюється лише час. Ціна лишається тією самою.</p>
-    <div id="move"></div>`;
+    <div id="move" data-own></div>`;
 }
 
 function renderMove() {
@@ -2213,7 +2213,7 @@ function renderMove() {
   const slots = moveSlots(b, move.date);
   if (move.time && !slots.some((x) => x.time === move.time && !x.busy)) move.time = null;
   const same = (time) => move.date === b.date && time === b.time;
-  $('#move').innerHTML = `<h2>Новий день</h2>
+  morph($('#move'), `<h2>Новий день</h2>
     <div class="days" role="group" aria-label="День">${bookingDays(p).map((d, i) => {
       const date = parseDate(d);
       const wd = i === 0 ? 'Сьогодні' : i === 1 ? 'Завтра' : date.toLocaleDateString('uk-UA', { weekday: 'short' });
@@ -2227,7 +2227,7 @@ function renderMove() {
       : '<p class="muted">На цей день вільного часу немає. Оберіть інший день.</p>'}
     ${b.deal ? `<p class="fine">Ви записалися зі знижкою −${b.deal.pct}%, тому перенести можна на час, коли діє така сама знижка. Інший час — скасуйте запис безкоштовно й запишіться знову.</p>` : ''}
     <div class="dock-space"></div>
-    <div class="dock"><button class="btn primary block" data-action="move-confirm" ${move.time ? '' : 'disabled'}>${move.time ? `Перенести на ${dayLabel(move.date, { day: 'numeric', month: 'long' })}, ${move.time}` : 'Оберіть новий час'}</button></div>`;
+    <div class="dock"><button class="btn primary block" data-action="move-confirm" ${move.time ? '' : 'disabled'}>${move.time ? `Перенести на ${dayLabel(move.date, { day: 'numeric', month: 'long' })}, ${move.time}` : 'Оберіть новий час'}</button></div>`);
 }
 
 function moveSlots(b, date) {
@@ -2932,7 +2932,7 @@ function renderRoute() {
   if (page === 'place') track('view_place', { placeId: arg });
   else if (page === 'book' && draft?.placeId !== arg) track('open_book', { placeId: arg, from: sub ? 'link' : 'page' });
   if (page === '') {
-    view.innerHTML = viewCatalog();
+    paint(view, viewCatalog());
     renderList();
     // Один раз за запуск визначаємо місце, щоб на кожній мийці було видно відстань і час у дорозі.
     if (!ui.pos && !ui.locTried) { ui.locTried = true; locate(true); }
@@ -2940,30 +2940,30 @@ function renderRoute() {
   else if (page === 'place') {
     // Старі посилання «Напишіть точці» ведуть на окремий чат.
     if (sub === 'ask') { location.replace(`#/ask/${arg}`); return; }
-    view.innerHTML = viewPlace(arg);
+    paint(view, viewPlace(arg));
     if (!ui.pos && !ui.locTried) { ui.locTried = true; locate(true); }
   }
-  else if (page === 'book') { view.innerHTML = viewBook(arg, sub, extra); if ($('#book')) renderBook(); }
-  else if (page === 'inbox') view.innerHTML = viewInbox();
-  else if (page === 'chat') view.innerHTML = viewChat(arg);
-  else if (page === 'ask') view.innerHTML = viewAsk(arg);
+  else if (page === 'book') { paint(view, viewBook(arg, sub, extra)); if ($('#book')) renderBook(); }
+  else if (page === 'inbox') paint(view, viewInbox());
+  else if (page === 'chat') paint(view, viewChat(arg));
+  else if (page === 'ask') paint(view, viewAsk(arg));
   else if (page === 'bookings') {
     // Старі посилання на чат у записі ведуть на окремий екран чату.
     if (sub === 'chat') { location.replace(`#/chat/${arg}`); return; }
-    view.innerHTML = viewBookings(arg);
-  } else if (page === 'move') { view.innerHTML = viewMove(arg); if ($('#move')) renderMove(); }
+    paint(view, viewBookings(arg));
+  } else if (page === 'move') { paint(view, viewMove(arg)); if ($('#move')) renderMove(); }
   else if (page === 'garage') {
     // «Додати авто» з головної відкриває форму в гаражі.
     ui.addCar = arg === 'add';
     // Додали авто з екрана запису — після збереження повертаємось до запису.
     if (ui.addCar) ui.addReturn = sub === 'book' && draft ? `#/book/${draft.placeId}` : null;
-    view.innerHTML = arg && arg !== 'add' ? viewCar(arg) : viewGarage();
+    paint(view, arg && arg !== 'add' ? viewCar(arg) : viewGarage());
   }
-  else if (page === 'invite') view.innerHTML = viewInvite();
-  else if (page === 'wallet') view.innerHTML = viewWallet();
-  else if (page === 'business') view.innerHTML = viewBusiness(arg);
-  else if (page === 'support') view.innerHTML = viewSupport(arg, sub);
-  else view.innerHTML = viewNotFound();
+  else if (page === 'invite') paint(view, viewInvite());
+  else if (page === 'wallet') paint(view, viewWallet());
+  else if (page === 'business') paint(view, viewBusiness(arg));
+  else if (page === 'support') paint(view, viewSupport(arg, sub));
+  else paint(view, viewNotFound());
 
   // Клієнт відкрив чат із точкою — відповіді на його запити прочитані.
   if (page === 'ask' && requests.some((r) => r.placeId === arg && r.unreadClient)) {

@@ -642,3 +642,32 @@ test('запис: дата й час не «стрибають» — стріч�
   expect(Math.round((await page.locator('.slot:not([disabled])').nth(3).boundingBox()).y)).toBe(Math.round(y));
   expect(await page.evaluate(() => scrollY)).toBe(200);
 });
+
+test('оновлення даних не перемальовує екран заново: кнопки, тексти й графіки лишаються на місці й не блимають', async ({ page }) => {
+  const remote = (key) => page.evaluate((k) => window.dispatchEvent(new StorageEvent('storage', { key: `carcar.${k}` })), key);
+  // Позначаємо елементи екрана; після оновлення це мають бути ті самі вузли (не пересоздані — нічого не блимає).
+  const mark = (sel) => page.evaluate((s) => { document.querySelectorAll(s).forEach((el, i) => { el.flkMark = i + 1; }); return document.querySelectorAll(s).length; }, sel);
+  const kept = (sel) => page.evaluate((s) => [...document.querySelectorAll(s)].filter((el) => el.flkMark).length, sel);
+  const screens = [
+    ['/#/', '#view button, #view .pcard, #view h1'],
+    ['/#/place/blysk', '#view .item, #view .btn, #view h1'],
+    ['/#/garage', '#view .card, #view .btn'],
+    [`${PRO}#/wash`, '#view .pro-card, #view .tile, #top .pro-brand, #tabbar a'],
+    [`${PRO}#/`, '#view .chip, #view h1'],
+    ['/admin.html#/', '#view .kpi, #ch-gmv svg, #nav a'],
+  ];
+  for (const [url, sel] of screens) {
+    await page.goto(url);
+    await page.waitForTimeout(300);
+    const n = await mark(sel);
+    expect(n, url).toBeGreaterThan(0);
+    for (const k of ['bookings', 'reviews', 'biz.places']) await remote(k);
+    await page.waitForTimeout(1500); // фонове оновлення відкладається на мить (calmRedraw)
+    expect(await kept(sel), url).toBe(n);
+  }
+  // Новий екран — як і раніше, малюється з нуля.
+  await page.goto('/#/');
+  await mark('#view h1');
+  await page.goto('/#/garage');
+  expect(await kept('#view h1')).toBe(0);
+});

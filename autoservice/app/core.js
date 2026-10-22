@@ -1080,6 +1080,52 @@ const sig = (el) => {
   const same = [...document.querySelectorAll(`${el.tagName}${cls ? `.${[...el.classList].map((c) => CSS.escape(c)).join('.')}` : ''}`)];
   return `${el.id || ''}#${el.dataset.id ?? ''}#${el.tagName}.${cls}#${same.indexOf(el)}`;
 };
+// Оновлення на місці: вузли, що не змінились, лишаються тими самими — анімації не перезапускаються, картинки не
+// перевантажуються, кнопки й тексти не блимають, прокрутка вкладених списків і фокус зберігаються.
+// Вміст елемента з data-own малює власний код (стрічка мийок, карта, кроки запису) — його не чіпаємо.
+const sameKind = (a, b) => a.nodeType === b.nodeType && a.nodeName === b.nodeName
+  && (a.nodeType !== 1 || (a.id === b.id && (a.nodeName !== 'INPUT' || (a.getAttribute('type') === b.getAttribute('type') && a.type !== 'file'))));
+function morphKids(a, b) {
+  let cur = a.firstChild;
+  for (const nb of [...b.childNodes]) {
+    let m = null;
+    if (nb.nodeType === 1 && nb.id) for (let x = cur; x; x = x.nextSibling) if (x.nodeType === 1 && x.id === nb.id) { m = x; break; }
+    if (!m && cur && sameKind(cur, nb)) m = cur;
+    if (m && !sameKind(m, nb)) m = null;
+    if (!m) { a.insertBefore(nb, cur); continue; }
+    if (m === cur) cur = cur.nextSibling; else a.insertBefore(m, cur);
+    morphNode(m, nb);
+  }
+  while (cur) { const n = cur.nextSibling; cur.remove(); cur = n; }
+}
+function morphNode(a, b) {
+  if (a.nodeType !== 1) { if (a.nodeValue !== b.nodeValue) a.nodeValue = b.nodeValue; return; }
+  if (a.hasAttribute('data-own') && b.hasAttribute('data-own')) return;
+  for (const at of [...a.attributes]) if (!b.hasAttributeNS(at.namespaceURI, at.localName)) a.removeAttributeNS(at.namespaceURI, at.localName);
+  for (const at of b.attributes) if (a.getAttributeNS(at.namespaceURI, at.localName) !== at.value) a.setAttributeNS(at.namespaceURI, at.name, at.value);
+  morphKids(a, b);
+  // Поля — як після звичайної перемальовки (введене зберігає keepUi).
+  if (a.nodeName === 'TEXTAREA') { if (a.value !== b.value) a.value = b.value; }
+  else if (a.nodeName === 'INPUT') {
+    if (a.type === 'checkbox' || a.type === 'radio') a.checked = b.hasAttribute('checked');
+    else if (a.value !== (b.getAttribute('value') ?? '')) a.value = b.getAttribute('value') ?? '';
+  } else if (a.nodeName === 'SELECT') {
+    const i = [...b.querySelectorAll('option')].findIndex((o) => o.hasAttribute('selected'));
+    a.selectedIndex = i < 0 ? (a.options.length ? 0 : -1) : i;
+  }
+}
+export function morph(el, html) {
+  const t = document.createElement('template');
+  t.innerHTML = html;
+  morphKids(el, t.content);
+}
+// Екран: новий маршрут — малюємо з нуля (починається згори, поля чисті); той самий — оновлюємо на місці.
+export function paint(el, html) {
+  if (el.paintedFor === location.hash && el.firstChild) morph(el, html);
+  else el.innerHTML = html;
+  el.paintedFor = location.hash;
+}
+
 export function keepUi(fn, same = () => true) {
   const y = window.scrollY;
   const fresh = Date.now() - lastSubmit.at < 1500 ? lastSubmit.form : null;
