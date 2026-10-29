@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # RocketBig bot — установка на Ubuntu одной командой:
-#   curl -fsSL https://raw.githubusercontent.com/dmitrylavrov05/rocketbig-bot/main/install.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/dmitrylavrov05/belong/rocketbig-bot/install.sh | sudo bash
 set -euo pipefail
 
-REPO_URL="${REPO_URL:-https://github.com/dmitrylavrov05/rocketbig-bot.git}"
+REPO_URL="${REPO_URL:-https://github.com/dmitrylavrov05/belong.git}"
+BRANCH="${BRANCH:-rocketbig-bot}"
 APP_DIR="/opt/rocketbig-bot"
 SERVICE="rocketbig"
 APP_USER="rocketbig"
@@ -24,9 +25,9 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git python3 python3-venv p
 echo "==> Скачиваю бота в $APP_DIR"
 if [ -d "$APP_DIR/.git" ]; then
   git config --global --add safe.directory "$APP_DIR"
-  git -C "$APP_DIR" pull -q
+  git -C "$APP_DIR" pull -q origin "$BRANCH"
 else
-  git clone -q "$REPO_URL" "$APP_DIR"
+  git clone -q --depth 1 -b "$BRANCH" "$REPO_URL" "$APP_DIR"
 fi
 
 id -u "$APP_USER" >/dev/null 2>&1 || useradd --system --home "$APP_DIR" --shell /usr/sbin/nologin "$APP_USER"
@@ -35,7 +36,7 @@ if [ ! -f "$APP_DIR/.env" ]; then
   echo "==> Настройка (данные сохранятся в $APP_DIR/.env)"
   TOKEN=$(ask "Токен бота от @BotFather")
   while [ -z "$TOKEN" ]; do TOKEN=$(ask "Токен не может быть пустым. Токен бота"); done
-  ADMINS=$(ask "Твой Telegram ID (узнать у @userinfobot), несколько через запятую")
+  ADMINS=$(ask "Telegram ID админов через запятую" "8979144494")
   URL=$(ask "Ссылка для кнопки «Забрать бонус»" "https://1win.com")
   PROMO=$(ask "Промокод" "ROCKETBIG")
   cat > "$APP_DIR/.env" <<EOF

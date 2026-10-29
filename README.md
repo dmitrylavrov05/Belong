@@ -14,7 +14,7 @@
 
 ## Установка на Ubuntu одной командой
 ```bash
-curl -fsSL https://raw.githubusercontent.com/dmitrylavrov05/rocketbig-bot/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/dmitrylavrov05/belong/rocketbig-bot/install.sh | sudo bash
 ```
 Скрипт спросит токен, твой Telegram ID, ссылку и промокод. Потом он сам поставит всё нужное и запустит бота как службу, которая работает 24/7.
 
