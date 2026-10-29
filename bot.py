@@ -23,8 +23,11 @@ from dotenv import load_dotenv
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 ADMIN_IDS = {int(x) for x in os.getenv("ADMIN_IDS", "").replace(" ", "").split(",") if x}
-BONUS_URL = os.getenv("BONUS_URL", "https://1win.com")
-PROMO_CODE = os.getenv("PROMO_CODE", "ROCKETBIG")
+BONUS_URLS = {
+    "ru": os.getenv("BONUS_URL_RU") or os.getenv("BONUS_URL") or "https://r1wapac.com/?p=mhge",
+    "pt": os.getenv("BONUS_URL_PT") or "https://r1wclcs.com/?p=7hra",
+}
+PROMO_CODE = os.getenv("PROMO_CODE", "BIGROCKET")
 BASE_DIR = Path(__file__).parent
 DB_PATH = BASE_DIR / os.getenv("DB_FILE", "bot.db")
 LOGO_PATH = BASE_DIR / "logo.png"
@@ -146,7 +149,7 @@ def kb_main(lang: str):
 
 def kb_go(lang: str):
     b = InlineKeyboardBuilder()
-    b.button(text=T[lang]["btn_go"], url=BONUS_URL)
+    b.button(text=T[lang]["btn_go"], url=BONUS_URLS[lang])
     return b.as_markup()
 
 # ---------------------------------------------------------------- user handlers

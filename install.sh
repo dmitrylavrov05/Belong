@@ -37,12 +37,14 @@ if [ ! -f "$APP_DIR/.env" ]; then
   TOKEN=$(ask "Токен бота от @BotFather")
   while [ -z "$TOKEN" ]; do TOKEN=$(ask "Токен не может быть пустым. Токен бота"); done
   ADMINS=$(ask "Telegram ID админов через запятую" "8979144494")
-  URL=$(ask "Ссылка для кнопки «Забрать бонус»" "https://1win.com")
-  PROMO=$(ask "Промокод" "ROCKETBIG")
+  URL_RU=$(ask "Реферальная ссылка (RU)" "https://r1wapac.com/?p=mhge")
+  URL_PT=$(ask "Реферальная ссылка (Бразилия)" "https://r1wclcs.com/?p=7hra")
+  PROMO=$(ask "Промокод" "BIGROCKET")
   cat > "$APP_DIR/.env" <<EOF
 BOT_TOKEN=$TOKEN
 ADMIN_IDS=$ADMINS
-BONUS_URL=$URL
+BONUS_URL_RU=$URL_RU
+BONUS_URL_PT=$URL_PT
 PROMO_CODE=$PROMO
 EOF
   chmod 600 "$APP_DIR/.env"
