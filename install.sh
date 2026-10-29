@@ -57,11 +57,11 @@ setkey() { grep -q "^$1=" "$APP_DIR/.env" || echo "$1=$2" >> "$APP_DIR/.env"; }
 IP=$(curl -fsS -4 --max-time 5 https://api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')
 setkey BONUS_URL_RU "https://r1wapac.com/?p=mhge"
 setkey BONUS_URL_PT "https://r1wclcs.com/?p=7hra"
-setkey WEB_PORT 80
-setkey PUBLIC_URL "http://$IP"
+setkey WEB_PORT 47391
+setkey PUBLIC_URL "http://$IP:47391"
 setkey POSTBACK_SECRET "$(head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')"
 setkey DRIP_ENABLED 1
-if command -v ufw >/dev/null && ufw status | grep -q "Status: active"; then ufw allow 80/tcp >/dev/null; fi
+if command -v ufw >/dev/null && ufw status | grep -q "Status: active"; then ufw allow 47391/tcp >/dev/null; fi
 
 echo "==> Ставлю зависимости Python"
 python3 -m venv "$APP_DIR/venv"
