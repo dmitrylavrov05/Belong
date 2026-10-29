@@ -52,6 +52,17 @@ else
   echo "==> .env уже есть, оставляю настройки"
 fi
 
+# --- новые настройки (добавляются, только если их ещё нет)
+setkey() { grep -q "^$1=" "$APP_DIR/.env" || echo "$1=$2" >> "$APP_DIR/.env"; }
+IP=$(curl -fsS -4 --max-time 5 https://api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')
+setkey BONUS_URL_RU "https://r1wapac.com/?p=mhge"
+setkey BONUS_URL_PT "https://r1wclcs.com/?p=7hra"
+setkey WEB_PORT 8080
+setkey PUBLIC_URL "http://$IP:8080"
+setkey POSTBACK_SECRET "$(head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+setkey DRIP_ENABLED 1
+if command -v ufw >/dev/null && ufw status | grep -q "Status: active"; then ufw allow 8080/tcp >/dev/null; fi
+
 echo "==> Ставлю зависимости Python"
 python3 -m venv "$APP_DIR/venv"
 "$APP_DIR/venv/bin/pip" install -q --upgrade pip
@@ -88,6 +99,13 @@ if systemctl is-active -q "$SERVICE"; then
   echo "   Перезапуск:  systemctl restart $SERVICE"
   echo "   Настройки:   nano $APP_DIR/.env  (потом перезапуск)"
   echo "   Обновить:    повтори команду установки"
+  PB_URL=$(grep '^PUBLIC_URL=' "$APP_DIR/.env" | cut -d= -f2-)
+  PB_SECRET=$(grep '^POSTBACK_SECRET=' "$APP_DIR/.env" | cut -d= -f2-)
+  echo ""
+  echo "📡 Постбэки для партнёрки 1win (вставь в кабинете партнёра):"
+  echo "   Регистрация:      $PB_URL/postback?secret=$PB_SECRET&event=reg&user={sub1}"
+  echo "   Первый депозит:   $PB_URL/postback?secret=$PB_SECRET&event=ftd&user={sub1}"
+  echo "   (если в кабинете макрос называется иначе, чем {sub1}, — подставь его)"
 else
   echo "❌ Бот не запустился. Последние логи:"
   journalctl -u "$SERVICE" -n 30 --no-pager
