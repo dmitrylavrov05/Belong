@@ -298,8 +298,22 @@ async def on_admin_help(message: Message):
         "🛠 <b>Команды админа</b>\n"
         "/stats — статистика и воронка\n"
         "/broadcast — рассылка (сегменты: ru, pt, nodep, dep)\n"
-        "/dep &lt;telegram_id&gt; — вручную отметить депозит пользователя"
+        "/dep &lt;telegram_id&gt; — вручную отметить депозит пользователя\n"
+        "/reset — пройти воронку с начала (для теста), /reset &lt;id&gt; — сбросить пользователя"
     )
+
+
+@admin.message(Command("reset"))
+async def on_reset(message: Message):
+    """/reset — начать воронку заново самому (для теста); /reset 123 — сбросить пользователя."""
+    parts = message.text.split()
+    uid = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else message.from_user.id
+    if not await get_user(uid):
+        return await message.answer("Пользователь не найден")
+    await set_fields(uid, stage="new", stage_at=now(), drip_step=0, last_drip_at=None, unsub=0,
+                     reg_at=None, dep_at=None, dep_source=None, lang=None)
+    await message.answer(f"🔄 Сброшено для {uid}. Отправь /start, чтобы пройти воронку с начала." if uid == message.from_user.id
+                         else f"🔄 Пользователь {uid} сброшен на начало воронки.")
 
 
 @admin.message(Command("dep"))
