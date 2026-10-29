@@ -28,6 +28,7 @@ ADMIN_IDS = {int(x) for x in os.getenv("ADMIN_IDS", "").replace(" ", "").split("
 BONUS_URLS = {
     "ru": os.getenv("BONUS_URL_RU") or os.getenv("BONUS_URL") or "https://r1wapac.com/?p=mhge",
     "pt": os.getenv("BONUS_URL_PT") or "https://r1wclcs.com/?p=7hra",
+    "en": os.getenv("BONUS_URL_EN") or os.getenv("BONUS_URL_RU") or "https://r1wapac.com/?p=mhge",
 }
 PROMO_CODE = os.getenv("PROMO_CODE", "BIGROCKET")
 SUB_PARAM = os.getenv("SUB_PARAM", "sub1")             # параметр ссылки, куда кладём Telegram ID (для постбэков)
@@ -36,12 +37,19 @@ POSTBACK_SECRET = os.getenv("POSTBACK_SECRET", "")
 WEB_PORT = int(os.getenv("WEB_PORT", "8080"))
 DRIP_ENABLED = os.getenv("DRIP_ENABLED", "1") == "1"
 MIN_GAP_H = float(os.getenv("DRIP_MIN_GAP_HOURS", "20"))   # не чаще одного автосообщения за N часов
-TZ_OFFSET = {"ru": 3, "pt": -3}                             # часовой пояс аудитории для «тихих часов»
+TZ_OFFSET = {"ru": 3, "pt": -3, "en": 0}                             # часовой пояс аудитории для «тихих часов»
 SEND_FROM, SEND_TO = 10, 22                                 # автосообщения только с 10:00 до 22:00 по их времени
 
 BASE_DIR = Path(__file__).parent
 DB_PATH = BASE_DIR / os.getenv("DB_FILE", "bot.db")
 LOGO_PATH = BASE_DIR / "logo.png"
+# Ролик в приветствии (своё видео для каждого языка). Пусто — вместо видео отправится логотип.
+_MEDIA = "https://d2ol7oe51mr4n9.cloudfront.net/user_3LMvoQcWsOlSTJx6cwoEfgtdFvq/"
+WELCOME_VIDEOS = {
+    "ru": os.getenv("WELCOME_VIDEO_RU", _MEDIA + "43e615e6-3655-4c61-b7ae-667525790d4d.mp4"),
+    "pt": os.getenv("WELCOME_VIDEO_PT", _MEDIA + "7740f598-0b65-495c-b222-7892d96af482.mp4"),
+    "en": os.getenv("WELCOME_VIDEO_EN", _MEDIA + "a7f5d2dc-9c1a-4dd1-88ce-660f2842a231.mp4"),
+}
 STAGES = ["new", "age_ok", "clicked", "registered", "promo", "deposited"]
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -78,6 +86,7 @@ async def db_init():
                 await db.execute(f"ALTER TABLE users ADD COLUMN {col} {typ}")
         await db.execute("CREATE TABLE IF NOT EXISTS clicks (user_id INTEGER, at TEXT)")
         await db.execute("CREATE TABLE IF NOT EXISTS events (user_id INTEGER, event TEXT, source TEXT, at TEXT)")
+        await db.execute("CREATE TABLE IF NOT EXISTS media (url TEXT PRIMARY KEY, file_id TEXT)")
         # миграция пользователей старой версии бота
         await db.execute("UPDATE users SET stage='age_ok', stage_at=? WHERE stage IS NULL AND lang IS NOT NULL", (now(),))
         await db.execute("UPDATE users SET stage='new', stage_at=? WHERE stage IS NULL", (now(),))
@@ -168,7 +177,7 @@ def kb(rows):
 
 
 def kb_lang():
-    return kb([[btn("🇷🇺 Русский", "lang:ru"), btn("🇧🇷 Português", "lang:pt")]])
+    return kb([[btn("🇷🇺 Русский", "lang:ru"), btn("🇧🇷 Português", "lang:pt")], [btn("🇬🇧 English", "lang:en")]])
 
 
 def kb_age(lang):
@@ -213,7 +222,7 @@ async def build_stats() -> str:
         unsub = await scalar(db, "SELECT COUNT(*) FROM users WHERE unsub=1 AND stage!='minor'")
         minors = await scalar(db, "SELECT COUNT(*) FROM users WHERE stage='minor'")
         lines = []
-        for lang, flag in (("ru", "🇷🇺"), ("pt", "🇧🇷")):
+        for lang, flag in (("ru", "🇷🇺"), ("pt", "🇧🇷"), ("en", "🇬🇧")):
             row = []
             for st in STAGES[1:]:
                 later = STAGES[STAGES.index(st):]
@@ -244,7 +253,7 @@ async def on_broadcast(message: Message):
     parts = message.text.split(maxsplit=2)
     target, text = "all", None
     seg = parts[1].lower() if len(parts) > 1 else ""
-    if seg in ("ru", "pt", "nodep", "dep"):
+    if seg in ("ru", "pt", "en", "nodep", "dep"):
         target = seg
         text = parts[2] if len(parts) > 2 else None
     elif len(parts) > 1:
@@ -259,12 +268,12 @@ async def on_broadcast(message: Message):
         return await message.answer(
             "Как сделать рассылку:\n"
             "• <code>/broadcast текст</code> — всем\n"
-            "• <code>/broadcast ru текст</code> или <code>pt</code> — по языку\n"
+            "• <code>/broadcast ru текст</code>, <code>pt</code> или <code>en</code> — по языку\n"
             "• <code>/broadcast nodep текст</code> — тем, кто ещё не пополнил\n"
             "• <code>/broadcast dep текст</code> — тем, кто уже пополнил\n"
             "• или ответь <code>/broadcast [сегмент]</code> на любое сообщение (фото/видео/кнопки)"
         )
-    who = {"all": "всем", "ru": "RU", "pt": "PT", "nodep": "не пополнившим", "dep": "пополнившим"}[target]
+    who = {"all": "всем", "ru": "RU", "pt": "PT", "en": "EN", "nodep": "не пополнившим", "dep": "пополнившим"}[target]
     await message.answer(f"Отправить ({who}) {preview}", parse_mode=None,
                          reply_markup=kb([[btn("✅ Отправить", "bc:yes"), btn("❌ Отмена", "bc:no")]]))
 
@@ -276,7 +285,7 @@ async def on_broadcast_confirm(cb: CallbackQuery, bot: Bot):
     if cb.data == "bc:no" or not job:
         return await cb.message.edit_text("Рассылка отменена.")
     target, msg_id, text = job
-    where = {"all": "", "ru": " AND lang='ru'", "pt": " AND lang='pt'",
+    where = {"all": "", "ru": " AND lang='ru'", "pt": " AND lang='pt'", "en": " AND lang='en'",
              "nodep": " AND stage IN ('age_ok','clicked','registered','promo')", "dep": " AND stage='deposited'"}[target]
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute("SELECT user_id FROM users WHERE active=1 AND stage NOT IN ('minor','new')" + where)
@@ -409,11 +418,30 @@ async def on_age(cb: CallbackQuery):
         return await cb.answer()
     await advance(cb.from_user.id, "age_ok")
     markup = kb([[btn(tx(lang, "btn_start_steps"), "go:1")]])
-    if LOGO_PATH.exists():
-        await cb.message.answer_photo(FSInputFile(LOGO_PATH), caption=tx(lang, "welcome"), reply_markup=markup)
-    else:
-        await cb.message.answer(tx(lang, "welcome"), reply_markup=markup)
+    await send_welcome_media(cb.message, lang, tx(lang, "welcome"), markup)
     await cb.answer()
+
+
+async def send_welcome_media(message: Message, lang: str, caption: str, markup):
+    """Ролик в приветствии. После первой отправки Telegram отдаёт file_id — дальше шлём по нему (мгновенно)."""
+    url = WELCOME_VIDEOS.get(lang) or ""
+    if url.startswith("http"):
+        async with aiosqlite.connect(DB_PATH) as db:
+            row = await (await db.execute("SELECT file_id FROM media WHERE url=?", (url,))).fetchone()
+        try:
+            sent = await message.answer_video(row[0] if row else url, caption=caption, reply_markup=markup,
+                                              width=1080, height=1920, supports_streaming=True)
+            if not row and sent.video:
+                async with aiosqlite.connect(DB_PATH) as db:
+                    await db.execute("INSERT OR REPLACE INTO media VALUES (?, ?)", (url, sent.video.file_id))
+                    await db.commit()
+            return
+        except TelegramBadRequest as e:
+            log.warning("welcome video failed (%s), sending logo instead", e)
+    if LOGO_PATH.exists():
+        await message.answer_photo(FSInputFile(LOGO_PATH), caption=caption, reply_markup=markup)
+    else:
+        await message.answer(caption, reply_markup=markup)
 
 
 @router.callback_query(F.data == "go:1")
