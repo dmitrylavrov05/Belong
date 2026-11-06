@@ -9,7 +9,7 @@ T = {
         "age_no": "❌ Нет",
         "age_denied": "Извини, бот доступен только с 18 лет. Возвращайся, когда исполнится 🙌",
         "welcome": (
-            "🚀 <b>Добро пожаловать в ROCKET BIG!</b>\n\n"
+            "🚀 <b>Добро пожаловать в BIGBONUS21!</b>\n\n"
             "Здесь ты заберёшь бонус <b>до +500%</b> на первый депозит в <b>1win</b> по нашему промокоду.\n\n"
             "🔑 Промокод: <code>{promo}</code>  ← нажми, чтобы скопировать\n\n"
             "Всего 3 шага, займёт ~2 минуты:\n"
@@ -113,7 +113,7 @@ T = {
         "age_no": "❌ Não",
         "age_denied": "Desculpe, o bot é apenas para maiores de 18 anos. Volte quando fizer 18 🙌",
         "welcome": (
-            "🚀 <b>Bem-vindo ao ROCKET BIG!</b>\n\n"
+            "🚀 <b>Bem-vindo ao BIGBONUS21!</b>\n\n"
             "Aqui você pega um bônus de <b>até +500%</b> no primeiro depósito na <b>1win</b> com o nosso código.\n\n"
             "🔑 Código: <code>{promo}</code>  ← toque para copiar\n\n"
             "Só 3 passos, ~2 minutos:\n"
@@ -222,7 +222,7 @@ T["en"] = {
     "age_no": "❌ No",
     "age_denied": "Sorry, this bot is for 18+ only. Come back when you turn 18 🙌",
     "welcome": (
-        "🚀 <b>Welcome to ROCKET BIG!</b>\n\n"
+        "🚀 <b>Welcome to BIGBONUS21!</b>\n\n"
         "Get a bonus of <b>up to +500%</b> on your first deposit at <b>1win</b> with our promo code.\n\n"
         "🔑 Promo code: <code>{promo}</code>  ← tap to copy\n\n"
         "Just 3 steps, ~2 minutes:\n"

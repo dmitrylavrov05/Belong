@@ -43,12 +43,12 @@ SEND_FROM, SEND_TO = 10, 22                                 # автосообщ
 BASE_DIR = Path(__file__).parent
 DB_PATH = BASE_DIR / os.getenv("DB_FILE", "bot.db")
 LOGO_PATH = BASE_DIR / "logo.png"
-# Ролик в приветствии (своё видео для каждого языка). Пусто — вместо видео отправится логотип.
+# Ролик в приветствии (ссылка на mp4 для каждого языка). Пусто — отправится логотип logo.png.
 _MEDIA = "https://d2ol7oe51mr4n9.cloudfront.net/user_3LMvoQcWsOlSTJx6cwoEfgtdFvq/"
 WELCOME_VIDEOS = {
-    "ru": os.getenv("WELCOME_VIDEO_RU", _MEDIA + "43e615e6-3655-4c61-b7ae-667525790d4d.mp4"),
-    "pt": os.getenv("WELCOME_VIDEO_PT", _MEDIA + "7740f598-0b65-495c-b222-7892d96af482.mp4"),
-    "en": os.getenv("WELCOME_VIDEO_EN", _MEDIA + "a7f5d2dc-9c1a-4dd1-88ce-660f2842a231.mp4"),
+    "ru": os.getenv("WELCOME_VIDEO_RU", ""),
+    "pt": os.getenv("WELCOME_VIDEO_PT", ""),
+    "en": os.getenv("WELCOME_VIDEO_EN", ""),
 }
 STAGES = ["new", "age_ok", "clicked", "registered", "promo", "deposited"]
 
